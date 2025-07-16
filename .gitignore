@@ -1,0 +1,35 @@
+# ─── Python artefacts ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ─── Packaging / build ─────────────────────────────────────────────────────────
+build/
+dist/
+*.egg-info/
+.eggs/
+.Python
+
+# ─── Virtual-envs ──────────────────────────────────────────────────────────────
+.venv/
+venv/
+ENV/
+env/
+
+# ─── Tool caches ───────────────────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ─── Dev tool config ───────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.code-workspace
+
+# ─── OS noise ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
