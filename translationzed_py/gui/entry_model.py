@@ -9,7 +9,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QUndoStack
 
 from translationzed_py.core import Entry, Status
-from translationzed_py.core.commands import EditValueCommand
+from translationzed_py.core.commands import ChangeStatusCommand, EditValueCommand
 from translationzed_py.core.model import ParsedFile
 
 _HEADERS = ("Key", "Value", "Status")
@@ -89,12 +89,20 @@ class TranslationModel(QAbstractTableModel):
 
     def flags(self, index: QModelIndex):  # noqa: N802
         base = super().flags(index)
-        if index.column() == 1:  # Value column
+        if index.column() in (1, 2):  # Value & Status columns
             return base | Qt.ItemIsEditable
         return base
 
     def setData(self, index: QModelIndex, value, role=Qt.EditRole):  # noqa: N802
-        if role == Qt.EditRole and index.column() == 1:
+        if role != Qt.EditRole:
+            return False
+
+        col = index.column()
+        row = index.row()
+        e = self._entries[row]
+
+        # ---- value edit ----------------------------------------------------
+        if col == 1:
             e = self._entries[index.row()]
             if value != e.value:
                 new_entry = Entry(e.key, str(value), Status.TRANSLATED, e.span)
@@ -107,3 +115,16 @@ class TranslationModel(QAbstractTableModel):
                 )
                 self._pf.undo_stack.push(cmd)
                 return True
+
+        # ---- status edit ---------------------------------------------------
+        if col == 2:
+            try:
+                st = Status[str(value).upper()]
+            except KeyError:
+                return False
+            if st != e.status:
+                cmd = ChangeStatusCommand(self._pf, row, st, self)
+                self._pf.undo_stack.push(cmd)
+                return True
+
+        return False

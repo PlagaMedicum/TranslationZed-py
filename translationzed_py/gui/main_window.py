@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
 )
 
 from translationzed_py.core import parse
+from translationzed_py.core.commands import ChangeStatusCommand
+from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
 from translationzed_py.core.status_cache import (
     read as _read_status_cache,
@@ -44,6 +46,13 @@ class MainWindow(QMainWindow):
         self.tree.expandAll()
         self.tree.activated.connect(self._file_chosen)  # double-click / Enter
         splitter.addWidget(self.tree)
+
+        # ── proofread toggle ────────────────────────────────────────────────
+        act_proof = QAction("&Mark Proofread", self)
+        act_proof.setShortcut("Ctrl+P")
+        act_proof.triggered.connect(self._mark_proofread)
+        self.addAction(act_proof)
+        self.act_proof = act_proof
 
         # ── right pane: entry table ─────────────────────────────────────────
         self.table = QTableView()
@@ -126,3 +135,15 @@ class MainWindow(QMainWindow):
             self._current_model._dirty = False
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
+
+    def _mark_proofread(self) -> None:
+        if not (self._current_pf and self._current_model):
+            return
+        idx = self.table.currentIndex()
+        if not idx.isValid():
+            return
+        row = idx.row()
+        cmd = ChangeStatusCommand(
+            self._current_pf, row, Status.PROOFREAD, self._current_model
+        )
+        self._current_pf.undo_stack.push(cmd)
