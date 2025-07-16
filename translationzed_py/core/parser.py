@@ -44,7 +44,7 @@ _PATTERNS = [
     (Kind.TRIVIA, rb"[ \t]+"),
     (Kind.NEWLINE, rb"\r?\n"),
     (Kind.COMMENT, rb"--[^\n]*"),  # spec §5.2 :contentReference[oaicite:3]{index=3}
-    (Kind.KEY, rb"[A-Z0-9_]+"),
+    (Kind.KEY, rb"[A-Za-z0-9_]+"),  # mixed-case identifiers
     (Kind.EQUAL, rb"="),
     (Kind.CONCAT, rb"\.\."),
     (Kind.STRING, rb'"(?:\\.|[^"])*"'),  # back-slash escapes

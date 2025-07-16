@@ -1,8 +1,8 @@
 """CLI / GUI entry-point for TranslationZed-Py."""
+
 from __future__ import annotations
 
 import argparse
-import sys
 from importlib import metadata
 from pathlib import Path
 
