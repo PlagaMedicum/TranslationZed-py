@@ -3,9 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from .model import ParsedFile
+from .status_cache import write as _write_status_cache
 
 
-def save(pf: ParsedFile, new_entries: dict[str, str]) -> None:
+def save(
+    pf: ParsedFile,
+    new_entries: dict[str, str],
+    *,
+    locale_dir: Path | None = None,
+    all_files: list[ParsedFile] | None = None,
+) -> None:
     """Patch raw bytes and overwrite file atomically."""
     buf = bytearray(pf.raw_bytes())
     for e in pf.entries:
@@ -16,3 +23,7 @@ def save(pf: ParsedFile, new_entries: dict[str, str]) -> None:
     tmp = Path(str(pf.path) + ".tmp")
     tmp.write_bytes(buf)
     tmp.replace(pf.path)
+
+    # persist status cache for this locale
+    if locale_dir is not None and all_files is not None:
+        _write_status_cache(locale_dir, all_files)

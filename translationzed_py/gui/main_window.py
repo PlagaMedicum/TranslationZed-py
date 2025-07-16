@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import xxhash
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
@@ -14,6 +15,12 @@ from PySide6.QtWidgets import (
 
 from translationzed_py.core import parse
 from translationzed_py.core.saver import save
+from translationzed_py.core.status_cache import (
+    read as _read_status_cache,
+)
+from translationzed_py.core.status_cache import (
+    write as _write_status_cache,
+)
 
 from .entry_model import TranslationModel
 from .fs_model import FsModel
@@ -52,6 +59,10 @@ class MainWindow(QMainWindow):
 
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
+        self._opened_pfs: list = []  # keeps every ParsedFile you’ve opened
+
+        # ── status-cache ───────────────────────────────────────────────
+        self._status_map = _read_status_cache(self._root)  # {u16-hash: Status}
 
     # ----------------------------------------------------------------- slots
     def _file_chosen(self, index) -> None:
@@ -65,9 +76,17 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Parse error", f"{path}\n\n{exc}")
             return
 
+        for e in pf.entries:
+            h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
+            if h in self._status_map:
+                e.status = self._status_map[h]
+
         self._current_pf = pf
         self._current_model = TranslationModel(pf.entries)
         self.table.setModel(self._current_model)
+
+        # remember for later cache-flush
+        self._opened_pfs.append(pf)
 
     def _save_current(self) -> None:
         """Patch file on disk if there are unsaved edits in the table model."""
@@ -79,6 +98,18 @@ class MainWindow(QMainWindow):
         changed = {e.key: e.value for e in self._current_model._entries}
         try:
             save(self._current_pf, changed)
+
+            # update cache & persist
+            _write_status_cache(self._root, [self._current_pf])
+            # ------------------------------------------------------------------
+            # update in-memory cache with *new* statuses from the file we saved
+            for e in self._current_pf.entries:
+                h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
+                self._status_map[h] = e.status
+
+            # persist statuses for every file we’ve opened so far
+            _write_status_cache(self._root, self._opened_pfs)
+
             self._current_model._dirty = False
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))

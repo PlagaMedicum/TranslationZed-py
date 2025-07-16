@@ -11,6 +11,7 @@ VENV_ACT = . $(VENV)/bin/activate &&
 venv:
 	@if [ ! -d $(VENV) ]; then \
 	    $(PY) -m venv $(VENV); \
+	    source $(VENV_ACT); \
 	    $(VENV_ACT) $(PY) -m pip install -U pip; \
 	    $(VENV_ACT) $(PIP) install -e .[dev]; \
 	else \
@@ -32,7 +33,7 @@ fmt:
 	$(VENV_ACT) black translationzed_py tests
 
 lint:
-	$(VENV_ACT) ruff check translationzed_py tests
+	$(VENV_ACT) ruff check translationzed_py tests --fix
 
 typecheck:
 	$(VENV_ACT) mypy translationzed_py
