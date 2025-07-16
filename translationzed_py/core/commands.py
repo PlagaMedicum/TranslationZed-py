@@ -4,7 +4,7 @@ from typing import Any
 
 from PySide6.QtGui import QUndoCommand
 
-from .model import Entry, ParsedFile
+from .model import Entry, ParsedFile, Status
 
 
 class EditValueCommand(QUndoCommand):
@@ -42,3 +42,32 @@ class EditValueCommand(QUndoCommand):
         # Replace frozen Entry wholesale (no mutation)
         self._pf.entries[self._row] = entry
         self._model._replace_entry(self._row, entry)
+
+
+class ChangeStatusCommand(QUndoCommand):
+    """Undo-able status toggle."""
+
+    def __init__(
+        self,
+        pf: ParsedFile,
+        row: int,
+        new_status: Status,
+        model: Any,
+    ) -> None:
+        super().__init__("Change status")
+        self._pf, self._row = pf, row
+        self._prev = pf.entries[row].status
+        self._new = new_status
+        self._model = model
+
+    # -------------------------------------------------
+    def undo(self) -> None:  # noqa: D401
+        self._apply(self._prev)
+
+    def redo(self) -> None:  # noqa: D401
+        self._apply(self._new)
+
+    def _apply(self, st: Status) -> None:
+        e = self._pf.entries[self._row]
+        self._pf.entries[self._row] = Entry(e.key, e.value, st, e.span)
+        self._model._replace_entry(self._row, self._pf.entries[self._row])
