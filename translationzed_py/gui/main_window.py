@@ -51,6 +51,10 @@ class MainWindow(QMainWindow):
 
         splitter.setSizes([220, 600])
 
+        # ── undo/redo actions ───────────────────────────────────────────────
+        self.act_undo: QAction | None = None
+        self.act_redo: QAction | None = None
+
         # ── save action ─────────────────────────────────────────────────────
         act_save = QAction("&Save", self)
         act_save.setShortcut(QKeySequence.StandardKey.Save)
@@ -82,8 +86,20 @@ class MainWindow(QMainWindow):
                 # Entry is frozen → use object.__setattr__
                 object.__setattr__(e, "status", self._status_map[h])
         self._current_pf = pf
-        self._current_model = TranslationModel(pf.entries)
+        self._current_model = TranslationModel(pf)
         self.table.setModel(self._current_model)
+
+        # (re)create undo/redo actions bound to this file’s stack
+        for old in (self.act_undo, self.act_redo):
+            if old:
+                self.removeAction(old)
+        stack = pf.undo_stack
+        self.act_undo = stack.createUndoAction(self, "&Undo")
+        self.act_redo = stack.createRedoAction(self, "&Redo")
+        self.act_undo.setShortcut(QKeySequence.StandardKey.Undo)
+        self.act_redo.setShortcut(QKeySequence.StandardKey.Redo)
+        for a in (self.act_undo, self.act_redo):
+            self.addAction(a)
 
         # remember for later cache-flush
         self._opened_pfs.append(pf)
