@@ -79,8 +79,8 @@ class MainWindow(QMainWindow):
         for e in pf.entries:
             h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
             if h in self._status_map:
-                e.status = self._status_map[h]
-
+                # Entry is frozen → use object.__setattr__
+                object.__setattr__(e, "status", self._status_map[h])
         self._current_pf = pf
         self._current_model = TranslationModel(pf.entries)
         self.table.setModel(self._current_model)
@@ -99,9 +99,6 @@ class MainWindow(QMainWindow):
         try:
             save(self._current_pf, changed)
 
-            # update cache & persist
-            _write_status_cache(self._root, [self._current_pf])
-            # ------------------------------------------------------------------
             # update in-memory cache with *new* statuses from the file we saved
             for e in self._current_pf.entries:
                 h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
