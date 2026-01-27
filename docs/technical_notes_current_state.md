@@ -78,6 +78,9 @@ From latest clarification:
 - **Dirty indicator**: file tree shows a dot (●) for unsaved edits.
 - **Exit prompt**: controlled by preference `prompt_write_on_exit` (default true).
 - **Save prompt**: lists all files with draft values before writing originals.
+- **Prompt scope**: only files opened in the current session are eligible for save prompts.
+- **Config formats**: local `.env`-style settings file and `config/app.toml` for adapter/path switches.
+- **Formats**: translation file extension comes from `config/app.toml` (`[formats]`).
 
 ---
 

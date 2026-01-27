@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.2.6 · 2026‑01‑27**\
+**Version 0.2.8 · 2026‑01‑27**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -66,11 +66,12 @@ translationzed_py/
 ├── core/
 │   ├── project_scanner.py   # locate locales / files
 │   ├── parser.py            # loss‑less token parser
-│   ├── model.py             # Entry, ParsedFile, undo/redo stack
+│   ├── model.py             # Entry, ParsedFile
 │   ├── saver.py             # multi‑file atomic writer
 │   ├── search.py            # index + query API
 │   ├── status_cache.py      # binary per-file status store
-│   └── preferences.py       # user settings (JSON in XDG dir)
+│   ├── app_config.py        # TOML-configurable paths/adapters/formats
+│   └── preferences.py       # user settings (settings.env)
 ├── gui/
 │   ├── main_window.py       # QMainWindow skeleton
 │   ├── file_tree_panel.py   # QTreeView wrapper
@@ -96,7 +97,9 @@ Layering (target):
 - **Infrastructure**: parser/saver/cache implementations behind interfaces.
 - **GUI adapters**: Qt widgets + models binding to core use cases.
 Interfaces should be **explicit but minimal**, justified by future replaceability
-(alternate formats, storage backends). Avoid over‑engineering.
+(alternate formats, storage backends). Avoid over‑engineering. Core adapters
+and format choices are **config‑driven** (see `config/app.toml`) to allow
+library/format swaps with minimal code churn.
 
 ---
 
@@ -112,7 +115,8 @@ def scan_root(root: Path) -> dict[str, Path]:
 - Discover locale directories by listing direct children of *root* and
   excluding `_TVRADIO_TRANSLATIONS`. Locale names are not constrained to a
   2‑letter regex (e.g., `EN UK`, `PTBR` are valid).
-- Index translatable `.txt` files recursively with `Path.rglob("*.txt")`,
+- Index translatable files recursively with `Path.rglob(f"*{translation_ext}")`,
+  where `translation_ext` comes from `config/app.toml` (`[formats]`).
   excluding `language.txt` and `credits.txt` in each locale.
 - Parse `language.txt` for:
   - `charset` (encoding for all files in that locale)
@@ -209,6 +213,23 @@ Algorithm:
 - Store: last root path, last locale, window geometry, theme, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
 
+### 5.6.1  `core.app_config`
+
+- TOML file at `<project-root>/config/app.toml` (checked after cwd, optional).
+- Purpose: minimize hard‑coding and enable quick adapter/format swaps without refactors.
+- Sections:
+  - `[paths]` → `cache_dir`, `config_dir`
+  - `[cache]` → `extension`
+  - `[adapters]` → `parser`, `ui`, `cache`
+  - `[formats]` → `translation_ext`, `comment_prefix`
+- Swappable adapters are selected by name; actual implementations live behind
+  interfaces in the application layer (clean architecture).
+
+### 5.6.2  `config/ci.yaml` (reserved)
+
+- YAML placeholder for future CI pipelines.
+- Lists scripted steps (lint/typecheck/test) to keep CI assembly lightweight.
+
 ### 5.7  `gui.main_window`
 
 - Menu structure:
@@ -229,7 +250,7 @@ if dirty_files and not prompt_save():
 - Locale selection uses checkboxes for multi-select; EN is excluded from the
   editable tree and used as Source. The left tree shows **one root per locale**.
 - File tree shows a **dirty dot (●)** prefix for files with unsaved edits.
-- Save/Exit prompt lists all files with draft values (scrollable list).
+- Save/Exit prompt lists only files **opened in this session** that have draft values (scrollable list).
 
 ### 5.8  `gui.translation_table`  `gui.translation_table`
 
@@ -273,7 +294,8 @@ def write(root: Path, file_path: Path, entries: list[Entry], *, changed_keys: se
 
 Cache path convention:
 - For a translation file `<root>/<locale>/path/file.txt`, the cache lives at
-  `<root>/.tzp-cache/<locale>/path/file.bin`.
+  `<root>/<cache_dir>/<locale>/path/file.bin` where `cache_dir` is configured in
+  `config/app.toml` (default `.tzp-cache`).
 
 ### 5.9.1  `core.en_hash_cache` (planned)
 

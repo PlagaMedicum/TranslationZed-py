@@ -18,6 +18,7 @@ from shiboken6 import isValid
 from translationzed_py.core import LocaleMeta, parse, scan_root
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
+from translationzed_py.core.app_config import load as _load_app_config
 from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.status_cache import CacheEntry, read as _read_status_cache
 from translationzed_py.core.status_cache import write as _write_status_cache
@@ -40,6 +41,7 @@ class MainWindow(QMainWindow):
         self._locales: dict[str, LocaleMeta] = {}
         self._selected_locales: list[str] = []
         self._current_encoding = "utf-8"
+        self._app_config = _load_app_config(self._root)
         prefs = _load_preferences(self._root)
         self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
 
@@ -83,6 +85,7 @@ class MainWindow(QMainWindow):
 
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
+        self._opened_files: set[Path] = set()
 
         # ── cache ──────────────────────────────────────────────────────
         self._cache_map: dict[int, CacheEntry] = {}
@@ -129,10 +132,10 @@ class MainWindow(QMainWindow):
         return "cancel"
 
     def _file_chosen(self, index) -> None:
-        """Populate table when user activates a .txt file."""
+        """Populate table when user activates a translation file."""
         raw_path = index.data(Qt.UserRole)  # FsModel stores absolute path string
         path = Path(raw_path) if raw_path else None
-        if not (path and path.suffix == ".txt"):
+        if not (path and path.suffix == self._app_config.translation_ext):
             return
         if not self._write_cache_current():
             return
@@ -167,6 +170,7 @@ class MainWindow(QMainWindow):
                     e.gaps,
                 )
         self._current_pf = pf
+        self._opened_files.add(path)
         if self._current_model:
             try:
                 self._current_model.dataChanged.disconnect(self._on_model_changed)
@@ -239,17 +243,19 @@ class MainWindow(QMainWindow):
             self._write_cache_current()
 
     def _draft_files(self) -> list[Path]:
-        cache_root = self._root / ".tzp-cache"
+        cache_root = self._root / self._app_config.cache_dir
         if not cache_root.exists():
             return []
         files: list[Path] = []
-        for cache_path in cache_root.rglob("*.bin"):
+        for cache_path in cache_root.rglob(f"*{self._app_config.cache_ext}"):
             try:
                 rel = cache_path.relative_to(cache_root)
             except ValueError:
                 continue
-            original = (self._root / rel).with_suffix(".txt")
+            original = (self._root / rel).with_suffix(self._app_config.translation_ext)
             if not original.exists():
+                continue
+            if original not in self._opened_files:
                 continue
             cached = _read_status_cache(self._root, original)
             if any(entry.value is not None for entry in cached.values()):

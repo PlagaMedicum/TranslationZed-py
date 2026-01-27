@@ -9,7 +9,7 @@ from translationzed_py.core.project_scanner import LocaleMeta, list_translatable
 
 
 class FsModel(QStandardItemModel):
-    """Tiny tree showing  <root>/<LOCALE>/**/*.txt  files only."""
+    """Tiny tree showing translatable files under <root>/<LOCALE>/."""
 
     def __init__(self, root: Path, locales: list[LocaleMeta]) -> None:
         super().__init__()

@@ -1,0 +1,15 @@
+[paths]
+cache_dir = ".tzp-cache"
+config_dir = ".tzp-config"
+
+[cache]
+extension = ".bin"
+
+[adapters]
+parser = "lua_v1"
+ui = "pyside6"
+cache = "binary_v1"
+
+[formats]
+translation_ext = ".txt"
+comment_prefix = "--"
