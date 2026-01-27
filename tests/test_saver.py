@@ -15,3 +15,14 @@ def test_save_updates_spans(tmp_path):
     assert path.read_text(encoding="utf-8") == 'A = "Longer"\nB = "YY"\n'
     assert pf.entries[0].value == "Longer"
     assert pf.entries[1].value == "YY"
+
+
+def test_save_preserves_concat_structure(tmp_path):
+    path = tmp_path / "file.txt"
+    path.write_text('HELLO = "Hel"  ..  "lo" -- cmt\n', encoding="utf-8")
+
+    pf = parse(path)
+    save(pf, {"HELLO": "Hola"})
+
+    # preserve concat + trivia; only literals updated
+    assert path.read_text(encoding="utf-8") == 'HELLO = "Hol"  ..  "a" -- cmt\n'
