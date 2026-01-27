@@ -28,13 +28,16 @@ class TranslationModel(QAbstractTableModel):
         self._pf = pf
         self._entries = list(pf.entries)
         self._dirty = False
+        self._changed_values: set[str] = set()
 
         self.undo_stack = QUndoStack()
 
     # ---------------------------------------------------------------- helpers
-    def _replace_entry(self, row: int, entry: Entry) -> None:
+    def _replace_entry(self, row: int, entry: Entry, *, value_changed: bool) -> None:
         """Called by EditValueCommand to swap immutable Entry objects."""
         self._entries[row] = entry
+        if value_changed:
+            self._changed_values.add(entry.key)
         left = self.index(row, 0)
         right = self.index(row, self.columnCount() - 1)
         self.dataChanged.emit(
@@ -44,6 +47,17 @@ class TranslationModel(QAbstractTableModel):
         )
         self._dirty = True
         self._pf.dirty = True
+
+    def changed_values(self) -> dict[str, str]:
+        """Return only values that were edited (no status-only changes)."""
+        out = {}
+        for e in self._entries:
+            if e.key in self._changed_values:
+                out[e.key] = e.value
+        return out
+
+    def clear_changed_values(self) -> None:
+        self._changed_values.clear()
 
     # Qt mandatory overrides ----------------------------------------------------
     def rowCount(  # noqa: N802
@@ -109,7 +123,14 @@ class TranslationModel(QAbstractTableModel):
         if col == 1:
             e = self._entries[index.row()]
             if value != e.value:
-                new_entry = Entry(e.key, str(value), Status.TRANSLATED, e.span)
+                new_entry = Entry(
+                    e.key,
+                    str(value),
+                    Status.TRANSLATED,
+                    e.span,
+                    e.segments,
+                    e.gaps,
+                )
                 cmd = EditValueCommand(
                     self._pf,
                     index.row(),

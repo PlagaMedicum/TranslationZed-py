@@ -147,9 +147,10 @@ class MainWindow(QMainWindow):
         if not getattr(self._current_model, "_dirty", False):
             return
 
-        changed = {e.key: e.value for e in self._current_model._entries}
+        changed = self._current_model.changed_values()
         try:
-            save(self._current_pf, changed)
+            if changed:
+                save(self._current_pf, changed)
 
             # update in-memory cache with *new* statuses from the file we saved
             for e in self._current_pf.entries:
@@ -164,6 +165,7 @@ class MainWindow(QMainWindow):
                 _write_status_cache(self._status_locale, locale_files)
 
             self._current_model._dirty = False
+            self._current_model.clear_changed_values()
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
 
