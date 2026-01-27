@@ -33,7 +33,7 @@ Observed alignment (snapshot):
 - (1) Mostly: raw bytes preserved and concat chains retained on save.
 - (2) Mostly: table editing + search + status UI; clipboard is minimal.
 - (3) Mostly: status cache per-file exists; encoding support present.
-- (4) Partial: atomic replace + fsync; crash recovery marker now implemented.
+- (4) Partial: atomic replace + fsync; no crash recovery.
 - (5) Mostly: deps are minimal; GUI requires PySide6; tests require pytest-qt.
 
 ---
@@ -52,7 +52,7 @@ From latest clarification:
 - **Encoding**: one encoding per locale (shared across files in that locale).
 - **English diff**: track English file hashes (raw bytes) for change signaling.
 - **Architecture**: strict separation; core must not depend on Qt from the start.
-- **Crash safety**: cache persistence + temp recovery marker in `$TMPDIR/tzpy_recovery.json`.
+- **Crash safety**: cache persistence only; no extra temporary recovery files.
 - **Cache location**: hidden `.tzp-cache/` subfolder.
 - **Cache layout**: `.tzp-cache/<locale>/<relative-path>.bin`.
 - **Program-generated comment naming**: `TZP:` prefix (accepted).
@@ -371,8 +371,7 @@ Missing coverage:
    - No collision mitigation exists (by design).
 
 3) Crash recovery
-   - Draft cache persists; crash‑recovery marker is written in `$TMPDIR/tzpy_recovery.json`.
-   - On next launch, user can Restore (keep cache) or Discard (delete cached drafts).
+   - Draft cache persists; no dedicated crash‑recovery file/merge flow yet.
 
 ---
 
