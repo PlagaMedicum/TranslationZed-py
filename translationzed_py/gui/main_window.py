@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
 
         if selected_locales is None:
             dialog = LocaleChooserDialog(selectable.values(), self)
-            if dialog.exec() != dialog.Accepted:
+            if dialog.exec() != dialog.DialogCode.Accepted:
                 self._selected_locales = []
                 return
             selected_locales = dialog.selected_codes()
