@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.2.4 · 2026‑01‑27**\
+**Version 0.2.5 · 2026‑01‑27**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -201,7 +201,11 @@ Algorithm:
 
 ### 5.6  `core.preferences`
 
-- JSON file at `<project-root>/.tzp-config/settings.json` (local config only).
+- Local config only; no `~` usage.
+- JSON file at `<project-root>/.tzp-config/settings.json`.
+- Optional `.env` at project root (same folder level as the project), with:
+  - `PROMPT_WRITE_ON_EXIT=true|false`
+- Search order: **cwd first, then project root**, later values override earlier.
 - Store: last root path, last locale, window geometry, theme, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
 
