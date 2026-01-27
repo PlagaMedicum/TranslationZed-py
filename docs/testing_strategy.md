@@ -52,8 +52,8 @@ Cost:
 - Requires maintaining expected files if format rules change.
 
 Decision: maintain a **golden set** for UTF‑8, cp1251, and UTF‑16 to guarantee
-byte‑exact preservation across encodings. Core tests already include
-production‑like fixtures; golden outputs will be added for all three encodings.
+byte‑exact preservation across encodings. Golden inputs/outputs are now present
+under `tests/fixtures/golden/` and validated in tests.
 
 ---
 
