@@ -50,11 +50,11 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 |  4 | SYS MUST show `LocaleChooserDialog` with **checkboxes** for locales, using `language.txt` → `text = ...` as display name. EN is excluded from the editable list. |
 |  5 | TR selects one or more locales and presses **Open**. |
 |  6 | SYS loads the file list for selected locales, populates the left **QTreeView** with **one root per locale** (excluding `language.txt` and `credits.txt`), and opens the first file in the table. |
-| **Alternate Flow A1** | *Unsaved Data Present* – if current project has dirty files, SYS MUST prompt **Save / Discard / Cancel** before step 1. |
+| **Alternate Flow A1** | *Unsaved Drafts Present* – SYS MUST auto‑persist drafts to `.tzp-cache` before changing the project root (no prompt). |
 | **Post‑condition** | Target locale is active; window title updated to `TranslationZed‑Py – [BE]`. |
 
 ### UC‑02  Switch Locale
-Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditions: a project is already open.  Steps 3‑6 repeat with the new locale selection (checkboxes).  Unsaved‑data guard identical to A1.
+Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditions: a project is already open.  Steps 3‑6 repeat with the new locale selection (checkboxes).  SYS MUST persist drafts to cache before switching (no prompt).
 
 ### UC‑03  Edit Translation
 | Field | Value |
@@ -65,7 +65,8 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditi
 |  1 | SYS shows an inline `QLineEdit` pre‑filled with current value. |
 |  2 | TR types new text; presses `Enter` to commit. |
 |  3 | SYS sets `Entry.changed = True` and `dirty` flag on containing `ParsedFile`. |
-|  4 | SYS MUST move focus to next row, same column. |
+|  4 | SYS writes draft value + status to `.tzp-cache/<locale>/<relative>.bin`. |
+|  5 | SYS MUST move focus to next row, same column. |
 | **Post‑condition** | Row background remains default (status unaffected).
 
 ### UC-03 bis  Undo / Redo
@@ -96,13 +97,14 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditi
 |  2 | First match row is auto‑selected and scrolled into view. |
 |  3 | `F3` / `Shift+F3` cycles through matches. |
 
-### UC‑06  Save Project
+### UC‑06  Save Project (Write Original)
 | **Trigger** | *Project ▸ Save* (`Ctrl+S`) |
 | **Flow** |
-|  1 | For every dirty `ParsedFile`, SYS MUST call `saver.write_atomic()`. |
-|  2 | On success, `dirty` flags cleared. |
-|  3 | SYS writes (or updates) per‑file cache entries under `.tzp-cache/<locale>/<relative>.tzstatus.bin` for **edited files only**. |
-|  4 | Status line shows “Saved HH:MM:SS”.
+|  1 | SYS prompts **Write / Cache only / Cancel**. |
+|  2 | On **Write**, SYS MUST call `saver.write_atomic()` for every dirty file. |
+|  3 | On success, `dirty` flags cleared and baseline updated. |
+|  4 | SYS writes (or updates) per‑file cache entries under `.tzp-cache/<locale>/<relative>.bin` for **edited files only** (status only; draft values cleared). |
+|  5 | Status line shows “Saved HH:MM:SS”.
 
 ### UC‑06 bis  Dirty Indicator in File Tree
 | **Trigger** | Any edit that marks a file dirty. |
@@ -113,9 +115,10 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditi
 ### UC‑07  Exit Application
 | **Trigger** | Window close button or *Project ▸ Exit* |
 | **Flow** |
-|  1 | If ANY dirty files exist, SYS prompts **Save / Discard / Cancel**. |
-|  2 | On Save, UC‑06 is executed. |
-|  3 | SYS shuts down, releasing file handles. |
+|  1 | If ANY dirty files exist, SYS prompts **Write / Cache only / Cancel**. |
+|  2 | On **Write**, UC‑06 is executed. |
+|  3 | On **Cache only**, SYS persists drafts to `.tzp-cache` and exits. |
+|  4 | SYS shuts down, releasing file handles. |
 
 ### UC‑08  Crash Recovery
 | **Trigger** | Application restarts after abnormal termination. |
@@ -175,10 +178,11 @@ UNTOUCHED ──────────────────────▶ 
 2. **Multiline Strings**: handled via parser token concatenation; no GUI wrap concerns beyond row height.
 3. **Locale Names**: mapping code → English name shipped in static JSON (ISO‑639‑1).
 4. **Accessibility**: basic; no screen‑reader optimisation in MVP.\
-5. **Status Cache**: After a successful Save, SYS MUST persist entry statuses
-   into binary file `.tzstatus.bin` **in the currently selected locale folder
+5. **Draft Cache**: SYS MUST persist entry statuses **and draft translations**
+   into binary file `.bin` **in the currently selected locale folder
    only** (see Technical Spec §5.9).  Cache is loaded on project open and
-   ignored if missing or corrupt.
+   ignored if missing or corrupt. Draft values are cleared from cache when
+   originals are written.
 
 ---
-_Last updated: 2026‑01‑27 (v0.3)_
+_Last updated: 2026‑01‑27 (v0.3.1)_

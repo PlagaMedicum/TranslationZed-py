@@ -1,11 +1,22 @@
 from __future__ import annotations
 
 import struct
+from dataclasses import dataclass
 from pathlib import Path
 
 import xxhash
 
 from translationzed_py.core.model import Entry, Status
+
+_MAGIC = b"TZC1"
+_HEADER = struct.Struct("<4sI")
+_RECORD = struct.Struct("<HBBI")
+
+
+@dataclass(frozen=True, slots=True)
+class CacheEntry:
+    status: Status
+    value: str | None
 
 
 def _hash_key(key: str) -> int:
@@ -15,50 +26,100 @@ def _hash_key(key: str) -> int:
 
 def _cache_path(root: Path, file_path: Path) -> Path:
     rel = file_path.relative_to(root)
-    rel_cache = rel.parent / f"{rel.name}.tzstatus.bin"
+    rel_cache = rel.parent / f"{rel.stem}.bin"
     return root / ".tzp-cache" / rel_cache
 
 
-def read(root: Path, file_path: Path) -> dict[int, Status]:
+def read(root: Path, file_path: Path) -> dict[int, CacheEntry]:
     """
-    Read per-file cache, returning a mapping { key_hash: Status }.
+    Read per-file cache, returning a mapping { key_hash: CacheEntry }.
     Missing or corrupt files are ignored.
     """
     status_file = _cache_path(root, file_path)
     try:
         data = status_file.read_bytes()
+        if not data:
+            return {}
+
+        if data.startswith(_MAGIC):
+            magic, count = _HEADER.unpack_from(data, 0)
+            if magic != _MAGIC:
+                return {}
+            offset = _HEADER.size
+            out: dict[int, CacheEntry] = {}
+            for _ in range(count):
+                if offset + _RECORD.size > len(data):
+                    return {}
+                key_hash, status_byte, flags, value_len = _RECORD.unpack_from(
+                    data, offset
+                )
+                offset += _RECORD.size
+                value: str | None = None
+                if flags & 0x1:
+                    end = offset + value_len
+                    if end > len(data):
+                        return {}
+                    raw = data[offset:end]
+                    offset = end
+                    value = raw.decode("utf-8", errors="replace")
+                try:
+                    status = Status(status_byte)
+                except ValueError:
+                    continue
+                out[key_hash] = CacheEntry(status, value)
+            return out
+
+        # --- legacy (status-only) format ---
         (count,) = struct.unpack_from("<I", data, 0)
         expected = 4 + (count * struct.calcsize("<HB"))
         if len(data) < expected:
             return {}
         offset = 4
-        out: dict[int, Status] = {}
+        out: dict[int, CacheEntry] = {}
         for _ in range(count):
             key_hash, status_byte = struct.unpack_from("<HB", data, offset)
             offset += struct.calcsize("<HB")
             try:
-                out[key_hash] = Status(status_byte)
+                status = Status(status_byte)
             except ValueError:
                 # unknown status code → skip
                 continue
+            out[key_hash] = CacheEntry(status, None)
         return out
     except (OSError, struct.error):
         return {}
 
 
-def write(root: Path, file_path: Path, entries: list[Entry]) -> None:
+def write(
+    root: Path,
+    file_path: Path,
+    entries: list[Entry],
+    *,
+    changed_keys: set[str] | None = None,
+) -> None:
     """
-    Write current in-memory statuses for `entries` into per-file cache.
+    Write current in-memory statuses and (optional) draft translations into
+    per-file cache. Values are stored only for keys in `changed_keys`.
     """
     status_file = _cache_path(root, file_path)
     status_file.parent.mkdir(parents=True, exist_ok=True)
-    rows: list[tuple[int, Status]] = []
+    changed_keys = changed_keys or set()
+    rows: list[tuple[int, Status, str | None]] = []
     for e in entries:
-        rows.append((_hash_key(e.key), e.status))
+        include = e.status != Status.UNTOUCHED or e.key in changed_keys
+        if not include:
+            continue
+        value = e.value if e.key in changed_keys else None
+        rows.append((_hash_key(e.key), e.status, value))
     buf = bytearray()
-    buf += struct.pack("<I", len(rows))
-    for key_hash, status in rows:
-        buf += struct.pack("<HB", key_hash, status.value)
+    buf += _HEADER.pack(_MAGIC, len(rows))
+    for key_hash, status, value in rows:
+        if value is None:
+            buf += _RECORD.pack(key_hash, status.value, 0, 0)
+        else:
+            raw = value.encode("utf-8")
+            buf += _RECORD.pack(key_hash, status.value, 1, len(raw))
+            buf += raw
     # atomic replace
     tmp = status_file.with_name(status_file.name + ".tmp")
     tmp.write_bytes(buf)

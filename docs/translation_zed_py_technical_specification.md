@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.2 · 2025‑07‑16**\
+**Version 0.2.1 · 2026‑01‑27**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -244,25 +244,29 @@ hidden `.tzp-cache/` subfolder under the repo root, preserving relative paths.
 
 | Offset | Type | Description |
 |--------|------|-------------|
-| 0      | u32  | entry-count |
-| 4      | …   | repeated: `u16 key-hash` • `u8 status` |
+| 0      | 4s   | magic `TZC1` |
+| 4      | u32  | entry-count |
+| 8      | …   | repeated: `u16 key-hash` • `u8 status` • `u8 flags` • `u32 len` • `bytes[len]` |
 
   *Key-hash* is `xxhash16(key_bytes)`.  
-  Status byte values follow `core.model.Status` order.
+  Status byte values follow `core.model.Status` order.  
+  Flags: bit0 = `has_value`. When `has_value=1`, `len` bytes of UTF‑8 value follow.
 
 ```python
-def read(file_path: Path) -> dict[str, Status]: ...
-def write(file_path: Path, entries: list[Entry]) -> None: ...
+def read(root: Path, file_path: Path) -> dict[int, CacheEntry]: ...
+def write(root: Path, file_path: Path, entries: list[Entry], *, changed_keys: set[str] | None = None) -> None: ...
 ```
-  - Loaded when a file is opened; ParsedFile.entries[].status is patched in
-    memory.
+  - Loaded when a file is opened; `ParsedFile.entries` values + statuses are
+    patched in memory from cache.
   - File length is validated against the declared entry count; corrupt caches
     are ignored without raising.
-  - Written only for **edited files** on save/exit.
+  - Written automatically on edit and on file switch. Draft values are stored
+    **only** for `changed_keys`; statuses stored when `status != UNTOUCHED`.
+  - On “Write Original”, draft values are cleared from cache; statuses persist.
 
 Cache path convention:
 - For a translation file `<root>/<locale>/path/file.txt`, the cache lives at
-  `<root>/.tzp-cache/<locale>/path/file.txt.tzstatus.bin`.
+  `<root>/.tzp-cache/<locale>/path/file.bin`.
 
 ### 5.9.1  `core.en_hash_cache` (planned)
 
@@ -294,12 +298,13 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
    tree but used as Source.
 6. **Editing Capabilities** – cell editing + undo/redo; status coloring and
    toolbar **Status ▼** label reflects the selected row.
-7. **Cache & EN Hashes** – per‑file status cache at
-   `<root>/.tzp-cache/<locale>/<relative>.tzstatus.bin`, written only for edited
-   files; EN hash cache as a single index file
+7. **Cache & EN Hashes** – per‑file draft cache at
+   `<root>/.tzp-cache/<locale>/<relative>.bin`, auto‑written on edit
+   (status + draft values) and on save (status only); EN hash cache as a single index file
    `<root>/.tzp-cache/en.hashes.bin` (raw bytes).
-8. **Persistence & Safety** – atomic multi‑file save, unsaved‑changes prompts.
-   Crash‑recovery cache is planned, not required in initial builds.
+8. **Persistence & Safety** – atomic multi‑file save, prompt only when writing
+   originals (“Write / Cache only / Cancel”). Crash‑recovery cache is planned,
+   not required in initial builds.
 9. **Search & Polish** – live search, keyboard navigation, wrap‑text, view
    toggles, and user preferences.
 

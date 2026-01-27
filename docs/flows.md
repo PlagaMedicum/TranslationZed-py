@@ -37,15 +37,17 @@ User: Project ▸ Open
 ```
 User edits cell
   -> update Entry value + status
-  -> mark ParsedFile.dirty
-  -> add dirty dot (●) in tree
+  -> write .tzp-cache/<locale>/<rel>.bin (status + draft value)
+  -> add dirty dot (●) in tree if value changed
 
 User: Save
-  -> saver preserves concat structure + trivia
-  -> write file.tmp -> replace
-  -> write .tzp-cache/<locale>/<rel>.tzstatus.bin
-  -> clear dirty
-  -> remove dirty dot (●)
+  -> prompt Write / Cache only / Cancel
+  -> Cache only: keep drafts in cache; originals unchanged
+  -> Write:
+       saver preserves concat structure + trivia
+       write file.tmp -> replace
+       write .tzp-cache/<locale>/<rel>.bin (status only)
+       remove dirty dot (●)
 ```
 
 ---
@@ -65,7 +67,7 @@ User: Status ▼ or Ctrl+P
 
 ```
 User: Project ▸ Switch Locale(s)
-  -> if dirty: Save / Discard / Cancel
+  -> auto-write cache for current file (no prompt)
   -> re-run locale chooser (checkboxes)
   -> rebuild tree (multiple roots)
   -> open first file
