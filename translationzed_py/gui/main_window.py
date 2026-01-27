@@ -17,12 +17,8 @@ from PySide6.QtWidgets import (
 from translationzed_py.core import parse
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
-from translationzed_py.core.status_cache import (
-    read as _read_status_cache,
-)
-from translationzed_py.core.status_cache import (
-    write as _write_status_cache,
-)
+from translationzed_py.core.status_cache import read as _read_status_cache
+from translationzed_py.core.status_cache import write as _write_status_cache
 
 from .entry_model import TranslationModel
 from .fs_model import FsModel
@@ -77,30 +73,9 @@ class MainWindow(QMainWindow):
 
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
-        self._opened_pfs: list = []  # keeps every ParsedFile you’ve opened
 
         # ── status-cache ───────────────────────────────────────────────
         self._status_map: dict[int, Status] = {}
-        self._status_locale: Path | None = None
-
-    def _locale_dir_for(self, path: Path) -> Path:
-        """Return the top-level locale directory for a file under the root."""
-        try:
-            rel = path.relative_to(self._root)
-        except ValueError:
-            return path.parent
-        if not rel.parts:
-            return path.parent
-        candidate = self._root / rel.parts[0]
-        if candidate.is_dir():
-            return candidate
-        return path.parent
-
-    def _ensure_status_cache(self, path: Path) -> None:
-        locale_dir = self._locale_dir_for(path)
-        if self._status_locale != locale_dir:
-            self._status_locale = locale_dir
-            self._status_map = _read_status_cache(locale_dir)
 
     # ----------------------------------------------------------------- slots
     def _file_chosen(self, index) -> None:
@@ -114,7 +89,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Parse error", f"{path}\n\n{exc}")
             return
 
-        self._ensure_status_cache(path)
+        self._status_map = _read_status_cache(self._root, path)
 
         for e in pf.entries:
             h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
@@ -137,8 +112,6 @@ class MainWindow(QMainWindow):
         for a in (self.act_undo, self.act_redo):
             self.addAction(a)
 
-        # remember for later cache-flush
-        self._opened_pfs.append(pf)
 
     def _save_current(self) -> None:
         """Patch file on disk if there are unsaved edits in the table model."""
@@ -157,12 +130,8 @@ class MainWindow(QMainWindow):
                 h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
                 self._status_map[h] = e.status
 
-            # persist statuses for every file we’ve opened so far
-            if self._status_locale is not None:
-                locale_files = [
-                    pf for pf in self._opened_pfs if self._status_locale in pf.path.parents
-                ]
-                _write_status_cache(self._status_locale, locale_files)
+            # persist statuses for this file only (edited files only)
+            _write_status_cache(self._root, self._current_pf.path, self._current_pf.entries)
 
             self._current_model._dirty = False
             self._current_model.clear_changed_values()
