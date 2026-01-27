@@ -26,12 +26,16 @@ class EditValueCommand(QUndoCommand):
             old_entry.value,
             old_entry.status,
             old_entry.span,
+            old_entry.segments,
+            old_entry.gaps,
         )
         self._new = Entry(
             new_entry.key,
             new_entry.value,
             new_entry.status,
             new_entry.span,
+            new_entry.segments,
+            new_entry.gaps,
         )
         self._model = model
 
@@ -46,7 +50,7 @@ class EditValueCommand(QUndoCommand):
     def _apply(self, entry: Entry) -> None:
         # Replace frozen Entry wholesale (no mutation)
         self._pf.entries[self._row] = entry
-        self._model._replace_entry(self._row, entry)
+        self._model._replace_entry(self._row, entry, value_changed=True)
 
 
 class ChangeStatusCommand(QUndoCommand):
@@ -74,5 +78,12 @@ class ChangeStatusCommand(QUndoCommand):
 
     def _apply(self, st: Status) -> None:
         e = self._pf.entries[self._row]
-        self._pf.entries[self._row] = Entry(e.key, e.value, st, e.span)
-        self._model._replace_entry(self._row, self._pf.entries[self._row])
+        self._pf.entries[self._row] = Entry(
+            e.key,
+            e.value,
+            st,
+            e.span,
+            e.segments,
+            e.gaps,
+        )
+        self._model._replace_entry(self._row, self._pf.entries[self._row], value_changed=False)
