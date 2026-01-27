@@ -18,12 +18,14 @@ _Last updated: 2026-01-27_
 - UTF‑8 / cp1251 / UTF‑16 decoding behavior.
 - Concat preservation in save (no collapsing).
 - Status cache read/write for edited files only.
-- EN hash cache index read/write (planned).
+- EN hash cache index read/write (implemented).
+- Core search behavior (once `core.search` is introduced).
+- Cache header `last_opened_unix` read/write correctness.
 
 ### 2.2 Integration Tests
 - Open project, select locale, load table.
 - Edit + save path writes file + cache.
-- EN hash change dialog (when implemented).
+- EN hash change dialog (implemented).
 
 ### 2.3 GUI Smoke Tests
 - App starts headless (`QT_QPA_PLATFORM=offscreen`).

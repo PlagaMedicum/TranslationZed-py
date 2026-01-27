@@ -25,10 +25,13 @@ User: Project ▸ Open
   -> scan locales (ignore _TVRADIO_TRANSLATIONS)
   -> read language.txt (charset + display name)
   -> show checkbox chooser (EN hidden)
+     - locales sorted alphanumerically; checked locales float to top
   -> user selects locales
   -> if none selected: abort opening
   -> build tree with multiple roots (one per locale)
-  -> open first file in table
+  -> open most recently opened file across selected locales
+     (fast scan of cache headers `last_opened_unix`)
+     - if no cache timestamps exist, open nothing
 ```
 
 ---

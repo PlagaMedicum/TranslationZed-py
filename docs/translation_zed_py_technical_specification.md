@@ -33,14 +33,18 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 - Present file tree (with sub‑dirs) and a 4‑column table (Key | Source | Translation | Status),
   where **Source** is the English string by default; **EN is not editable**.
 - One file open at a time in the table (no tabs in MVP).
+- On startup, open the **most recently opened file** across the selected locales.
+  The timestamp is stored in each file’s cache header for fast lookup.
 - Status per Entry: **Untouched** (initial state), **Translated**, **Proofread**.  Future statuses pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
 - Live plain / regex search over Key / Source / Translation with `F3` / `Shift+F3` navigation.
 - Reference‑locale switching without reloading UI (future; English is base in MVP).
 - On startup, check EN hash cache; if changed, show a confirmation dialog to
   reset the cache to the new EN version.
-- Atomic multi‑file save; prompt on unsaved changes for *locale switch* or *exit*.
+- Atomic multi‑file save; **prompt only on exit** (locale switch is cache‑only).
 - Clipboard, wrap‑text (View menu), keyboard navigation.
+- **Productivity bias**: prioritize low‑latency startup and interaction; avoid
+  heavyweight scans on startup.
 
 *Out of scope for MVP*: English diff colours, item/recipe generator, VCS, self‑update.
 
@@ -53,9 +57,11 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 | **Performance**   | Load 20k keys ≤ 2 s; memory ≤ 300 MB.                                                |
 | **Usability**     | All actions accessible via menu and shortcuts; table usable without mouse.           |
 | **Portability**   | Tested on Win 10‑11, macOS 13‑14 (ARM + x86), Ubuntu 22.04+.                         |
-| **Reliability**   | No data loss on power‑kill (`os.replace` atomic writes; crash‑recovery cache planned). |
+| **Reliability**   | No data loss on power‑kill (`os.replace` atomic writes; cache‑only recovery in v0.1). |
 | **Extensibility** | New statuses, parsers and generators added by registering entry‑points.              |
 | **Security**      | Never execute user‑provided code; sanitise paths to prevent traversal.               |
+| **Productivity**  | Startup < 1s for cached project; key search/respond < 50ms typical.                  |
+| **UI Guidelines** | Follow GNOME HIG + KDE HIG via native Qt widgets; avoid custom theming.              |
 
 ---
 
@@ -201,7 +207,9 @@ Algorithm:
 
 - If `is_regex`: `re_flags = re.IGNORECASE | re.MULTILINE`.
 - Otherwise lower‑case substring on indexed `.lower()` caches.
-- Returns `(file, row_index)` list for selection.
+- Returns `(file_path, row_index)` list for selection (multi‑file capable).
+- Future: optional `match_span`/`snippet` payload for preview; not in v0.1.
+- GUI must delegate search logic to this module (no GUI-level search).
 
 ### 5.6  `core.preferences`
 
@@ -209,8 +217,12 @@ Algorithm:
 - Env file at `<project-root>/.tzp-config/settings.env`.
 - Keys:
   - `PROMPT_WRITE_ON_EXIT=true|false`
+  - `WRAP_TEXT=true|false`
+  - `LAST_ROOT=<path>`
+  - `LAST_LOCALES=LOCALE1,LOCALE2`
+- (No last‑open metadata in settings; timestamps live in per‑file cache headers.)
 - Search order: **cwd first, then project root**, later values override earlier.
-- Store: last root path, last locale, window geometry, theme, wrap‑text toggle.
+- Store: last root path, last locale(s), window geometry, theme, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
 
 ### 5.6.1  `core.app_config`
@@ -235,9 +247,9 @@ Algorithm:
 - Menu structure:
   - **Project**: Open, Save, Switch Locale(s), Exit
   - **Edit**: Copy, Cut, Paste
-  - **View**: Wrap Long Strings (checkable)
-- Toolbar: `[Locales ▼] [Key|Source|Trans] [Regex☑] [🔍] [Status ▼]`
-- Creates actions and connects unsaved‑changes guard:
+  - **View**: Wrap Long Strings (checkable), Prompt on Exit (checkable)
+- Toolbar: `[Status ▼] [Key|Source|Trans] [Regex☑] [Search box]`
+- Exit guard uses `prompt_write_on_exit` (locale switch is cache‑only):
 
 ```python
 if dirty_files and not prompt_save():
@@ -249,8 +261,28 @@ if dirty_files and not prompt_save():
   the currently selected row status.
 - Locale selection uses checkboxes for multi-select; EN is excluded from the
   editable tree and used as Source. The left tree shows **one root per locale**.
-- File tree shows a **dirty dot (●)** prefix for files with unsaved edits.
+- Locale chooser ordering: locales sorted alphanumerically, **checked locales
+  float to the top** while preserving alphanumeric order inside each group.
+- Locale chooser remembers **last selected locales** and pre-checks them.
+- On startup, table opens the most recently opened file across selected locales
+  (timestamp stored in cache headers). If no history exists, no file is auto-opened.
+- File tree shows a **dirty dot (●)** prefix for files with cached draft values.
 - Save/Exit prompt lists only files **opened in this session** that have draft values (scrollable list).
+- Copy/Paste: if a **row** is selected, copy the whole row; if a **cell** is
+  selected, copy that cell. Cut/Paste only applies to Translation column cells.
+  Row copy is **tab-delimited**: `Key\tSource\tValue\tStatus`.
+  Row selection is achieved via row header; cell selection remains enabled.
+- Status bar shows `Saved HH:MM:SS | Row i / n | <locale/relative/path>`.
+
+### 5.7.1  UI Guidelines (GNOME + KDE)
+
+- Prefer **native Qt widgets** and platform theme; avoid custom palettes/styles.
+- Use **standard dialogs** (`QFileDialog`, `QMessageBox`) to match platform HIG.
+- Keep **menu bar visible** by default; toolbar sits below menu (KDE‑friendly).
+- Use **standard shortcuts** and avoid duplicate accelerators.
+- Toolbar style: **Text‑only** buttons with generous hit‑targets; use separators
+  to avoid clutter.
+- Provide **compact, fast UI**: minimal chrome, clear focus order, no heavy redraws.
 
 ### 5.8  `gui.translation_table`  `gui.translation_table`
 
@@ -272,8 +304,9 @@ hidden `.tzp-cache/` subfolder under the repo root, preserving relative paths.
 | Offset | Type | Description |
 |--------|------|-------------|
 | 0      | 4s   | magic `TZC1` |
-| 4      | u32  | entry-count |
-| 8      | …   | repeated: `u16 key-hash` • `u8 status` • `u8 flags` • `u32 len` • `bytes[len]` |
+| 4      | u64  | `last_opened_unix` |
+| 12     | u32  | entry-count |
+| 16     | …   | repeated: `u16 key-hash` • `u8 status` • `u8 flags` • `u32 len` • `bytes[len]` |
 
   *Key-hash* is `xxhash16(key_bytes)`.  
   Status byte values follow `core.model.Status` order.  
@@ -287,9 +320,11 @@ def write(root: Path, file_path: Path, entries: list[Entry], *, changed_keys: se
     patched in memory from cache.
   - File length is validated against the declared entry count; corrupt caches
     are ignored without raising.
+  - `last_opened_unix` is updated on file open.
   - Written automatically on edit and on file switch. Draft values are stored
     **only** for `changed_keys`; statuses stored when `status != UNTOUCHED`.
   - On “Write Original”, draft values are cleared from cache; statuses persist.
+  - `last_opened_unix` is written **only when a cache file exists** (no empty cache files).
   - If no statuses or drafts exist, cache file MUST be absent (or removed).
 
 Cache path convention:
@@ -311,6 +346,9 @@ UNTOUCHED).
 ---
 
 ## 6  Implementation Plan (LLM‑Friendly)
+
+Detailed, step‑by‑step plan (with current status, acceptance checks, diagrams) lives in:
+`docs/implementation_plan.md`. The list below is a high‑level phase summary.
 
 Instead of sprint dates, the project is broken into **six sequential phases**.  Each phase can be executed once the previous one is functionally complete; timeboxing is left to the integrator.
 
@@ -359,9 +397,10 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 
 ## 9  Crash Recovery
 
-Planned feature (not in initial builds):
-- On every edit, diff kept in RAM and mirrored to a temp JSON file.
-- On next launch, if crash cache exists, ask user to merge or discard.
+v0.1 uses **cache‑only** recovery:
+- Drafts are persisted to `.tzp-cache` on edit.
+- No separate temp recovery file is created.
+- If future crash recovery is needed, it will build on cache state only.
 
 ---
 

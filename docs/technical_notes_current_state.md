@@ -75,12 +75,19 @@ From latest clarification:
   (one root per locale).
 - **EN hash cache**: single index file for all EN hashes (for now).
 - **Non-translatables**: `language.txt` and `credits.txt` are hidden in the tree.
-- **Dirty indicator**: file tree shows a dot (●) for unsaved edits.
+- **Dirty indicator**: file tree shows a dot (●) for cached **draft values**
+  (including on startup). Status‑only changes currently do **not** trigger dots.
 - **Exit prompt**: controlled by preference `prompt_write_on_exit` (default true).
 - **Save prompt**: lists all files with draft values before writing originals.
 - **Prompt scope**: only files opened in the current session are eligible for save prompts.
 - **Config formats**: local `.env`-style settings file and `config/app.toml` for adapter/path switches.
 - **Formats**: translation file extension comes from `config/app.toml` (`[formats]`).
+- **Dirty dot**: shows only when draft values exist; status‑only edits do not show dots.
+- **Auto-open**: on startup, open the most recently opened file across selected locales
+  (timestamp stored in cache headers).
+- **Timestamps**: `last_opened` lives in per‑file cache header (no settings entry).
+- **No timestamp cache**: if no cache files exist, open nothing by default.
+- **UI guidelines**: align with GNOME HIG + KDE HIG via native Qt widgets/dialogs.
 
 ---
 
@@ -302,6 +309,7 @@ Atomic save                  tmp + fsync + replace        tmp + replace + fsync 
 Status cache                 per file (1:1)               Implemented per file
 Concat preservation           Preserve original chains      Currently flattens on edit
 Search dock                  live search + F3             Implemented (toolbar + debounce)
+Core search separation       core.search module           Not implemented (required); no snippets in v0.1
 Unsaved guard                on locale switch/exit        Exit prompt only (no switch guard)
 Wrap text toggle             View menu toggle             Implemented (wrap + preference)
 Preferences UI               prompt_write_on_exit toggle  Implemented (View menu)
@@ -318,7 +326,7 @@ Open project -> pick locale   Locale chooser + multi-root tree
 Open file -> table appears    Table populated on activate/double-click
 Edit translations quickly     Works only after model is set
 Proofread workflow            Ctrl+P + Status combo
-Search + navigation           Toolbar search + F3/Shift+F3
+Search + navigation           Toolbar search + F3/Shift+F3 (GUI-level)
 Save status persistence       Cache written for opened files only
 ```
 
