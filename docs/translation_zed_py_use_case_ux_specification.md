@@ -48,12 +48,13 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 |  1 | SYS MUST present an **OS-native directory picker**. |
 |  2 | TR selects a folder. |
 |  3 | SYS scans one level deep for locale folders, ignoring `_TVRADIO_TRANSLATIONS`. |
-|  4 | SYS MUST show `LocaleChooserDialog` with **checkboxes** for locales, using `language.txt` → `text = ...` as display name. EN is excluded from the editable list. |
+|  4 | SYS MUST show `LocaleChooserDialog` with **checkboxes** for locales, using `language.txt` → `text = ...` as display name. EN is excluded from the editable list. Locales are sorted alphanumerically; **checked locales float to the top**. The last selected locales are pre‑checked. |
 |  5 | TR selects one or more locales and presses **Open**. |
-|  6 | SYS loads the file list for selected locales, populates the left **QTreeView** with **one root per locale** (excluding `language.txt` and `credits.txt`), and opens the first file in the table. |
+|  6 | SYS loads the file list for selected locales, populates the left **QTreeView** with **one root per locale** (excluding `language.txt` and `credits.txt`), and opens the **most recently opened file** across selected locales. |
 | **Alternate Flow A1** | *Unsaved Drafts Present* – SYS MUST auto‑persist drafts to `.tzp-cache` before changing the project root (no prompt). |
 | **Alternate Flow A2** | *No locale selected* – SYS aborts opening the project and closes the window. |
-| **Post‑condition** | Target locale is active; window title updated to `TranslationZed‑Py – [BE]`. |
+| **Alternate Flow A3** | *No cache timestamps* – SYS opens no file until user selects one. |
+| **Post‑condition** | Target locale(s) are active; window title updated to `TranslationZed‑Py – <root>`. |
 
 ### UC‑02  Switch Locale
 Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditions: a project is already open.  Steps 3‑6 repeat with the new locale selection (checkboxes).  SYS MUST persist drafts to cache before switching (no prompt).
@@ -99,6 +100,13 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  2 | First match row is auto‑selected and scrolled into view. |
 |  3 | `F3` / `Shift+F3` cycles through matches. |
 
+### UC‑05 bis  Copy / Cut / Paste
+| **Trigger** | *Edit ▸ Copy/Cut/Paste* or standard shortcuts. |
+| **Flow** |
+|  1 | If a **row** is selected, SYS copies the full row as tab‑delimited values: `Key\tSource\tValue\tStatus`. |
+|  2 | If a **cell** is selected, SYS copies only that cell. |
+|  3 | Cut/Paste only apply to the **Translation** cell (Value column). |
+
 ### UC‑06  Save Project (Write Original)
 | **Trigger** | *Project ▸ Save* (`Ctrl+S`) |
 | **Flow** |
@@ -123,12 +131,11 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  4 | If `prompt_write_on_exit=false`, SYS skips the prompt and performs **Cache only**. |
 |  5 | SYS shuts down, releasing file handles. |
 
-### UC‑08  Crash Recovery
+### UC‑08  Crash Recovery (Deferred)
 | **Trigger** | Application restarts after abnormal termination. |
 | **Flow** |
-|  1 | At startup, SYS checks `$TMPDIR/tzpy_recovery.json`. |
-|  2 | If present, dialog offers **Restore / Discard**. |
-|  3 | On Restore, cached diffs are merged into memory and marked dirty. |
+|  1 | v0.1 relies on `.tzp-cache` only; no extra recovery file is created. |
+|  2 | Future: optional recovery prompt may be added if cache is extended. |
 
 ---
 ## 4  GUI Wireframe (ASCII)
@@ -147,7 +154,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 │└────────────────────┘└────────────────────────────┘│
 └────────────────────────────────────────────────────┘
 ┌─Status bar───────────────────────────────────────────────────────────────────┐
-│ "Saved 12:34:56" | Row 123 / 450                                              │
+│ "Saved 12:34:56" | Row 123 / 450 | BE/sub/dir/file.txt                         │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
