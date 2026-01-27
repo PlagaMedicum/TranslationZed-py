@@ -27,7 +27,12 @@ class EditValueCommand(QUndoCommand):
             old_entry.status,
             old_entry.span,
         )
-        self._old, self._new = old_entry, new_entry
+        self._new = Entry(
+            new_entry.key,
+            new_entry.value,
+            new_entry.status,
+            new_entry.span,
+        )
         self._model = model
 
     # ---- QUndoCommand -------------------------------------------------

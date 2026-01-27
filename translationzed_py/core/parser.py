@@ -56,7 +56,7 @@ _TOKEN_RE = re.compile(
 
 
 # ── The generator the test asked about ────────────────────────────────────────
-def _tokenise(data: bytes) -> Iterable[Tok]:
+def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
     pos = 0
     while pos < len(data):
         m = _TOKEN_RE.match(data, pos)
@@ -68,13 +68,13 @@ def _tokenise(data: bytes) -> Iterable[Tok]:
         kind = Kind[group]  # now str, not str|None
 
         span = (m.start(), m.end())
-        yield Tok(kind, span, m.group().decode("utf-8", "replace"))
+        yield Tok(kind, span, m.group().decode(encoding, "replace"))
         pos = m.end()
 
 
 # ── parse() placeholder – we’ll flesh this out next ───────────────────────────
 def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
-    """Read *path*, tokenise, and build a read-only ParsedFile object."""
+    """Read *path*, tokenise, and build a ParsedFile with stable spans."""
     # local import avoids an import cycle
     from .model import Entry, ParsedFile, Status
 
@@ -86,7 +86,7 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
         }
 
     raw = path.read_bytes()
-    toks = list(_tokenise(raw))
+    toks = list(_tokenise(raw, encoding=encoding))
 
     entries: list[Entry] = []
     i = 0
@@ -104,16 +104,23 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
             j += 1  # after '='
             # gather one or more STRING [TRIVIA] CONCAT [TRIVIA] STRING …
             parts: list[str] = []
-            span_start = key_tok.span[0]
+            span_start: int | None = None
+            span_end: int | None = None
             while j < len(toks):
                 if toks[j].kind is Kind.STRING:
                     parts.append(_unescape(toks[j].text[1:-1]))
+                    if span_start is None:
+                        span_start = toks[j].span[0]
                     span_end = toks[j].span[1]
                     j += 1
                 elif toks[j].kind in (Kind.TRIVIA, Kind.CONCAT):
                     j += 1
                 else:
                     break
+            # TODO: preserve original concat/whitespace tokens for loss-less edits.
+            if span_start is None or span_end is None:
+                i += 1
+                continue
             value = "".join(parts)
             # find comment on the same line
             status = Status.UNTOUCHED
@@ -122,7 +129,6 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
                 if toks[k].kind is Kind.COMMENT:
                     tag = toks[k].text[2:].strip().upper()
                     status = _STATUS_MAP.get(tag, Status.UNTOUCHED)
-                    span_end = toks[k].span[1]
                     break
                 k += 1
             entries.append(Entry(key_tok.text, value, status, (span_start, span_end)))
