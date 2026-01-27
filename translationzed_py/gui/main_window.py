@@ -775,13 +775,18 @@ class MainWindow(QMainWindow):
         sel = self.table.selectionModel()
         if sel is None or not sel.hasSelection():
             return
-        rows = sel.selectedRows()
-        if rows:
+        full_rows = [
+            idx.row()
+            for idx in sel.selectedRows()
+            if sel.isRowSelected(idx.row(), idx.parent())
+        ]
+        if full_rows:
             lines: list[str] = []
-            for row_index in sorted(rows, key=lambda i: i.row()):
-                row = row_index.row()
+            for row in sorted(set(full_rows)):
                 cols = [
-                    self._current_model.index(row, col).data(Qt.DisplayRole) if self._current_model else ""
+                    self._current_model.index(row, col).data(Qt.DisplayRole)
+                    if self._current_model
+                    else ""
                     for col in range(4)
                 ]
                 line = "\t".join("" if c is None else str(c) for c in cols)
