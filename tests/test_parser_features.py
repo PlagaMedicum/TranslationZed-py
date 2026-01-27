@@ -20,3 +20,16 @@ def test_concat(tmp_path):
 def test_status_comment(tmp_path):
     pf = _tmp('UI_YES = "Так" -- PROOFREAD\n', tmp_path)
     assert pf.entries[0].status is Status.PROOFREAD
+
+
+def test_parse_cp1251(prod_like_root):
+    path = prod_like_root / "RU" / "IG_UI_RU.txt"
+    pf = parse(path, encoding="Cp1251")
+    assert pf.entries[0].key == "UI_OK"
+    assert pf.entries[0].value == "Привет"
+
+
+def test_parse_utf16(prod_like_root):
+    path = prod_like_root / "KO" / "IG_UI_KO.txt"
+    pf = parse(path, encoding="UTF-16")
+    assert pf.entries[0].key == "UI_OK"
