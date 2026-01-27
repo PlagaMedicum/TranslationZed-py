@@ -33,7 +33,6 @@ from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.preferences import save as _save_preferences
 from translationzed_py.core.status_cache import CacheEntry, read as _read_status_cache
 from translationzed_py.core.status_cache import write as _write_status_cache
-from translationzed_py.core import crash_recovery as _crash_recovery
 
 from .entry_model import TranslationModel
 from .fs_model import FsModel
@@ -64,9 +63,6 @@ class MainWindow(QMainWindow):
         self._child_windows: list[MainWindow] = []
 
         if not self._check_en_hash_cache():
-            self._startup_aborted = True
-            return
-        if not self._check_crash_recovery():
             self._startup_aborted = True
             return
         prefs = _load_preferences(self._root)
@@ -138,6 +134,7 @@ class MainWindow(QMainWindow):
         # prevent in-place renaming on double-click; we use double-click to open
         self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tree.expandAll()
+        self._mark_cached_dirty()
         self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
         self.tree.doubleClicked.connect(self._file_chosen)
         splitter.addWidget(self.tree)
@@ -328,40 +325,6 @@ class MainWindow(QMainWindow):
             _write_en_hash_cache(self._root, computed)
         return True
 
-    def _check_crash_recovery(self) -> bool:
-        rec = _crash_recovery.read()
-        if not rec:
-            return True
-        rec_root = rec.get("root")
-        if not isinstance(rec_root, str):
-            return True
-        try:
-            if Path(rec_root).resolve() != self._root:
-                return True
-        except Exception:
-            return True
-        files = rec.get("files", [])
-        if not isinstance(files, list) or not files:
-            _crash_recovery.clear()
-            return True
-        msg = QMessageBox(self)
-        msg.setIcon(QMessageBox.Warning)
-        msg.setWindowTitle("Recovery data found")
-        msg.setText("A previous session ended unexpectedly.")
-        msg.setInformativeText(
-            "Drafts are stored in cache. Restore to keep them, or Discard to remove cached drafts."
-        )
-        preview = "\n".join(files[:8])
-        if len(files) > 8:
-            preview += f"\n… {len(files) - 8} more"
-        msg.setDetailedText(preview)
-        btn_restore = msg.addButton("Restore", QMessageBox.AcceptRole)
-        btn_discard = msg.addButton("Discard", QMessageBox.RejectRole)
-        msg.exec()
-        if msg.clickedButton() is btn_discard:
-            _crash_recovery.discard_cache(self._root, files)
-        _crash_recovery.clear()
-        return True
     def _prompt_write_original(self) -> str:
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Question)
@@ -412,6 +375,7 @@ class MainWindow(QMainWindow):
         self.fs_model = FsModel(self._root, [self._locales[c] for c in self._selected_locales])
         self.tree.setModel(self.fs_model)
         self.tree.expandAll()
+        self._mark_cached_dirty()
 
     def _file_chosen(self, index) -> None:
         """Populate table when user activates a translation file."""
@@ -521,7 +485,6 @@ class MainWindow(QMainWindow):
 
             self._current_model.reset_baseline()
             self.fs_model.set_dirty(self._current_pf.path, False)
-            self._update_recovery_marker()
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
             return False
@@ -564,6 +527,28 @@ class MainWindow(QMainWindow):
                 files.append(original)
         return sorted(set(files))
 
+    def _all_draft_files(self) -> list[Path]:
+        cache_root = self._root / self._app_config.cache_dir
+        if not cache_root.exists():
+            return []
+        files: list[Path] = []
+        for cache_path in cache_root.rglob(f"*{self._app_config.cache_ext}"):
+            try:
+                rel = cache_path.relative_to(cache_root)
+            except ValueError:
+                continue
+            original = (self._root / rel).with_suffix(self._app_config.translation_ext)
+            if not original.exists():
+                continue
+            cached = _read_status_cache(self._root, original)
+            if any(entry.value is not None for entry in cached.values()):
+                files.append(original)
+        return sorted(set(files))
+
+    def _mark_cached_dirty(self) -> None:
+        for path in self._all_draft_files():
+            self.fs_model.set_dirty(path, True)
+
     def _save_all_files(self, files: list[Path]) -> None:
         if not files:
             return
@@ -583,7 +568,6 @@ class MainWindow(QMainWindow):
                 "Save incomplete",
                 f"Some files could not be written:\n{rel}",
             )
-        self._update_recovery_marker()
 
     def _save_file_from_cache(self, path: Path) -> bool:
         cached = _read_status_cache(self._root, path)
@@ -633,17 +617,12 @@ class MainWindow(QMainWindow):
             self.fs_model.set_dirty(self._current_pf.path, True)
         else:
             self.fs_model.set_dirty(self._current_pf.path, False)
-        self._update_recovery_marker()
         return True
 
     def _on_model_changed(self, *_args) -> None:
         if not (self._current_pf and self._current_model):
             return
         self._write_cache_current()
-
-    def _update_recovery_marker(self) -> None:
-        files = self._draft_files()
-        _crash_recovery.write(self._root, files)
 
     def _focus_search(self) -> None:
         self.search_edit.setFocus()
@@ -868,5 +847,4 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self._persist_preferences()
-        _crash_recovery.clear()
         event.accept()
