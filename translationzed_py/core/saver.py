@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from .model import Entry, ParsedFile
-from .status_cache import write as _write_status_cache
 
 
 def save(
@@ -11,8 +10,6 @@ def save(
     new_entries: dict[str, str],
     *,
     encoding: str = "utf-8",
-    locale_dir: Path | None = None,
-    all_files: list[ParsedFile] | None = None,
 ) -> None:
     """Patch raw bytes and overwrite file atomically."""
     buf = bytearray(pf.raw_bytes())
@@ -91,7 +88,3 @@ def save(
     pf.entries = new_list
     pf._raw = buf
     pf.dirty = False
-
-    # persist status cache for this locale
-    if locale_dir is not None and all_files is not None:
-        _write_status_cache(locale_dir, all_files)
