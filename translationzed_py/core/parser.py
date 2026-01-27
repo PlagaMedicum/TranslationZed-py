@@ -138,11 +138,16 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
             j += 1  # after '='
             # gather one or more STRING [TRIVIA] CONCAT [TRIVIA] STRING …
             parts: list[str] = []
+            seg_lens: list[int] = []
+            seg_spans: list[tuple[int, int]] = []
             span_start: int | None = None
             span_end: int | None = None
             while j < len(toks):
                 if toks[j].kind is Kind.STRING:
-                    parts.append(_unescape(toks[j].text[1:-1]))
+                    seg_text = _unescape(toks[j].text[1:-1])
+                    parts.append(seg_text)
+                    seg_lens.append(len(seg_text))
+                    seg_spans.append(toks[j].span)
                     if span_start is None:
                         span_start = toks[j].span[0]
                     span_end = toks[j].span[1]
@@ -165,7 +170,19 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
                     status = _STATUS_MAP.get(tag, Status.UNTOUCHED)
                     break
                 k += 1
-            entries.append(Entry(key_tok.text, value, status, (span_start, span_end)))
+            gaps: list[bytes] = []
+            for prev, nxt in zip(seg_spans, seg_spans[1:]):
+                gaps.append(raw[prev[1] : nxt[0]])
+            entries.append(
+                Entry(
+                    key_tok.text,
+                    value,
+                    status,
+                    (span_start, span_end),
+                    tuple(seg_lens) if seg_lens else (len(value),),
+                    tuple(gaps),
+                )
+            )
             # fast-forward to newline to continue loop
             while j < len(toks) and toks[j].kind is not Kind.NEWLINE:
                 j += 1

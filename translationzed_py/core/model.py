@@ -17,6 +17,8 @@ class Entry:
     value: str
     status: Status
     span: tuple[int, int]  # byte offsets in raw file
+    segments: tuple[int, ...]  # unescaped segment lengths
+    gaps: tuple[bytes, ...]  # raw bytes between string literals
 
 
 class ParsedFile:
