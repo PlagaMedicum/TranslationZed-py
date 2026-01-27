@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .atomic_io import write_bytes_atomic
 from .model import Entry, ParsedFile
 
 
@@ -27,8 +28,18 @@ def save(
                 remaining = remaining[seg_len:]
         return parts
 
+    def _escape_literal(text: str) -> str:
+        return (
+            text.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        )
+
     def _encode_literal(text: str) -> bytes:
-        return b'"' + text.encode(encoding).replace(b'"', b'\\"') + b'"'
+        escaped = _escape_literal(text)
+        return f'"{escaped}"'.encode(encoding)
 
     replacements: list[tuple[int, int, bytes]] = []
     changed_by_index: dict[int, tuple[str, tuple[int, ...], int]] = {}
@@ -48,9 +59,7 @@ def save(
     for start, end, literal in sorted(replacements, key=lambda item: item[0], reverse=True):
         buf[start:end] = literal
 
-    tmp = Path(str(pf.path) + ".tmp")
-    tmp.write_bytes(buf)
-    tmp.replace(pf.path)
+    write_bytes_atomic(pf.path, bytes(buf))
 
     # refresh in-memory spans and cached raw bytes after a successful write
     shift = 0

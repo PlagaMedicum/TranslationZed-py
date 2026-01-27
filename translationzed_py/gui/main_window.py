@@ -4,12 +4,13 @@ import re
 from pathlib import Path
 
 import xxhash
-from PySide6.QtCore import QItemSelectionModel, QTimer, Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import QByteArray, QItemSelectionModel, QTimer, Qt
+from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
+    QFileDialog,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -29,6 +30,7 @@ from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
 from translationzed_py.core.preferences import load as _load_preferences
+from translationzed_py.core.preferences import save as _save_preferences
 from translationzed_py.core.status_cache import CacheEntry, read as _read_status_cache
 from translationzed_py.core.status_cache import write as _write_status_cache
 
@@ -58,12 +60,23 @@ class MainWindow(QMainWindow):
         self._opened_files: set[Path] = set()
         self._cache_map: dict[int, CacheEntry] = {}
         self._en_cache: dict[Path, ParsedFile] = {}
+        self._child_windows: list[MainWindow] = []
 
         if not self._check_en_hash_cache():
             self._startup_aborted = True
             return
         prefs = _load_preferences(self._root)
         self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
+        self._wrap_text = bool(prefs.get("wrap_text", False))
+        self._last_locales = list(prefs.get("last_locales", []) or [])
+        self._last_root = str(prefs.get("last_root", "") or self._root)
+        self._prefs_extras = dict(prefs.get("__extras__", {}))
+        geom = str(prefs.get("window_geometry", "")).strip()
+        if geom:
+            try:
+                self.restoreGeometry(QByteArray.fromBase64(geom.encode("ascii")))
+            except Exception:
+                pass
 
         splitter = QSplitter(self)
         self.setCentralWidget(splitter)
@@ -104,6 +117,12 @@ class MainWindow(QMainWindow):
         self._search_index = -1
         self._search_column = 0
 
+        # ── menu bar ───────────────────────────────────────────────────────
+        menubar = self.menuBar()
+        self.menu_project = menubar.addMenu("Project")
+        self.menu_edit = menubar.addMenu("Edit")
+        self.menu_view = menubar.addMenu("View")
+
         # ── left pane: project tree ──────────────────────────────────────────
         self.tree = QTreeView()
         self._init_locales(selected_locales)
@@ -129,6 +148,7 @@ class MainWindow(QMainWindow):
         # ── right pane: entry table ─────────────────────────────────────────
         self.table = QTableView()
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setWordWrap(self._wrap_text)
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
         splitter.addWidget(self.table)
@@ -144,6 +164,38 @@ class MainWindow(QMainWindow):
         act_save.setShortcut(QKeySequence.StandardKey.Save)
         act_save.triggered.connect(self._request_write_original)
         self.addAction(act_save)
+        act_open = QAction("&Open", self)
+        act_open.setShortcut(QKeySequence.StandardKey.Open)
+        act_open.triggered.connect(self._open_project)
+        self.addAction(act_open)
+        act_switch = QAction("Switch &Locale(s)", self)
+        act_switch.triggered.connect(self._switch_locales)
+        self.addAction(act_switch)
+        act_exit = QAction("E&xit", self)
+        act_exit.setShortcut(QKeySequence.StandardKey.Quit)
+        act_exit.triggered.connect(self.close)
+        self.addAction(act_exit)
+        self.menu_project.addAction(act_open)
+        self.menu_project.addAction(act_save)
+        self.menu_project.addAction(act_switch)
+        self.menu_project.addSeparator()
+        self.menu_project.addAction(act_exit)
+
+        act_copy = QAction("&Copy", self)
+        act_copy.setShortcut(QKeySequence.StandardKey.Copy)
+        act_copy.triggered.connect(self._copy_selection)
+        self.addAction(act_copy)
+        act_cut = QAction("Cu&t", self)
+        act_cut.setShortcut(QKeySequence.StandardKey.Cut)
+        act_cut.triggered.connect(self._cut_selection)
+        self.addAction(act_cut)
+        act_paste = QAction("&Paste", self)
+        act_paste.setShortcut(QKeySequence.StandardKey.Paste)
+        act_paste.triggered.connect(self._paste_selection)
+        self.addAction(act_paste)
+        self.menu_edit.addAction(act_copy)
+        self.menu_edit.addAction(act_cut)
+        self.menu_edit.addAction(act_paste)
         act_find = QAction("&Find", self)
         act_find.setShortcut(QKeySequence.StandardKey.Find)
         act_find.triggered.connect(self._focus_search)
@@ -157,6 +209,19 @@ class MainWindow(QMainWindow):
         act_find_prev.triggered.connect(self._search_prev)
         self.addAction(act_find_prev)
 
+        act_wrap = QAction("Wrap &Long Strings", self)
+        act_wrap.setCheckable(True)
+        act_wrap.setChecked(self._wrap_text)
+        act_wrap.triggered.connect(self._toggle_wrap_text)
+        self.addAction(act_wrap)
+        act_prompt = QAction("Prompt on E&xit", self)
+        act_prompt.setCheckable(True)
+        act_prompt.setChecked(self._prompt_write_on_exit)
+        act_prompt.triggered.connect(self._toggle_prompt_on_exit)
+        self.addAction(act_prompt)
+        self.menu_view.addAction(act_wrap)
+        self.menu_view.addAction(act_prompt)
+
         # ── cache ──────────────────────────────────────────────────────
 
     def _init_locales(self, selected_locales: list[str] | None) -> None:
@@ -164,7 +229,9 @@ class MainWindow(QMainWindow):
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
 
         if selected_locales is None:
-            dialog = LocaleChooserDialog(selectable.values(), self)
+            dialog = LocaleChooserDialog(
+                selectable.values(), self, preselected=self._last_locales
+            )
             if dialog.exec() != dialog.DialogCode.Accepted:
                 self._selected_locales = []
                 return
@@ -274,6 +341,39 @@ class MainWindow(QMainWindow):
             return "no"
         return "cancel"
 
+    def _open_project(self) -> None:
+        start_dir = self._last_root or str(self._root)
+        picked = QFileDialog.getExistingDirectory(self, "Open Project", start_dir)
+        if not picked:
+            return
+        win = MainWindow(picked)
+        if getattr(win, "_startup_aborted", False):
+            return
+        win.show()
+        self._child_windows.append(win)
+
+    def _switch_locales(self) -> None:
+        if not self._write_cache_current():
+            return
+        selectable = {k: v for k, v in self._locales.items() if k != "EN"}
+        dialog = LocaleChooserDialog(
+            selectable.values(), self, preselected=self._selected_locales
+        )
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        selected = [c for c in dialog.selected_codes() if c in selectable]
+        if not selected:
+            return
+        self._selected_locales = selected
+        self._opened_files.clear()
+        self._current_pf = None
+        self._current_model = None
+        self.table.setModel(None)
+        self._set_status_combo(None)
+        self.fs_model = FsModel(self._root, [self._locales[c] for c in self._selected_locales])
+        self.tree.setModel(self.fs_model)
+        self.tree.expandAll()
+
     def _file_chosen(self, index) -> None:
         """Populate table when user activates a translation file."""
         raw_path = index.data(Qt.UserRole)  # FsModel stores absolute path string
@@ -340,6 +440,8 @@ class MainWindow(QMainWindow):
         # (re)create undo/redo actions bound to this file’s stack
         for old in (self.act_undo, self.act_redo):
             if old and isValid(old):
+                if old in self.menu_edit.actions():
+                    self.menu_edit.removeAction(old)
                 self.removeAction(old)
                 old.deleteLater()
         stack = self._current_model.undo_stack
@@ -349,6 +451,13 @@ class MainWindow(QMainWindow):
         self.act_redo.setShortcut(QKeySequence.StandardKey.Redo)
         for a in (self.act_undo, self.act_redo):
             self.addAction(a)
+        if self.menu_edit.actions():
+            first = self.menu_edit.actions()[0]
+            self.menu_edit.insertAction(first, self.act_redo)
+            self.menu_edit.insertAction(first, self.act_undo)
+        else:
+            self.menu_edit.addAction(self.act_undo)
+            self.menu_edit.addAction(self.act_redo)
 
 
     def _save_current(self) -> bool:
@@ -572,6 +681,59 @@ class MainWindow(QMainWindow):
         self._search_index = (self._search_index - 1) % len(self._search_matches)
         self._select_match(self._search_index)
 
+    def _copy_selection(self) -> None:
+        idx = self.table.currentIndex()
+        if not idx.isValid():
+            return
+        text = idx.data(Qt.DisplayRole)
+        QGuiApplication.clipboard().setText("" if text is None else str(text))
+
+    def _cut_selection(self) -> None:
+        idx = self.table.currentIndex()
+        if not idx.isValid() or idx.column() != 2:
+            return
+        self._copy_selection()
+        if self._current_model:
+            self._current_model.setData(idx, "", Qt.EditRole)
+
+    def _paste_selection(self) -> None:
+        idx = self.table.currentIndex()
+        if not idx.isValid() or idx.column() != 2:
+            return
+        if not self._current_model:
+            return
+        text = QGuiApplication.clipboard().text()
+        self._current_model.setData(idx, text, Qt.EditRole)
+
+    def _toggle_wrap_text(self, checked: bool) -> None:
+        self._wrap_text = bool(checked)
+        self.table.setWordWrap(self._wrap_text)
+        self.table.resizeRowsToContents()
+        self._persist_preferences()
+
+    def _toggle_prompt_on_exit(self, checked: bool) -> None:
+        self._prompt_write_on_exit = bool(checked)
+        self._persist_preferences()
+
+    def _persist_preferences(self) -> None:
+        geometry = ""
+        try:
+            geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
+        except Exception:
+            geometry = ""
+        prefs = {
+            "prompt_write_on_exit": self._prompt_write_on_exit,
+            "wrap_text": self._wrap_text,
+            "last_root": str(self._root),
+            "last_locales": list(self._selected_locales),
+            "window_geometry": geometry,
+            "__extras__": dict(self._prefs_extras),
+        }
+        try:
+            _save_preferences(prefs, self._root)
+        except Exception:
+            pass
+
     def _on_model_data_changed(self, top_left, bottom_right, roles=None) -> None:
         if not self._current_model:
             return
@@ -659,4 +821,5 @@ class MainWindow(QMainWindow):
         if not self._write_cache_current():
             event.ignore()
             return
+        self._persist_preferences()
         event.accept()

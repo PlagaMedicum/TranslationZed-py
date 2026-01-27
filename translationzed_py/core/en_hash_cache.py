@@ -6,6 +6,7 @@ from pathlib import Path
 import xxhash
 
 from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.atomic_io import write_bytes_atomic
 from translationzed_py.core.project_scanner import list_translatable_files, scan_root
 
 _MAGIC = b"ENH1"
@@ -78,7 +79,6 @@ def write(root: Path, hashes: dict[str, int]) -> None:
         if cache_path.exists():
             cache_path.unlink()
         return
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
     items = sorted(hashes.items())
     buf = bytearray()
     buf += _HEADER.pack(_MAGIC, len(items))
@@ -87,6 +87,4 @@ def write(root: Path, hashes: dict[str, int]) -> None:
         buf += struct.pack("<H", len(raw))
         buf += raw
         buf += _HASH.pack(hval)
-    tmp = cache_path.with_name(cache_path.name + ".tmp")
-    tmp.write_bytes(buf)
-    tmp.replace(cache_path)
+    write_bytes_atomic(cache_path, bytes(buf))

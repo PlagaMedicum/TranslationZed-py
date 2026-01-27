@@ -31,9 +31,9 @@ Pillars stated or implied in specs:
 
 Observed alignment (snapshot):
 - (1) Mostly: raw bytes preserved and concat chains retained on save.
-- (2) Partial: table exists but UI open flow blocks it; no search dock.
+- (2) Mostly: table editing + search + status UI; clipboard is minimal.
 - (3) Mostly: status cache per-file exists; encoding support present.
-- (4) Partial: atomic replace exists; no fsync or crash recovery.
+- (4) Partial: atomic replace + fsync; no crash recovery.
 - (5) Mostly: deps are minimal; GUI requires PySide6; tests require pytest-qt.
 
 ---
@@ -298,11 +298,13 @@ Multi-locale selection        One or more locales selectable Implemented (multi-
 Locale chooser               Dialog + autonym list        Implemented
 Project scan                 scan_root() used             Implemented (scan_root + FsModel)
 Encoding                     language.txt per locale      Implemented
-Atomic save                  tmp + fsync + replace        tmp + replace (no fsync)
+Atomic save                  tmp + fsync + replace        tmp + replace + fsync (best-effort)
 Status cache                 per file (1:1)               Implemented per file
 Concat preservation           Preserve original chains      Currently flattens on edit
 Search dock                  live search + F3             Implemented (toolbar + debounce)
 Unsaved guard                on locale switch/exit        Exit prompt only (no switch guard)
+Wrap text toggle             View menu toggle             Implemented (wrap + preference)
+Preferences UI               prompt_write_on_exit toggle  Implemented (View menu)
 ```
 
 ---
