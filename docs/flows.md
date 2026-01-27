@@ -7,7 +7,7 @@ _Last updated: 2026-01-27_
 
 ```
 App start
-  -> load .tzp-cache/en.hashes.bin
+  -> load <cache_dir>/en.hashes.bin
   -> hash EN files (raw bytes)
   -> if mismatch:
        show dialog "English source changed"

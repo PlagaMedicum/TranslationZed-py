@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.2.8 · 2026‑01‑27**\
+**Version 0.2.9 · 2026‑01‑27**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -219,7 +219,7 @@ Algorithm:
 - Purpose: minimize hard‑coding and enable quick adapter/format swaps without refactors.
 - Sections:
   - `[paths]` → `cache_dir`, `config_dir`
-  - `[cache]` → `extension`
+  - `[cache]` → `extension`, `en_hash_filename`
   - `[adapters]` → `parser`, `ui`, `cache`
   - `[formats]` → `translation_ext`, `comment_prefix`
 - Swappable adapters are selected by name; actual implementations live behind
@@ -297,10 +297,11 @@ Cache path convention:
   `<root>/<cache_dir>/<locale>/path/file.bin` where `cache_dir` is configured in
   `config/app.toml` (default `.tzp-cache`).
 
-### 5.9.1  `core.en_hash_cache` (planned)
+### 5.9.1  `core.en_hash_cache`
 
 Track hashes of English files (raw bytes) to detect upstream changes.
-- Stored in a **single index file** at `<root>/.tzp-cache/en.hashes.bin`.
+- Stored in a **single index file** at `<root>/<cache_dir>/<en_hash_filename>`,
+  both configurable in `config/app.toml` (`[cache]`).
 - On startup: if any English hash differs, notify user and require explicit
   acknowledgment to reset the hash cache to the new EN version.
 

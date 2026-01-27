@@ -19,6 +19,9 @@ from translationzed_py.core import LocaleMeta, parse, scan_root
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
 from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
+from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
+from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
 from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.status_cache import CacheEntry, read as _read_status_cache
 from translationzed_py.core.status_cache import write as _write_status_cache
@@ -42,6 +45,9 @@ class MainWindow(QMainWindow):
         self._selected_locales: list[str] = []
         self._current_encoding = "utf-8"
         self._app_config = _load_app_config(self._root)
+        if not self._check_en_hash_cache():
+            self.close()
+            return
         prefs = _load_preferences(self._root)
         self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
 
@@ -113,6 +119,31 @@ class MainWindow(QMainWindow):
         return rel.parts[0]
 
     # ----------------------------------------------------------------- slots
+    def _check_en_hash_cache(self) -> bool:
+        try:
+            computed = _compute_en_hashes(self._root)
+        except Exception:
+            return True
+        if not computed:
+            return True
+        cached = _read_en_hash_cache(self._root)
+        if not cached:
+            _write_en_hash_cache(self._root, computed)
+            return True
+        if cached == computed:
+            return True
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("English source changed")
+        msg.setText("English source files changed since last run.")
+        msg.setInformativeText("Acknowledge to reset the EN hash index.")
+        ack = msg.addButton("Acknowledge & Reset", QMessageBox.AcceptRole)
+        msg.addButton(QMessageBox.Cancel)
+        msg.exec()
+        if msg.clickedButton() is ack:
+            _write_en_hash_cache(self._root, computed)
+            return True
+        return False
     def _prompt_write_original(self) -> str:
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Question)
