@@ -42,7 +42,7 @@ User edits cell
 
 User: Save
   -> prompt Write / Cache only / Cancel
-  -> prompt shows a scrollable list of files to be written
+  -> prompt shows a scrollable list of files to be written (opened this session)
   -> Cache only: keep drafts in cache; originals unchanged
   -> Write:
        saver preserves concat structure + trivia

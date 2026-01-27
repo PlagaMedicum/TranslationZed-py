@@ -1,0 +1,8 @@
+ci:
+  python: "3.12"
+  venv: ".venv"
+  steps:
+    - scripts/venv.sh
+    - scripts/lint.sh
+    - scripts/typecheck.sh
+    - scripts/test.sh

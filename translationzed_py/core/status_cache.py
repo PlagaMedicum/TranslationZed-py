@@ -6,6 +6,7 @@ from pathlib import Path
 
 import xxhash
 
+from translationzed_py.core.app_config import load as _load_app_config
 from translationzed_py.core.model import Entry, Status
 
 _MAGIC = b"TZC1"
@@ -25,9 +26,10 @@ def _hash_key(key: str) -> int:
 
 
 def _cache_path(root: Path, file_path: Path) -> Path:
+    cfg = _load_app_config(root)
     rel = file_path.relative_to(root)
-    rel_cache = rel.parent / f"{rel.stem}.bin"
-    return root / ".tzp-cache" / rel_cache
+    rel_cache = rel.parent / f"{rel.stem}{cfg.cache_ext}"
+    return root / cfg.cache_dir / rel_cache
 
 
 def read(root: Path, file_path: Path) -> dict[int, CacheEntry]:

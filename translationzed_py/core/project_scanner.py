@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-_IGNORE_DIRS = {"_TVRADIO_TRANSLATIONS", ".tzp-cache"}
+from translationzed_py.core.app_config import load as _load_app_config
+
+_IGNORE_DIRS = {"_TVRADIO_TRANSLATIONS"}
 _IGNORE_FILES = {"language.txt", "credits.txt"}
 
 
@@ -38,9 +40,11 @@ def _parse_language_file(path: Path) -> tuple[str, str]:
 
 
 def list_translatable_files(locale_path: Path) -> list[Path]:
-    """Return .txt files under *locale_path*, excluding non-translatables."""
+    """Return translatable files under *locale_path*, excluding non-translatables."""
+    cfg = _load_app_config(locale_path.parent)
     files = []
-    for path in locale_path.rglob("*.txt"):
+    pattern = f"*{cfg.translation_ext}"
+    for path in locale_path.rglob(pattern):
         if path.name in _IGNORE_FILES:
             continue
         files.append(path)
@@ -52,11 +56,14 @@ def scan_root(root: Path) -> dict[str, LocaleMeta]:
     if not root.is_dir():
         raise NotADirectoryError(root)
 
+    cfg = _load_app_config(root)
     locales: dict[str, LocaleMeta] = {}
     for child in root.iterdir():
         if not child.is_dir():
             continue
         if child.name in _IGNORE_DIRS:
+            continue
+        if child.name in {cfg.cache_dir, cfg.config_dir}:
             continue
         lang_file = child / "language.txt"
         display_name, charset = _parse_language_file(lang_file)

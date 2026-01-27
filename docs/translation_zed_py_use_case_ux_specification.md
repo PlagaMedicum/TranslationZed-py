@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.2 · 2026‑01‑27_
+_version 0.3.3 · 2026‑01‑27_
 
 ---
 ## 1  Actors
@@ -100,7 +100,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 ### UC‑06  Save Project (Write Original)
 | **Trigger** | *Project ▸ Save* (`Ctrl+S`) |
 | **Flow** |
-|  1 | SYS prompts **Write / Cache only / Cancel** and shows a scrollable list of files to be written. |
+|  1 | SYS prompts **Write / Cache only / Cancel** and shows a scrollable list of files to be written (only files opened in this session). |
 |  2 | On **Write**, SYS MUST call `saver.write_atomic()` for every dirty file. |
 |  3 | On success, `dirty` flags cleared and baseline updated. |
 |  4 | SYS writes (or updates) per‑file cache entries under `.tzp-cache/<locale>/<relative>.bin` for **edited files only** (status only; draft values cleared). |
@@ -115,7 +115,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 ### UC‑07  Exit Application
 | **Trigger** | Window close button or *Project ▸ Exit* |
 | **Flow** |
-|  1 | If ANY dirty files exist **and** `prompt_write_on_exit=true`, SYS prompts **Write / Cache only / Cancel**. |
+|  1 | If ANY dirty files exist **and** `prompt_write_on_exit=true`, SYS prompts **Write / Cache only / Cancel** (only files opened in this session). |
 |  2 | On **Write**, UC‑06 is executed. |
 |  3 | On **Cache only**, SYS persists drafts to `.tzp-cache` and exits. |
 |  4 | If `prompt_write_on_exit=false`, SYS skips the prompt and performs **Cache only**. |
@@ -186,4 +186,4 @@ UNTOUCHED ──────────────────────▶ 
    originals are written.
 
 ---
-_Last updated: 2026‑01‑27 (v0.3.2)_
+_Last updated: 2026‑01‑27 (v0.3.3)_

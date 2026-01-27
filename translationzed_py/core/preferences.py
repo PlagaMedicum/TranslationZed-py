@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from translationzed_py.core.app_config import load as _load_app_config
 _BOOL_TRUE = {"1", "true", "yes", "on"}
 _BOOL_FALSE = {"0", "false", "no", "off"}
 
@@ -13,7 +14,8 @@ _DEFAULTS: dict[str, Any] = {
 
 def _config_dir(root: Path | None = None) -> Path:
     base = root or Path.cwd()
-    return base / ".tzp-config"
+    cfg = _load_app_config(root)
+    return base / cfg.config_dir
 
 
 def _config_path(root: Path | None = None) -> Path:
