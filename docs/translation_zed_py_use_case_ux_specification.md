@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.2 · 2025‑07‑16_
+_version 0.3 · 2026‑01‑27_
 
 ---
 ## 1  Actors
@@ -23,13 +23,26 @@ Only one human actor interacts via mouse / keyboard.  All persistence is managed
 ## 3  Primary Use‑Cases
 Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 
+### UC‑00  Startup EN Update Check
+| Field | Value |
+|-------|-------|
+| **Goal** | Detect upstream English changes and require user acknowledgment. |
+| **Primary Actor** | SYS |
+| **Trigger** | Application startup after a project was previously opened. |
+| **Main Success Scenario** |
+|  1 | SYS loads EN hash index from `.tzp-cache/en.hashes.bin`. |
+|  2 | SYS recomputes raw‑byte hashes for EN files in the repo. |
+|  3 | If any hash differs, SYS MUST show a dialog: **“English source changed”** with options **Acknowledge & Reset** / **Cancel**. |
+|  4 | On **Acknowledge & Reset**, SYS rewrites the EN hash index to the new values and proceeds to normal startup. |
+| **Post‑condition** | EN hash cache is either current or startup is aborted. |
+
 ### UC‑01  Open Project Folder
 | Field | Value |
 |-------|-------|
 | **Goal** | Load a Project Zomboid `translations` root so the user can pick a locale. |
 | **Primary Actor** | TR / PR |
 | **Pre‑condition** | No project is currently open, or current project is clean. |
-| **Trigger** | `Set Status` toolbar button, `Ctrl+P`, or context‑menu → **Mark Proofread** on selected rows. |
+| **Trigger** | *Project ▸ Open…* |
 | **Main Success Scenario** |
 |  1 | SYS MUST present an **OS-native directory picker**. |
 |  2 | TR selects a folder. |
@@ -73,6 +86,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditi
 | **Flow** |
 |  1 | SYS sets `Entry.status = PROOFREAD`. |
 |  2 | Table delegate re‑paints cell background light‑green. |
+|  3 | Toolbar **Status ▼** label reflects the selected row status. |
 
 ### UC‑05  Search & Navigate
 | **Trigger** | Typing in search box (`Ctrl+F`). |
@@ -87,8 +101,14 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditi
 | **Flow** |
 |  1 | For every dirty `ParsedFile`, SYS MUST call `saver.write_atomic()`. |
 |  2 | On success, `dirty` flags cleared. |
-|  3 | SYS writes (or updates) `.tzstatus.bin` **only inside the current target-locale folder**.
+|  3 | SYS writes (or updates) per‑file cache entries under `.tzp-cache/<locale>/<relative>.tzstatus.bin` for **edited files only**. |
 |  4 | Status line shows “Saved HH:MM:SS”.
+
+### UC‑06 bis  Dirty Indicator in File Tree
+| **Trigger** | Any edit that marks a file dirty. |
+| **Flow** |
+|  1 | SYS marks the file as dirty in the tree with a leading dot (`●`). |
+|  2 | On successful save, SYS removes the dot. |
 
 ### UC‑07  Exit Application
 | **Trigger** | Window close button or *Project ▸ Exit* |
@@ -112,16 +132,16 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditi
 | (Open|Save|Exit) (Undo|Redo|Copy|Paste|Cut)        |
 └────────────────────────────────────────────────────┘
 ┌─Toolbar────────────────────────────────────────────┐
-│ [Key|Source|Trans]  [Regex☑]  [🔍 Box]            │
+│ [Locales ▼] [Key|Source|Trans] [Regex☑] [🔍 Box] [Status ▼ (Proofread)] │
 └────────────────────────────────────────────────────┘
 ┌─QSplitter──────────────────────────────────────────┐
 │┌File Tree───────────┐┌Table (Key | Src | Trans)───┐│
 ││  files…            ││ key  | src  | translation ││
-││  sub/dir/file.txt  ││ …                         ││
+││  ● sub/dir/file.txt││ …                         ││
 │└────────────────────┘└────────────────────────────┘│
 └────────────────────────────────────────────────────┘
-┌─Bottom bar───────────────────────────────────────────────────────────────────┐
-│ [Locale ▼] [Status ▼] │ Status‑bar:  "Saved 12:34:56" | "BE" | Row 123 / 450 │
+┌─Status bar───────────────────────────────────────────────────────────────────┐
+│ "Saved 12:34:56" | Row 123 / 450                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 

@@ -53,7 +53,7 @@ Supporting files: `Makefile`, `pyproject.toml` (`.[dev]` extra + `PySide6-stubs`
 | **Concat preservation**                | Edited values collapse concat chains; spec requires preserving original `..` + trivia.                      |
 | **Cache layout**                       | Spec requires per‑file cache in root `.tzp-cache/`, EN hash index file; code uses per‑locale cache.         |
 | **Clean architecture**                 | `core` still depends on Qt (`QUndoStack`, `QUndoCommand`).                                                   |
-| **GUI**                                | No locale chooser, no EN Source column, no status inspector pane, no search dock.                            |
+| **GUI**                                | No locale chooser, no EN Source column, no status-in-toolbar wiring, no search dock.                        |
 | **Safety**                             | No unsaved-changes guard; crash‑recovery cache planned only.                                                  |
 
 ---
@@ -89,7 +89,7 @@ Supporting files: `Makefile`, `pyproject.toml` (`.[dev]` extra + `PySide6-stubs`
 | **P1**   | **Concat preservation** · store per-segment spans and reserialize without collapsing `..`.                                  | `core.parser`, `core.saver`                           |
 | **P1**   | **Cache layout** · per‑file `.tzp-cache` + EN hash index; write edited files only.                                          | `core.status_cache`, new `core.en_hash_cache`, GUI    |
 | **P2**   | **GUI locale chooser** · checkbox multi-select; multiple roots; EN used as Source only.                                     | `gui.main_window`, new dialog, `gui.fs_model`         |
-| **P2**   | **Status UI** · row colors + right-side inspector pane (Poedit‑like).                                                       | `gui.entry_model`, new `gui.delegates` + inspector    |
+| **P2**   | **Status UI** · row colors + toolbar Status label (selected row).                                                           | `gui.entry_model`, `gui.delegates`                    |
 | **P3**   | **Search** · search dock + regex mode + F3 navigation.                                                                      | `core.search`, `gui.search_dock`                      |
 | **P3**   | **Safety** · unsaved‑changes guard; crash‑recovery cache remains planned only.                                               | `gui.main_window`                                     |
 

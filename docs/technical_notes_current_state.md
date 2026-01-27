@@ -58,17 +58,22 @@ From latest clarification:
   multi-locale selection (checkboxes) to display multiple locales concurrently.
 - **English base**: EN is not edited; EN strings appear as Source; EN hashes
   tracked for change notifications and user acknowledgment to reset cache.
-- **Status UI**: status visible for every row (color), plus a right-side
-  inspector with icon + label for the selected row (Poedit-like).
+- **Status UI**: status visible for every row (color); toolbar **Status ▼**
+  shows the currently selected row status.
 - **Concat preservation**: edited values must preserve original `..` chains and
   trivia; no collapsing into single literals.
 - **File structure immutability**: comments, spacing, braces, line order, and
   all non‑literal bytes are treated as immutable; only translation literals may
   change.
+- **Parser/saver placement**: treated as infrastructure (behind interfaces),
+  not core domain.
+- **Testing**: core-first coverage; golden‑file tests are required for UTF‑8,
+  cp1251, and UTF‑16.
 - **Tree layout**: when multiple locales are selected, show **multiple roots**
   (one root per locale).
 - **EN hash cache**: single index file for all EN hashes (for now).
 - **Non-translatables**: `language.txt` and `credits.txt` are hidden in the tree.
+- **Dirty indicator**: file tree shows a dot (●) for unsaved edits.
 
 ---
 
