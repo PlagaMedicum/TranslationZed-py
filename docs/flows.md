@@ -11,8 +11,8 @@ App start
   -> hash EN files (raw bytes)
   -> if mismatch:
        show dialog "English source changed"
-       -> Acknowledge & Reset: rewrite EN hash index
-       -> Cancel: abort startup
+       -> Continue: rewrite EN hash index (dismiss reminder)
+       -> Dismiss: keep reminder and continue
 ```
 
 ---
@@ -26,6 +26,7 @@ User: Project ▸ Open
   -> read language.txt (charset + display name)
   -> show checkbox chooser (EN hidden)
   -> user selects locales
+  -> if none selected: abort opening
   -> build tree with multiple roots (one per locale)
   -> open first file in table
 ```

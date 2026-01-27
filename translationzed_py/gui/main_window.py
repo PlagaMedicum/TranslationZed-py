@@ -7,10 +7,13 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
+    QLabel,
     QMainWindow,
     QMessageBox,
     QSplitter,
     QTableView,
+    QToolBar,
     QTreeView,
 )
 from shiboken6 import isValid
@@ -29,6 +32,7 @@ from translationzed_py.core.status_cache import write as _write_status_cache
 from .entry_model import TranslationModel
 from .fs_model import FsModel
 from .commands import ChangeStatusCommand
+from .delegates import StatusDelegate
 from .dialogs import LocaleChooserDialog, SaveFilesDialog
 
 
@@ -61,6 +65,21 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(self)
         self.setCentralWidget(splitter)
 
+        # ── toolbar ────────────────────────────────────────────────────────
+        self.toolbar = QToolBar("Toolbar", self)
+        self.toolbar.setMovable(False)
+        self.addToolBar(self.toolbar)
+        self._updating_status_combo = False
+        self.toolbar.addWidget(QLabel("Status", self))
+        self.status_combo = QComboBox(self)
+        self.status_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        for st in Status:
+            self.status_combo.addItem(st.name.title(), st)
+        self.status_combo.setCurrentIndex(-1)
+        self.status_combo.setEnabled(False)
+        self.status_combo.currentIndexChanged.connect(self._status_combo_changed)
+        self.toolbar.addWidget(self.status_combo)
+
         # ── left pane: project tree ──────────────────────────────────────────
         self.tree = QTreeView()
         self._init_locales(selected_locales)
@@ -85,6 +104,8 @@ class MainWindow(QMainWindow):
 
         # ── right pane: entry table ─────────────────────────────────────────
         self.table = QTableView()
+        self._status_delegate = StatusDelegate(self.table)
+        self.table.setItemDelegateForColumn(3, self._status_delegate)
         splitter.addWidget(self.table)
 
         splitter.setSizes([220, 600])
@@ -260,6 +281,7 @@ class MainWindow(QMainWindow):
         if self._current_model:
             try:
                 self._current_model.dataChanged.disconnect(self._on_model_changed)
+                self._current_model.dataChanged.disconnect(self._on_model_data_changed)
             except (TypeError, RuntimeError):
                 pass
         self._current_model = TranslationModel(
@@ -269,7 +291,10 @@ class MainWindow(QMainWindow):
             source_values=source_values,
         )
         self._current_model.dataChanged.connect(self._on_model_changed)
+        self._current_model.dataChanged.connect(self._on_model_data_changed)
         self.table.setModel(self._current_model)
+        self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
+        self._update_status_combo_from_selection()
         if changed_keys:
             self.fs_model.set_dirty(self._current_pf.path, True)
 
@@ -426,6 +451,62 @@ class MainWindow(QMainWindow):
             return
         self._write_cache_current()
 
+    def _on_model_data_changed(self, top_left, bottom_right, roles=None) -> None:
+        if not self._current_model:
+            return
+        current = self.table.currentIndex()
+        if not current.isValid():
+            self._update_status_combo_from_selection()
+            return
+        row = current.row()
+        if top_left.row() <= row <= bottom_right.row():
+            if roles is None or Qt.EditRole in roles or Qt.DisplayRole in roles:
+                self._update_status_combo_from_selection()
+
+    def _on_selection_changed(self, _current, _previous) -> None:
+        self._update_status_combo_from_selection()
+
+    def _update_status_combo_from_selection(self) -> None:
+        if not self._current_model:
+            self._set_status_combo(None)
+            return
+        current = self.table.currentIndex()
+        if not current.isValid():
+            self._set_status_combo(None)
+            return
+        status = self._current_model.status_for_row(current.row())
+        self._set_status_combo(status)
+
+    def _set_status_combo(self, status: Status | None) -> None:
+        self._updating_status_combo = True
+        try:
+            if status is None:
+                self.status_combo.setEnabled(False)
+                self.status_combo.setCurrentIndex(-1)
+                return
+            self.status_combo.setEnabled(True)
+            for i in range(self.status_combo.count()):
+                if self.status_combo.itemData(i) == status:
+                    self.status_combo.setCurrentIndex(i)
+                    return
+            self.status_combo.setCurrentIndex(-1)
+        finally:
+            self._updating_status_combo = False
+
+    def _status_combo_changed(self, _index: int) -> None:
+        if self._updating_status_combo:
+            return
+        if not self._current_model:
+            return
+        current = self.table.currentIndex()
+        if not current.isValid():
+            return
+        status = self.status_combo.currentData()
+        if status is None:
+            return
+        model_index = self._current_model.index(current.row(), 3)
+        self._current_model.setData(model_index, status, Qt.EditRole)
+
     def _mark_proofread(self) -> None:
         if not (self._current_pf and self._current_model):
             return
@@ -438,6 +519,7 @@ class MainWindow(QMainWindow):
         )
         self._current_model.undo_stack.push(cmd)
         self._write_cache_current()
+        self._update_status_combo_from_selection()
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self._write_cache_current()
