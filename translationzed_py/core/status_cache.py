@@ -33,6 +33,10 @@ def _cache_path(root: Path, file_path: Path) -> Path:
     return root / cfg.cache_dir / rel_cache
 
 
+def cache_path(root: Path, file_path: Path) -> Path:
+    return _cache_path(root, file_path)
+
+
 def read(root: Path, file_path: Path) -> dict[int, CacheEntry]:
     """
     Read per-file cache, returning a mapping { key_hash: CacheEntry }.
