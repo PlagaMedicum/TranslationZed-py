@@ -26,3 +26,13 @@ def test_save_preserves_concat_structure(tmp_path):
 
     # preserve concat + trivia; only literals updated
     assert path.read_text(encoding="utf-8") == 'HELLO = "Hol"  ..  "a" -- cmt\n'
+
+
+def test_save_escapes_special_chars(tmp_path):
+    path = tmp_path / "file.txt"
+    path.write_text('A = "Hi"\n', encoding="utf-8")
+
+    pf = parse(path)
+    save(pf, {"A": "Line1\nLine2\\Path"})
+
+    assert path.read_text(encoding="utf-8") == 'A = "Line1\\nLine2\\\\Path"\n'

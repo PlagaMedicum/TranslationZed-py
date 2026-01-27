@@ -4,11 +4,18 @@ from pathlib import Path
 from typing import Any
 
 from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.atomic_io import write_text_atomic
+
 _BOOL_TRUE = {"1", "true", "yes", "on"}
 _BOOL_FALSE = {"0", "false", "no", "off"}
+_EXTRAS_KEY = "__extras__"
 
 _DEFAULTS: dict[str, Any] = {
     "prompt_write_on_exit": True,
+    "wrap_text": False,
+    "last_root": "",
+    "last_locales": [],
+    "window_geometry": "",
 }
 
 
@@ -26,6 +33,7 @@ def _parse_env(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     out: dict[str, Any] = {}
+    extras: dict[str, str] = {}
     try:
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -40,8 +48,24 @@ def _parse_env(path: Path) -> dict[str, Any]:
                     out["prompt_write_on_exit"] = True
                 elif val in _BOOL_FALSE:
                     out["prompt_write_on_exit"] = False
+            elif key == "WRAP_TEXT":
+                val = value.lower()
+                if val in _BOOL_TRUE:
+                    out["wrap_text"] = True
+                elif val in _BOOL_FALSE:
+                    out["wrap_text"] = False
+            elif key == "LAST_ROOT":
+                out["last_root"] = value
+            elif key == "LAST_LOCALES":
+                out["last_locales"] = [v.strip() for v in value.split(",") if v.strip()]
+            elif key == "WINDOW_GEOMETRY":
+                out["window_geometry"] = value
+            else:
+                extras[key] = value
     except OSError:
         return {}
+    if extras:
+        out[_EXTRAS_KEY] = extras
     return out
 
 
@@ -67,8 +91,13 @@ def load(root: Path | None = None) -> dict[str, Any]:
     Unknown keys are preserved.
     """
     merged = dict(_DEFAULTS)
+    extras: dict[str, str] = {}
     for base in _candidate_roots(root):
-        merged.update(_parse_env(_config_path(base)))
+        parsed = _parse_env(_config_path(base))
+        extras.update(parsed.pop(_EXTRAS_KEY, {}))
+        merged.update(parsed)
+    if extras:
+        merged[_EXTRAS_KEY] = extras
     return merged
 
 
@@ -76,12 +105,31 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     """Persist preferences to disk (atomic replace)."""
     path = _config_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    raw = "\n".join(
-        [
-            f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
-            "",
-        ]
-    )
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(raw, encoding="utf-8")
-    tmp.replace(path)
+    extras: dict[str, str] = dict(prefs.get(_EXTRAS_KEY, {}))
+    known_keys = {
+        "PROMPT_WRITE_ON_EXIT",
+        "WRAP_TEXT",
+        "LAST_ROOT",
+        "LAST_LOCALES",
+        "WINDOW_GEOMETRY",
+    }
+    lines = [
+        f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
+        f"WRAP_TEXT={'true' if prefs.get('wrap_text', False) else 'false'}",
+    ]
+    last_root = str(prefs.get("last_root", "")).strip()
+    if last_root:
+        lines.append(f"LAST_ROOT={last_root}")
+    last_locales = prefs.get("last_locales", [])
+    if isinstance(last_locales, (list, tuple)) and last_locales:
+        lines.append(f"LAST_LOCALES={','.join(str(v) for v in last_locales)}")
+    geometry = str(prefs.get("window_geometry", "")).strip()
+    if geometry:
+        lines.append(f"WINDOW_GEOMETRY={geometry}")
+    for key, value in extras.items():
+        if key in known_keys:
+            continue
+        lines.append(f"{key}={value}")
+    lines.append("")
+    raw = "\n".join(lines)
+    write_text_atomic(path, raw, encoding="utf-8")

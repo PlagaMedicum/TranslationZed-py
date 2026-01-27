@@ -7,6 +7,7 @@ from pathlib import Path
 import xxhash
 
 from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.atomic_io import write_bytes_atomic
 from translationzed_py.core.model import Entry, Status
 
 _MAGIC = b"TZC1"
@@ -116,7 +117,6 @@ def write(
         if status_file.exists():
             status_file.unlink()
         return
-    status_file.parent.mkdir(parents=True, exist_ok=True)
     buf = bytearray()
     buf += _HEADER.pack(_MAGIC, len(rows))
     for key_hash, status, value in rows:
@@ -127,6 +127,4 @@ def write(
             buf += _RECORD.pack(key_hash, status.value, 1, len(raw))
             buf += raw
     # atomic replace
-    tmp = status_file.with_name(status_file.name + ".tmp")
-    tmp.write_bytes(buf)
-    tmp.replace(status_file)
+    write_bytes_atomic(status_file, bytes(buf))

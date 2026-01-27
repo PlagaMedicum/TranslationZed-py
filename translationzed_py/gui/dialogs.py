@@ -21,10 +21,17 @@ from translationzed_py.core.project_scanner import LocaleMeta
 class LocaleChooserDialog(QDialog):
     """Checkbox chooser for target locales."""
 
-    def __init__(self, locales: Iterable[LocaleMeta], parent=None) -> None:
+    def __init__(
+        self,
+        locales: Iterable[LocaleMeta],
+        parent=None,
+        *,
+        preselected: Iterable[str] | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Select locales")
         self.setModal(True)
+        preselected_set = set(preselected or [])
 
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(QLabel("Choose locales to edit:"))
@@ -37,7 +44,7 @@ class LocaleChooserDialog(QDialog):
         for meta in sorted(locales, key=lambda m: m.code):
             label = f"{meta.code} — {meta.display_name}"
             box = QCheckBox(label, self)
-            box.setChecked(False)
+            box.setChecked(meta.code in preselected_set)
             self._boxes[meta.code] = box
             list_layout.addWidget(box)
 
