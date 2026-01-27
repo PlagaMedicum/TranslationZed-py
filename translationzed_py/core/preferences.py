@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+_DEFAULTS: dict[str, Any] = {
+    "prompt_write_on_exit": True,
+}
+
+
+def _config_dir() -> Path:
+    root = os.environ.get("XDG_CONFIG_HOME")
+    if root:
+        return Path(root) / "translationzed-py"
+    return Path.home() / ".config" / "translationzed-py"
+
+
+def _config_path() -> Path:
+    return _config_dir() / "settings.json"
+
+
+def load() -> dict[str, Any]:
+    """
+    Load preferences from disk, falling back to defaults.
+    Unknown keys are preserved.
+    """
+    path = _config_path()
+    data: dict[str, Any] = {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            data = {}
+    except FileNotFoundError:
+        data = {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    merged = dict(_DEFAULTS)
+    merged.update(data)
+    return merged
+
+
+def save(prefs: dict[str, Any]) -> None:
+    """Persist preferences to disk (atomic replace)."""
+    path = _config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw = json.dumps(prefs, ensure_ascii=True, indent=2, sort_keys=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(raw, encoding="utf-8")
+    tmp.replace(path)

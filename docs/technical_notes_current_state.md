@@ -46,8 +46,9 @@ From latest clarification:
 - **Program-generated comments**: writable *only* if they are clearly marked as
   app-generated; all other comments are read-only. (Planned post-MVP.)
 - **Cache scope**: per-file cache (one cache file per translation file).
-- **Edited files only**: cache is written for edited files only; auto-written on
-  edit and file switch. Draft values are stored only for changed keys.
+- **Edited files only**: cache files exist only when statuses or draft values
+  are present; auto-written on edit and file switch. Draft values are stored
+  only for changed keys.
 - **Encoding**: one encoding per locale (shared across files in that locale).
 - **English diff**: track English file hashes (raw bytes) for change signaling.
 - **Architecture**: strict separation; core must not depend on Qt from the start.
@@ -75,6 +76,7 @@ From latest clarification:
 - **EN hash cache**: single index file for all EN hashes (for now).
 - **Non-translatables**: `language.txt` and `credits.txt` are hidden in the tree.
 - **Dirty indicator**: file tree shows a dot (●) for unsaved edits.
+- **Exit prompt**: controlled by preference `prompt_write_on_exit` (default true).
 
 ---
 

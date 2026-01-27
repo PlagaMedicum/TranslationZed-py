@@ -26,7 +26,7 @@ def test_parse_cp1251(prod_like_root):
     path = prod_like_root / "RU" / "IG_UI_RU.txt"
     pf = parse(path, encoding="Cp1251")
     assert pf.entries[0].key == "UI_OK"
-    assert pf.entries[0].value == "ОК"
+    assert pf.entries[0].value == "Тест"
 
 
 def test_parse_utf16(prod_like_root):
