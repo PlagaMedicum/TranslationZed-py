@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
 )
 
 from translationzed_py.core import parse
-from translationzed_py.core.commands import ChangeStatusCommand
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
 from translationzed_py.core.status_cache import (
@@ -27,6 +26,7 @@ from translationzed_py.core.status_cache import (
 
 from .entry_model import TranslationModel
 from .fs_model import FsModel
+from .commands import ChangeStatusCommand
 
 
 class MainWindow(QMainWindow):
@@ -129,7 +129,7 @@ class MainWindow(QMainWindow):
         for old in (self.act_undo, self.act_redo):
             if old:
                 self.removeAction(old)
-        stack = pf.undo_stack
+        stack = self._current_model.undo_stack
         self.act_undo = stack.createUndoAction(self, "&Undo")
         self.act_redo = stack.createRedoAction(self, "&Redo")
         self.act_undo.setShortcut(QKeySequence.StandardKey.Undo)
@@ -177,4 +177,4 @@ class MainWindow(QMainWindow):
         cmd = ChangeStatusCommand(
             self._current_pf, row, Status.PROOFREAD, self._current_model
         )
-        self._current_pf.undo_stack.push(cmd)
+        self._current_model.undo_stack.push(cmd)

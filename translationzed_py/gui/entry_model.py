@@ -9,7 +9,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QUndoStack
 
 from translationzed_py.core import Entry, Status
-from translationzed_py.core.commands import ChangeStatusCommand, EditValueCommand
+from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 from translationzed_py.core.model import ParsedFile
 
 _HEADERS = ("Key", "Value", "Status")
@@ -29,9 +29,7 @@ class TranslationModel(QAbstractTableModel):
         self._entries = list(pf.entries)
         self._dirty = False
 
-        # attach a QUndoStack lazily to the ParsedFile object
-        if not hasattr(self._pf, "undo_stack"):
-            self._pf.undo_stack = QUndoStack()  # type: ignore[attr-defined]
+        self.undo_stack = QUndoStack()
 
     # ---------------------------------------------------------------- helpers
     def _replace_entry(self, row: int, entry: Entry) -> None:
@@ -119,7 +117,7 @@ class TranslationModel(QAbstractTableModel):
                     new_entry,
                     self,
                 )
-                self._pf.undo_stack.push(cmd)
+                self.undo_stack.push(cmd)
                 return True
 
         # ---- status edit ---------------------------------------------------
@@ -130,7 +128,7 @@ class TranslationModel(QAbstractTableModel):
                 return False
             if st != e.status:
                 cmd = ChangeStatusCommand(self._pf, row, st, self)
-                self._pf.undo_stack.push(cmd)
+                self.undo_stack.push(cmd)
                 return True
 
         return False

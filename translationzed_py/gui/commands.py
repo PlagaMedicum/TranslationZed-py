@@ -4,7 +4,7 @@ from typing import Any
 
 from PySide6.QtGui import QUndoCommand
 
-from .model import Entry, ParsedFile, Status
+from translationzed_py.core.model import Entry, ParsedFile, Status
 
 
 class EditValueCommand(QUndoCommand):
