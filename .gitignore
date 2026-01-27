@@ -24,13 +24,11 @@ env/
 .coverage
 htmlcov/
 .tzp-cache/
-.tzp-config/
 
 # ─── Dev tool config ───────────────────────────────────────────────────────────
 .idea/
 .vscode/
 *.code-workspace
-.env
 
 # ─── OS noise ──────────────────────────────────────────────────────────────────
 .DS_Store
