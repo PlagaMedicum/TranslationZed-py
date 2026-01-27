@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import codecs
 import enum
 import re
 from collections.abc import Iterable
@@ -41,34 +42,67 @@ class Tok:
 
 # ── Regex table (spec §5.2) ───────────────────────────────────────────────────
 _PATTERNS = [
-    (Kind.TRIVIA, rb"[ \t]+"),
-    (Kind.NEWLINE, rb"\r?\n"),
-    (Kind.COMMENT, rb"--[^\n]*"),  # spec §5.2 :contentReference[oaicite:3]{index=3}
-    (Kind.KEY, rb"[A-Za-z0-9_]+"),  # mixed-case identifiers
-    (Kind.EQUAL, rb"="),
-    (Kind.CONCAT, rb"\.\."),
-    (Kind.STRING, rb'"(?:\\.|[^"])*"'),  # back-slash escapes
+    (Kind.TRIVIA, r"[ \t]+"),
+    (Kind.NEWLINE, r"\r?\n"),
+    (Kind.COMMENT, r"--[^\n]*"),
+    (Kind.KEY, r"[A-Za-z0-9_]+"),
+    (Kind.EQUAL, r"="),
+    (Kind.CONCAT, r"\.\."),
+    (Kind.STRING, r'"(?:\\.|[^"])*"'),  # back-slash escapes
 ]
 _TOKEN_RE = re.compile(
-    b"|".join(rf"(?P<{k.name}>{p.decode()})".encode() for k, p in _PATTERNS),
+    "|".join(rf"(?P<{k.name}>{p})" for k, p in _PATTERNS),
     re.DOTALL,
 )
 
 
+def _encoding_for_offsets(encoding: str, raw: bytes) -> tuple[str, int]:
+    enc = encoding.lower().replace("_", "-")
+    if enc in {"utf-16", "utf16"}:
+        if raw.startswith(b"\xff\xfe"):
+            return "utf-16-le", 2
+        if raw.startswith(b"\xfe\xff"):
+            return "utf-16-be", 2
+        return "utf-16-le", 0
+    return encoding, 0
+
+
+def _build_offset_map(text: str, encoding: str) -> list[int]:
+    encoder = codecs.getincrementalencoder(encoding)()
+    offsets = [0]
+    total = 0
+    for ch in text:
+        total += len(encoder.encode(ch))
+        offsets.append(total)
+    return offsets
+
+
 # ── The generator the test asked about ────────────────────────────────────────
 def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
+    text = data.decode(encoding)
+    enc_for_map, bom_len = _encoding_for_offsets(encoding, data)
+    offsets = _build_offset_map(text, enc_for_map)
+    expected_len = len(data) - bom_len
+    if offsets[-1] != expected_len:
+        raise ValueError(
+            f"Encoding length mismatch: expected {expected_len}, got {offsets[-1]}"
+        )
+
     pos = 0
-    while pos < len(data):
-        m = _TOKEN_RE.match(data, pos)
+    while pos < len(text):
+        m = _TOKEN_RE.match(text, pos)
         if not m:
-            raise SyntaxError(f"Unknown byte sequence at {pos}")
+            raise SyntaxError(f"Unknown sequence at {pos}")
 
         group = m.lastgroup
         assert group is not None  # narrow the type for mypy
         kind = Kind[group]  # now str, not str|None
 
-        span = (m.start(), m.end())
-        yield Tok(kind, span, m.group().decode(encoding, "replace"))
+        span = (
+            offsets[m.start()] + bom_len,
+            offsets[m.end()] + bom_len,
+        )
+        yield Tok(kind, span, m.group())
         pos = m.end()
 
 

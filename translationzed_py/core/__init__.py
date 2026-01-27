@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from .model import Entry, ParsedFile, Status
 from .parser import parse
-from .project_scanner import scan_root
+from .project_scanner import LocaleMeta, list_translatable_files, scan_root
 
 __all__ = [
     "scan_root",
+    "list_translatable_files",
     "parse",
+    "LocaleMeta",
     "Entry",
     "Status",
     "ParsedFile",
