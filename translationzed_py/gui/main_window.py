@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QTableView,
     QTreeView,
 )
+from shiboken6 import isValid
 
 from translationzed_py.core import LocaleMeta, parse, scan_root
 from translationzed_py.core.model import Status
@@ -106,12 +107,43 @@ class MainWindow(QMainWindow):
         return rel.parts[0]
 
     # ----------------------------------------------------------------- slots
+    def _prompt_unsaved(self) -> str:
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Unsaved changes")
+        msg.setText("Save changes to the current file?")
+        msg.setInformativeText("Your changes will be lost if you discard them.")
+        msg.setStandardButtons(
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel
+        )
+        result = msg.exec()
+        if result == QMessageBox.StandardButton.Save:
+            return "save"
+        if result == QMessageBox.StandardButton.Discard:
+            return "discard"
+        return "cancel"
+
     def _file_chosen(self, index) -> None:
         """Populate table when user activates a .txt file."""
         raw_path = index.data(Qt.UserRole)  # FsModel stores absolute path string
         path = Path(raw_path) if raw_path else None
         if not (path and path.suffix == ".txt"):
             return
+        if self._current_model and getattr(self._current_model, "_dirty", False):
+            decision = self._prompt_unsaved()
+            if decision == "cancel":
+                return
+            if decision == "save":
+                if not self._save_current():
+                    return
+            else:
+                # discard edits
+                if self._current_pf:
+                    self.fs_model.set_dirty(self._current_pf.path, False)
+                self._current_model._dirty = False
+                self._current_model.clear_changed_values()
         locale = self._locale_for_path(path)
         encoding = self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
         try:
@@ -130,13 +162,20 @@ class MainWindow(QMainWindow):
                 # Entry is frozen → use object.__setattr__
                 object.__setattr__(e, "status", self._status_map[h])
         self._current_pf = pf
+        if self._current_model:
+            try:
+                self._current_model.dataChanged.disconnect(self._on_model_changed)
+            except (TypeError, RuntimeError):
+                pass
         self._current_model = TranslationModel(pf)
+        self._current_model.dataChanged.connect(self._on_model_changed)
         self.table.setModel(self._current_model)
 
         # (re)create undo/redo actions bound to this file’s stack
         for old in (self.act_undo, self.act_redo):
-            if old:
+            if old and isValid(old):
                 self.removeAction(old)
+                old.deleteLater()
         stack = self._current_model.undo_stack
         self.act_undo = stack.createUndoAction(self, "&Undo")
         self.act_redo = stack.createRedoAction(self, "&Redo")
@@ -146,12 +185,12 @@ class MainWindow(QMainWindow):
             self.addAction(a)
 
 
-    def _save_current(self) -> None:
+    def _save_current(self) -> bool:
         """Patch file on disk if there are unsaved edits in the table model."""
         if not (self._current_pf and self._current_model):
-            return
+            return True
         if not getattr(self._current_model, "_dirty", False):
-            return
+            return True
 
         changed = self._current_model.changed_values()
         try:
@@ -168,8 +207,17 @@ class MainWindow(QMainWindow):
 
             self._current_model._dirty = False
             self._current_model.clear_changed_values()
+            self.fs_model.set_dirty(self._current_pf.path, False)
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
+            return False
+        return True
+
+    def _on_model_changed(self, *_args) -> None:
+        if not (self._current_pf and self._current_model):
+            return
+        if getattr(self._current_model, "_dirty", False):
+            self.fs_model.set_dirty(self._current_pf.path, True)
 
     def _mark_proofread(self) -> None:
         if not (self._current_pf and self._current_model):
@@ -182,3 +230,4 @@ class MainWindow(QMainWindow):
             self._current_pf, row, Status.PROOFREAD, self._current_model
         )
         self._current_model.undo_stack.push(cmd)
+        self.fs_model.set_dirty(self._current_pf.path, True)
