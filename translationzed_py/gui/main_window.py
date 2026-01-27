@@ -4,8 +4,8 @@ import time
 from pathlib import Path
 
 import xxhash
-from PySide6.QtCore import QByteArray, QItemSelectionModel, QTimer, Qt
-from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
+from PySide6.QtCore import QByteArray, QItemSelectionModel, QTimer, Qt, QUrl
+from PySide6.QtGui import QAction, QDesktopServices, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QTableView,
     QToolBar,
+    QToolButton,
     QTreeView,
 )
 from shiboken6 import isValid
@@ -114,6 +115,12 @@ class MainWindow(QMainWindow):
         self.regex_check = QCheckBox("Regex", self)
         self.regex_check.stateChanged.connect(self._schedule_search)
         self.toolbar.addWidget(self.regex_check)
+        self.regex_help = QToolButton(self)
+        self.regex_help.setText("?")
+        self.regex_help.setToolTip("Regex help (Python re)")
+        self.regex_help.setAutoRaise(True)
+        self.regex_help.clicked.connect(self._open_regex_help)
+        self.toolbar.addWidget(self.regex_help)
         self.search_edit = QLineEdit(self)
         self.search_edit.setPlaceholderText("Search")
         self.search_edit.textChanged.connect(self._schedule_search)
@@ -682,6 +689,9 @@ class MainWindow(QMainWindow):
     def _focus_search(self) -> None:
         self.search_edit.setFocus()
         self.search_edit.selectAll()
+
+    def _open_regex_help(self) -> None:
+        QDesktopServices.openUrl(QUrl("https://docs.python.org/3/library/re.html"))
 
     def _schedule_search(self, *_args) -> None:
         if self._search_timer.isActive():

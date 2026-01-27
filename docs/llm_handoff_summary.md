@@ -53,10 +53,10 @@ fixtures in `tests/fixtures/prod_like/`.
 
 | Area | Gap |
 | ---- | --- |
-| **Status bar** | No “Saved HH:MM:SS” / row index indicator yet. |
-| **Golden tests** | Golden‑file tests for UTF‑8/cp1251/UTF‑16 not added. |
-| **Core search** | Search lives in GUI; needs core module for clean separation. |
-| **Last‑opened** | Cache header timestamp tracking not implemented yet. |
+| **Status bar** | Implemented (Saved time + row index + path). |
+| **Golden tests** | Implemented for UTF‑8/cp1251/UTF‑16. |
+| **Core search** | Implemented in `core.search`; GUI delegates to core. |
+| **Last‑opened** | Implemented via cache header timestamps. |
 | **Status-only dots** | Explicitly **no** until a future option enables status comments in originals. |
 | **Search snippets** | Future idea; not required for v0.1. |
 

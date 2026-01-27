@@ -308,8 +308,8 @@ Encoding                     language.txt per locale      Implemented
 Atomic save                  tmp + fsync + replace        tmp + replace + fsync (best-effort)
 Status cache                 per file (1:1)               Implemented per file
 Concat preservation           Preserve original chains      Currently flattens on edit
-Search dock                  live search + F3             Implemented (toolbar + debounce)
-Core search separation       core.search module           Not implemented (required); no snippets in v0.1
+Search dock                  live search + F3             Implemented (core.search + GUI)
+Core search separation       core.search module           Implemented (no snippets in v0.1)
 Unsaved guard                on locale switch/exit        Exit prompt only (no switch guard)
 Wrap text toggle             View menu toggle             Implemented (wrap + preference)
 Preferences UI               prompt_write_on_exit toggle  Implemented (View menu)
@@ -326,7 +326,7 @@ Open project -> pick locale   Locale chooser + multi-root tree
 Open file -> table appears    Table populated on activate/double-click
 Edit translations quickly     Works only after model is set
 Proofread workflow            Ctrl+P + Status combo
-Search + navigation           Toolbar search + F3/Shift+F3 (GUI-level)
+Search + navigation           Toolbar search + F3/Shift+F3 (core.search)
 Save status persistence       Cache written for opened files only
 ```
 

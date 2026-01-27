@@ -273,6 +273,7 @@ if dirty_files and not prompt_save():
   Row copy is **tab-delimited**: `Key\tSource\tValue\tStatus`.
   Row selection is achieved via row header; cell selection remains enabled.
 - Status bar shows `Saved HH:MM:SS | Row i / n | <locale/relative/path>`.
+- Regex help: a small **“?”** button opens Python `re` docs in the browser.
 
 ### 5.7.1  UI Guidelines (GNOME + KDE)
 

@@ -28,6 +28,18 @@ def save(
                 remaining = remaining[seg_len:]
         return parts
 
+    def _normalize_encoding(enc: str, raw: bytes) -> str:
+        norm = enc.lower().replace("_", "-")
+        if norm in {"utf-16", "utf16"}:
+            if raw.startswith(b"\xff\xfe"):
+                return "utf-16-le"
+            if raw.startswith(b"\xfe\xff"):
+                return "utf-16-be"
+            return "utf-16-le"
+        return enc
+
+    literal_encoding = _normalize_encoding(encoding, buf)
+
     def _escape_literal(text: str) -> str:
         return (
             text.replace("\\", "\\\\")
@@ -39,7 +51,7 @@ def save(
 
     def _encode_literal(text: str) -> bytes:
         escaped = _escape_literal(text)
-        return f'"{escaped}"'.encode(encoding)
+        return f'"{escaped}"'.encode(literal_encoding)
 
     replacements: list[tuple[int, int, bytes]] = []
     changed_by_index: dict[int, tuple[str, tuple[int, ...], int]] = {}

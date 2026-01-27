@@ -156,7 +156,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Dots shown on startup for files with cached draft values
   - Dots update immediately on edit/save
 
-### Step 13 — Status bar + UX polish [ ] (next)
+### Step 13 — Status bar + UX polish [✓]
 - Touchpoints: `gui/main_window.py`
 - Acceptance:
   - Status bar shows “Saved HH:MM:SS”
@@ -165,13 +165,13 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Status bar updates on selection change (row index + file)
   - Use native icons (Qt theme) and standard spacing to align with GNOME/KDE HIG
 
-### Step 14 — Golden‑file tests [ ] (next)
+### Step 14 — Golden‑file tests [✓]
 - Touchpoints: `tests/fixtures/*`, `tests/test_roundtrip.py` or new tests
 - Acceptance:
   - Golden inputs/outputs for UTF‑8, cp1251, UTF‑16
   - Byte‑exact comparison after edit
 
-### Step 15 — Core search interface (clean separation) [ ] (required)
+### Step 15 — Core search interface (clean separation) [✓] (required)
 - Touchpoints: `core/search.py`, `gui/main_window.py`
 - Acceptance:
   - GUI uses core search module instead of direct model scanning
@@ -201,8 +201,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 [✓] EN hash warning  
 [✓] Search with regex + F3 navigation  
 [✓] Preferences: prompt on exit + wrap text  
-[ ] Status bar feedback (Saved time + row index)  
-[ ] Golden‑file tests for encodings  
+[✓] Status bar feedback (Saved time + row index)  
+[✓] Golden‑file tests for encodings  
 
 ---
 
