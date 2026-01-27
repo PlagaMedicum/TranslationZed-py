@@ -12,7 +12,7 @@ from translationzed_py.core import Entry, Status
 from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 from translationzed_py.core.model import ParsedFile
 
-_HEADERS = ("Key", "Source", "Value", "Status")
+_HEADERS = ("Key", "Source", "Translation", "Status")
 _BG = {
     Status.PROOFREAD: QColor("#ccffcc"),
 }
@@ -144,7 +144,7 @@ class TranslationModel(QAbstractTableModel):
 
     def flags(self, index: QModelIndex):  # noqa: N802
         base = super().flags(index)
-        if index.column() in (2, 3):  # Value & Status columns
+        if index.column() in (2, 3):  # Translation & Status columns
             return base | Qt.ItemIsEditable
         return base
 
