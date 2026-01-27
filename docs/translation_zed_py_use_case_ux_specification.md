@@ -117,7 +117,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |-------|-------|
 | **Goal** | Centralize non‑frequent settings to keep the toolbar uncluttered. |
 | **Primary Actor** | TR / PR |
-| **Trigger** | Menu → **Preferences…** (shortcut TBD). |
+| **Trigger** | General → **Preferences…** (shortcut TBD). |
 | **Main Success Scenario** |
 |  1 | SYS opens a Preferences window with grouped sections. |
 |  2 | SYS presents groups: **General**, **Search & Replace**, **View**. |
