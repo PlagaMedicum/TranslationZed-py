@@ -1,0 +1,75 @@
+# TranslationZed-Py — Testing Strategy
+_Last updated: 2026-01-27_
+
+---
+
+## 1) Priorities
+
+1) **Core correctness first** (parser/saver/cache/metadata).
+2) **GUI smoke + integration** second (Qt event wiring).
+3) Keep tests deterministic and runnable headless.
+
+---
+
+## 2) Test Layers
+
+### 2.1 Core Unit Tests (highest priority)
+- Parser tokenization and span integrity.
+- UTF‑8 / cp1251 / UTF‑16 decoding behavior.
+- Concat preservation in save (no collapsing).
+- Status cache read/write for edited files only.
+- EN hash cache index read/write (planned).
+
+### 2.2 Integration Tests
+- Open project, select locale, load table.
+- Edit + save path writes file + cache.
+- EN hash change dialog (when implemented).
+
+### 2.3 GUI Smoke Tests
+- App starts headless (`QT_QPA_PLATFORM=offscreen`).
+- Table renders, basic editing works.
+
+---
+
+## 3) Golden‑File Tests (definition)
+
+**Golden‑file tests** compare *entire file bytes* after an edit against a stored,
+expected output (“golden”). This is the strongest guarantee for byte‑exact
+preservation of structure, comments, and whitespace.
+
+Example concept:
+```
+input.txt   -> edit one translation -> output bytes == expected.txt
+```
+
+Benefits:
+- Detects any accidental formatting changes.
+- Guards concat‑preservation logic.
+
+Cost:
+- Requires maintaining expected files if format rules change.
+
+Decision: maintain a **golden set** for UTF‑8, cp1251, and UTF‑16 to guarantee
+byte‑exact preservation across encodings. Core tests already include
+production‑like fixtures; golden outputs will be added for all three encodings.
+
+---
+
+## 4) Fixtures
+
+Production‑like fixtures live in:
+```
+tests/fixtures/prod_like/
+```
+They include:
+- Non‑2‑letter locales (`EN UK`, `PTBR`)
+- UTF‑16 (KO) and cp1251 (RU)
+- Subfolders with punctuation
+- `_TVRADIO_TRANSLATIONS` to ignore
+
+---
+
+## 5) Coverage Goals
+
+- Core modules: target ≥ 95% line coverage.
+- GUI: smoke and integration coverage sufficient to validate wiring.

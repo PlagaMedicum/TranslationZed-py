@@ -32,10 +32,13 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
   immutable base** and is not edited directly.
 - Present file tree (with sub‑dirs) and a 3‑column table (Key | Source | Translation),
   where **Source** is the English string by default; **EN is not editable**.
+- One file open at a time in the table (no tabs in MVP).
 - Status per Entry: **Untouched** (initial state), **Translated**, **Proofread**.  Future statuses pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
 - Live plain / regex search over Key / Source / Translation with `F3` / `Shift+F3` navigation.
 - Reference‑locale switching without reloading UI (future; English is base in MVP).
+- On startup, check EN hash cache; if changed, show a confirmation dialog to
+  reset the cache to the new EN version.
 - Atomic multi‑file save; prompt on unsaved changes for *locale switch* or *exit*.
 - Clipboard, wrap‑text (View menu), keyboard navigation.
 
@@ -87,6 +90,13 @@ Component diagram:
        ↑                                ↓
    project_scanner       saver  ←------+
 ```
+
+Layering (target):
+- **Core (domain)**: data model + use cases; no Qt dependencies.
+- **Infrastructure**: parser/saver/cache implementations behind interfaces.
+- **GUI adapters**: Qt widgets + models binding to core use cases.
+Interfaces should be **explicit but minimal**, justified by future replaceability
+(alternate formats, storage backends). Avoid over‑engineering.
 
 ---
 
@@ -209,10 +219,11 @@ if dirty_files and not prompt_save():
 ```
 
 - **Status ▼** triggers `set_selected_status(status)` on TranslationTableModel.
-- Status UI: table shows per-row status (colors); a right-side inspector pane
-  shows icon + label for the currently selected row (Poedit-like).
+- Status UI: table shows per-row status (colors); the **Status ▼** label shows
+  the currently selected row status.
 - Locale selection uses checkboxes for multi-select; EN is excluded from the
   editable tree and used as Source. The left tree shows **one root per locale**.
+- File tree shows a **dirty dot (●)** prefix for files with unsaved edits.
 
 ### 5.8  `gui.translation_table`  `gui.translation_table`
 
@@ -282,7 +293,7 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
    tree with **multiple roots** (one per selected locale); EN excluded from
    tree but used as Source.
 6. **Editing Capabilities** – cell editing + undo/redo; status coloring and
-   a right‑side status inspector pane (Poedit‑like).
+   toolbar **Status ▼** label reflects the selected row.
 7. **Cache & EN Hashes** – per‑file status cache at
    `<root>/.tzp-cache/<locale>/<relative>.tzstatus.bin`, written only for edited
    files; EN hash cache as a single index file
