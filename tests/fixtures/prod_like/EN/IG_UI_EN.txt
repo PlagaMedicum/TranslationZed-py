@@ -1,0 +1,2 @@
+UI_OK = "OK"
+UI_CANCEL = "Cancel"
