@@ -23,8 +23,8 @@ def test_undo_redo(qtbot):
 
         assert pf.entries[0].value == "Bonjour"
 
-        pf.undo_stack.undo()
+        model.undo_stack.undo()
         assert pf.entries[0].value == "Hi"
 
-        pf.undo_stack.redo()
+        model.undo_stack.redo()
         assert pf.entries[0].value == "Bonjour"
