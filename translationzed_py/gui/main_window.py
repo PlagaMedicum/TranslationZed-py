@@ -67,6 +67,7 @@ from .fs_model import FsModel
 from .commands import ChangeStatusCommand
 from .delegates import StatusDelegate
 from .dialogs import LocaleChooserDialog, SaveFilesDialog
+from .preferences_dialog import PreferencesDialog
 
 
 class MainWindow(QMainWindow):
@@ -77,7 +78,34 @@ class MainWindow(QMainWindow):
     ) -> None:
         super().__init__()
         self._startup_aborted = False
-        self._root = Path(project_root or ".").resolve()
+        self._root = Path(".").resolve()
+        self._default_root = ""
+        if project_root is None:
+            prefs_global = _load_preferences(None)
+            default_root = str(prefs_global.get("default_root", "")).strip()
+            if default_root and Path(default_root).exists():
+                self._root = Path(default_root).resolve()
+                self._default_root = default_root
+            else:
+                picked = QFileDialog.getExistingDirectory(
+                    self, "Select Project Root", str(Path.cwd())
+                )
+                if not picked:
+                    self._startup_aborted = True
+                    return
+                self._root = Path(picked).resolve()
+                self._default_root = str(self._root)
+                prefs_global["default_root"] = self._default_root
+                try:
+                    _save_preferences(prefs_global, None)
+                except Exception:
+                    pass
+        else:
+            self._root = Path(project_root).resolve()
+        if not self._root.exists():
+            QMessageBox.warning(self, "Invalid project root", str(self._root))
+            self._startup_aborted = True
+            return
         self.setWindowTitle(f"TranslationZed – {self._root}")
         self._locales: dict[str, LocaleMeta] = {}
         self._selected_locales: list[str] = []
@@ -96,6 +124,13 @@ class MainWindow(QMainWindow):
         prefs = _load_preferences(self._root)
         self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
         self._wrap_text = bool(prefs.get("wrap_text", False))
+        self._default_root = str(prefs.get("default_root", "") or self._default_root)
+        self._search_scope = str(prefs.get("search_scope", "FILE")).upper()
+        if self._search_scope not in {"FILE", "LOCALE", "POOL"}:
+            self._search_scope = "FILE"
+        self._replace_scope = str(prefs.get("replace_scope", "FILE")).upper()
+        if self._replace_scope not in {"FILE", "LOCALE", "POOL"}:
+            self._replace_scope = "FILE"
         self._last_locales = list(prefs.get("last_locales", []) or [])
         self._last_root = str(prefs.get("last_root", "") or self._root)
         self._prefs_extras = dict(prefs.get("__extras__", {}))
@@ -228,7 +263,7 @@ class MainWindow(QMainWindow):
         self._search_column = 0
         self._last_saved_text = ""
         self._search_index_by_file: dict[Path, list[_SearchRow]] = {}
-        self._search_index_locales: tuple[str, ...] | None = None
+        self._search_index_key: tuple | None = None
         self._suppress_search_update = False
         self._replace_visible = False
         self._skip_search_autoselect = False
@@ -237,7 +272,7 @@ class MainWindow(QMainWindow):
 
         # ── menu bar ───────────────────────────────────────────────────────
         menubar = self.menuBar()
-        self.menu_project = menubar.addMenu("Project")
+        self.menu_general = menubar.addMenu("General")
         self.menu_edit = menubar.addMenu("Edit")
         self.menu_view = menubar.addMenu("View")
 
@@ -297,11 +332,17 @@ class MainWindow(QMainWindow):
         act_exit.setShortcut(QKeySequence.StandardKey.Quit)
         act_exit.triggered.connect(self.close)
         self.addAction(act_exit)
-        self.menu_project.addAction(act_open)
-        self.menu_project.addAction(act_save)
-        self.menu_project.addAction(act_switch)
-        self.menu_project.addSeparator()
-        self.menu_project.addAction(act_exit)
+        act_prefs = QAction("&Preferences…", self)
+        act_prefs.setShortcut(QKeySequence.StandardKey.Preferences)
+        act_prefs.triggered.connect(self._open_preferences)
+        self.addAction(act_prefs)
+        self.menu_general.addAction(act_open)
+        self.menu_general.addAction(act_save)
+        self.menu_general.addAction(act_switch)
+        self.menu_general.addSeparator()
+        self.menu_general.addAction(act_prefs)
+        self.menu_general.addSeparator()
+        self.menu_general.addAction(act_exit)
 
         act_copy = QAction("&Copy", self)
         act_copy.setShortcut(QKeySequence.StandardKey.Copy)
@@ -345,6 +386,48 @@ class MainWindow(QMainWindow):
         self.menu_view.addAction(act_prompt)
 
         # ── cache ──────────────────────────────────────────────────────
+        self._search_scope_widget, self._search_scope_action, self._search_scope_icon = (
+            self._build_scope_indicator("edit-find", "Search scope")
+        )
+        self._replace_scope_widget, self._replace_scope_action, self._replace_scope_icon = (
+            self._build_scope_indicator("edit-find-replace", "Replace scope")
+        )
+        self.statusBar().addPermanentWidget(self._search_scope_widget)
+        self.statusBar().addPermanentWidget(self._replace_scope_widget)
+        self._update_status_bar()
+
+    def _build_scope_indicator(self, icon_name: str, tooltip: str):
+        widget = QWidget(self)
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(4, 0, 4, 0)
+        layout.setSpacing(2)
+        action = QLabel(widget)
+        scope = QLabel(widget)
+        layout.addWidget(action)
+        layout.addWidget(scope)
+        action.setPixmap(
+            QIcon.fromTheme(
+                icon_name,
+                self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView),
+            ).pixmap(14, 14)
+        )
+        widget.setVisible(False)
+        widget.setToolTip(tooltip)
+        return widget, action, scope
+
+    def _scope_icon(self, scope: str) -> QIcon:
+        if scope == "FILE":
+            return QIcon.fromTheme(
+                "text-x-generic", self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon)
+            )
+        if scope == "LOCALE":
+            return QIcon.fromTheme(
+                "folder", self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon)
+            )
+        return QIcon.fromTheme(
+            "view-list-tree",
+            self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon),
+        )
 
     def _init_locales(self, selected_locales: list[str] | None) -> None:
         self._locales = scan_root(self._root)
@@ -475,6 +558,42 @@ class MainWindow(QMainWindow):
         win.show()
         self._child_windows.append(win)
 
+    def _open_preferences(self) -> None:
+        prefs = {
+            "default_root": self._default_root,
+            "prompt_write_on_exit": self._prompt_write_on_exit,
+            "wrap_text": self._wrap_text,
+            "search_scope": self._search_scope,
+            "replace_scope": self._replace_scope,
+        }
+        dialog = PreferencesDialog(prefs, parent=self)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        self._apply_preferences(dialog.values())
+
+    def _apply_preferences(self, values: dict) -> None:
+        self._prompt_write_on_exit = bool(values.get("prompt_write_on_exit", True))
+        self._wrap_text = bool(values.get("wrap_text", False))
+        self.table.setWordWrap(self._wrap_text)
+        self.table.resizeRowsToContents()
+        self._default_root = str(values.get("default_root", "")).strip()
+        search_scope = str(values.get("search_scope", "FILE")).upper()
+        if search_scope not in {"FILE", "LOCALE", "POOL"}:
+            search_scope = "FILE"
+        replace_scope = str(values.get("replace_scope", "FILE")).upper()
+        if replace_scope not in {"FILE", "LOCALE", "POOL"}:
+            replace_scope = "FILE"
+        if search_scope != self._search_scope:
+            self._search_scope = search_scope
+            self._search_index_by_file.clear()
+            self._search_index_key = None
+            if self.search_edit.text():
+                self._schedule_search()
+        self._replace_scope = replace_scope
+        self._persist_preferences()
+        self._update_replace_enabled()
+        self._update_status_bar()
+
     def _switch_locales(self) -> None:
         if not self._write_cache_current():
             return
@@ -494,7 +613,7 @@ class MainWindow(QMainWindow):
         self._search_matches = []
         self._search_index = -1
         self._search_index_by_file.clear()
-        self._search_index_locales = None
+        self._search_index_key = None
         self.table.setModel(None)
         self._set_status_combo(None)
         self.fs_model = FsModel(self._root, [self._locales[c] for c in self._selected_locales])
@@ -829,6 +948,7 @@ class MainWindow(QMainWindow):
 
     def _schedule_search(self, *_args) -> None:
         self._update_replace_enabled()
+        self._update_status_bar()
         if self._search_timer.isActive():
             self._search_timer.stop()
         self._search_timer.start()
@@ -843,6 +963,7 @@ class MainWindow(QMainWindow):
             self._align_replace_bar()
             QTimer.singleShot(0, self._align_replace_bar)
         self._update_replace_enabled()
+        self._update_status_bar()
 
     def _align_replace_bar(self) -> None:
         if not self.replace_toolbar.isVisible():
@@ -886,6 +1007,27 @@ class MainWindow(QMainWindow):
             use_regex and re.search(r"\$(\d+)|\\g<\\d+>|\\[1-9]", replacement)
         )
         return pattern, replacement, use_regex, matches_empty, has_group_ref
+
+    def _files_for_scope(self, scope: str) -> list[Path]:
+        if not self._current_pf:
+            return []
+        if scope == "FILE":
+            return [self._current_pf.path]
+        if scope == "LOCALE":
+            locale = self._locale_for_path(self._current_pf.path)
+            if not locale:
+                return []
+            meta = self._locales.get(locale)
+            if not meta:
+                return []
+            return list_translatable_files(meta.path)
+        files: list[Path] = []
+        for locale in self._selected_locales:
+            meta = self._locales.get(locale)
+            if not meta:
+                continue
+            files.extend(list_translatable_files(meta.path))
+        return files
 
     def _replace_current(self) -> None:
         if not self._current_model:
@@ -931,6 +1073,34 @@ class MainWindow(QMainWindow):
         )
         if pattern is None:
             return
+        scope = self._replace_scope
+        files = self._files_for_scope(scope)
+        if not files:
+            return
+        if self._current_pf and self._current_pf.path in files:
+            if not self._replace_all_in_model(
+                pattern, replacement, use_regex, matches_empty, has_group_ref
+            ):
+                return
+        for path in files:
+            if self._current_pf and path == self._current_pf.path:
+                continue
+            if not self._replace_all_in_file(
+                path, pattern, replacement, use_regex, matches_empty, has_group_ref
+            ):
+                return
+        self._schedule_search()
+
+    def _replace_all_in_model(
+        self,
+        pattern: re.Pattern[str],
+        replacement: str,
+        use_regex: bool,
+        matches_empty: bool,
+        has_group_ref: bool,
+    ) -> bool:
+        if not self._current_model:
+            return True
         for row in range(self._current_model.rowCount()):
             idx = self._current_model.index(row, 2)
             text = idx.data(Qt.DisplayRole)
@@ -953,10 +1123,76 @@ class MainWindow(QMainWindow):
                         new_text = pattern.sub(lambda _m: replacement, text)
                 except re.error as exc:
                     QMessageBox.warning(self, "Replace failed", str(exc))
-                    return
+                    return False
             if new_text != text:
                 self._current_model.setData(idx, new_text, Qt.EditRole)
-        self._schedule_search()
+        return True
+
+    def _replace_all_in_file(
+        self,
+        path: Path,
+        pattern: re.Pattern[str],
+        replacement: str,
+        use_regex: bool,
+        matches_empty: bool,
+        has_group_ref: bool,
+    ) -> bool:
+        locale = self._locale_for_path(path)
+        encoding = self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
+        try:
+            pf = parse(path, encoding=encoding)
+        except Exception as exc:
+            QMessageBox.warning(self, "Parse error", f"{path}\n\n{exc}")
+            return False
+        cache_map = _read_status_cache(self._root, path)
+        changed_keys: set[str] = set()
+        new_entries = []
+        for entry in pf.entries:
+            key_hash = xxhash.xxh64(entry.key.encode("utf-8")).intdigest() & 0xFFFF
+            cache = cache_map.get(key_hash)
+            value = cache.value if cache and cache.value is not None else entry.value
+            status = cache.status if cache else entry.status
+            text = "" if value is None else str(value)
+            new_value = text
+            if text:
+                if matches_empty and not has_group_ref:
+                    new_value = replacement
+                else:
+                    if pattern.search(text):
+                        try:
+                            if use_regex:
+                                template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
+                                count = 1 if matches_empty else 0
+                                new_value = pattern.sub(
+                                    lambda m: m.expand(template), text, count=count
+                                )
+                            else:
+                                new_value = pattern.sub(lambda _m: replacement, text)
+                        except re.error as exc:
+                            QMessageBox.warning(self, "Replace failed", str(exc))
+                            return False
+            if new_value != text:
+                status = Status.TRANSLATED
+                changed_keys.add(entry.key)
+            if new_value != entry.value or status != entry.status:
+                entry = type(entry)(
+                    entry.key,
+                    new_value,
+                    status,
+                    entry.span,
+                    entry.segments,
+                    entry.gaps,
+                )
+            new_entries.append(entry)
+        _write_status_cache(
+            self._root,
+            path,
+            new_entries,
+            changed_keys=changed_keys,
+        )
+        if changed_keys:
+            self.fs_model.set_dirty(path, True)
+        return True
 
     def _rows_from_model(self) -> list[_SearchRow]:
         if not (self._current_model and self._current_pf):
@@ -1004,11 +1240,31 @@ class MainWindow(QMainWindow):
         return rows
 
     def _ensure_search_index(self) -> None:
-        locales_key = tuple(self._selected_locales)
-        if self._search_index_locales != locales_key:
+        scope = self._search_scope
+        current_path = self._current_pf.path if self._current_pf else None
+        current_locale = self._locale_for_path(current_path) if current_path else None
+        if scope == "FILE":
+            if not current_path or not self._current_model:
+                self._search_index_by_file.clear()
+                self._search_index_key = ("FILE", None)
+                return
+            self._search_index_by_file = {current_path: self._rows_from_model()}
+            self._search_index_key = ("FILE", current_path)
+            return
+        if scope == "LOCALE":
+            key = ("LOCALE", current_locale)
+        else:
+            key = ("POOL", tuple(self._selected_locales))
+        if key != self._search_index_key:
             self._search_index_by_file.clear()
-            self._search_index_locales = locales_key
-            for locale in self._selected_locales:
+            self._search_index_key = key
+            locales = []
+            if scope == "LOCALE":
+                if current_locale:
+                    locales = [current_locale]
+            else:
+                locales = list(self._selected_locales)
+            for locale in locales:
                 meta = self._locales.get(locale)
                 if not meta:
                     continue
@@ -1188,12 +1444,22 @@ class MainWindow(QMainWindow):
             "last_root": str(self._root),
             "last_locales": list(self._selected_locales),
             "window_geometry": geometry,
+            "default_root": self._default_root,
+            "search_scope": self._search_scope,
+            "replace_scope": self._replace_scope,
             "__extras__": dict(self._prefs_extras),
         }
         try:
             _save_preferences(prefs, self._root)
         except Exception:
             pass
+        if self._default_root:
+            try:
+                global_prefs = _load_preferences(None)
+                global_prefs["default_root"] = self._default_root
+                _save_preferences(global_prefs, None)
+            except Exception:
+                pass
 
     def _on_model_data_changed(self, top_left, bottom_right, roles=None) -> None:
         if not self._current_model:
@@ -1278,6 +1544,41 @@ class MainWindow(QMainWindow):
         if not parts:
             parts.append("Ready")
         self.statusBar().showMessage(" | ".join(parts))
+        self._update_scope_indicators()
+
+    def _update_scope_indicators(self) -> None:
+        search_active = bool(self.search_edit.text().strip())
+        replace_active = self.replace_toolbar.isVisible()
+        self._set_scope_indicator(
+            self._search_scope_widget,
+            self._search_scope_icon,
+            self._search_scope,
+            search_active,
+            "Search scope",
+        )
+        self._set_scope_indicator(
+            self._replace_scope_widget,
+            self._replace_scope_icon,
+            self._replace_scope,
+            replace_active,
+            "Replace scope",
+        )
+
+    def _set_scope_indicator(
+        self,
+        widget: QWidget,
+        icon_label: QLabel,
+        scope: str,
+        active: bool,
+        title: str,
+    ) -> None:
+        if not active:
+            widget.setVisible(False)
+            return
+        icon = self._scope_icon(scope)
+        icon_label.setPixmap(icon.pixmap(14, 14))
+        widget.setToolTip(f"{title}: {scope.title()}")
+        widget.setVisible(True)
 
     def _mark_proofread(self) -> None:
         if not (self._current_pf and self._current_model):
