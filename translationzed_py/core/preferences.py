@@ -16,6 +16,9 @@ _DEFAULTS: dict[str, Any] = {
     "last_root": "",
     "last_locales": [],
     "window_geometry": "",
+    "default_root": "",
+    "search_scope": "FILE",
+    "replace_scope": "FILE",
 }
 
 
@@ -60,6 +63,16 @@ def _parse_env(path: Path) -> dict[str, Any]:
                 out["last_locales"] = [v.strip() for v in value.split(",") if v.strip()]
             elif key == "WINDOW_GEOMETRY":
                 out["window_geometry"] = value
+            elif key == "DEFAULT_ROOT":
+                out["default_root"] = value
+            elif key == "SEARCH_SCOPE":
+                value = value.upper()
+                if value in {"FILE", "LOCALE", "POOL"}:
+                    out["search_scope"] = value
+            elif key == "REPLACE_SCOPE":
+                value = value.upper()
+                if value in {"FILE", "LOCALE", "POOL"}:
+                    out["replace_scope"] = value
             else:
                 extras[key] = value
     except OSError:
@@ -112,6 +125,9 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         "LAST_ROOT",
         "LAST_LOCALES",
         "WINDOW_GEOMETRY",
+        "DEFAULT_ROOT",
+        "SEARCH_SCOPE",
+        "REPLACE_SCOPE",
     }
     lines = [
         f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
@@ -126,6 +142,15 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     geometry = str(prefs.get("window_geometry", "")).strip()
     if geometry:
         lines.append(f"WINDOW_GEOMETRY={geometry}")
+    default_root = str(prefs.get("default_root", "")).strip()
+    if default_root:
+        lines.append(f"DEFAULT_ROOT={default_root}")
+    search_scope = str(prefs.get("search_scope", "FILE")).strip().upper()
+    if search_scope:
+        lines.append(f"SEARCH_SCOPE={search_scope}")
+    replace_scope = str(prefs.get("replace_scope", "FILE")).strip().upper()
+    if replace_scope:
+        lines.append(f"REPLACE_SCOPE={replace_scope}")
     for key, value in extras.items():
         if key in known_keys:
             continue
