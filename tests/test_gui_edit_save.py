@@ -24,7 +24,7 @@ def test_edit_and_save(qtbot, tmp_path):
     win._file_chosen(ix)
 
     model = win.table.model()
-    model.setData(model.index(0, 1), "Yes-edited")  # edit the value
+    model.setData(model.index(0, 2), "Yes-edited")  # edit the value
 
     win._save_current()
     assert (dst / "BE" / "ui.txt").read_text() == 'UI_YES = "Yes-edited"\n'
