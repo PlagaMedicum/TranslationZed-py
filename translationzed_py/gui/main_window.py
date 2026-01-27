@@ -137,14 +137,16 @@ class MainWindow(QMainWindow):
         msg.setIcon(QMessageBox.Warning)
         msg.setWindowTitle("English source changed")
         msg.setText("English reference files have changed.")
-        msg.setInformativeText("Continue to update the reference used for change checks.")
+        msg.setInformativeText(
+            "Please update translations accordingly. "
+            "Continue to reset the reminder, or Dismiss to be reminded later."
+        )
         ack = msg.addButton("Continue", QMessageBox.AcceptRole)
         msg.addButton("Dismiss", QMessageBox.RejectRole)
         msg.exec()
         if msg.clickedButton() is ack:
             _write_en_hash_cache(self._root, computed)
-            return True
-        return False
+        return True
     def _prompt_write_original(self) -> str:
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Question)

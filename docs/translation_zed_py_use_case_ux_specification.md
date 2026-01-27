@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.4 · 2026‑01‑27_
+_version 0.3.5 · 2026‑01‑27_
 
 ---
 ## 1  Actors
@@ -34,7 +34,8 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 |  2 | SYS recomputes raw‑byte hashes for EN files in the repo. |
 |  3 | If any hash differs, SYS MUST show a dialog: **“English source changed”** with options **Continue** / **Dismiss**. |
 |  4 | On **Continue**, SYS rewrites the EN hash index to the new values and proceeds to normal startup. |
-| **Post‑condition** | EN hash cache is either current or startup is aborted. |
+|  5 | On **Dismiss**, SYS proceeds to normal startup and keeps the old hash index (reminder will appear again next launch). |
+| **Post‑condition** | EN hash cache is either current or marked as needing attention. |
 
 ### UC‑01  Open Project Folder
 | Field | Value |
@@ -186,4 +187,4 @@ UNTOUCHED ──────────────────────▶ 
    originals are written.
 
 ---
-_Last updated: 2026‑01‑27 (v0.3.4)_
+_Last updated: 2026‑01‑27 (v0.3.5)_
