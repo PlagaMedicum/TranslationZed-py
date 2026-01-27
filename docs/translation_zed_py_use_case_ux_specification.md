@@ -33,15 +33,15 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 | **Main Success Scenario** |
 |  1 | SYS MUST present an **OS-native directory picker**. |
 |  2 | TR selects a folder. |
-|  3 | SYS scans one level deep for sub‑folders whose name matches `^[A-Z]{2}$`, ignoring `_TVRADIO_TRANSLATIONS`. |
-|  4 | SYS MUST show `LocaleChooserDialog` listing discovered codes and their English autonym (e.g. `BE – Belarusian`). |
-|  5 | TR picks a locale and presses **Open**. |
-|  6 | SYS loads the file list, populates the left **QTreeView**, and opens the first file in the table. |
+|  3 | SYS scans one level deep for locale folders, ignoring `_TVRADIO_TRANSLATIONS`. |
+|  4 | SYS MUST show `LocaleChooserDialog` with **checkboxes** for locales, using `language.txt` → `text = ...` as display name. EN is excluded from the editable list. |
+|  5 | TR selects one or more locales and presses **Open**. |
+|  6 | SYS loads the file list for selected locales, populates the left **QTreeView** with **one root per locale** (excluding `language.txt` and `credits.txt`), and opens the first file in the table. |
 | **Alternate Flow A1** | *Unsaved Data Present* – if current project has dirty files, SYS MUST prompt **Save / Discard / Cancel** before step 1. |
 | **Post‑condition** | Target locale is active; window title updated to `TranslationZed‑Py – [BE]`. |
 
 ### UC‑02  Switch Locale
-Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditions: a project is already open.  Steps 3‑6 repeat with the new locale.  Unsaved‑data guard identical to A1.
+Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditions: a project is already open.  Steps 3‑6 repeat with the new locale selection (checkboxes).  Unsaved‑data guard identical to A1.
 
 ### UC‑03  Edit Translation
 | Field | Value |
@@ -162,4 +162,3 @@ UNTOUCHED ──────────────────────▶ 
 
 ---
 _Last updated: 2025‑07‑16 (v0.2)_
-

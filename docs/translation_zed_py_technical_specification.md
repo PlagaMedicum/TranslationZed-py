@@ -26,12 +26,16 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 ## 2  Functional Scope (MVP)
 
 - Open an existing `ProjectZomboidTranslations` folder.
-- Detect locale sub‑folders, ignoring `_TVRADIO_TRANSLATIONS`.
-- Present file tree (with sub‑dirs) and a 3‑column table (Key | Source | Translation).
+- Detect locale sub‑folders in the repo root, ignoring `_TVRADIO_TRANSLATIONS`.
+- Locale names are taken as‑is from directory names (e.g., `EN`, `EN UK`, `PTBR`).
+- Select one or more target locales to display in the left tree; **EN is the
+  immutable base** and is not edited directly.
+- Present file tree (with sub‑dirs) and a 3‑column table (Key | Source | Translation),
+  where **Source** is the English string by default; **EN is not editable**.
 - Status per Entry: **Untouched** (initial state), **Translated**, **Proofread**.  Future statuses pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
 - Live plain / regex search over Key / Source / Translation with `F3` / `Shift+F3` navigation.
-- Reference‑locale switching without reloading UI.
+- Reference‑locale switching without reloading UI (future; English is base in MVP).
 - Atomic multi‑file save; prompt on unsaved changes for *locale switch* or *exit*.
 - Clipboard, wrap‑text (View menu), keyboard navigation.
 
@@ -46,7 +50,7 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 | **Performance**   | Load 20k keys ≤ 2 s; memory ≤ 300 MB.                                                |
 | **Usability**     | All actions accessible via menu and shortcuts; table usable without mouse.           |
 | **Portability**   | Tested on Win 10‑11, macOS 13‑14 (ARM + x86), Ubuntu 22.04+.                         |
-| **Reliability**   | No data loss on power‑kill (`os.replace` atomic writes + crash‑recovery temp cache). |
+| **Reliability**   | No data loss on power‑kill (`os.replace` atomic writes; crash‑recovery cache planned). |
 | **Extensibility** | New statuses, parsers and generators added by registering entry‑points.              |
 | **Security**      | Never execute user‑provided code; sanitise paths to prevent traversal.               |
 
@@ -62,7 +66,7 @@ translationzed_py/
 │   ├── model.py             # Entry, ParsedFile, undo/redo stack
 │   ├── saver.py             # multi‑file atomic writer
 │   ├── search.py            # index + query API
-│   ├── status_cache.py      # binary per-locale status store
+│   ├── status_cache.py      # binary per-file status store
 │   └── preferences.py       # user settings (JSON in XDG dir)
 ├── gui/
 │   ├── main_window.py       # QMainWindow skeleton
@@ -95,8 +99,14 @@ def scan_root(root: Path) -> dict[str, Path]:
     """Return mapping {locale_code: locale_path}."""
 ```
 
-- Validate folder names via `re.compile(r"^[A-Z]{2}$")`.
-- Index `.txt` files recursively with `Path.rglob("*.txt")`.
+- Discover locale directories by listing direct children of *root* and
+  excluding `_TVRADIO_TRANSLATIONS`. Locale names are not constrained to a
+  2‑letter regex (e.g., `EN UK`, `PTBR` are valid).
+- Index translatable `.txt` files recursively with `Path.rglob("*.txt")`,
+  excluding `language.txt` and `credits.txt` in each locale.
+- Parse `language.txt` for:
+  - `charset` (encoding for all files in that locale)
+  - `text` (human‑readable language name for UI)
 
 ### 5.2  `core.parser`
 
@@ -115,10 +125,21 @@ Parse algorithm:
 1. Read raw bytes using the locale‑specific `encoding` (from `language.txt`; default *utf‑8*).
 2. Tokenize entire file → `list[Token]` with `(type, text, start, end)`.
 3. For each `STRING` immediately right of `IDENT "="`, create **Entry** whose
-   `span` covers *only* the string token(s); braces `{}` and all whitespace /
-   comments are treated as trivia and **must be preserved byte-exactly** on
+   `span` covers *only* the string literal region (including the quotes), even
+   when the value is a concatenation chain. Braces `{}` and all whitespace /
+   comments are treated as trivia and **must be preserved byte‑exactly** on
    save.
+4. Concatenated tokens are preserved as structural metadata. The in‑memory value
+   may be flattened for editing, but **saving must preserve the original concat
+   chain and trivia** (whitespace/comments) without collapsing into a single
+   literal.
+   - Persist per‑entry segment spans to allow re‑serialization without changing
+     token boundaries.
 5. Return `ParsedFile` containing `entries`, `raw_bytes`. `entries`, `raw_bytes`.
+6. Status comments are **not** written into localization files by default.
+   If program-generated status markers are later introduced, they must be
+   explicitly namespaced to distinguish them from user comments (e.g. `TZP:`),
+   and only those program‑generated comments are writable.
 
 ### 5.3  `core.model`
 
@@ -148,8 +169,13 @@ Algorithm:
    - Read raw bytes once to preserve leading `{`, trailing `}`, comments and
      whitespace exactly as on disk.
    - Re‑read file using provided `encoding`.
-   - For every changed `Entry`, apply slice replacement via `bytearray`.
-   - Write to `path.with_suffix(".tmp")` encoded with the same charset, `fsync`, then `os.replace`.
+   - For every changed `Entry`, replace only the string‑literal `span` and apply
+     replacements in **reverse offset order** to avoid index drift.
+   - For concatenated values, preserve the original token structure and trivia;
+     do **not** collapse the chain into a single literal.
+   - After a successful write, recompute in‑memory spans using a cumulative
+     delta to keep subsequent edits stable in the same session.
+  - Write to `path.with_suffix(".tmp")` encoded with the same charset, then `os.replace`.
 2. Emit Qt signal `saved(files=...)`. `saved(files=...)`.
 
 ### 5.5  `core.search`
@@ -168,10 +194,10 @@ Algorithm:
 ### 5.7  `gui.main_window`
 
 - Menu structure:
-  - **Project**: Open, Save, Switch Locale, Exit
+  - **Project**: Open, Save, Switch Locale(s), Exit
   - **Edit**: Copy, Cut, Paste
   - **View**: Wrap Long Strings (checkable)
-- Toolbar: `[Locale ▼] [Key|Source|Trans] [Regex☑] [🔍] [Status ▼]`
+- Toolbar: `[Locales ▼] [Key|Source|Trans] [Regex☑] [🔍] [Status ▼]`
 - Creates actions and connects unsaved‑changes guard:
 
 ```python
@@ -180,6 +206,10 @@ if dirty_files and not prompt_save():
 ```
 
 - **Status ▼** triggers `set_selected_status(status)` on TranslationTableModel.
+- Status UI: table shows per-row status (colors); a right-side inspector pane
+  shows icon + label for the currently selected row (Poedit-like).
+- Locale selection uses checkboxes for multi-select; EN is excluded from the
+  editable tree and used as Source. The left tree shows **one root per locale**.
 
 ### 5.8  `gui.translation_table`  `gui.translation_table`
 
@@ -193,7 +223,8 @@ if dirty_files and not prompt_save():
 
 ### 5.9  `core.status_cache`
 
-Binary file **`.tzstatus.bin`** stored **inside each locale folder**.
+Binary cache stored **per translation file** (1:1 with each `.txt`), inside a
+hidden `.tzp-cache/` subfolder under the repo root, preserving relative paths.
 
 * **Layout**
 
@@ -206,12 +237,25 @@ Binary file **`.tzstatus.bin`** stored **inside each locale folder**.
   Status byte values follow `core.model.Status` order.
 
 ```python
-def read(locale_dir: Path) -> dict[str, Status]: ...
-def write(locale_dir: Path, files: list[ParsedFile]) -> None: ...
+def read(file_path: Path) -> dict[str, Status]: ...
+def write(file_path: Path, entries: list[Entry]) -> None: ...
 ```
-  - Loaded once at project-open; ParsedFile.entries[].status is patched in
+  - Loaded when a file is opened; ParsedFile.entries[].status is patched in
     memory.
-  - Written by core.saver after all text files are flushed.
+  - File length is validated against the declared entry count; corrupt caches
+    are ignored without raising.
+  - Written only for **edited files** on save/exit.
+
+Cache path convention:
+- For a translation file `<root>/<locale>/path/file.txt`, the cache lives at
+  `<root>/.tzp-cache/<locale>/path/file.txt.tzstatus.bin`.
+
+### 5.9.1  `core.en_hash_cache` (planned)
+
+Track hashes of English files (raw bytes) to detect upstream changes.
+- Stored in a **single index file** at `<root>/.tzp-cache/en.hashes.bin`.
+- On startup: if any English hash differs, notify user and require explicit
+  acknowledgment to reset the hash cache to the new EN version.
 
 A missing or corrupt cache MUST be ignored gracefully (all entries fall back to
 UNTOUCHED).
@@ -223,11 +267,27 @@ UNTOUCHED).
 Instead of sprint dates, the project is broken into **six sequential phases**.  Each phase can be executed once the previous one is functionally complete; timeboxing is left to the integrator.
 
 1. **Bootstrap** – initialise repo, add `pyproject.toml`, pre‑commit hooks, baseline docs.
-2. **Backend Core** – implement `project_scanner`, `parser`, `model` (read‑only), plus unit tests ensuring round‑trip fidelity.
-3. **GUI Skeleton** – QMainWindow with file‑tree and table wired to backend (read‑only).
-4. **Editing Capabilities** – enable cell editing, undo/redo via `QUndoStack`, status colouring, live plain/regex search.
-5. **Persistence & Safety** – in‑memory dirty tracking, atomic multi‑file save, unsaved‑changes prompts, crash‑recovery temp cache, user preferences.
-6. **Polish & Packaging** – keyboard shortcuts, wrap‑text option, reference‑locale switch, installer / wheel build, user‑visible docs.
+2. **Backend Core (clean)** – implement `project_scanner`, `parser`, `model` as
+   Qt‑free domain objects; add production‑like fixtures (non‑2‑letter locales,
+   UTF‑16, cp1251, punctuation in subfolders).
+3. **Encoding + Metadata** – parse `language.txt` for `charset` + `text`; ignore
+   `credits.txt` and `language.txt` in translatable lists. Apply per‑locale
+   encoding for all reads/writes.
+4. **Parser Fidelity** – preserve concat chains and trivia on save. Store
+   per‑segment spans so edited values re‑serialize without collapsing `..`.
+5. **GUI Skeleton** – QMainWindow with multi‑locale checkbox chooser and a
+   tree with **multiple roots** (one per selected locale); EN excluded from
+   tree but used as Source.
+6. **Editing Capabilities** – cell editing + undo/redo; status coloring and
+   a right‑side status inspector pane (Poedit‑like).
+7. **Cache & EN Hashes** – per‑file status cache at
+   `<root>/.tzp-cache/<locale>/<relative>.tzstatus.bin`, written only for edited
+   files; EN hash cache as a single index file
+   `<root>/.tzp-cache/en.hashes.bin` (raw bytes).
+8. **Persistence & Safety** – atomic multi‑file save, unsaved‑changes prompts.
+   Crash‑recovery cache is planned, not required in initial builds.
+9. **Search & Polish** – live search, keyboard navigation, wrap‑text, view
+   toggles, and user preferences.
 
 *(Phase boundaries are purely logical; the orchestrating LLM may pipeline or parallelise tasks as appropriate.)*
 
@@ -250,7 +310,8 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 
 ## 9  Crash Recovery
 
-- On every edit, diff kept in RAM **and** mirrored to `tempfile.NamedTemporaryFile(delete=False)` as JSON (`{path: {key: new_value, status}}`).
+Planned feature (not in initial builds):
+- On every edit, diff kept in RAM and mirrored to a temp JSON file.
 - On next launch, if crash cache exists, ask user to merge or discard.
 
 ---
@@ -296,4 +357,3 @@ The stack is **per-file** and cleared on successful save or file reload.
 ---
 
 *Last updated: → 2025-07-16 (v0.2.1)*
-
