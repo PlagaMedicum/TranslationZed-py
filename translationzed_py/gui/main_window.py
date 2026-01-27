@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import re
+import time
 from pathlib import Path
 
 import xxhash
@@ -25,13 +25,21 @@ from shiboken6 import isValid
 from translationzed_py.core import LocaleMeta, ParsedFile, parse, scan_root
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
+from translationzed_py.core.search import SearchField as _SearchField
+from translationzed_py.core.search import SearchRow as _SearchRow
+from translationzed_py.core.search import search as _search_rows
 from translationzed_py.core.app_config import load as _load_app_config
 from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
 from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.preferences import save as _save_preferences
-from translationzed_py.core.status_cache import CacheEntry, read as _read_status_cache
+from translationzed_py.core.status_cache import (
+    CacheEntry,
+    read as _read_status_cache,
+    read_last_opened_from_path as _read_last_opened_from_path,
+    touch_last_opened as _touch_last_opened,
+)
 from translationzed_py.core.status_cache import write as _write_status_cache
 
 from .entry_model import TranslationModel
@@ -116,6 +124,7 @@ class MainWindow(QMainWindow):
         self._search_matches: list[int] = []
         self._search_index = -1
         self._search_column = 0
+        self._last_saved_text = ""
 
         # ── menu bar ───────────────────────────────────────────────────────
         menubar = self.menuBar()
@@ -135,6 +144,7 @@ class MainWindow(QMainWindow):
         self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tree.expandAll()
         self._mark_cached_dirty()
+        self._auto_open_last_file()
         self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
         self.tree.doubleClicked.connect(self._file_chosen)
         splitter.addWidget(self.tree)
@@ -148,7 +158,8 @@ class MainWindow(QMainWindow):
 
         # ── right pane: entry table ─────────────────────────────────────────
         self.table = QTableView()
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setWordWrap(self._wrap_text)
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
@@ -376,6 +387,8 @@ class MainWindow(QMainWindow):
         self.tree.setModel(self.fs_model)
         self.tree.expandAll()
         self._mark_cached_dirty()
+        self._auto_open_last_file()
+        self._mark_cached_dirty()
 
     def _file_chosen(self, index) -> None:
         """Populate table when user activates a translation file."""
@@ -398,6 +411,7 @@ class MainWindow(QMainWindow):
         base_values = {e.key: e.value for e in pf.entries}
         source_values = self._load_en_source(path, locale)
         self._cache_map = _read_status_cache(self._root, path)
+        _touch_last_opened(self._root, path, int(time.time()))
         changed_keys: set[str] = set()
         for idx, e in enumerate(pf.entries):
             h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
@@ -435,6 +449,7 @@ class MainWindow(QMainWindow):
         self.table.setModel(self._current_model)
         self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
         self._update_status_combo_from_selection()
+        self._update_status_bar()
         if self.search_edit.text():
             self._schedule_search()
         if changed_keys:
@@ -481,10 +496,12 @@ class MainWindow(QMainWindow):
                 self._current_pf.path,
                 self._current_pf.entries,
                 changed_keys=set(),
+                last_opened=int(time.time()),
             )
 
             self._current_model.reset_baseline()
             self.fs_model.set_dirty(self._current_pf.path, False)
+            self._set_saved_status()
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
             return False
@@ -549,6 +566,35 @@ class MainWindow(QMainWindow):
         for path in self._all_draft_files():
             self.fs_model.set_dirty(path, True)
 
+    def _auto_open_last_file(self) -> None:
+        cache_root = self._root / self._app_config.cache_dir
+        if not cache_root.exists():
+            return
+        best_ts = 0
+        best_path: Path | None = None
+        for cache_path in cache_root.rglob(f"*{self._app_config.cache_ext}"):
+            ts = _read_last_opened_from_path(cache_path)
+            if ts <= 0:
+                continue
+            try:
+                rel = cache_path.relative_to(cache_root)
+            except ValueError:
+                continue
+            original = (self._root / rel).with_suffix(self._app_config.translation_ext)
+            if not original.exists():
+                continue
+            locale = self._locale_for_path(original)
+            if locale not in self._selected_locales:
+                continue
+            if ts > best_ts:
+                best_ts = ts
+                best_path = original
+        if not best_path:
+            return
+        index = self.fs_model.index_for_path(best_path)
+        if index.isValid():
+            self._file_chosen(index)
+
     def _save_all_files(self, files: list[Path]) -> None:
         if not files:
             return
@@ -568,6 +614,8 @@ class MainWindow(QMainWindow):
                 "Save incomplete",
                 f"Some files could not be written:\n{rel}",
             )
+        else:
+            self._set_saved_status()
 
     def _save_file_from_cache(self, path: Path) -> bool:
         cached = _read_status_cache(self._root, path)
@@ -609,6 +657,7 @@ class MainWindow(QMainWindow):
                 self._current_pf.path,
                 self._current_pf.entries,
                 changed_keys=self._current_model.changed_keys(),
+                last_opened=int(time.time()),
             )
         except Exception as exc:
             QMessageBox.critical(self, "Cache write failed", str(exc))
@@ -646,30 +695,30 @@ class MainWindow(QMainWindow):
         column = int(self.search_mode.currentData())
         self._search_column = column
         use_regex = self.regex_check.isChecked()
-        matcher = None
-        if use_regex:
-            try:
-                matcher = re.compile(query, re.IGNORECASE)
-            except re.error:
-                self._search_matches = []
-                self._search_index = -1
-                return
-        else:
-            query = query.lower()
-
-        matches: list[int] = []
+        field_map = {
+            0: _SearchField.KEY,
+            1: _SearchField.SOURCE,
+            2: _SearchField.TRANSLATION,
+        }
+        field = field_map.get(column, _SearchField.TRANSLATION)
+        file_path = self._current_pf.path if self._current_pf else Path(".")
+        rows: list[_SearchRow] = []
         for row in range(self._current_model.rowCount()):
-            index = self._current_model.index(row, column)
-            value = index.data(Qt.DisplayRole)
-            text = "" if value is None else str(value)
-            if matcher:
-                if matcher.search(text):
-                    matches.append(row)
-            else:
-                if query in text.lower():
-                    matches.append(row)
-        self._search_matches = matches
-        if not matches:
+            key = self._current_model.index(row, 0).data(Qt.DisplayRole) or ""
+            source = self._current_model.index(row, 1).data(Qt.DisplayRole) or ""
+            value = self._current_model.index(row, 2).data(Qt.DisplayRole) or ""
+            rows.append(
+                _SearchRow(
+                    file=file_path,
+                    row=row,
+                    key=str(key),
+                    source=str(source),
+                    value=str(value),
+                )
+            )
+        matches = _search_rows(rows, query, field, use_regex)
+        self._search_matches = [m.row for m in matches if m.file == file_path]
+        if not self._search_matches:
             self._search_index = -1
             return
         self._search_index = 0
@@ -707,6 +756,22 @@ class MainWindow(QMainWindow):
         self._select_match(self._search_index)
 
     def _copy_selection(self) -> None:
+        sel = self.table.selectionModel()
+        if sel is None or not sel.hasSelection():
+            return
+        rows = sel.selectedRows()
+        if rows:
+            lines: list[str] = []
+            for row_index in sorted(rows, key=lambda i: i.row()):
+                row = row_index.row()
+                cols = [
+                    self._current_model.index(row, col).data(Qt.DisplayRole) if self._current_model else ""
+                    for col in range(4)
+                ]
+                line = "\t".join("" if c is None else str(c) for c in cols)
+                lines.append(line)
+            QGuiApplication.clipboard().setText("\n".join(lines))
+            return
         idx = self.table.currentIndex()
         if not idx.isValid():
             return
@@ -773,6 +838,7 @@ class MainWindow(QMainWindow):
 
     def _on_selection_changed(self, _current, _previous) -> None:
         self._update_status_combo_from_selection()
+        self._update_status_bar()
 
     def _update_status_combo_from_selection(self) -> None:
         if not self._current_model:
@@ -814,6 +880,28 @@ class MainWindow(QMainWindow):
             return
         model_index = self._current_model.index(current.row(), 3)
         self._current_model.setData(model_index, status, Qt.EditRole)
+
+    def _set_saved_status(self) -> None:
+        self._last_saved_text = time.strftime("Saved %H:%M:%S")
+        self._update_status_bar()
+
+    def _update_status_bar(self) -> None:
+        parts: list[str] = []
+        if self._last_saved_text:
+            parts.append(self._last_saved_text)
+        if self._current_model:
+            idx = self.table.currentIndex()
+            if idx.isValid():
+                parts.append(f"Row {idx.row() + 1} / {self._current_model.rowCount()}")
+        if self._current_pf:
+            try:
+                rel = self._current_pf.path.relative_to(self._root)
+                parts.append(str(rel))
+            except ValueError:
+                parts.append(str(self._current_pf.path))
+        if not parts:
+            parts.append("Ready")
+        self.statusBar().showMessage(" | ".join(parts))
 
     def _mark_proofread(self) -> None:
         if not (self._current_pf and self._current_model):

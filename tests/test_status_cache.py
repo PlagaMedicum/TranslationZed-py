@@ -3,7 +3,12 @@ from pathlib import Path
 
 from translationzed_py.core import parse
 from translationzed_py.core.model import Status
-from translationzed_py.core.status_cache import CacheEntry, read, write
+from translationzed_py.core.status_cache import (
+    CacheEntry,
+    read,
+    read_last_opened_from_path,
+    write,
+)
 
 
 def test_roundtrip():
@@ -53,3 +58,18 @@ def test_write_skips_empty_cache():
         cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
         assert not cache_path.exists()
         assert not (root / ".tzp-cache").exists()
+
+
+def test_last_opened_written():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "root"
+        loc = root / "EN"
+        loc.mkdir(parents=True)
+        path = loc / "dummy.txt"
+        path.write_text('GREETING = "Hi"\n', encoding="utf-8")
+
+        pf = parse(path)
+        object.__setattr__(pf.entries[0], "status", Status.TRANSLATED)
+        write(root, path, pf.entries, last_opened=123)
+        cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
+        assert read_last_opened_from_path(cache_path) == 123
