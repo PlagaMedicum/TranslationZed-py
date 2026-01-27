@@ -161,4 +161,4 @@ UNTOUCHED ──────────────────────▶ 
    ignored if missing or corrupt.
 
 ---
-_Last updated: 2025‑07‑16 (v0.2)_
+_Last updated: 2026‑01‑27 (v0.3)_
