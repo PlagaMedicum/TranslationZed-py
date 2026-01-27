@@ -165,12 +165,13 @@ class MainWindow(QMainWindow):
         self.table.setItemDelegateForColumn(3, self._status_delegate)
         splitter.addWidget(self.table)
 
-        splitter.setSizes([220, 600])
+        splitter.setSizes([260, 840])
+        self.resize(1200, 800)
+        self.act_undo: QAction | None = None
+        self.act_redo: QAction | None = None
         self._auto_open_last_file()
 
         # ── undo/redo actions ───────────────────────────────────────────────
-        self.act_undo: QAction | None = None
-        self.act_redo: QAction | None = None
 
         # ── save action ─────────────────────────────────────────────────────
         act_save = QAction("&Save", self)
@@ -449,8 +450,12 @@ class MainWindow(QMainWindow):
         self._current_model.dataChanged.connect(self._on_model_data_changed)
         self.table.setModel(self._current_model)
         self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
+        self.table.resizeColumnsToContents()
         self._update_status_combo_from_selection()
         self._update_status_bar()
+        if not self._last_saved_text:
+            self._last_saved_text = "Ready"
+            self._update_status_bar()
         if self.search_edit.text():
             self._schedule_search()
         if changed_keys:
