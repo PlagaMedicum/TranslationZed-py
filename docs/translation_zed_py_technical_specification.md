@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.2.9 · 2026‑01‑27**\
+**Version 0.2.10 · 2026‑01‑27**\
 *author: TranslationZed‑Py team*
 
 ---
