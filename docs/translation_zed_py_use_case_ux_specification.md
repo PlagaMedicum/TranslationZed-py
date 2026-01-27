@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.5 · 2026‑01‑27_
+_version 0.3.6 · 2026‑01‑27_
 
 ---
 ## 1  Actors
@@ -52,6 +52,7 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 |  5 | TR selects one or more locales and presses **Open**. |
 |  6 | SYS loads the file list for selected locales, populates the left **QTreeView** with **one root per locale** (excluding `language.txt` and `credits.txt`), and opens the first file in the table. |
 | **Alternate Flow A1** | *Unsaved Drafts Present* – SYS MUST auto‑persist drafts to `.tzp-cache` before changing the project root (no prompt). |
+| **Alternate Flow A2** | *No locale selected* – SYS aborts opening the project and closes the window. |
 | **Post‑condition** | Target locale is active; window title updated to `TranslationZed‑Py – [BE]`. |
 
 ### UC‑02  Switch Locale
@@ -187,4 +188,4 @@ UNTOUCHED ──────────────────────▶ 
    originals are written.
 
 ---
-_Last updated: 2026‑01‑27 (v0.3.5)_
+_Last updated: 2026‑01‑27 (v0.3.6)_

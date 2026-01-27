@@ -18,7 +18,7 @@ def test_undo_redo(qtbot):
         model = TranslationModel(pf)
 
         # edit value via model ⇒ pushes command
-        idx = model.index(0, 1)
+        idx = model.index(0, 2)
         model.setData(idx, "Bonjour")
 
         assert pf.entries[0].value == "Bonjour"

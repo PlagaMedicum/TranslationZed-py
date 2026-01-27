@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
-from translationzed_py.core import LocaleMeta, parse, scan_root
+from translationzed_py.core import LocaleMeta, ParsedFile, parse, scan_root
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
 from translationzed_py.core.app_config import load as _load_app_config
@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
         self._current_model: TranslationModel | None = None
         self._opened_files: set[Path] = set()
         self._cache_map: dict[int, CacheEntry] = {}
+        self._en_cache: dict[Path, ParsedFile] = {}
 
         if not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -63,6 +64,9 @@ class MainWindow(QMainWindow):
         # ── left pane: project tree ──────────────────────────────────────────
         self.tree = QTreeView()
         self._init_locales(selected_locales)
+        if not self._selected_locales:
+            self._startup_aborted = True
+            return
         self.fs_model = FsModel(self._root, [self._locales[c] for c in self._selected_locales])
         self.tree.setModel(self.fs_model)
         # prevent in-place renaming on double-click; we use double-click to open
@@ -118,6 +122,53 @@ class MainWindow(QMainWindow):
         if not rel.parts:
             return None
         return rel.parts[0]
+
+    def _en_path_for(self, path: Path, locale: str | None) -> Path | None:
+        if not locale or locale == "EN":
+            return None
+        en_meta = self._locales.get("EN")
+        if not en_meta:
+            return None
+        try:
+            rel = path.relative_to(self._root / locale)
+        except ValueError:
+            try:
+                rel_full = path.relative_to(self._root)
+                if rel_full.parts and rel_full.parts[0] == locale:
+                    rel = Path(*rel_full.parts[1:])
+                else:
+                    return None
+            except ValueError:
+                return None
+        candidate = en_meta.path / rel
+        if candidate.exists():
+            return candidate
+        stem = rel.stem
+        for token in (locale, locale.replace(" ", "_")):
+            suffix = f"_{token}"
+            if stem.endswith(suffix):
+                new_stem = stem[: -len(suffix)] + "_EN"
+                alt = rel.with_name(new_stem + rel.suffix)
+                alt_path = en_meta.path / alt
+                if alt_path.exists():
+                    return alt_path
+        return None
+
+    def _load_en_source(self, path: Path, locale: str | None) -> dict[str, str]:
+        en_path = self._en_path_for(path, locale)
+        if not en_path:
+            return {}
+        if en_path in self._en_cache:
+            pf = self._en_cache[en_path]
+        else:
+            en_meta = self._locales.get("EN")
+            encoding = en_meta.charset if en_meta else "utf-8"
+            try:
+                pf = parse(en_path, encoding=encoding)
+            except Exception:
+                return {}
+            self._en_cache[en_path] = pf
+        return {e.key: e.value for e in pf.entries}
 
     # ----------------------------------------------------------------- slots
     def _check_en_hash_cache(self) -> bool:
@@ -184,6 +235,7 @@ class MainWindow(QMainWindow):
         self._current_encoding = encoding
 
         base_values = {e.key: e.value for e in pf.entries}
+        source_values = self._load_en_source(path, locale)
         self._cache_map = _read_status_cache(self._root, path)
         changed_keys: set[str] = set()
         for idx, e in enumerate(pf.entries):
@@ -211,7 +263,10 @@ class MainWindow(QMainWindow):
             except (TypeError, RuntimeError):
                 pass
         self._current_model = TranslationModel(
-            pf, base_values=base_values, changed_keys=changed_keys
+            pf,
+            base_values=base_values,
+            changed_keys=changed_keys,
+            source_values=source_values,
         )
         self._current_model.dataChanged.connect(self._on_model_changed)
         self.table.setModel(self._current_model)

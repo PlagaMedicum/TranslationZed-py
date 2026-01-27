@@ -290,9 +290,9 @@ Area                         Spec Expectation             As-Built Status
 ---------------------------  ---------------------------- -------------------------
 File open UX                 Double-click/Enter opens     Double-click edits label
 Translation table            QTableView + delegates       QTableView only
-Status coloring              Background color             Foreground text color
+Status coloring              Background color             Proofread background implemented
 Status dropdown              Toolbar "Status"             Only Ctrl+P action
-Source column                Key | Source | Translation   Key | Value | Status
+Source column                Key | Source | Translation   Key | Source | Value | Status
 EN as base (non-editable)    EN shown as Source           EN not loaded as Source
 Multi-locale selection        One or more locales selectable Single-locale tree only
 Locale chooser               Dialog + autonym list        Not implemented

@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.2.11 · 2026‑01‑27**\
+**Version 0.2.12 · 2026‑01‑27**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -30,7 +30,7 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 - Locale names are taken as‑is from directory names (e.g., `EN`, `EN UK`, `PTBR`).
 - Select one or more target locales to display in the left tree; **EN is the
   immutable base** and is not edited directly.
-- Present file tree (with sub‑dirs) and a 3‑column table (Key | Source | Translation),
+- Present file tree (with sub‑dirs) and a 4‑column table (Key | Source | Translation | Status),
   where **Source** is the English string by default; **EN is not editable**.
 - One file open at a time in the table (no tabs in MVP).
 - Status per Entry: **Untouched** (initial state), **Translated**, **Proofread**.  Future statuses pluggable.

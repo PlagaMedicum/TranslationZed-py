@@ -12,11 +12,9 @@ from translationzed_py.core import Entry, Status
 from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 from translationzed_py.core.model import ParsedFile
 
-_HEADERS = ("Key", "Value", "Status")
-_COLOR = {
-    Status.UNTOUCHED: QColor("#2d2d2d"),  # dark grey text
-    Status.TRANSLATED: QColor("#006400"),  # green
-    Status.PROOFREAD: QColor("#004c99"),  # blue
+_HEADERS = ("Key", "Source", "Value", "Status")
+_BG = {
+    Status.PROOFREAD: QColor("#ccffcc"),
 }
 
 
@@ -29,10 +27,12 @@ class TranslationModel(QAbstractTableModel):
         *,
         base_values: dict[str, str] | None = None,
         changed_keys: set[str] | None = None,
+        source_values: dict[str, str] | None = None,
     ):
         super().__init__()
         self._pf = pf
         self._entries = list(pf.entries)
+        self._source_values = source_values or {}
         self._base_values = base_values or {e.key: e.value for e in self._entries}
         self._changed_values: set[str] = set(changed_keys or set())
         self._dirty = bool(self._changed_values)
@@ -97,7 +97,7 @@ class TranslationModel(QAbstractTableModel):
     ) -> int:
         if parent and parent.isValid():
             return 0
-        return 3
+        return 4
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole):  # noqa: N802
         if not index.isValid():
@@ -111,13 +111,15 @@ class TranslationModel(QAbstractTableModel):
                 case 0:
                     return e.key
                 case 1:
-                    return e.value
+                    return self._source_values.get(e.key, "")
                 case 2:
+                    return e.value
+                case 3:
                     return e.status.name.title()
 
-        # --- colour by status ------------------------------------------------
-        if role == Qt.ForegroundRole:
-            return _COLOR[e.status]
+        # --- background by status --------------------------------------------
+        if role == Qt.BackgroundRole:
+            return _BG.get(e.status)
 
         return None
 
@@ -130,7 +132,7 @@ class TranslationModel(QAbstractTableModel):
 
     def flags(self, index: QModelIndex):  # noqa: N802
         base = super().flags(index)
-        if index.column() in (1, 2):  # Value & Status columns
+        if index.column() in (2, 3):  # Value & Status columns
             return base | Qt.ItemIsEditable
         return base
 
@@ -143,7 +145,7 @@ class TranslationModel(QAbstractTableModel):
         e = self._entries[row]
 
         # ---- value edit ----------------------------------------------------
-        if col == 1:
+        if col == 2:
             e = self._entries[index.row()]
             if value != e.value:
                 new_entry = Entry(
@@ -165,7 +167,7 @@ class TranslationModel(QAbstractTableModel):
                 return True
 
         # ---- status edit ---------------------------------------------------
-        if col == 2:
+        if col == 3:
             try:
                 st = Status[str(value).upper()]
             except KeyError:
