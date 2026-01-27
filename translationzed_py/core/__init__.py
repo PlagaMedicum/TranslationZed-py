@@ -5,6 +5,7 @@ from __future__ import annotations
 from .model import Entry, ParsedFile, Status
 from .parser import parse
 from .project_scanner import LocaleMeta, list_translatable_files, scan_root
+from .search import Match, SearchField, SearchRow, search
 
 __all__ = [
     "scan_root",
@@ -14,4 +15,8 @@ __all__ = [
     "Entry",
     "Status",
     "ParsedFile",
+    "SearchField",
+    "SearchRow",
+    "Match",
+    "search",
 ]
