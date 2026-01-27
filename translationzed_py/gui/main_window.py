@@ -131,6 +131,12 @@ class MainWindow(QMainWindow):
         self._replace_scope = str(prefs.get("replace_scope", "FILE")).upper()
         if self._replace_scope not in {"FILE", "LOCALE", "POOL"}:
             self._replace_scope = "FILE"
+        self._search_scope_widget = None
+        self._search_scope_action = None
+        self._search_scope_icon = None
+        self._replace_scope_widget = None
+        self._replace_scope_action = None
+        self._replace_scope_icon = None
         self._last_locales = list(prefs.get("last_locales", []) or [])
         self._last_root = str(prefs.get("last_root", "") or self._root)
         self._prefs_extras = dict(prefs.get("__extras__", {}))
@@ -312,7 +318,6 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
         self.act_undo: QAction | None = None
         self.act_redo: QAction | None = None
-        self._auto_open_last_file()
 
         # ── undo/redo actions ───────────────────────────────────────────────
 
@@ -395,6 +400,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._search_scope_widget)
         self.statusBar().addPermanentWidget(self._replace_scope_widget)
         self._update_status_bar()
+        self._auto_open_last_file()
 
     def _build_scope_indicator(self, icon_name: str, tooltip: str):
         widget = QWidget(self)
@@ -1547,6 +1553,8 @@ class MainWindow(QMainWindow):
         self._update_scope_indicators()
 
     def _update_scope_indicators(self) -> None:
+        if not self._search_scope_widget or not self._replace_scope_widget:
+            return
         search_active = bool(self.search_edit.text().strip())
         replace_active = self.replace_toolbar.isVisible()
         self._set_scope_indicator(
