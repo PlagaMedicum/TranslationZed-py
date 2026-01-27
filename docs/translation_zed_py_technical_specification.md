@@ -132,7 +132,8 @@ Parse algorithm:
 4. Concatenated tokens are preserved as structural metadata. The in‑memory value
    may be flattened for editing, but **saving must preserve the original concat
    chain and trivia** (whitespace/comments) without collapsing into a single
-   literal.
+   literal. All non‑literal bytes (comments, spacing, braces, line breaks) are
+   treated as immutable and must be preserved byte‑exactly.
    - Persist per‑entry segment spans to allow re‑serialization without changing
      token boundaries.
 5. Return `ParsedFile` containing `entries`, `raw_bytes`. `entries`, `raw_bytes`.
@@ -173,6 +174,8 @@ Algorithm:
      replacements in **reverse offset order** to avoid index drift.
    - For concatenated values, preserve the original token structure and trivia;
      do **not** collapse the chain into a single literal.
+   - All non‑literal bytes (comments, whitespace, braces, punctuation) are
+     preserved byte‑exactly; ordering is never modified.
    - After a successful write, recompute in‑memory spans using a cumulative
      delta to keep subsequent edits stable in the same session.
   - Write to `path.with_suffix(".tmp")` encoded with the same charset, then `os.replace`.
@@ -356,4 +359,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: → 2025-07-16 (v0.2.1)*
+*Last updated: → 2026-01-27 (v0.3.1)*

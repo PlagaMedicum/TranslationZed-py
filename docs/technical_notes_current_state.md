@@ -62,6 +62,9 @@ From latest clarification:
   inspector with icon + label for the selected row (Poedit-like).
 - **Concat preservation**: edited values must preserve original `..` chains and
   trivia; no collapsing into single literals.
+- **File structure immutability**: comments, spacing, braces, line order, and
+  all non‑literal bytes are treated as immutable; only translation literals may
+  change.
 - **Tree layout**: when multiple locales are selected, show **multiple roots**
   (one root per locale).
 - **EN hash cache**: single index file for all EN hashes (for now).
