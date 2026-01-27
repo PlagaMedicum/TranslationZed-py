@@ -250,9 +250,10 @@ Algorithm:
 - Scope selection lives in Preferences (not in the toolbar by default), and UI text
   must make the scope explicit to avoid accidental mass edits.
  - Defaults: `SEARCH_SCOPE=FILE`, `REPLACE_SCOPE=FILE`.
- - Status bar must echo the active scopes when search/replace are in use.
-   Prefer icon‑only indicators if unambiguous (e.g., 🔍 + file/locale/pool icon),
-   otherwise use compact text labels. Avoid mixed symbol+word pairs in the same indicator.
+- Status bar must echo the active scopes when search/replace are in use.
+  Prefer icon‑only indicators if unambiguous (e.g., 🔍 + file/locale/pool icon),
+  otherwise use compact text labels. Avoid mixed symbol+word pairs in the same indicator.
+ - Icon mapping: **File** → file icon, **Locale** → folder icon, **Locale Pool** → tree icon.
 
 #### 5.6.2  Default root path semantics
 
@@ -282,7 +283,7 @@ Algorithm:
 ### 5.7  `gui.main_window`
 
 - Menu structure:
-  - **Project**: Open, Save, Switch Locale(s), Exit
+  - **General**: Open, Save, Switch Locale(s), Preferences, Exit
   - **Edit**: Copy, Cut, Paste
   - **View**: Wrap Long Strings (checkable), Prompt on Exit (checkable)
 - Toolbar: `[Status ▼] [Key|Source|Trans] [Regex☑] [Search box]`
