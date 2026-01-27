@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QTreeView,
 )
 
-from translationzed_py.core import parse
+from translationzed_py.core import LocaleMeta, parse, scan_root
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
 from translationzed_py.core.status_cache import read as _read_status_cache
@@ -23,23 +23,29 @@ from translationzed_py.core.status_cache import write as _write_status_cache
 from .entry_model import TranslationModel
 from .fs_model import FsModel
 from .commands import ChangeStatusCommand
+from .dialogs import LocaleChooserDialog
 
 
 class MainWindow(QMainWindow):
     """Main window: left file-tree, right translation table."""
 
-    def __init__(self, project_root: str | None = None) -> None:
+    def __init__(
+        self, project_root: str | None = None, *, selected_locales: list[str] | None = None
+    ) -> None:
         super().__init__()
         self._root = Path(project_root or ".").resolve()
         self.setWindowTitle(f"TranslationZed – {self._root}")
-        # TODO: replace direct root browsing with locale chooser + unsaved-changes guard.
+        self._locales: dict[str, LocaleMeta] = {}
+        self._selected_locales: list[str] = []
+        self._current_encoding = "utf-8"
 
         splitter = QSplitter(self)
         self.setCentralWidget(splitter)
 
         # ── left pane: project tree ──────────────────────────────────────────
         self.tree = QTreeView()
-        self.fs_model = FsModel(self._root)
+        self._init_locales(selected_locales)
+        self.fs_model = FsModel(self._root, [self._locales[c] for c in self._selected_locales])
         self.tree.setModel(self.fs_model)
         # prevent in-place renaming on double-click; we use double-click to open
         self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -77,17 +83,44 @@ class MainWindow(QMainWindow):
         # ── status-cache ───────────────────────────────────────────────
         self._status_map: dict[int, Status] = {}
 
+    def _init_locales(self, selected_locales: list[str] | None) -> None:
+        self._locales = scan_root(self._root)
+        selectable = {k: v for k, v in self._locales.items() if k != "EN"}
+
+        if selected_locales is None:
+            dialog = LocaleChooserDialog(selectable.values(), self)
+            if dialog.exec() != dialog.Accepted:
+                self._selected_locales = []
+                return
+            selected_locales = dialog.selected_codes()
+
+        self._selected_locales = [c for c in selected_locales if c in selectable]
+
+    def _locale_for_path(self, path: Path) -> str | None:
+        try:
+            rel = path.relative_to(self._root)
+        except ValueError:
+            return None
+        if not rel.parts:
+            return None
+        return rel.parts[0]
+
     # ----------------------------------------------------------------- slots
     def _file_chosen(self, index) -> None:
         """Populate table when user activates a .txt file."""
-        path: Path | None = index.data(Qt.UserRole)  # FsModel stores Path here
+        raw_path = index.data(Qt.UserRole)  # FsModel stores absolute path string
+        path = Path(raw_path) if raw_path else None
         if not (path and path.suffix == ".txt"):
             return
+        locale = self._locale_for_path(path)
+        encoding = self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
         try:
-            pf = parse(path)
+            pf = parse(path, encoding=encoding)
         except Exception as exc:
             QMessageBox.warning(self, "Parse error", f"{path}\n\n{exc}")
             return
+
+        self._current_encoding = encoding
 
         self._status_map = _read_status_cache(self._root, path)
 
@@ -123,7 +156,7 @@ class MainWindow(QMainWindow):
         changed = self._current_model.changed_values()
         try:
             if changed:
-                save(self._current_pf, changed)
+                save(self._current_pf, changed, encoding=self._current_encoding)
 
             # update in-memory cache with *new* statuses from the file we saved
             for e in self._current_pf.entries:
