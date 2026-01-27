@@ -37,9 +37,15 @@ class TranslationModel(QAbstractTableModel):
     def _replace_entry(self, row: int, entry: Entry) -> None:
         """Called by EditValueCommand to swap immutable Entry objects."""
         self._entries[row] = entry
-        idx = self.index(row, 1)
-        self.dataChanged.emit(idx, idx, [Qt.DisplayRole])
+        left = self.index(row, 0)
+        right = self.index(row, self.columnCount() - 1)
+        self.dataChanged.emit(
+            left,
+            right,
+            [Qt.DisplayRole, Qt.EditRole, Qt.ForegroundRole, Qt.BackgroundRole],
+        )
         self._dirty = True
+        self._pf.dirty = True
 
     # Qt mandatory overrides ----------------------------------------------------
     def rowCount(  # noqa: N802

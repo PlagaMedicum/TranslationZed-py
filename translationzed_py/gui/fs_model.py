@@ -22,6 +22,9 @@ class FsModel(QStandardItemModel):
             for txt in sorted(loc_dir.rglob("*.txt")):
                 rel = str(txt.relative_to(root))
                 file_item = QStandardItem(rel)
+                file_item.setFlags(
+                    Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+                )
                 # store absolute Path in UserRole
                 file_item.setData(txt, int(Qt.ItemDataRole.UserRole))
                 loc_item.appendRow(file_item)
