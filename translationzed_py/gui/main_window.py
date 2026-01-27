@@ -356,7 +356,7 @@ class MainWindow(QMainWindow):
             preview += f"\n… {len(files) - 8} more"
         msg.setDetailedText(preview)
         btn_restore = msg.addButton("Restore", QMessageBox.AcceptRole)
-        btn_discard = msg.addButton("Discard", QMessageBox.DestructRole)
+        btn_discard = msg.addButton("Discard", QMessageBox.RejectRole)
         msg.exec()
         if msg.clickedButton() is btn_discard:
             _crash_recovery.discard_cache(self._root, files)
