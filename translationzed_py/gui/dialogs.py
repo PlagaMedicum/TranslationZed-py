@@ -37,18 +37,19 @@ class LocaleChooserDialog(QDialog):
         main_layout.addWidget(QLabel("Choose locales to edit:"))
 
         list_widget = QWidget(self)
-        list_layout = QVBoxLayout(list_widget)
-        list_layout.setContentsMargins(0, 0, 0, 0)
+        self._list_layout = QVBoxLayout(list_widget)
+        self._list_layout.setContentsMargins(0, 0, 0, 0)
 
         self._boxes: dict[str, QCheckBox] = {}
+        self._items: list[tuple[str, QCheckBox]] = []
         for meta in sorted(locales, key=lambda m: m.code):
             label = f"{meta.code} — {meta.display_name}"
             box = QCheckBox(label, self)
             box.setChecked(meta.code in preselected_set)
+            box.stateChanged.connect(self._rebuild_order)
             self._boxes[meta.code] = box
-            list_layout.addWidget(box)
-
-        list_layout.addStretch(1)
+            self._items.append((meta.code, box))
+        self._rebuild_order()
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setWidget(list_widget)
@@ -66,6 +67,21 @@ class LocaleChooserDialog(QDialog):
 
     def selected_codes(self) -> list[str]:
         return [code for code, box in self._boxes.items() if box.isChecked()]
+
+    def _rebuild_order(self) -> None:
+        checked = {code for code, box in self._items if box.isChecked()}
+        ordered = sorted(
+            self._items,
+            key=lambda pair: (0 if pair[0] in checked else 1, pair[0]),
+        )
+        while self._list_layout.count():
+            item = self._list_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+        for _, box in ordered:
+            self._list_layout.addWidget(box)
+        self._list_layout.addStretch(1)
 
 
 class SaveFilesDialog(QDialog):
