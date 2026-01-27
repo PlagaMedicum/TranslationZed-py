@@ -22,6 +22,9 @@ def read(locale_dir: Path) -> dict[int, Status]:
     try:
         data = status_file.read_bytes()
         (count,) = struct.unpack_from("<I", data, 0)
+        expected = 4 + (count * struct.calcsize("<HB"))
+        if len(data) < expected:
+            return {}
         offset = 4
         out: dict[int, Status] = {}
         for _ in range(count):
@@ -52,6 +55,6 @@ def write(locale_dir: Path, files: list[ParsedFile]) -> None:
     for key_hash, status in entries:
         buf += struct.pack("<HB", key_hash, status.value)
     # atomic replace
-    tmp = status_file.with_suffix(".tzstatus.bin.tmp")
+    tmp = status_file.with_name(".tzstatus.bin.tmp")
     tmp.write_bytes(buf)
     tmp.replace(status_file)
