@@ -110,6 +110,7 @@ class MainWindow(QMainWindow):
         self.search_mode.addItem("Trans", 2)
         self.search_mode.currentIndexChanged.connect(self._schedule_search)
         self.toolbar.addWidget(self.search_mode)
+        self.toolbar.addSeparator()
         self.regex_check = QCheckBox("Regex", self)
         self.regex_check.stateChanged.connect(self._schedule_search)
         self.toolbar.addWidget(self.regex_check)
@@ -144,7 +145,6 @@ class MainWindow(QMainWindow):
         self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tree.expandAll()
         self._mark_cached_dirty()
-        self._auto_open_last_file()
         self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
         self.tree.doubleClicked.connect(self._file_chosen)
         splitter.addWidget(self.tree)
@@ -166,6 +166,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.table)
 
         splitter.setSizes([220, 600])
+        self._auto_open_last_file()
 
         # ── undo/redo actions ───────────────────────────────────────────────
         self.act_undo: QAction | None = None
