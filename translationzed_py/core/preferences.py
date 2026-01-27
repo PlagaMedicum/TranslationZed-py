@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +17,7 @@ def _config_dir(root: Path | None = None) -> Path:
 
 
 def _config_path(root: Path | None = None) -> Path:
-    return _config_dir(root) / "settings.json"
+    return _config_dir(root) / "settings.env"
 
 
 def _parse_env(path: Path) -> dict[str, Any]:
@@ -44,18 +43,6 @@ def _parse_env(path: Path) -> dict[str, Any]:
     return out
 
 
-def _load_json(path: Path) -> dict[str, Any]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            return data
-    except FileNotFoundError:
-        return {}
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return {}
-
-
 def _candidate_roots(root: Path | None) -> list[Path]:
     roots = [Path.cwd()]
     if root is not None:
@@ -79,8 +66,7 @@ def load(root: Path | None = None) -> dict[str, Any]:
     """
     merged = dict(_DEFAULTS)
     for base in _candidate_roots(root):
-        merged.update(_load_json(_config_path(base)))
-        merged.update(_parse_env(base / ".env"))
+        merged.update(_parse_env(_config_path(base)))
     return merged
 
 
@@ -88,7 +74,12 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     """Persist preferences to disk (atomic replace)."""
     path = _config_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    raw = json.dumps(prefs, ensure_ascii=True, indent=2, sort_keys=True)
+    raw = "\n".join(
+        [
+            f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
+            "",
+        ]
+    )
     tmp = path.with_suffix(".tmp")
     tmp.write_text(raw, encoding="utf-8")
     tmp.replace(path)
