@@ -52,3 +52,4 @@ def test_write_skips_empty_cache():
         write(root, path, pf.entries, changed_keys=set())
         cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
         assert not cache_path.exists()
+        assert not (root / ".tzp-cache").exists()

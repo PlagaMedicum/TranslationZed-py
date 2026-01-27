@@ -77,6 +77,7 @@ From latest clarification:
 - **Non-translatables**: `language.txt` and `credits.txt` are hidden in the tree.
 - **Dirty indicator**: file tree shows a dot (●) for unsaved edits.
 - **Exit prompt**: controlled by preference `prompt_write_on_exit` (default true).
+- **Save prompt**: lists all files with draft values before writing originals.
 
 ---
 

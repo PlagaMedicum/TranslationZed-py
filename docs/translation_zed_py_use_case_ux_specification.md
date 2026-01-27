@@ -100,7 +100,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 ### UC‑06  Save Project (Write Original)
 | **Trigger** | *Project ▸ Save* (`Ctrl+S`) |
 | **Flow** |
-|  1 | SYS prompts **Write / Cache only / Cancel**. |
+|  1 | SYS prompts **Write / Cache only / Cancel** and shows a scrollable list of files to be written. |
 |  2 | On **Write**, SYS MUST call `saver.write_atomic()` for every dirty file. |
 |  3 | On success, `dirty` flags cleared and baseline updated. |
 |  4 | SYS writes (or updates) per‑file cache entries under `.tzp-cache/<locale>/<relative>.bin` for **edited files only** (status only; draft values cleared). |

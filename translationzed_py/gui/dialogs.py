@@ -4,10 +4,12 @@ from typing import Iterable
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
     QLabel,
+    QListWidget,
     QScrollArea,
     QVBoxLayout,
     QWidget,
@@ -57,3 +59,39 @@ class LocaleChooserDialog(QDialog):
 
     def selected_codes(self) -> list[str]:
         return [code for code, box in self._boxes.items() if box.isChecked()]
+
+
+class SaveFilesDialog(QDialog):
+    """Prompt listing files that will be written to originals."""
+
+    def __init__(self, files: Iterable[str], parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Write original files")
+        self.setModal(True)
+        self._choice = "cancel"
+
+        main_layout = QVBoxLayout(self)
+        main_layout.addWidget(QLabel("The following files will be written:"))
+
+        list_widget = QListWidget(self)
+        list_widget.setSelectionMode(QAbstractItemView.NoSelection)
+        for item in files:
+            list_widget.addItem(item)
+        list_widget.setMaximumHeight(220)
+        main_layout.addWidget(list_widget)
+
+        buttons = QDialogButtonBox(self)
+        btn_write = buttons.addButton("Write", QDialogButtonBox.AcceptRole)
+        btn_cache = buttons.addButton("Cache only", QDialogButtonBox.ActionRole)
+        buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
+        btn_write.clicked.connect(lambda: self._set_choice("write"))
+        btn_cache.clicked.connect(lambda: self._set_choice("cache"))
+        buttons.rejected.connect(self.reject)
+        main_layout.addWidget(buttons)
+
+    def _set_choice(self, choice: str) -> None:
+        self._choice = choice
+        self.accept()
+
+    def choice(self) -> str:
+        return self._choice

@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.2.2 · 2026‑01‑27**\
+**Version 0.2.3 · 2026‑01‑27**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -225,6 +225,7 @@ if dirty_files and not prompt_save():
 - Locale selection uses checkboxes for multi-select; EN is excluded from the
   editable tree and used as Source. The left tree shows **one root per locale**.
 - File tree shows a **dirty dot (●)** prefix for files with unsaved edits.
+- Save/Exit prompt lists all files with draft values (scrollable list).
 
 ### 5.8  `gui.translation_table`  `gui.translation_table`
 
