@@ -157,14 +157,22 @@ def write(
 
 def read_last_opened_from_path(path: Path) -> int:
     try:
-        data = path.read_bytes()
+        with path.open("rb") as handle:
+            data = handle.read(_HEADER_V2.size)
     except OSError:
         return 0
-    parsed = _read_rows_any(data)
-    if not parsed:
+    if len(data) < _HEADER_V1.size:
         return 0
-    last_opened, _ = parsed
-    return int(last_opened or 0)
+    if not data.startswith(_MAGIC):
+        return 0
+    if len(data) >= _HEADER_V2.size:
+        magic, last_opened, _count = _HEADER_V2.unpack_from(data, 0)
+        if magic == _MAGIC:
+            return int(last_opened or 0)
+    magic, _count = _HEADER_V1.unpack_from(data, 0)
+    if magic != _MAGIC:
+        return 0
+    return 0
 
 
 def touch_last_opened(root: Path, file_path: Path, last_opened: int) -> bool:
