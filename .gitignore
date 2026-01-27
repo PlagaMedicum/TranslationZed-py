@@ -23,6 +23,8 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
+.tzp-cache/
+.tzp-config/
 
 # ─── Dev tool config ───────────────────────────────────────────────────────────
 .idea/
@@ -32,4 +34,3 @@ htmlcov/
 # ─── OS noise ──────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
-

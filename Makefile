@@ -5,52 +5,44 @@ VENV    ?= .venv
 VENV_ACT = . $(VENV)/bin/activate &&
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt lint typecheck test check run clean dist
+.PHONY: venv install precommit fmt lint typecheck test check run clean clean-cache dist
 
 ## create .venv and populate dev deps (one-off)
 venv:
-	@if [ ! -d $(VENV) ]; then \
-	    $(PY) -m venv $(VENV); \
-	    source $(VENV_ACT); \
-	    $(VENV_ACT) $(PY) -m pip install -U pip; \
-	    $(VENV_ACT) $(PIP) install -e .[dev]; \
-	else \
-	    echo "$(VENV) already exists — skip creation"; \
-	fi
+	PY=$(PY) VENV=$(VENV) bash scripts/venv.sh
 
 ## (re)install the package in editable mode inside existing venv
 install:
-	@if [ ! -d $(VENV) ]; then \
-	    echo "No venv; run 'make venv' first"; exit 1; \
-	fi
-	$(VENV_ACT) $(PIP) install -e .
+	VENV=$(VENV) bash scripts/install.sh
 
 ## install pre-commit hooks (only once per clone)
 precommit: venv
-	$(VENV_ACT) pre-commit install
+	VENV=$(VENV) bash scripts/precommit.sh
 
 fmt:
-	$(VENV_ACT) black translationzed_py tests
+	VENV=$(VENV) bash scripts/fmt.sh
 
 lint:
-	$(VENV_ACT) ruff check translationzed_py tests --fix
+	VENV=$(VENV) bash scripts/lint.sh
 
 typecheck:
-	$(VENV_ACT) mypy translationzed_py
+	VENV=$(VENV) bash scripts/typecheck.sh
 
 test:
-	$(VENV_ACT) pytest -q
+	VENV=$(VENV) bash scripts/test.sh
 
 ## run all quality gates
 check: fmt lint typecheck test
 
 ## convenience runner:  make run ARGS="--help"
 run:
-	$(VENV_ACT) $(PY) -m translationzed_py $(ARGS)
+	VENV=$(VENV) bash scripts/run.sh $(ARGS)
 
 clean:
-	rm -rf build dist *.egg-info
-	find . -type d \( -name "__pycache__" -o -name ".mypy_cache" -o -name ".ruff_cache" -o -name ".pytest_cache" \) -exec rm -rf {} +
+	bash scripts/clean.sh
+
+clean-cache:
+	bash scripts/clean_cache.sh
 
 dist: clean
-	$(VENV_ACT) $(PY) -m build --no-isolation --wheel --sdist
+	VENV=$(VENV) bash scripts/dist.sh

@@ -40,7 +40,7 @@ class MainWindow(QMainWindow):
         self._locales: dict[str, LocaleMeta] = {}
         self._selected_locales: list[str] = []
         self._current_encoding = "utf-8"
-        prefs = _load_preferences()
+        prefs = _load_preferences(self._root)
         self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
 
         splitter = QSplitter(self)
