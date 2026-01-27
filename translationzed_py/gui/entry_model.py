@@ -72,6 +72,11 @@ class TranslationModel(QAbstractTableModel):
     def changed_keys(self) -> set[str]:
         return set(self._changed_values)
 
+    def status_for_row(self, row: int) -> Status | None:
+        if 0 <= row < len(self._entries):
+            return self._entries[row].status
+        return None
+
     def clear_changed_values(self) -> None:
         self._changed_values.clear()
         self._dirty = False
@@ -116,6 +121,13 @@ class TranslationModel(QAbstractTableModel):
                     return e.value
                 case 3:
                     return e.status.name.title()
+
+        if role == Qt.EditRole:
+            match index.column():
+                case 2:
+                    return e.value
+                case 3:
+                    return e.status
 
         # --- background by status --------------------------------------------
         if role == Qt.BackgroundRole:
@@ -168,10 +180,13 @@ class TranslationModel(QAbstractTableModel):
 
         # ---- status edit ---------------------------------------------------
         if col == 3:
-            try:
-                st = Status[str(value).upper()]
-            except KeyError:
-                return False
+            if isinstance(value, Status):
+                st = value
+            else:
+                try:
+                    st = Status[str(value).upper()]
+                except KeyError:
+                    return False
             if st != e.status:
                 cmd = ChangeStatusCommand(self._pf, row, st, self)
                 self.undo_stack.push(cmd)
