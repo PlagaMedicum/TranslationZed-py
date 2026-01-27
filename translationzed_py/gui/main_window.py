@@ -25,7 +25,7 @@ from translationzed_py.core.status_cache import write as _write_status_cache
 from .entry_model import TranslationModel
 from .fs_model import FsModel
 from .commands import ChangeStatusCommand
-from .dialogs import LocaleChooserDialog
+from .dialogs import LocaleChooserDialog, SaveFilesDialog
 
 
 class MainWindow(QMainWindow):
@@ -222,17 +222,90 @@ class MainWindow(QMainWindow):
         return True
 
     def _request_write_original(self) -> None:
-        if not (self._current_pf and self._current_model):
+        self._write_cache_current()
+        files = self._draft_files()
+        if not files:
+            QMessageBox.information(self, "Nothing to write", "No draft changes to write.")
             return
-        if not self._current_model.changed_keys():
-            return
-        decision = self._prompt_write_original()
+        rel_files = [str(p.relative_to(self._root)) for p in files]
+        dialog = SaveFilesDialog(rel_files, self)
+        dialog.exec()
+        decision = dialog.choice()
         if decision == "cancel":
             return
-        if decision == "yes":
-            self._save_current()
+        if decision == "write":
+            self._save_all_files(files)
         else:
             self._write_cache_current()
+
+    def _draft_files(self) -> list[Path]:
+        cache_root = self._root / ".tzp-cache"
+        if not cache_root.exists():
+            return []
+        files: list[Path] = []
+        for cache_path in cache_root.rglob("*.bin"):
+            try:
+                rel = cache_path.relative_to(cache_root)
+            except ValueError:
+                continue
+            original = (self._root / rel).with_suffix(".txt")
+            if not original.exists():
+                continue
+            cached = _read_status_cache(self._root, original)
+            if any(entry.value is not None for entry in cached.values()):
+                files.append(original)
+        return sorted(set(files))
+
+    def _save_all_files(self, files: list[Path]) -> None:
+        if not files:
+            return
+        remaining = list(files)
+        if self._current_pf and self._current_pf.path in remaining:
+            if not self._save_current():
+                return
+            remaining.remove(self._current_pf.path)
+        failures: list[Path] = []
+        for path in remaining:
+            if not self._save_file_from_cache(path):
+                failures.append(path)
+        if failures:
+            rel = "\n".join(str(p.relative_to(self._root)) for p in failures)
+            QMessageBox.warning(
+                self,
+                "Save incomplete",
+                f"Some files could not be written:\n{rel}",
+            )
+
+    def _save_file_from_cache(self, path: Path) -> bool:
+        cached = _read_status_cache(self._root, path)
+        if not any(entry.value is not None for entry in cached.values()):
+            return True
+        locale = self._locale_for_path(path)
+        encoding = self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
+        try:
+            pf = parse(path, encoding=encoding)
+        except Exception as exc:
+            QMessageBox.warning(self, "Parse error", f"{path}\n\n{exc}")
+            return False
+        changed: dict[str, str] = {}
+        new_entries = []
+        for e in pf.entries:
+            h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
+            rec = cached.get(h)
+            if rec is None:
+                new_entries.append(e)
+                continue
+            if rec.status != e.status:
+                e = type(e)(e.key, e.value, rec.status, e.span, e.segments, e.gaps)
+            if rec.value is not None:
+                changed[e.key] = rec.value
+            new_entries.append(e)
+        pf.entries = new_entries
+        if changed:
+            save(pf, changed, encoding=encoding)
+        _write_status_cache(self._root, path, pf.entries, changed_keys=set())
+        self.fs_model.set_dirty(path, False)
+        return True
 
     def _write_cache_current(self) -> bool:
         if not (self._current_pf and self._current_model):
@@ -272,18 +345,19 @@ class MainWindow(QMainWindow):
         self._write_cache_current()
 
     def closeEvent(self, event) -> None:  # noqa: N802
-        if not (self._current_pf and self._current_model):
-            event.accept()
-            return
-        if self._current_model.changed_keys() and self._prompt_write_on_exit:
-            decision = self._prompt_write_original()
-            if decision == "cancel":
-                event.ignore()
-                return
-            if decision == "yes":
-                if not self._save_current():
+        self._write_cache_current()
+        if self._prompt_write_on_exit:
+            files = self._draft_files()
+            if files:
+                rel_files = [str(p.relative_to(self._root)) for p in files]
+                dialog = SaveFilesDialog(rel_files, self)
+                dialog.exec()
+                decision = dialog.choice()
+                if decision == "cancel":
                     event.ignore()
                     return
+                if decision == "write":
+                    self._save_all_files(files)
         if not self._write_cache_current():
             event.ignore()
             return

@@ -102,7 +102,6 @@ def write(
     per-file cache. Values are stored only for keys in `changed_keys`.
     """
     status_file = _cache_path(root, file_path)
-    status_file.parent.mkdir(parents=True, exist_ok=True)
     changed_keys = changed_keys or set()
     rows: list[tuple[int, Status, str | None]] = []
     for e in entries:
@@ -115,6 +114,7 @@ def write(
         if status_file.exists():
             status_file.unlink()
         return
+    status_file.parent.mkdir(parents=True, exist_ok=True)
     buf = bytearray()
     buf += _HEADER.pack(_MAGIC, len(rows))
     for key_hash, status, value in rows:
