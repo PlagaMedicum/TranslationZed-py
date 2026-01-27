@@ -4,6 +4,7 @@ config_dir = ".tzp-config"
 
 [cache]
 extension = ".bin"
+en_hash_filename = "en.hashes.bin"
 
 [adapters]
 parser = "lua_v1"
