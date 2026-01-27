@@ -14,9 +14,9 @@ def test_table_fills(qtbot, tmp_path: Path):
     for loc in ("EN", "BE"):
         (dst / loc).mkdir()
         (dst / loc / "ui.txt").write_text('UI_YES = "Yes"\n')
-    win = MainWindow(str(dst))
+    win = MainWindow(str(dst), selected_locales=["BE"])
     qtbot.addWidget(win)
-    # select EN/ui.txt
-    ix = win.fs_model.index_for_path(dst / "EN" / "ui.txt")
+    # select BE/ui.txt
+    ix = win.fs_model.index_for_path(dst / "BE" / "ui.txt")
     win._file_chosen(ix)
     assert win.table.model().rowCount() == 1

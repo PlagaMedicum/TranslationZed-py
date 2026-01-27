@@ -12,19 +12,19 @@ def test_edit_and_save(qtbot, tmp_path):
     for loc in ("EN", "BE"):
         (dst / loc).mkdir()
         (dst / loc / "ui.txt").write_text('UI_YES = "Yes"\n')
-    win = MainWindow(str(dst))
+    win = MainWindow(str(dst), selected_locales=["BE"])
     qtbot.addWidget(win)
-    # select EN/ui.txt
-    ix = win.fs_model.index_for_path(dst / "EN" / "ui.txt")
+    # select BE/ui.txt
+    ix = win.fs_model.index_for_path(dst / "BE" / "ui.txt")
     win._file_chosen(ix)
     assert win.table.model().rowCount() == 1
-    win = MainWindow(str(dst))
+    win = MainWindow(str(dst), selected_locales=["BE"])
     qtbot.addWidget(win)
-    ix = win.fs_model.index_for_path(dst / "EN" / "ui.txt")
+    ix = win.fs_model.index_for_path(dst / "BE" / "ui.txt")
     win._file_chosen(ix)
 
     model = win.table.model()
     model.setData(model.index(0, 1), "Yes-edited")  # edit the value
 
     win._save_current()
-    assert (dst / "EN" / "ui.txt").read_text() == 'UI_YES = "Yes-edited"\n'
+    assert (dst / "BE" / "ui.txt").read_text() == 'UI_YES = "Yes-edited"\n'
