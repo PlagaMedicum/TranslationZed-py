@@ -39,7 +39,7 @@ Supporting files: `Makefile`, `pyproject.toml` (`.[dev]` extra + `PySide6-stubs`
 | **Undo/Redo** | Implemented via `core.commands` + `QUndoStack` in `entry_model`.                                                                             |
 | **GUI shell** | QMainWindow with splitter and editable table; tree double-click activation fixed; proofread action exists (Ctrl+P).                           |
 | **Tests**     | Headless Qt guard (`QT_QPA_PLATFORM=offscreen`), GUI tests skip without PySide6; saver span regression test added.                            |
-| **Docs**      | Technical & UX specs updated to v0.3.1; detailed technical notes added.                                                                       |
+| **Docs**      | Technical & UX specs updated; detailed technical notes added.                                                                               |
 
 ---
 
@@ -47,24 +47,19 @@ Supporting files: `Makefile`, `pyproject.toml` (`.[dev]` extra + `PySide6-stubs`
 
 | Spec section                           | Gap                                                                                                         |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Locale discovery**                   | Must accept non‑2‑letter locale dirs (e.g., `EN UK`, `PTBR`) and ignore `_TVRADIO_TRANSLATIONS`.            |
-| **Metadata**                           | `language.txt` must drive charset + display name; `credits.txt`/`language.txt` must be excluded from tree. |
-| **Encoding**                           | UTF‑16 locales (KO) not supported by current byte-tokenizer.                                                |
-| **Concat preservation**                | Edited values collapse concat chains; spec requires preserving original `..` + trivia.                      |
-| **Cache layout**                       | Spec requires per‑file cache in root `.tzp-cache/`, EN hash index file; code uses per‑locale cache.         |
-| **Clean architecture**                 | `core` still depends on Qt (`QUndoStack`, `QUndoCommand`).                                                   |
-| **GUI**                                | No locale chooser, no EN Source column, no status-in-toolbar wiring, no search dock.                        |
-| **Safety**                             | No unsaved-changes guard; crash‑recovery cache planned only.                                                  |
+| **EN hash cache**                      | Not implemented yet (startup EN hash index + confirmation dialog).                                           |
+| **Search**                             | No search dock, regex toggle, or F3 navigation.                                                              |
+| **Source column**                      | EN Source column is still missing (table is Key/Value/Status).                                               |
+| **Status UI**                          | Toolbar Status dropdown/label not wired; row coloring uses foreground not background.                        |
+| **Preferences UI**                     | Preferences file exists, but no GUI for toggles (e.g., exit prompt).                                          |
 
 ---
 
 ## 4  Known issues
 
-1. **UTF‑16 locale files** (e.g., KO) will not parse with current byte-based tokenizer.
-2. **Concat chains** are flattened on edit; violates confirmed requirement to preserve structure.
-3. **Core/GUI coupling**: `core.model` depends on Qt types; violates clean architecture requirement.
-4. **Status cache location** mismatches spec (per-locale vs per-file `.tzp-cache`).
-5. **Locale scanning** rejects `EN UK` / `PTBR` and does not ignore `language.txt` / `credits.txt`.
+1. **Status color style** uses text color instead of background; spec wants background.
+2. **Source column** missing; EN not shown in table yet.
+3. **Search** not implemented.
 
 ---
 
@@ -83,15 +78,11 @@ Supporting files: `Makefile`, `pyproject.toml` (`.[dev]` extra + `PySide6-stubs`
 
 | Priority | Task                                                                                                                       | Modules                                               |
 | -------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| **P0**   | **Clean core split** · remove Qt dependencies from `core` (replace QUndoStack/Command with pure-domain interfaces).         | `core.model`, `core.commands`, GUI adapters           |
-| **P0**   | **Locale scan + metadata** · support non‑2‑letter locales, ignore `_TVRADIO_TRANSLATIONS`, parse `language.txt` + encoding. | `core.project_scanner`, new `core.locale_meta`        |
-| **P0**   | **Encoding support** · byte/char mapping and UTF‑16-safe tokenization.                                                      | `core.parser`, tests (`fixtures/prod_like`)           |
-| **P1**   | **Concat preservation** · store per-segment spans and reserialize without collapsing `..`.                                  | `core.parser`, `core.saver`                           |
-| **P1**   | **Cache layout** · per‑file `.tzp-cache` + EN hash index; write edited files only.                                          | `core.status_cache`, new `core.en_hash_cache`, GUI    |
-| **P2**   | **GUI locale chooser** · checkbox multi-select; multiple roots; EN used as Source only.                                     | `gui.main_window`, new dialog, `gui.fs_model`         |
-| **P2**   | **Status UI** · row colors + toolbar Status label (selected row).                                                           | `gui.entry_model`, `gui.delegates`                    |
-| **P3**   | **Search** · search dock + regex mode + F3 navigation.                                                                      | `core.search`, `gui.search_dock`                      |
-| **P3**   | **Safety** · unsaved‑changes guard; crash‑recovery cache remains planned only.                                               | `gui.main_window`                                     |
+| **P0**   | **EN hash cache** · implement EN hash index and startup confirmation dialog.                                                | `core.en_hash_cache`, `gui.main_window`               |
+| **P1**   | **Source column** · show EN strings alongside translation values.                                                           | `gui.entry_model`, `gui.main_window`                  |
+| **P1**   | **Status UI** · background coloring + toolbar Status label/dropdown.                                                        | `gui.delegates`, `gui.main_window`                    |
+| **P2**   | **Search** · search dock + regex mode + F3 navigation.                                                                      | `core.search`, `gui.search_dock`                      |
+| **P2**   | **Preferences UI** · expose `prompt_write_on_exit` toggle in settings.                                                      | `gui.preferences`                                     |
 
 ---
 

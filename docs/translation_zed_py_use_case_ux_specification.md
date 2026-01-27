@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3 · 2026‑01‑27_
+_version 0.3.2 · 2026‑01‑27_
 
 ---
 ## 1  Actors
@@ -115,10 +115,11 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 ### UC‑07  Exit Application
 | **Trigger** | Window close button or *Project ▸ Exit* |
 | **Flow** |
-|  1 | If ANY dirty files exist, SYS prompts **Write / Cache only / Cancel**. |
+|  1 | If ANY dirty files exist **and** `prompt_write_on_exit=true`, SYS prompts **Write / Cache only / Cancel**. |
 |  2 | On **Write**, UC‑06 is executed. |
 |  3 | On **Cache only**, SYS persists drafts to `.tzp-cache` and exits. |
-|  4 | SYS shuts down, releasing file handles. |
+|  4 | If `prompt_write_on_exit=false`, SYS skips the prompt and performs **Cache only**. |
+|  5 | SYS shuts down, releasing file handles. |
 
 ### UC‑08  Crash Recovery
 | **Trigger** | Application restarts after abnormal termination. |
@@ -185,4 +186,4 @@ UNTOUCHED ──────────────────────▶ 
    originals are written.
 
 ---
-_Last updated: 2026‑01‑27 (v0.3.1)_
+_Last updated: 2026‑01‑27 (v0.3.2)_

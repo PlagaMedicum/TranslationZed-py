@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.2.1 · 2026‑01‑27**\
+**Version 0.2.2 · 2026‑01‑27**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -203,6 +203,7 @@ Algorithm:
 
 - JSON file at `${XDG_CONFIG_HOME}/translationzed‑py/settings.json`.
 - Store: last root path, last locale, window geometry, theme, wrap‑text toggle.
+- **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
 
 ### 5.7  `gui.main_window`
 
@@ -263,6 +264,7 @@ def write(root: Path, file_path: Path, entries: list[Entry], *, changed_keys: se
   - Written automatically on edit and on file switch. Draft values are stored
     **only** for `changed_keys`; statuses stored when `status != UNTOUCHED`.
   - On “Write Original”, draft values are cleared from cache; statuses persist.
+  - If no statuses or drafts exist, cache file MUST be absent (or removed).
 
 Cache path convention:
 - For a translation file `<root>/<locale>/path/file.txt`, the cache lives at

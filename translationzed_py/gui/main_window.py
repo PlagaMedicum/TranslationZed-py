@@ -18,6 +18,7 @@ from shiboken6 import isValid
 from translationzed_py.core import LocaleMeta, parse, scan_root
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
+from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.status_cache import CacheEntry, read as _read_status_cache
 from translationzed_py.core.status_cache import write as _write_status_cache
 
@@ -39,6 +40,8 @@ class MainWindow(QMainWindow):
         self._locales: dict[str, LocaleMeta] = {}
         self._selected_locales: list[str] = []
         self._current_encoding = "utf-8"
+        prefs = _load_preferences()
+        self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
 
         splitter = QSplitter(self)
         self.setCentralWidget(splitter)
@@ -272,7 +275,7 @@ class MainWindow(QMainWindow):
         if not (self._current_pf and self._current_model):
             event.accept()
             return
-        if self._current_model.changed_keys():
+        if self._current_model.changed_keys() and self._prompt_write_on_exit:
             decision = self._prompt_write_original()
             if decision == "cancel":
                 event.ignore()

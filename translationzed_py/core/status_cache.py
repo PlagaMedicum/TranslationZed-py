@@ -111,6 +111,10 @@ def write(
             continue
         value = e.value if e.key in changed_keys else None
         rows.append((_hash_key(e.key), e.status, value))
+    if not rows:
+        if status_file.exists():
+            status_file.unlink()
+        return
     buf = bytearray()
     buf += _HEADER.pack(_MAGIC, len(rows))
     for key_hash, status, value in rows:
