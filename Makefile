@@ -53,4 +53,4 @@ clean:
 	find . -type d \( -name "__pycache__" -o -name ".mypy_cache" -o -name ".ruff_cache" -o -name ".pytest_cache" \) -exec rm -rf {} +
 
 dist: clean
-	$(PY) -m build --wheel --sdist
+	$(VENV_ACT) $(PY) -m build --no-isolation --wheel --sdist

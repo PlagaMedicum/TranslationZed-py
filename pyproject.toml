@@ -26,6 +26,7 @@ dev = [
     "pytest-qt>=4.4",
     "pre-commit>=3.6",
     "build>=1.2",
+    "wheel>=0.46",
     "PySide6-stubs>=2.1",
 ]
 
