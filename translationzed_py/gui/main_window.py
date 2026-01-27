@@ -39,14 +39,20 @@ class MainWindow(QMainWindow):
         self, project_root: str | None = None, *, selected_locales: list[str] | None = None
     ) -> None:
         super().__init__()
+        self._startup_aborted = False
         self._root = Path(project_root or ".").resolve()
         self.setWindowTitle(f"TranslationZed – {self._root}")
         self._locales: dict[str, LocaleMeta] = {}
         self._selected_locales: list[str] = []
         self._current_encoding = "utf-8"
         self._app_config = _load_app_config(self._root)
+        self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
+        self._current_model: TranslationModel | None = None
+        self._opened_files: set[Path] = set()
+        self._cache_map: dict[int, CacheEntry] = {}
+
         if not self._check_en_hash_cache():
-            self.close()
+            self._startup_aborted = True
             return
         prefs = _load_preferences(self._root)
         self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
@@ -89,12 +95,7 @@ class MainWindow(QMainWindow):
         act_save.triggered.connect(self._request_write_original)
         self.addAction(act_save)
 
-        self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
-        self._current_model: TranslationModel | None = None
-        self._opened_files: set[Path] = set()
-
         # ── cache ──────────────────────────────────────────────────────
-        self._cache_map: dict[int, CacheEntry] = {}
 
     def _init_locales(self, selected_locales: list[str] | None) -> None:
         self._locales = scan_root(self._root)
@@ -135,10 +136,10 @@ class MainWindow(QMainWindow):
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Warning)
         msg.setWindowTitle("English source changed")
-        msg.setText("English source files changed since last run.")
-        msg.setInformativeText("Acknowledge to reset the EN hash index.")
-        ack = msg.addButton("Acknowledge & Reset", QMessageBox.AcceptRole)
-        msg.addButton(QMessageBox.Cancel)
+        msg.setText("English reference files have changed.")
+        msg.setInformativeText("Continue to update the reference used for change checks.")
+        ack = msg.addButton("Continue", QMessageBox.AcceptRole)
+        msg.addButton("Dismiss", QMessageBox.RejectRole)
         msg.exec()
         if msg.clickedButton() is ack:
             _write_en_hash_cache(self._root, computed)
