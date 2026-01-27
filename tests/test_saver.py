@@ -1,0 +1,17 @@
+from translationzed_py.core import parse
+from translationzed_py.core.saver import save
+
+
+def test_save_updates_spans(tmp_path):
+    path = tmp_path / "file.txt"
+    path.write_text('A = "Hi"\nB = "Hello"\n', encoding="utf-8")
+
+    pf = parse(path)
+    save(pf, {"A": "Longer", "B": "X"})
+    assert path.read_text(encoding="utf-8") == 'A = "Longer"\nB = "X"\n'
+
+    # second save uses adjusted spans after length changes
+    save(pf, {"B": "YY"})
+    assert path.read_text(encoding="utf-8") == 'A = "Longer"\nB = "YY"\n'
+    assert pf.entries[0].value == "Longer"
+    assert pf.entries[1].value == "YY"
