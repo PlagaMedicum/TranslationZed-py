@@ -1,4 +1,4 @@
-# TranslationZed-Py: Technical Notes (2026-01-26)
+# TranslationZed-Py: Technical Notes (2026-01-27)
 
 Goal: capture *observed behavior*, *as-built architecture*, and *spec deltas* with
 minimal prose and maximal precision. These are diagnostic notes, not a roadmap.
@@ -30,9 +30,9 @@ Pillars stated or implied in specs:
 5) **Minimal deps + portability** (PySide6 + stdlib; cross-platform).
 
 Observed alignment (snapshot):
-- (1) Partial: raw bytes preserved, but concat chains are flattened on save.
+- (1) Mostly: raw bytes preserved and concat chains retained on save.
 - (2) Partial: table exists but UI open flow blocks it; no search dock.
-- (3) Partial: status cache per-locale exists; encoding support missing.
+- (3) Mostly: status cache per-file exists; encoding support present.
 - (4) Partial: atomic replace exists; no fsync or crash recovery.
 - (5) Mostly: deps are minimal; GUI requires PySide6; tests require pytest-qt.
 
@@ -46,13 +46,14 @@ From latest clarification:
 - **Program-generated comments**: writable *only* if they are clearly marked as
   app-generated; all other comments are read-only. (Planned post-MVP.)
 - **Cache scope**: per-file cache (one cache file per translation file).
-- **Edited files only**: cache is written for edited files only on exit/save.
+- **Edited files only**: cache is written for edited files only; auto-written on
+  edit and file switch. Draft values are stored only for changed keys.
 - **Encoding**: one encoding per locale (shared across files in that locale).
 - **English diff**: track English file hashes (raw bytes) for change signaling.
 - **Architecture**: strict separation; core must not depend on Qt from the start.
 - **Crash safety**: cache persistence only; no extra temporary recovery files yet.
 - **Cache location**: hidden `.tzp-cache/` subfolder.
-- **Cache layout**: `.tzp-cache/<locale>/<relative-path>.tzstatus.bin`.
+- **Cache layout**: `.tzp-cache/<locale>/<relative-path>.bin`.
 - **Program-generated comment naming**: `TZP:` prefix (accepted).
 - **Locale workflow**: primary workflow is one locale at a time; potential
   multi-locale selection (checkboxes) to display multiple locales concurrently.
@@ -146,7 +147,7 @@ High-level architecture (actual wiring):
 GUI: MainWindow
   -> FsModel (QStandardItemModel)
   -> QTableView + TranslationModel
-  -> QUndoStack per ParsedFile (from core/model)
+  -> QUndoStack per file (GUI)
   -> saver.save(...)
           |
           v
@@ -157,11 +158,10 @@ Core: status_cache.read/write (xxhash16)
 Module responsibility matrix (actual):
 ```
 core/parser.py          Tokenize, parse Entry spans, read status comments
-core/model.py           Entry/ParsedFile + QUndoStack (Qt coupling)
-core/commands.py        Undo/redo commands (value + status)
+core/model.py           Entry/ParsedFile (Qt-free)
 core/saver.py           In-place span replacement + atomic file replace
-core/status_cache.py    .tzstatus.bin read/write (hash -> status)
-core/project_scanner.py Locale discovery (unused in GUI)
+core/status_cache.py    .bin read/write (hash -> status + optional draft value)
+core/project_scanner.py Locale discovery + language.txt parsing (used in GUI)
 
 gui/fs_model.py         Tree model of <root>/<LOCALE>/**/*.txt
 gui/entry_model.py      QAbstractTableModel with edits -> QUndoStack
@@ -179,15 +179,14 @@ GUI -> core (pure domain) -> IO
 
 Actual coupling:
 ```
-GUI -> core.model (Qt) -> IO
+GUI -> core (Qt-free) -> IO
 ```
 
 Coupling hotspots:
-- `core.model` imports `QUndoStack` (Qt GUI class).
-- `core.commands` depends on `QUndoCommand`.
+- Undo/redo stack lives in GUI (`gui/commands.py`).
 
 Impact:
-- Core cannot be imported without Qt unless fallbacks exist.
+- Core can be imported without Qt.
 - Domain reuse (CLI/batch) is harder than spec implies.
 
 ---
@@ -233,17 +232,13 @@ TranslationModel.setData()
         -> TranslationModel._dirty = True; ParsedFile.dirty = True
 
 MainWindow._save_current()
-  -> build dict {key: value} for ALL rows (not just changed)
-  -> saver.save(pf, new_entries)
+  -> build dict {key: value} for changed rows only
+  -> saver.save(pf, changed)
      -> patch in-memory raw bytes
      -> write file.tmp and replace
      -> recompute Entry spans + values
-  -> status_cache.write(...) for opened files in current locale
+  -> status_cache.write(...) for the current file only
 ```
-
-Key weakness:
-- `new_entries` is built for all rows, so the saver rewrites all literals even if
-  only one row changed. This is correct but causes unnecessary rewrites.
 
 Durability gap:
 - No `fsync()` before `os.replace()`; atomicity is present, but durability on
@@ -255,7 +250,7 @@ Durability gap:
 
 Current status sources:
 1) Inline comment tags (`-- TRANSLATED`, `-- PROOFREAD`) parsed by `core/parser`.
-2) Binary cache `.tzstatus.bin` for in-memory status override.
+2) Binary cache `.bin` for in-memory status + draft overrides.
 
 Notes:
 - Status cache uses 16-bit hash of UTF-8 key text (xxhash64 -> u16).
@@ -270,10 +265,14 @@ Clarified direction:
 
 Cache file layout (actual):
 ```
+4s magic ("TZC1")
 u32 count
 repeat count:
   u16 key_hash
   u8  status
+  u8  flags (bit0 = has_value)
+  u32 value_len
+  bytes[value_len] (UTF-8)
 ```
 
 ---
@@ -355,30 +354,16 @@ Missing coverage:
 
 ## 9) Architectural Weak Points (Coherence)
 
-1) Core/GUI coupling
-   - `core.model` imports Qt for `QUndoStack`.
-   - Headless or CLI usage requires Qt dependency or fallbacks.
+1) Status persistence split-brain
+   - Status can come from legacy comments or cache; saver writes only cache.
+   - Divergence is possible if comment tags exist in source files.
 
-2) Duplicate logic for project scanning
-   - `core.project_scanner.scan_root()` exists but GUI does not use it.
-   - `FsModel` re-implements scanning with slightly different rules.
+2) Cache collisions
+   - Status/draft cache uses 16-bit hash keys; collisions are possible.
+   - No collision mitigation exists (by design).
 
-3) Lossy token preservation
-   - Concatenated string chains are flattened on edit.
-   - This violates the confirmed requirement to preserve concat structure.
-
-4) Status persistence split-brain
-   - Status can come from comments or cache; saver writes only cache.
-   - Divergence is possible if comments exist in source.
-
-5) Locale boundary ambiguity
-   - GUI allows opening any `<root>/<LOCALE>/...` file.
-   - Status cache is per-locale, but `_opened_pfs` tracks only opened files.
-   - Vision now requires per-file cache in `.tzp-cache/` and only for edited files.
-
-6) Build metadata warnings
-   - `README.md` is referenced but missing.
-   - `project.license` uses deprecated table form.
+3) Crash recovery
+   - Draft cache persists, but no dedicated crash‑recovery file/merge flow yet.
 
 ---
 
@@ -398,14 +383,14 @@ Missing coverage:
                  |  - parser          |
                  |  - saver           |
                  |  - status_cache    |
-                 |  - model (Qt)  <-- coupling
+                 |  - model
                  +---------+----------+
                            |
                            v
                  +--------------------+
                  |  Filesystem (IO)   |
                  |  .txt files         |
-                 |  .tzstatus.bin      |
+                 |  .bin      |
                  +--------------------+
 ```
 

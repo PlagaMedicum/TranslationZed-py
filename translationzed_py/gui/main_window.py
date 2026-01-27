@@ -18,7 +18,7 @@ from shiboken6 import isValid
 from translationzed_py.core import LocaleMeta, parse, scan_root
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
-from translationzed_py.core.status_cache import read as _read_status_cache
+from translationzed_py.core.status_cache import CacheEntry, read as _read_status_cache
 from translationzed_py.core.status_cache import write as _write_status_cache
 
 from .entry_model import TranslationModel
@@ -75,14 +75,14 @@ class MainWindow(QMainWindow):
         # ── save action ─────────────────────────────────────────────────────
         act_save = QAction("&Save", self)
         act_save.setShortcut(QKeySequence.StandardKey.Save)
-        act_save.triggered.connect(self._save_current)
+        act_save.triggered.connect(self._request_write_original)
         self.addAction(act_save)
 
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
 
-        # ── status-cache ───────────────────────────────────────────────
-        self._status_map: dict[int, Status] = {}
+        # ── cache ──────────────────────────────────────────────────────
+        self._cache_map: dict[int, CacheEntry] = {}
 
     def _init_locales(self, selected_locales: list[str] | None) -> None:
         self._locales = scan_root(self._root)
@@ -107,22 +107,22 @@ class MainWindow(QMainWindow):
         return rel.parts[0]
 
     # ----------------------------------------------------------------- slots
-    def _prompt_unsaved(self) -> str:
+    def _prompt_write_original(self) -> str:
         msg = QMessageBox(self)
-        msg.setIcon(QMessageBox.Warning)
-        msg.setWindowTitle("Unsaved changes")
-        msg.setText("Save changes to the current file?")
-        msg.setInformativeText("Your changes will be lost if you discard them.")
+        msg.setIcon(QMessageBox.Question)
+        msg.setWindowTitle("Write to original file")
+        msg.setText("Write draft translations to the original file?")
+        msg.setInformativeText("No keeps changes in cache only.")
         msg.setStandardButtons(
-            QMessageBox.StandardButton.Save
-            | QMessageBox.StandardButton.Discard
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No
             | QMessageBox.StandardButton.Cancel
         )
         result = msg.exec()
-        if result == QMessageBox.StandardButton.Save:
-            return "save"
-        if result == QMessageBox.StandardButton.Discard:
-            return "discard"
+        if result == QMessageBox.StandardButton.Yes:
+            return "yes"
+        if result == QMessageBox.StandardButton.No:
+            return "no"
         return "cancel"
 
     def _file_chosen(self, index) -> None:
@@ -131,19 +131,8 @@ class MainWindow(QMainWindow):
         path = Path(raw_path) if raw_path else None
         if not (path and path.suffix == ".txt"):
             return
-        if self._current_model and getattr(self._current_model, "_dirty", False):
-            decision = self._prompt_unsaved()
-            if decision == "cancel":
-                return
-            if decision == "save":
-                if not self._save_current():
-                    return
-            else:
-                # discard edits
-                if self._current_pf:
-                    self.fs_model.set_dirty(self._current_pf.path, False)
-                self._current_model._dirty = False
-                self._current_model.clear_changed_values()
+        if not self._write_cache_current():
+            return
         locale = self._locale_for_path(path)
         encoding = self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
         try:
@@ -154,22 +143,39 @@ class MainWindow(QMainWindow):
 
         self._current_encoding = encoding
 
-        self._status_map = _read_status_cache(self._root, path)
-
-        for e in pf.entries:
+        base_values = {e.key: e.value for e in pf.entries}
+        self._cache_map = _read_status_cache(self._root, path)
+        changed_keys: set[str] = set()
+        for idx, e in enumerate(pf.entries):
             h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
-            if h in self._status_map:
-                # Entry is frozen → use object.__setattr__
-                object.__setattr__(e, "status", self._status_map[h])
+            if h not in self._cache_map:
+                continue
+            rec = self._cache_map[h]
+            new_value = rec.value if rec.value is not None else e.value
+            if rec.value is not None and rec.value != e.value:
+                changed_keys.add(e.key)
+            if new_value != e.value or rec.status != e.status:
+                pf.entries[idx] = type(e)(
+                    e.key,
+                    new_value,
+                    rec.status,
+                    e.span,
+                    e.segments,
+                    e.gaps,
+                )
         self._current_pf = pf
         if self._current_model:
             try:
                 self._current_model.dataChanged.disconnect(self._on_model_changed)
             except (TypeError, RuntimeError):
                 pass
-        self._current_model = TranslationModel(pf)
+        self._current_model = TranslationModel(
+            pf, base_values=base_values, changed_keys=changed_keys
+        )
         self._current_model.dataChanged.connect(self._on_model_changed)
         self.table.setModel(self._current_model)
+        if changed_keys:
+            self.fs_model.set_dirty(self._current_pf.path, True)
 
         # (re)create undo/redo actions bound to this file’s stack
         for old in (self.act_undo, self.act_redo):
@@ -186,10 +192,10 @@ class MainWindow(QMainWindow):
 
 
     def _save_current(self) -> bool:
-        """Patch file on disk if there are unsaved edits in the table model."""
+        """Patch file on disk if there are unsaved value edits."""
         if not (self._current_pf and self._current_model):
             return True
-        if not getattr(self._current_model, "_dirty", False):
+        if not self._current_model.changed_keys():
             return True
 
         changed = self._current_model.changed_values()
@@ -197,27 +203,57 @@ class MainWindow(QMainWindow):
             if changed:
                 save(self._current_pf, changed, encoding=self._current_encoding)
 
-            # update in-memory cache with *new* statuses from the file we saved
-            for e in self._current_pf.entries:
-                h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
-                self._status_map[h] = e.status
+            # persist cache for this file only (statuses + draft values)
+            _write_status_cache(
+                self._root,
+                self._current_pf.path,
+                self._current_pf.entries,
+                changed_keys=set(),
+            )
 
-            # persist statuses for this file only (edited files only)
-            _write_status_cache(self._root, self._current_pf.path, self._current_pf.entries)
-
-            self._current_model._dirty = False
-            self._current_model.clear_changed_values()
+            self._current_model.reset_baseline()
             self.fs_model.set_dirty(self._current_pf.path, False)
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
             return False
         return True
 
+    def _request_write_original(self) -> None:
+        if not (self._current_pf and self._current_model):
+            return
+        if not self._current_model.changed_keys():
+            return
+        decision = self._prompt_write_original()
+        if decision == "cancel":
+            return
+        if decision == "yes":
+            self._save_current()
+        else:
+            self._write_cache_current()
+
+    def _write_cache_current(self) -> bool:
+        if not (self._current_pf and self._current_model):
+            return True
+        try:
+            _write_status_cache(
+                self._root,
+                self._current_pf.path,
+                self._current_pf.entries,
+                changed_keys=self._current_model.changed_keys(),
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Cache write failed", str(exc))
+            return False
+        if self._current_model.changed_keys():
+            self.fs_model.set_dirty(self._current_pf.path, True)
+        else:
+            self.fs_model.set_dirty(self._current_pf.path, False)
+        return True
+
     def _on_model_changed(self, *_args) -> None:
         if not (self._current_pf and self._current_model):
             return
-        if getattr(self._current_model, "_dirty", False):
-            self.fs_model.set_dirty(self._current_pf.path, True)
+        self._write_cache_current()
 
     def _mark_proofread(self) -> None:
         if not (self._current_pf and self._current_model):
@@ -230,4 +266,22 @@ class MainWindow(QMainWindow):
             self._current_pf, row, Status.PROOFREAD, self._current_model
         )
         self._current_model.undo_stack.push(cmd)
-        self.fs_model.set_dirty(self._current_pf.path, True)
+        self._write_cache_current()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if not (self._current_pf and self._current_model):
+            event.accept()
+            return
+        if self._current_model.changed_keys():
+            decision = self._prompt_write_original()
+            if decision == "cancel":
+                event.ignore()
+                return
+            if decision == "yes":
+                if not self._save_current():
+                    event.ignore()
+                    return
+        if not self._write_cache_current():
+            event.ignore()
+            return
+        event.accept()

@@ -70,7 +70,7 @@ Supporting files: `Makefile`, `pyproject.toml` (`.[dev]` extra + `PySide6-stubs`
 
 ## 5  Agreed spec deltas (2026-01-27)
 
-* **Status cache** is per‑file, stored under `<root>/.tzp-cache/<locale>/<rel>.tzstatus.bin`.
+* **Status cache** is per‑file, stored under `<root>/.tzp-cache/<locale>/<rel>.bin`.
 * **EN hash cache** is a single index file `<root>/.tzp-cache/en.hashes.bin` (raw bytes).
 * **EN is base**: not editable; Source column is EN by default.
 * **Locale selection** uses checkboxes and shows multiple roots (one per locale).

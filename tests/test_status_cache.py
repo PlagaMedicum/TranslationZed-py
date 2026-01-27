@@ -3,7 +3,7 @@ from pathlib import Path
 
 from translationzed_py.core import parse
 from translationzed_py.core.model import Status
-from translationzed_py.core.status_cache import read, write
+from translationzed_py.core.status_cache import CacheEntry, read, write
 
 
 def test_roundtrip():
@@ -19,4 +19,22 @@ def test_roundtrip():
         object.__setattr__(pf.entries[0], "status", Status.TRANSLATED)
 
         write(root, path, pf.entries)
-        assert list(read(root, path).values()) == [Status.TRANSLATED]
+        assert list(read(root, path).values()) == [CacheEntry(Status.TRANSLATED, None)]
+
+
+def test_roundtrip_with_value_override():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "root"
+        loc = root / "EN"
+        loc.mkdir(parents=True)
+        path = loc / "dummy.txt"
+        path.write_text('GREETING = "Hi"\n', encoding="utf-8")
+
+        pf = parse(path)
+        object.__setattr__(pf.entries[0], "status", Status.TRANSLATED)
+        object.__setattr__(pf.entries[0], "value", "Hello!")
+
+        write(root, path, pf.entries, changed_keys={"GREETING"})
+        entry = list(read(root, path).values())[0]
+        assert entry.status == Status.TRANSLATED
+        assert entry.value == "Hello!"

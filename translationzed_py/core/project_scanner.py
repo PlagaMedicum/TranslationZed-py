@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-_IGNORE_DIRS = {"_TVRADIO_TRANSLATIONS"}
+_IGNORE_DIRS = {"_TVRADIO_TRANSLATIONS", ".tzp-cache"}
 _IGNORE_FILES = {"language.txt", "credits.txt"}
 
 

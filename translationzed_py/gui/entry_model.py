@@ -23,12 +23,20 @@ _COLOR = {
 class TranslationModel(QAbstractTableModel):
     """Qt model that backs the translation table, with undo/redo support."""
 
-    def __init__(self, pf: ParsedFile):
+    def __init__(
+        self,
+        pf: ParsedFile,
+        *,
+        base_values: dict[str, str] | None = None,
+        changed_keys: set[str] | None = None,
+    ):
         super().__init__()
         self._pf = pf
         self._entries = list(pf.entries)
-        self._dirty = False
-        self._changed_values: set[str] = set()
+        self._base_values = base_values or {e.key: e.value for e in self._entries}
+        self._changed_values: set[str] = set(changed_keys or set())
+        self._dirty = bool(self._changed_values)
+        self._pf.dirty = self._dirty
 
         self.undo_stack = QUndoStack()
 
@@ -37,7 +45,11 @@ class TranslationModel(QAbstractTableModel):
         """Called by EditValueCommand to swap immutable Entry objects."""
         self._entries[row] = entry
         if value_changed:
-            self._changed_values.add(entry.key)
+            base_value = self._base_values.get(entry.key)
+            if base_value is not None and entry.value == base_value:
+                self._changed_values.discard(entry.key)
+            else:
+                self._changed_values.add(entry.key)
         left = self.index(row, 0)
         right = self.index(row, self.columnCount() - 1)
         self.dataChanged.emit(
@@ -45,8 +57,9 @@ class TranslationModel(QAbstractTableModel):
             right,
             [Qt.DisplayRole, Qt.EditRole, Qt.ForegroundRole, Qt.BackgroundRole],
         )
-        self._dirty = True
-        self._pf.dirty = True
+        if value_changed:
+            self._dirty = bool(self._changed_values)
+            self._pf.dirty = self._dirty
 
     def changed_values(self) -> dict[str, str]:
         """Return only values that were edited (no status-only changes)."""
@@ -56,8 +69,18 @@ class TranslationModel(QAbstractTableModel):
                 out[e.key] = e.value
         return out
 
+    def changed_keys(self) -> set[str]:
+        return set(self._changed_values)
+
     def clear_changed_values(self) -> None:
         self._changed_values.clear()
+        self._dirty = False
+        self._pf.dirty = False
+
+    def reset_baseline(self) -> None:
+        """After writing to disk, treat current values as the new baseline."""
+        self._base_values = {e.key: e.value for e in self._entries}
+        self.clear_changed_values()
 
     # Qt mandatory overrides ----------------------------------------------------
     def rowCount(  # noqa: N802
