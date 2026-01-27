@@ -122,7 +122,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ### Step 8 — Table model + editing [✓]
 - Touchpoints: `gui/entry_model.py`, `gui/commands.py`, `gui/delegates.py`
 - Acceptance:
-  - 4 columns: Key | Source | Value | Status
+  - 4 columns: Key | Source | Translation | Status
   - Undo/redo per file
   - Status editor (combo) + proofread shortcut
   - Status background color (Proofread)
@@ -133,6 +133,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Debounced search across Key/Source/Trans
   - Regex toggle
   - F3 / Shift+F3 navigation
+  - Replace row toggle + Replace / Replace All (current file, Translation only)
+  - Future: locale‑scope Replace All (current locale only, scope explicitly labeled)
 
 ### Step 10 — Save flows + prompts [✓]
 - Touchpoints: `gui/main_window.py`, `gui/dialogs.py`
@@ -149,6 +151,16 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Wrap text toggle changes view
   - Last locale selection remembered
   - Last opened file per locale stored **inside cache headers** (no settings entry)
+  - Preferences include **Search scope** and **Replace scope** (future UI)
+
+### Step 18 — Preferences window (planned)
+- Touchpoints: `gui/preferences_dialog.py` (new), `core/preferences.py`
+- Acceptance:
+  - Preferences window groups settings: General, Search & Replace, View
+  - Default root path can be set
+  - Search scope: File | Locale | Pool
+  - Replace scope: File | Locale | Pool
+  - Values persisted to `.tzp-config/settings.env`
 
 ### Step 12 — Dirty indicators from cache [✓]
 - Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
@@ -163,6 +175,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Row indicator (e.g., `Row 123 / 450`)
   - File path label (e.g., `BE/sub/dir/file.txt`)
   - Status bar updates on selection change (row index + file)
+  - When search/replace is active, status bar shows scope indicator(s)
   - Use native icons (Qt theme) and standard spacing to align with GNOME/KDE HIG
 
 ### Step 14 — Golden‑file tests [✓]
@@ -175,8 +188,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Touchpoints: `core/search.py`, `gui/main_window.py`
 - Acceptance:
   - GUI uses core search module instead of direct model scanning
-  - Search behavior unchanged from user perspective
-  - Search API supports multi-file search (future)
+  - Search API supports multi-file search
 
 ### Step 16 — Status‑only dirty semantics [✓]
 - Decision: **no dot** for status‑only changes until a future option allows
@@ -193,7 +205,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ## 3) MVP Acceptance Checklist (v0.1)
 
 [✓] Open project, select locales (EN hidden)  
-[✓] File tree + table (Key | Source | Value | Status)  
+[✓] File tree + table (Key | Source | Translation | Status)  
 [✓] Edit translations with undo/redo  
 [✓] Status changes + proofread shortcut + background coloring  
 [✓] Draft cache auto‑written  

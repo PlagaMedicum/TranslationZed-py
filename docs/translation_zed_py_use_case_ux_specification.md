@@ -96,9 +96,49 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 | **Trigger** | Typing in search box (`Ctrl+F`). |
 | **Parameter** | Mode (Key / Source / Translation) and Regex toggle. |
 | **Flow** |
-|  1 | After 300 ms debounce, SYS executes search; matches collected. |
-|  2 | First match row is auto‑selected and scrolled into view. |
-|  3 | `F3` / `Shift+F3` cycles through matches. |
+|  1 | After 300 ms debounce, SYS executes search across selected locales; matches collected. |
+|  2 | If the **current file** has matches, the first match row is auto‑selected and scrolled into view. |
+|  3 | Switching files does **not** auto‑jump to matches in other files. |
+|  4 | `F3` / `Shift+F3` cycles through matches across files (opening files as needed). |
+
+### UC‑05 ter  Search & Replace
+| **Trigger** | Toggle **Replace** control to expand the replace row. |
+| **Scope** | Current file only; **Translation** column only. |
+| **Flow** |
+|  1 | SYS exposes a **Replace** field plus **Replace** / **Replace All** buttons. |
+|  2 | If Regex is enabled, `$1`‑style capture references are allowed in Replace text. |
+|  3 | **Replace** updates only the current match row. |
+|  4 | **Replace All** updates all matches in the current file. |
+|  5 | If the regex can match empty strings (e.g., `(.*)`), SYS performs a single replacement per cell. |
+| **Future** | A locale‑scope **Replace All** will apply to all files in the **current locale only** and must be explicitly labeled to avoid ambiguity. |
+
+### UC‑09  Preferences (Settings)
+| Field | Value |
+|-------|-------|
+| **Goal** | Centralize non‑frequent settings to keep the toolbar uncluttered. |
+| **Primary Actor** | TR / PR |
+| **Trigger** | Menu → **Preferences…** (shortcut TBD). |
+| **Main Success Scenario** |
+|  1 | SYS opens a Preferences window with grouped sections. |
+|  2 | SYS presents groups: **General**, **Search & Replace**, **View**. |
+|  3 | User sets **Default root path** (optional). |
+|  4 | User sets **Search scope** (File / Locale / Locale Pool). |
+|  5 | User sets **Replace scope** (File / Locale / Locale Pool). |
+|  6 | User toggles general options (Prompt on Exit, Wrap Text, etc.). |
+|  7 | On Apply/OK, SYS persists settings to `.tzp-config/settings.env`. |
+| **Post‑condition** | Next app launch uses the selected defaults; toolbar remains minimal. |
+
+### UC‑10  First Run — Select Default Root
+| Field | Value |
+|-------|-------|
+| **Goal** | Store a default project root when launching without CLI args. |
+| **Primary Actor** | TR / PR |
+| **Trigger** | App starts without `--project` and no default root is set. |
+| **Main Success Scenario** |
+|  1 | SYS **blocks** with a Project Zomboid translations root chooser. |
+|  2 | On confirm, SYS stores it as **Default root path**. |
+|  3 | SYS continues startup using the selected root. |
+| **Post‑condition** | Subsequent launches use the default root unless CLI args override. |
 
 ### UC‑05 bis  Copy / Cut / Paste
 | **Trigger** | *Edit ▸ Copy/Cut/Paste* or standard shortcuts. |

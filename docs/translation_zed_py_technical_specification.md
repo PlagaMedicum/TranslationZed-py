@@ -211,6 +211,15 @@ Algorithm:
 - Future: optional `match_span`/`snippet` payload for preview; not in v0.1.
 - GUI must delegate search logic to this module (no GUI-level search).
 
+### 5.5.1  Search & Replace UI semantics
+
+- Search runs across selected locales; auto‑selects the **first match in the current file** only.
+- Cross‑file navigation is explicit via next/prev shortcuts; switching files does not auto‑jump.
+- Replace is **current file only** and **Translation column only**.
+- Regex replacement supports `$1`‑style capture references (mapped to Python `\g<1>`).
+- If a regex can match empty strings (e.g. `(.*)`), replacement is applied **once per cell**.
+- Future: replace scopes are configurable via Preferences (see §5.6); scope labels must be explicit.
+
 ### 5.6  `core.preferences`
 
 - Local config only; no `~` usage.
@@ -220,12 +229,40 @@ Algorithm:
   - `WRAP_TEXT=true|false`
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
+  - `DEFAULT_ROOT=<path>` (default project root in Preferences)
+  - `SEARCH_SCOPE=FILE|LOCALE|POOL`
+  - `REPLACE_SCOPE=FILE|LOCALE|POOL`
 - (No last‑open metadata in settings; timestamps live in per‑file cache headers.)
 - Search order: **cwd first, then project root**, later values override earlier.
 - Store: last root path, last locale(s), window geometry, theme, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
 
-### 5.6.1  `core.app_config`
+#### 5.6.1  Search & Replace preferences
+
+- **Search scope**:
+  - `FILE`: current file only.
+  - `LOCALE`: all files in the current locale.
+  - `POOL` (**Locale Pool**): all files in all selected locales (current session).
+- **Replace scope**:
+  - `FILE`: current file only (default in v0.1).
+  - `LOCALE`: all files in the current locale.
+  - `POOL` (**Locale Pool**): all files in all selected locales (current session).
+- Scope selection lives in Preferences (not in the toolbar by default), and UI text
+  must make the scope explicit to avoid accidental mass edits.
+ - Defaults: `SEARCH_SCOPE=FILE`, `REPLACE_SCOPE=FILE`.
+ - Status bar must echo the active scopes when search/replace are in use.
+   Prefer icon‑only indicators if unambiguous (e.g., 🔍 + file/locale/pool icon),
+   otherwise use compact text labels. Avoid mixed symbol+word pairs in the same indicator.
+
+#### 5.6.2  Default root path semantics
+
+- On first run, if no CLI `--project` arg is provided and `DEFAULT_ROOT` is unset,
+  the app **blocks** with a project‑root chooser and saves it as `DEFAULT_ROOT`.
+- If CLI `--project` is provided, it **overrides** `DEFAULT_ROOT` for that run
+  but does not modify it.
+- Users can change or clear `DEFAULT_ROOT` only via Preferences.
+
+### 5.6.2  `core.app_config`
 
 - TOML file at `<project-root>/config/app.toml` (checked after cwd, optional).
 - Purpose: minimize hard‑coding and enable quick adapter/format swaps without refactors.
@@ -237,7 +274,7 @@ Algorithm:
 - Swappable adapters are selected by name; actual implementations live behind
   interfaces in the application layer (clean architecture).
 
-### 5.6.2  `config/ci.yaml` (reserved)
+### 5.6.3  `config/ci.yaml` (reserved)
 
 - YAML placeholder for future CI pipelines.
 - Lists scripted steps (lint/typecheck/test) to keep CI assembly lightweight.
@@ -249,6 +286,10 @@ Algorithm:
   - **Edit**: Copy, Cut, Paste
   - **View**: Wrap Long Strings (checkable), Prompt on Exit (checkable)
 - Toolbar: `[Status ▼] [Key|Source|Trans] [Regex☑] [Search box]`
+ - Status bar:
+   - Saved timestamp, row indicator, current file path.
+   - When search/replace is active, append **scope indicator(s)**:
+    `Search: File|Locale|Pool`, `Replace: File|Locale|Pool`.
 - Exit guard uses `prompt_write_on_exit` (locale switch is cache‑only):
 
 ```python
