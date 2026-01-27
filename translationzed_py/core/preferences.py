@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -10,23 +9,21 @@ _DEFAULTS: dict[str, Any] = {
 }
 
 
-def _config_dir() -> Path:
-    root = os.environ.get("XDG_CONFIG_HOME")
-    if root:
-        return Path(root) / "translationzed-py"
-    return Path.home() / ".config" / "translationzed-py"
+def _config_dir(root: Path | None = None) -> Path:
+    base = root or Path.cwd()
+    return base / ".tzp-config"
 
 
-def _config_path() -> Path:
-    return _config_dir() / "settings.json"
+def _config_path(root: Path | None = None) -> Path:
+    return _config_dir(root) / "settings.json"
 
 
-def load() -> dict[str, Any]:
+def load(root: Path | None = None) -> dict[str, Any]:
     """
     Load preferences from disk, falling back to defaults.
     Unknown keys are preserved.
     """
-    path = _config_path()
+    path = _config_path(root)
     data: dict[str, Any] = {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -41,9 +38,9 @@ def load() -> dict[str, Any]:
     return merged
 
 
-def save(prefs: dict[str, Any]) -> None:
+def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     """Persist preferences to disk (atomic replace)."""
-    path = _config_path()
+    path = _config_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     raw = json.dumps(prefs, ensure_ascii=True, indent=2, sort_keys=True)
     tmp = path.with_suffix(".tmp")
