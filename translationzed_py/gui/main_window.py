@@ -1,31 +1,50 @@
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 
 import xxhash
-from PySide6.QtCore import QByteArray, QItemSelectionModel, QTimer, Qt, QUrl
-from PySide6.QtGui import QAction, QDesktopServices, QGuiApplication, QKeySequence
+from PySide6.QtCore import QByteArray, QItemSelectionModel, QPoint, QTimer, Qt, QUrl
+from PySide6.QtGui import (
+    QAction,
+    QDesktopServices,
+    QGuiApplication,
+    QIcon,
+    QKeySequence,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
     QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QSizePolicy,
     QSplitter,
+    QStyle,
     QTableView,
     QToolBar,
     QToolButton,
     QTreeView,
+    QWidget,
 )
 from shiboken6 import isValid
 
-from translationzed_py.core import LocaleMeta, ParsedFile, parse, scan_root
+from translationzed_py.core import (
+    LocaleMeta,
+    ParsedFile,
+    list_translatable_files,
+    parse,
+    scan_root,
+)
 from translationzed_py.core.model import Status
 from translationzed_py.core.saver import save
+from translationzed_py.core.search import Match as _SearchMatch
 from translationzed_py.core.search import SearchField as _SearchField
 from translationzed_py.core.search import SearchRow as _SearchRow
 from translationzed_py.core.search import search as _search_rows
@@ -105,34 +124,116 @@ class MainWindow(QMainWindow):
         self.status_combo.currentIndexChanged.connect(self._status_combo_changed)
         self.toolbar.addWidget(self.status_combo)
         self.toolbar.addSeparator()
+        self.regex_check = QCheckBox("Regex", self)
+        self.regex_check.stateChanged.connect(self._schedule_search)
+        self.regex_help = QLabel(
+            '<a href="https://docs.python.org/3/library/re.html">'
+            '<span style="vertical-align:super; font-size:smaller;">?</span>'
+            "</a>",
+            self,
+        )
+        self.regex_help.setToolTip("Regex help (Python re)")
+        self.regex_help.setTextFormat(Qt.RichText)
+        self.regex_help.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.regex_help.setOpenExternalLinks(True)
+        self.regex_help.setContentsMargins(0, 0, 4, 0)
+        regex_wrap = QWidget(self)
+        regex_layout = QHBoxLayout(regex_wrap)
+        regex_layout.setContentsMargins(0, 0, 0, 0)
+        regex_layout.setSpacing(0)
+        regex_layout.addWidget(self.regex_check)
+        regex_layout.addWidget(self.regex_help)
+        self.toolbar.addWidget(regex_wrap)
+        self.search_edit = QLineEdit(self)
+        self.search_edit.setPlaceholderText("Search")
+        self.search_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.search_edit.setMinimumWidth(320)
+        self.search_edit.textChanged.connect(self._schedule_search)
+        self.toolbar.addWidget(self.search_edit)
+        self.search_prev_btn = QToolButton(self)
+        self.search_prev_btn.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
+        )
+        self.search_prev_btn.setToolTip("Find previous match")
+        self.search_prev_btn.setAutoRaise(True)
+        self.search_prev_btn.clicked.connect(self._search_prev)
+        self.toolbar.addWidget(self.search_prev_btn)
+        self.search_next_btn = QToolButton(self)
+        self.search_next_btn.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
+        )
+        self.search_next_btn.setToolTip("Find next match")
+        self.search_next_btn.setAutoRaise(True)
+        self.search_next_btn.clicked.connect(self._search_next)
+        self.toolbar.addWidget(self.search_next_btn)
+        self.replace_toggle = QToolButton(self)
+        self.replace_toggle.setIcon(
+            QIcon.fromTheme(
+                "edit-find-replace",
+                self.style().standardIcon(QStyle.StandardPixmap.SP_DialogResetButton),
+            )
+        )
+        self.replace_toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.replace_toggle.setToolTip("Show replace")
+        self.replace_toggle.setCheckable(True)
+        self.replace_toggle.toggled.connect(self._toggle_replace)
+        self.toolbar.addWidget(self.replace_toggle)
+        self.search_column_label = QLabel("Search in:", self)
+        self.search_column_label.setContentsMargins(8, 0, 4, 0)
+        self.toolbar.addWidget(self.search_column_label)
         self.search_mode = QComboBox(self)
         self.search_mode.addItem("Key", 0)
         self.search_mode.addItem("Source", 1)
         self.search_mode.addItem("Trans", 2)
-        self.search_mode.currentIndexChanged.connect(self._schedule_search)
+        self.search_mode.setCurrentIndex(2)
+        self.search_mode.currentIndexChanged.connect(self._on_search_mode_changed)
         self.toolbar.addWidget(self.search_mode)
-        self.toolbar.addSeparator()
-        self.regex_check = QCheckBox("Regex", self)
-        self.regex_check.stateChanged.connect(self._schedule_search)
-        self.toolbar.addWidget(self.regex_check)
-        self.regex_help = QToolButton(self)
-        self.regex_help.setText("?")
-        self.regex_help.setToolTip("Regex help (Python re)")
-        self.regex_help.setAutoRaise(True)
-        self.regex_help.clicked.connect(self._open_regex_help)
-        self.toolbar.addWidget(self.regex_help)
-        self.search_edit = QLineEdit(self)
-        self.search_edit.setPlaceholderText("Search")
-        self.search_edit.textChanged.connect(self._schedule_search)
-        self.toolbar.addWidget(self.search_edit)
+
+        self.addToolBarBreak()
+        self.replace_toolbar = QToolBar("Replace", self)
+        self.replace_toolbar.setMovable(False)
+        self.replace_toolbar.setContentsMargins(0, 0, 0, 0)
+        self.addToolBar(self.replace_toolbar)
+        self.replace_spacer = QLabel(self)
+        self.replace_spacer.setFixedWidth(0)
+        self.replace_toolbar.addWidget(self.replace_spacer)
+        self.replace_edit = QLineEdit(self)
+        self.replace_edit.setPlaceholderText("Replace")
+        self.replace_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.replace_edit.setMinimumWidth(self.search_edit.minimumWidth())
+        self.replace_edit.textChanged.connect(self._update_replace_enabled)
+        self.replace_toolbar.addWidget(self.replace_edit)
+        self.replace_btn = QToolButton(self)
+        self.replace_btn.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton)
+        )
+        self.replace_btn.setToolTip("Replace current match in Trans")
+        self.replace_btn.setAutoRaise(True)
+        self.replace_btn.clicked.connect(self._replace_current)
+        self.replace_toolbar.addWidget(self.replace_btn)
+        self.replace_all_btn = QToolButton(self)
+        self.replace_all_btn.setText("All")
+        self.replace_all_btn.setToolTip("Replace all matches in this file (Trans)")
+        self.replace_all_btn.setAutoRaise(True)
+        self.replace_all_btn.clicked.connect(self._replace_all)
+        self.replace_toolbar.addWidget(self.replace_all_btn)
+        self.replace_toolbar.setVisible(False)
+        self._update_replace_enabled()
         self._search_timer = QTimer(self)
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(300)
         self._search_timer.timeout.connect(self._run_search)
-        self._search_matches: list[int] = []
+        self._search_matches: list[_SearchMatch] = []
         self._search_index = -1
         self._search_column = 0
         self._last_saved_text = ""
+        self._search_index_by_file: dict[Path, list[_SearchRow]] = {}
+        self._search_index_locales: tuple[str, ...] | None = None
+        self._suppress_search_update = False
+        self._replace_visible = False
+        self._skip_search_autoselect = False
+        self._key_column_width: int | None = None
+        self._status_column_width: int | None = None
 
         # ── menu bar ───────────────────────────────────────────────────────
         menubar = self.menuBar()
@@ -172,7 +273,7 @@ class MainWindow(QMainWindow):
         self.table.setItemDelegateForColumn(3, self._status_delegate)
         splitter.addWidget(self.table)
 
-        splitter.setSizes([260, 840])
+        splitter.setSizes([220, 980])
         self.resize(1200, 800)
         self.act_undo: QAction | None = None
         self.act_redo: QAction | None = None
@@ -390,6 +491,10 @@ class MainWindow(QMainWindow):
         self._opened_files.clear()
         self._current_pf = None
         self._current_model = None
+        self._search_matches = []
+        self._search_index = -1
+        self._search_index_by_file.clear()
+        self._search_index_locales = None
         self.table.setModel(None)
         self._set_status_combo(None)
         self.fs_model = FsModel(self._root, [self._locales[c] for c in self._selected_locales])
@@ -456,30 +561,43 @@ class MainWindow(QMainWindow):
         self._current_model.dataChanged.connect(self._on_model_changed)
         self._current_model.dataChanged.connect(self._on_model_data_changed)
         self.table.setModel(self._current_model)
+        self._apply_table_layout()
         self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
-        self.table.resizeColumnsToContents()
         self._update_status_combo_from_selection()
+        self._update_replace_enabled()
         self._update_status_bar()
         if not self._last_saved_text:
             self._last_saved_text = "Ready"
             self._update_status_bar()
-        if self.search_edit.text():
+        if self.search_edit.text() and not self._suppress_search_update:
+            self._skip_search_autoselect = True
             self._schedule_search()
         if changed_keys:
             self.fs_model.set_dirty(self._current_pf.path, True)
 
         # (re)create undo/redo actions bound to this file’s stack
+        for action in list(self.menu_edit.actions()):
+            text = action.text().replace("&", "").strip()
+            if text.startswith("Undo") or text.startswith("Redo"):
+                self.menu_edit.removeAction(action)
         for old in (self.act_undo, self.act_redo):
             if old and isValid(old):
-                if old in self.menu_edit.actions():
-                    self.menu_edit.removeAction(old)
-                self.removeAction(old)
-                old.deleteLater()
+                try:
+                    if old in self.menu_edit.actions():
+                        self.menu_edit.removeAction(old)
+                    self.removeAction(old)
+                    old.deleteLater()
+                except RuntimeError:
+                    pass
+        self.act_undo = None
+        self.act_redo = None
         stack = self._current_model.undo_stack
         self.act_undo = stack.createUndoAction(self, "&Undo")
         self.act_redo = stack.createRedoAction(self, "&Redo")
         self.act_undo.setShortcut(QKeySequence.StandardKey.Undo)
-        self.act_redo.setShortcut(QKeySequence.StandardKey.Redo)
+        self.act_redo.setShortcut(QKeySequence("Ctrl+Y"))
+        self.act_undo.setShortcutContext(Qt.ApplicationShortcut)
+        self.act_redo.setShortcutContext(Qt.ApplicationShortcut)
         for a in (self.act_undo, self.act_redo):
             self.addAction(a)
         if self.menu_edit.actions():
@@ -489,6 +607,22 @@ class MainWindow(QMainWindow):
         else:
             self.menu_edit.addAction(self.act_undo)
             self.menu_edit.addAction(self.act_redo)
+
+    def _apply_table_layout(self) -> None:
+        header = self.table.horizontalHeader()
+        header.setStretchLastSection(False)
+        if self._key_column_width is None or self._status_column_width is None:
+            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+            self.table.resizeColumnsToContents()
+            self._key_column_width = header.sectionSize(0)
+            self._status_column_width = header.sectionSize(3)
+        header.setSectionResizeMode(0, QHeaderView.Fixed)
+        header.resizeSection(0, int(self._key_column_width or 0))
+        header.setSectionResizeMode(3, QHeaderView.Fixed)
+        header.resizeSection(3, int(self._status_column_width or 0))
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
 
 
     def _save_current(self) -> bool:
@@ -694,15 +828,202 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(QUrl("https://docs.python.org/3/library/re.html"))
 
     def _schedule_search(self, *_args) -> None:
+        self._update_replace_enabled()
         if self._search_timer.isActive():
             self._search_timer.stop()
         self._search_timer.start()
 
-    def _run_search(self) -> None:
-        if not self._current_model:
-            self._search_matches = []
-            self._search_index = -1
+    def _on_search_mode_changed(self, *_args) -> None:
+        self._schedule_search()
+
+    def _toggle_replace(self, checked: bool) -> None:
+        self._replace_visible = bool(checked)
+        self.replace_toolbar.setVisible(self._replace_visible)
+        if self._replace_visible:
+            self._align_replace_bar()
+            QTimer.singleShot(0, self._align_replace_bar)
+        self._update_replace_enabled()
+
+    def _align_replace_bar(self) -> None:
+        if not self.replace_toolbar.isVisible():
             return
+        search_pos = self.search_edit.mapToGlobal(QPoint(0, 0)).x()
+        replace_pos = self.replace_edit.mapToGlobal(QPoint(0, 0)).x()
+        delta = search_pos - replace_pos
+        new_width = max(0, self.replace_spacer.width() + delta)
+        self.replace_spacer.setFixedWidth(new_width)
+
+    def _update_replace_enabled(self, *_args) -> None:
+        mode = int(self.search_mode.currentData())
+        has_query = bool(self.search_edit.text().strip())
+        replace_allowed = bool(self._current_model and mode == _SearchField.TRANSLATION)
+        if not replace_allowed and self.replace_toggle.isChecked():
+            self.replace_toggle.setChecked(False)
+        self.replace_toggle.setEnabled(replace_allowed)
+        enabled = bool(replace_allowed and has_query)
+        for widget in (self.replace_edit, self.replace_btn, self.replace_all_btn):
+            widget.setEnabled(enabled)
+
+    def _prepare_replace_pattern(
+        self,
+    ) -> tuple[re.Pattern[str] | None, str, bool, bool, bool]:
+        query = self.search_edit.text()
+        if not query:
+            return None, "", False, False, False
+        use_regex = self.regex_check.isChecked()
+        flags = re.IGNORECASE | re.MULTILINE
+        try:
+            if use_regex:
+                pattern = re.compile(query, flags)
+            else:
+                pattern = re.compile(re.escape(query), flags)
+        except re.error:
+            QMessageBox.warning(self, "Invalid regex", "Regex pattern is invalid.")
+            return None, "", False, False, False
+        replacement = self.replace_edit.text()
+        matches_empty = bool(pattern.match(""))
+        has_group_ref = bool(
+            use_regex and re.search(r"\$(\d+)|\\g<\\d+>|\\[1-9]", replacement)
+        )
+        return pattern, replacement, use_regex, matches_empty, has_group_ref
+
+    def _replace_current(self) -> None:
+        if not self._current_model:
+            return
+        pattern, replacement, use_regex, matches_empty, has_group_ref = (
+            self._prepare_replace_pattern()
+        )
+        if pattern is None:
+            return
+        current = self.table.currentIndex()
+        if not current.isValid():
+            return
+        row = current.row()
+        idx = self._current_model.index(row, 2)
+        text = idx.data(Qt.DisplayRole)
+        text = "" if text is None else str(text)
+        if not pattern.search(text):
+            return
+        if matches_empty and not has_group_ref:
+            new_text = replacement
+        else:
+            try:
+                if use_regex:
+                    template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
+                    count = 1 if matches_empty else 1
+                    new_text = pattern.sub(
+                        lambda m: m.expand(template), text, count=count
+                    )
+                else:
+                    new_text = pattern.sub(lambda _m: replacement, text, count=1)
+            except re.error as exc:
+                QMessageBox.warning(self, "Replace failed", str(exc))
+                return
+        if new_text != text:
+            self._current_model.setData(idx, new_text, Qt.EditRole)
+            self._schedule_search()
+
+    def _replace_all(self) -> None:
+        if not self._current_model:
+            return
+        pattern, replacement, use_regex, matches_empty, has_group_ref = (
+            self._prepare_replace_pattern()
+        )
+        if pattern is None:
+            return
+        for row in range(self._current_model.rowCount()):
+            idx = self._current_model.index(row, 2)
+            text = idx.data(Qt.DisplayRole)
+            text = "" if text is None else str(text)
+            if not text:
+                continue
+            if matches_empty and not has_group_ref:
+                new_text = replacement
+            else:
+                if not pattern.search(text):
+                    continue
+                try:
+                    if use_regex:
+                        template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
+                        count = 1 if matches_empty else 0
+                        new_text = pattern.sub(
+                            lambda m: m.expand(template), text, count=count
+                        )
+                    else:
+                        new_text = pattern.sub(lambda _m: replacement, text)
+                except re.error as exc:
+                    QMessageBox.warning(self, "Replace failed", str(exc))
+                    return
+            if new_text != text:
+                self._current_model.setData(idx, new_text, Qt.EditRole)
+        self._schedule_search()
+
+    def _rows_from_model(self) -> list[_SearchRow]:
+        if not (self._current_model and self._current_pf):
+            return []
+        rows: list[_SearchRow] = []
+        for row in range(self._current_model.rowCount()):
+            key = self._current_model.index(row, 0).data(Qt.DisplayRole) or ""
+            source = self._current_model.index(row, 1).data(Qt.DisplayRole) or ""
+            value = self._current_model.index(row, 2).data(Qt.DisplayRole) or ""
+            rows.append(
+                _SearchRow(
+                    file=self._current_pf.path,
+                    row=row,
+                    key=str(key),
+                    source=str(source),
+                    value=str(value),
+                )
+            )
+        return rows
+
+    def _rows_from_file(self, path: Path, locale: str) -> list[_SearchRow]:
+        meta = self._locales.get(locale)
+        encoding = meta.charset if meta else "utf-8"
+        try:
+            pf = parse(path, encoding=encoding)
+        except Exception:
+            return []
+        cache_map = _read_status_cache(self._root, path)
+        source_values = self._load_en_source(path, locale)
+        rows: list[_SearchRow] = []
+        for idx, entry in enumerate(pf.entries):
+            key = entry.key
+            key_hash = xxhash.xxh64(key.encode("utf-8")).intdigest() & 0xFFFF
+            rec = cache_map.get(key_hash)
+            value = rec.value if rec and rec.value is not None else entry.value
+            rows.append(
+                _SearchRow(
+                    file=path,
+                    row=idx,
+                    key=key,
+                    source=source_values.get(key, ""),
+                    value="" if value is None else str(value),
+                )
+            )
+        return rows
+
+    def _ensure_search_index(self) -> None:
+        locales_key = tuple(self._selected_locales)
+        if self._search_index_locales != locales_key:
+            self._search_index_by_file.clear()
+            self._search_index_locales = locales_key
+            for locale in self._selected_locales:
+                meta = self._locales.get(locale)
+                if not meta:
+                    continue
+                for path in list_translatable_files(meta.path):
+                    if self._current_pf and path == self._current_pf.path:
+                        rows = self._rows_from_model()
+                    else:
+                        rows = self._rows_from_file(path, locale)
+                    if rows:
+                        self._search_index_by_file[path] = rows
+            return
+        if self._current_pf and self._current_model:
+            self._search_index_by_file[self._current_pf.path] = self._rows_from_model()
+
+    def _run_search(self) -> None:
         query = self.search_edit.text()
         if not query:
             self._search_matches = []
@@ -717,28 +1038,30 @@ class MainWindow(QMainWindow):
             2: _SearchField.TRANSLATION,
         }
         field = field_map.get(column, _SearchField.TRANSLATION)
-        file_path = self._current_pf.path if self._current_pf else Path(".")
+        self._ensure_search_index()
         rows: list[_SearchRow] = []
-        for row in range(self._current_model.rowCount()):
-            key = self._current_model.index(row, 0).data(Qt.DisplayRole) or ""
-            source = self._current_model.index(row, 1).data(Qt.DisplayRole) or ""
-            value = self._current_model.index(row, 2).data(Qt.DisplayRole) or ""
-            rows.append(
-                _SearchRow(
-                    file=file_path,
-                    row=row,
-                    key=str(key),
-                    source=str(source),
-                    value=str(value),
-                )
-            )
+        for file_rows in self._search_index_by_file.values():
+            rows.extend(file_rows)
         matches = _search_rows(rows, query, field, use_regex)
-        self._search_matches = [m.row for m in matches if m.file == file_path]
+        self._search_matches = matches
         if not self._search_matches:
             self._search_index = -1
+            self._skip_search_autoselect = False
             return
-        self._search_index = 0
-        self._select_match(0)
+        if self._skip_search_autoselect:
+            self._search_index = -1
+            self._skip_search_autoselect = False
+            return
+        current_path = self._current_pf.path if self._current_pf else None
+        initial_index = -1
+        if current_path:
+            for idx, match in enumerate(self._search_matches):
+                if match.file == current_path:
+                    initial_index = idx
+                    break
+        self._search_index = initial_index
+        if initial_index != -1:
+            self._select_match(initial_index)
 
     def _ensure_search_ready(self) -> None:
         if self._search_timer.isActive():
@@ -746,11 +1069,32 @@ class MainWindow(QMainWindow):
             self._run_search()
 
     def _select_match(self, idx: int) -> None:
-        if not self._current_model or not self._search_matches:
+        if not self._search_matches:
             return
-        row = self._search_matches[idx]
+        match = self._search_matches[idx]
+        if not self._current_pf or match.file != self._current_pf.path:
+            index = self.fs_model.index_for_path(match.file)
+            if not index.isValid():
+                return
+            self._suppress_search_update = True
+            try:
+                self._file_chosen(index)
+            finally:
+                self._suppress_search_update = False
+            if self._current_pf and self._current_pf.path == match.file:
+                self.tree.selectionModel().setCurrentIndex(
+                    index,
+                    QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+                )
+                self.tree.scrollTo(index, QAbstractItemView.PositionAtCenter)
+        if not self._current_model or not self._current_pf:
+            return
+        if match.file != self._current_pf.path:
+            return
+        if match.row < 0 or match.row >= self._current_model.rowCount():
+            return
         column = self._search_column
-        model_index = self._current_model.index(row, column)
+        model_index = self._current_model.index(match.row, column)
         self.table.selectionModel().setCurrentIndex(
             model_index,
             QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
@@ -761,14 +1105,20 @@ class MainWindow(QMainWindow):
         self._ensure_search_ready()
         if not self._search_matches:
             return
-        self._search_index = (self._search_index + 1) % len(self._search_matches)
+        if self._search_index == -1:
+            self._search_index = 0
+        else:
+            self._search_index = (self._search_index + 1) % len(self._search_matches)
         self._select_match(self._search_index)
 
     def _search_prev(self) -> None:
         self._ensure_search_ready()
         if not self._search_matches:
             return
-        self._search_index = (self._search_index - 1) % len(self._search_matches)
+        if self._search_index == -1:
+            self._search_index = len(self._search_matches) - 1
+        else:
+            self._search_index = (self._search_index - 1) % len(self._search_matches)
         self._select_match(self._search_index)
 
     def _copy_selection(self) -> None:
@@ -860,6 +1210,11 @@ class MainWindow(QMainWindow):
     def _on_selection_changed(self, _current, _previous) -> None:
         self._update_status_combo_from_selection()
         self._update_status_bar()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if self.replace_toolbar.isVisible():
+            self._align_replace_bar()
 
     def _update_status_combo_from_selection(self) -> None:
         if not self._current_model:
