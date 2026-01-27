@@ -1,5 +1,9 @@
 from pathlib import Path
 
+import pytest
+
+pytest.importorskip("PySide6")
+
 from translationzed_py.gui import MainWindow
 
 

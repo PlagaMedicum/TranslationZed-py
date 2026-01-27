@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("PySide6")
+
 from translationzed_py.gui import MainWindow
 
 
@@ -23,4 +27,4 @@ def test_edit_and_save(qtbot, tmp_path):
     model.setData(model.index(0, 1), "Yes-edited")  # edit the value
 
     win._save_current()
-    assert (dst / "EN" / "ui.txt").read_text().endswith('"Yes-edited"\n')
+    assert (dst / "EN" / "ui.txt").read_text() == 'UI_YES = "Yes-edited"\n'

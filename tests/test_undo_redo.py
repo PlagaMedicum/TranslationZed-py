@@ -1,6 +1,10 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
+pytest.importorskip("PySide6")
+
 from translationzed_py.core import parse
 from translationzed_py.gui.entry_model import TranslationModel
 
