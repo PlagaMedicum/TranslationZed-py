@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import xxhash
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QItemSelectionModel, QTimer, Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QSplitter,
@@ -79,6 +82,27 @@ class MainWindow(QMainWindow):
         self.status_combo.setEnabled(False)
         self.status_combo.currentIndexChanged.connect(self._status_combo_changed)
         self.toolbar.addWidget(self.status_combo)
+        self.toolbar.addSeparator()
+        self.search_mode = QComboBox(self)
+        self.search_mode.addItem("Key", 0)
+        self.search_mode.addItem("Source", 1)
+        self.search_mode.addItem("Trans", 2)
+        self.search_mode.currentIndexChanged.connect(self._schedule_search)
+        self.toolbar.addWidget(self.search_mode)
+        self.regex_check = QCheckBox("Regex", self)
+        self.regex_check.stateChanged.connect(self._schedule_search)
+        self.toolbar.addWidget(self.regex_check)
+        self.search_edit = QLineEdit(self)
+        self.search_edit.setPlaceholderText("Search")
+        self.search_edit.textChanged.connect(self._schedule_search)
+        self.toolbar.addWidget(self.search_edit)
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(300)
+        self._search_timer.timeout.connect(self._run_search)
+        self._search_matches: list[int] = []
+        self._search_index = -1
+        self._search_column = 0
 
         # ── left pane: project tree ──────────────────────────────────────────
         self.tree = QTreeView()
@@ -104,6 +128,7 @@ class MainWindow(QMainWindow):
 
         # ── right pane: entry table ─────────────────────────────────────────
         self.table = QTableView()
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
         splitter.addWidget(self.table)
@@ -119,6 +144,18 @@ class MainWindow(QMainWindow):
         act_save.setShortcut(QKeySequence.StandardKey.Save)
         act_save.triggered.connect(self._request_write_original)
         self.addAction(act_save)
+        act_find = QAction("&Find", self)
+        act_find.setShortcut(QKeySequence.StandardKey.Find)
+        act_find.triggered.connect(self._focus_search)
+        self.addAction(act_find)
+        act_find_next = QAction("Find &Next", self)
+        act_find_next.setShortcut(QKeySequence.StandardKey.FindNext)
+        act_find_next.triggered.connect(self._search_next)
+        self.addAction(act_find_next)
+        act_find_prev = QAction("Find &Previous", self)
+        act_find_prev.setShortcut(QKeySequence.StandardKey.FindPrevious)
+        act_find_prev.triggered.connect(self._search_prev)
+        self.addAction(act_find_prev)
 
         # ── cache ──────────────────────────────────────────────────────
 
@@ -295,6 +332,8 @@ class MainWindow(QMainWindow):
         self.table.setModel(self._current_model)
         self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
         self._update_status_combo_from_selection()
+        if self.search_edit.text():
+            self._schedule_search()
         if changed_keys:
             self.fs_model.set_dirty(self._current_pf.path, True)
 
@@ -450,6 +489,88 @@ class MainWindow(QMainWindow):
         if not (self._current_pf and self._current_model):
             return
         self._write_cache_current()
+
+    def _focus_search(self) -> None:
+        self.search_edit.setFocus()
+        self.search_edit.selectAll()
+
+    def _schedule_search(self, *_args) -> None:
+        if self._search_timer.isActive():
+            self._search_timer.stop()
+        self._search_timer.start()
+
+    def _run_search(self) -> None:
+        if not self._current_model:
+            self._search_matches = []
+            self._search_index = -1
+            return
+        query = self.search_edit.text()
+        if not query:
+            self._search_matches = []
+            self._search_index = -1
+            return
+        column = int(self.search_mode.currentData())
+        self._search_column = column
+        use_regex = self.regex_check.isChecked()
+        matcher = None
+        if use_regex:
+            try:
+                matcher = re.compile(query, re.IGNORECASE)
+            except re.error:
+                self._search_matches = []
+                self._search_index = -1
+                return
+        else:
+            query = query.lower()
+
+        matches: list[int] = []
+        for row in range(self._current_model.rowCount()):
+            index = self._current_model.index(row, column)
+            value = index.data(Qt.DisplayRole)
+            text = "" if value is None else str(value)
+            if matcher:
+                if matcher.search(text):
+                    matches.append(row)
+            else:
+                if query in text.lower():
+                    matches.append(row)
+        self._search_matches = matches
+        if not matches:
+            self._search_index = -1
+            return
+        self._search_index = 0
+        self._select_match(0)
+
+    def _ensure_search_ready(self) -> None:
+        if self._search_timer.isActive():
+            self._search_timer.stop()
+            self._run_search()
+
+    def _select_match(self, idx: int) -> None:
+        if not self._current_model or not self._search_matches:
+            return
+        row = self._search_matches[idx]
+        column = self._search_column
+        model_index = self._current_model.index(row, column)
+        self.table.selectionModel().setCurrentIndex(
+            model_index,
+            QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+        )
+        self.table.scrollTo(model_index, QAbstractItemView.PositionAtCenter)
+
+    def _search_next(self) -> None:
+        self._ensure_search_ready()
+        if not self._search_matches:
+            return
+        self._search_index = (self._search_index + 1) % len(self._search_matches)
+        self._select_match(self._search_index)
+
+    def _search_prev(self) -> None:
+        self._ensure_search_ready()
+        if not self._search_matches:
+            return
+        self._search_index = (self._search_index - 1) % len(self._search_matches)
+        self._select_match(self._search_index)
 
     def _on_model_data_changed(self, top_left, bottom_right, roles=None) -> None:
         if not self._current_model:

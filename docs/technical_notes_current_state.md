@@ -288,21 +288,21 @@ repeat count:
 ```
 Area                         Spec Expectation             As-Built Status
 ---------------------------  ---------------------------- -------------------------
-File open UX                 Double-click/Enter opens     Double-click edits label
-Translation table            QTableView + delegates       QTableView only
+File open UX                 Double-click/Enter opens     Implemented (opens file)
+Translation table            QTableView + delegates       Status delegate implemented
 Status coloring              Background color             Proofread background implemented
-Status dropdown              Toolbar "Status"             Only Ctrl+P action
+Status dropdown              Toolbar "Status"             Implemented (combo + Ctrl+P)
 Source column                Key | Source | Translation   Key | Source | Value | Status
-EN as base (non-editable)    EN shown as Source           EN not loaded as Source
-Multi-locale selection        One or more locales selectable Single-locale tree only
-Locale chooser               Dialog + autonym list        Not implemented
-Project scan                 scan_root() used             GUI uses FsModel directly
-Encoding                     language.txt per locale      UTF-8 only
+EN as base (non-editable)    EN shown as Source           Implemented (EN source map)
+Multi-locale selection        One or more locales selectable Implemented (multi-root tree)
+Locale chooser               Dialog + autonym list        Implemented
+Project scan                 scan_root() used             Implemented (scan_root + FsModel)
+Encoding                     language.txt per locale      Implemented
 Atomic save                  tmp + fsync + replace        tmp + replace (no fsync)
-Status cache                 per file (1:1)               Implemented per-locale; not per-file
+Status cache                 per file (1:1)               Implemented per file
 Concat preservation           Preserve original chains      Currently flattens on edit
-Search dock                  live search + F3             Not implemented
-Unsaved guard                on locale switch/exit        Not implemented
+Search dock                  live search + F3             Implemented (toolbar + debounce)
+Unsaved guard                on locale switch/exit        Exit prompt only (no switch guard)
 ```
 
 ---
@@ -312,11 +312,11 @@ Unsaved guard                on locale switch/exit        Not implemented
 ```
 Expectation                  Current Behavior
 ---------------------------  ---------------------------------------------
-Open project -> pick locale   No chooser; root shown directly
-Open file -> table appears    Double-click edits label; table not shown
+Open project -> pick locale   Locale chooser + multi-root tree
+Open file -> table appears    Table populated on activate/double-click
 Edit translations quickly     Works only after model is set
-Proofread workflow            Ctrl+P only; no visible Status UI
-Search + navigation           Not implemented
+Proofread workflow            Ctrl+P + Status combo
+Search + navigation           Toolbar search + F3/Shift+F3
 Save status persistence       Cache written for opened files only
 ```
 
