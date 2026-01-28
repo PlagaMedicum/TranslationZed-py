@@ -136,6 +136,7 @@ Tokenizer regex patterns:
 - `STRING    = r'"(?:\.|[^"\])*"'`
 - `CONCAT    = r"\.\."`
 - `BRACE     = r"[{}]"`
+- `COMMA     = r","`
 - etc.
 
 `parse(path: Path, encoding: str) -> ParsedFile`
@@ -147,8 +148,8 @@ Parse algorithm:
 3. For each `STRING` immediately right of `IDENT "="`, create **Entry** whose
    `span` covers *only* the string literal region (including the quotes), even
    when the value is a concatenation chain. Braces `{}` and all whitespace /
-   comments are treated as trivia and **must be preserved byte‑exactly** on
-   save.
+   commas / comments are treated as trivia and **must be preserved byte‑exactly**
+   on save.
 4. Concatenated tokens are preserved as structural metadata. The in‑memory value
    may be flattened for editing, but **saving must preserve the original concat
    chain and trivia** (whitespace/comments) without collapsing into a single
@@ -470,6 +471,8 @@ v0.1 uses **cache‑only** recovery:
 3. GitHub PR integration (REST v4 API).
 4. Automatic update check (GitHub Releases).
 5. Simple editor for location `description.txt` files.
+6. Whitespace visualization (spaces/newlines glyphs) + highlighting of escape sequences,
+   tags, and repeated whitespace in Source/Translation preview + edit.
 
 ## 13  Undo / Redo
 
@@ -487,4 +490,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: → 2026-01-27 (v0.3.1)*
+*Last updated: → 2026-01-28 (v0.3.2)*

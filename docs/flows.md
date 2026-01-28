@@ -1,5 +1,5 @@
 # TranslationZed-Py — Key Flows
-_Last updated: 2026-01-27_
+_Last updated: 2026-01-28_
 
 ---
 
@@ -22,7 +22,7 @@ App start
 ```
 User: Project ▸ Open
   -> directory picker
-  -> scan locales (ignore _TVRADIO_TRANSLATIONS)
+  -> scan locales (ignore _TVRADIO_TRANSLATIONS, .git, .vscode)
   -> read language.txt (charset + display name)
   -> show checkbox chooser (EN hidden)
      - locales sorted alphanumerically; checked locales float to top

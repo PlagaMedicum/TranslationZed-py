@@ -1,4 +1,4 @@
-# TranslationZed-Py: Technical Notes (2026-01-27)
+# TranslationZed-Py: Technical Notes (2026-01-28)
 
 Goal: capture *observed behavior*, *as-built architecture*, and *spec deltas* with
 minimal prose and maximal precision. These are diagnostic notes, not a roadmap.
@@ -88,6 +88,20 @@ From latest clarification:
 - **Timestamps**: `last_opened` lives in per‑file cache header (no settings entry).
 - **No timestamp cache**: if no cache files exist, open nothing by default.
 - **UI guidelines**: align with GNOME HIG + KDE HIG via native Qt widgets/dialogs.
+- **Table invariants**: Key column right-aligned with left elide; Key/Status widths fixed by default,
+  user-resizable; Source/Translation share remaining width equally by default and remain stable across
+  file loads. Resizing any column keeps total width fixed.
+- **Cell viewing/editing**:
+  - Wrapping ON: rows expand to show full text in-table.
+  - Wrapping OFF: Source opens in read-only multi-line editor on edit; Translation opens in editable
+    multi-line editor. Editor expands to remaining table width and height adapts to content
+    (min ~3 lines, max limited by table viewport). Mouse-wheel scroll stays inside editor
+    (table does not scroll while editor is active).
+- **Plain-text files**: if a file has no `=` tokens, it is treated as a single raw entry
+  (key = filename) and saved back verbatim without quoting. Mixed/unsupported formats remain errors.
+- **Future text visualization**: add highlighting for escape sequences, tags, and repeated whitespace,
+  plus optional glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation
+  in both preview and edit.
 
 ---
 
@@ -99,6 +113,7 @@ ProjectZomboidTranslations/
   AF AR BE CA CH CN CS DA DE EE EN EN UK ES FI FR HU ID IT JP KO NL NO PH PL
   PT PTBR RO RU TH TR UA
   _TVRADIO_TRANSLATIONS  (ignored)
+  .git, .vscode  (ignored)
   README.md, CODEOWNERS   (files)
 ```
 
