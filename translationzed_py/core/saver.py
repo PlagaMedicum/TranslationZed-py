@@ -54,18 +54,28 @@ def save(
         return f'"{escaped}"'.encode(literal_encoding)
 
     replacements: list[tuple[int, int, bytes]] = []
-    changed_by_index: dict[int, tuple[str, tuple[int, ...], int]] = {}
+    changed_by_index: dict[int, tuple[str, tuple[int, ...], int, bool]] = {}
     for idx, e in enumerate(pf.entries):
         if e.key not in new_entries:
             continue
         new_value = new_entries[e.key]
+        if e.raw:
+            region = new_value.encode(literal_encoding)
+            replacements.append((0, len(buf), region))
+            changed_by_index[idx] = (new_value, (len(new_value),), len(region), True)
+            break
         parts = _split_by_segments(new_value, e.segments)
         literals = [_encode_literal(p) for p in parts]
         region = literals[0]
         for gap, literal in zip(e.gaps, literals[1:]):
             region += gap + literal
         replacements.append((e.span[0], e.span[1], region))
-        changed_by_index[idx] = (new_value, tuple(len(p) for p in parts), len(region))
+        changed_by_index[idx] = (
+            new_value,
+            tuple(len(p) for p in parts),
+            len(region),
+            False,
+        )
 
     # apply from end → start to keep original spans valid during the write
     for start, end, literal in sorted(replacements, key=lambda item: item[0], reverse=True):
@@ -79,7 +89,7 @@ def save(
     for idx, e in enumerate(pf.entries):
         start, end = e.span
         if idx in changed_by_index:
-            value, seg_lens, region_len = changed_by_index[idx]
+            value, seg_lens, region_len, raw_entry = changed_by_index[idx]
             new_start = start + shift
             new_end = new_start + region_len
             shift += region_len - (end - start)
@@ -91,6 +101,7 @@ def save(
                     (new_start, new_end),
                     seg_lens,
                     e.gaps,
+                    raw_entry,
                 )
             )
         else:
@@ -104,6 +115,7 @@ def save(
                     (new_start, new_end),
                     e.segments,
                     e.gaps,
+                    e.raw,
                 )
             )
     pf.entries = new_list

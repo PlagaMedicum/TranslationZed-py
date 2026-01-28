@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import ast
 import codecs
 import enum
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # forward-refs for mypy, no runtime cycle
     from .model import Entry, ParsedFile, Status
@@ -18,8 +17,27 @@ _STATUS_MAP: dict[str, Status] = {}  # populated on first parse()
 
 
 def _unescape(raw: str) -> str:
-    """Turn `He said \\\"hi\\\"` → `He said "hi"`."""
-    return cast(str, ast.literal_eval(f'"{raw}"'))
+    """Unescape only escaped quotes/backslashes; keep other escapes literal."""
+    if "\\" not in raw:
+        if '""' not in raw:
+            return raw
+    out: list[str] = []
+    i = 0
+    while i < len(raw):
+        ch = raw[i]
+        if ch == "\\" and i + 1 < len(raw):
+            nxt = raw[i + 1]
+            if nxt in {'"', "\\"}:
+                out.append(nxt)
+                i += 2
+                continue
+        if ch == '"' and i + 1 < len(raw) and raw[i + 1] == '"':
+            out.append('"')
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 # ── Token meta ────────────────────────────────────────────────────────────────
@@ -31,6 +49,8 @@ class Kind(enum.IntEnum):
     CONCAT = 4  #  ..
     NEWLINE = 5
     TRIVIA = 6  #  space / tab
+    BRACE = 7  # { }
+    COMMA = 8  # ,
 
 
 @dataclass(slots=True, frozen=True)
@@ -45,10 +65,11 @@ _PATTERNS = [
     (Kind.TRIVIA, r"[ \t]+"),
     (Kind.NEWLINE, r"\r?\n"),
     (Kind.COMMENT, r"--[^\n]*"),
-    (Kind.KEY, r"[A-Za-z0-9_]+"),
+    (Kind.KEY, r"[^\s=\"\.][^=\r\n]*"),
     (Kind.EQUAL, r"="),
     (Kind.CONCAT, r"\.\."),
-    (Kind.STRING, r'"(?:\\.|[^"])*"'),  # back-slash escapes
+    (Kind.BRACE, r"[{}]"),
+    (Kind.COMMA, r","),
 ]
 _TOKEN_RE = re.compile(
     "|".join(rf"(?P<{k.name}>{p})" for k, p in _PATTERNS),
@@ -58,6 +79,9 @@ _TOKEN_RE = re.compile(
 
 def _encoding_for_offsets(encoding: str, raw: bytes) -> tuple[str, int]:
     enc = encoding.lower().replace("_", "-")
+    if enc in {"utf-8", "utf8"}:
+        if raw.startswith(codecs.BOM_UTF8):
+            return "utf-8", 3
     if enc in {"utf-16", "utf16"}:
         if raw.startswith(b"\xff\xfe"):
             return "utf-16-le", 2
@@ -77,9 +101,40 @@ def _build_offset_map(text: str, encoding: str) -> list[int]:
     return offsets
 
 
+def _decode_text(data: bytes, encoding: str) -> str:
+    text = data.decode(encoding, errors="replace")
+    if text.startswith("\ufeff"):
+        return text[1:]
+    return text
+
+
+def _read_string_token(text: str, pos: int) -> int:
+    i = pos + 1
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == '"':
+            if i == pos + 1:
+                i += 1
+                continue
+            if i + 1 < len(text) and text[i + 1] == '"':
+                j = i + 2
+                if j >= len(text) or text[j] in {",", "}", "\r", "\n"}:
+                    i += 2
+                    return i
+                i += 2
+                continue
+            i += 1
+            return i
+        i += 1
+    raise SyntaxError("Unterminated string literal")
+
+
 # ── The generator the test asked about ────────────────────────────────────────
 def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
-    text = data.decode(encoding)
+    text = _decode_text(data, encoding)
     enc_for_map, bom_len = _encoding_for_offsets(encoding, data)
     offsets = _build_offset_map(text, enc_for_map)
     expected_len = len(data) - bom_len
@@ -90,9 +145,25 @@ def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
 
     pos = 0
     while pos < len(text):
+        if text[pos] == '"':
+            end = _read_string_token(text, pos)
+            span = (offsets[pos] + bom_len, offsets[end] + bom_len)
+            yield Tok(Kind.STRING, span, text[pos:end])
+            pos = end
+            continue
         m = _TOKEN_RE.match(text, pos)
         if not m:
-            raise SyntaxError(f"Unknown sequence at {pos}")
+            line = text.count("\n", 0, pos) + 1
+            col = pos - text.rfind("\n", 0, pos)
+            ch = text[pos] if pos < len(text) else ""
+            codepoint = f"U+{ord(ch):04X}" if ch else "EOF"
+            snippet_chunk = text[pos : pos + 40]
+            snippet = snippet_chunk.splitlines()[0] if snippet_chunk else ""
+            raise SyntaxError(
+                "Unknown sequence at "
+                f"{pos} (line {line}, col {col}, char {codepoint}). "
+                f"Snippet: {snippet!r}"
+            )
 
         group = m.lastgroup
         assert group is not None  # narrow the type for mypy
@@ -120,7 +191,25 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
         }
 
     raw = path.read_bytes()
+    if path.name.startswith("News_"):
+        text = _decode_text(raw, encoding)
+        return ParsedFile(
+            path,
+            [
+                Entry(
+                    path.name,
+                    text,
+                    Status.UNTOUCHED,
+                    (0, len(raw)),
+                    (len(text),),
+                    (),
+                    True,
+                )
+            ],
+            raw,
+        )
     toks = list(_tokenise(raw, encoding=encoding))
+    saw_equal = any(tok.kind is Kind.EQUAL for tok in toks)
 
     entries: list[Entry] = []
     i = 0
@@ -173,9 +262,13 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
             gaps: list[bytes] = []
             for prev, nxt in zip(seg_spans, seg_spans[1:]):
                 gaps.append(raw[prev[1] : nxt[0]])
+            key_text = key_tok.text.strip()
+            if not key_text:
+                i += 1
+                continue
             entries.append(
                 Entry(
-                    key_tok.text,
+                    key_text,
                     value,
                     status,
                     (span_start, span_end),
@@ -188,5 +281,25 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
                 j += 1
             i = j
         i += 1
+
+    if not entries:
+        if not saw_equal:
+            text = _decode_text(raw, encoding)
+            return ParsedFile(
+                path,
+                [
+                    Entry(
+                        path.name,
+                        text,
+                        Status.UNTOUCHED,
+                        (0, len(raw)),
+                        (len(text),),
+                        (),
+                        True,
+                    )
+                ],
+                raw,
+            )
+        raise ValueError("Unsupported file format (no translatable entries found).")
 
     return ParsedFile(path, entries, raw)
