@@ -5,7 +5,7 @@ from pathlib import Path
 
 from translationzed_py.core.app_config import load as _load_app_config
 
-_IGNORE_DIRS = {"_TVRADIO_TRANSLATIONS"}
+_IGNORE_DIRS = {"_TVRADIO_TRANSLATIONS", ".git", ".vscode"}
 _IGNORE_FILES = {"language.txt", "credits.txt"}
 
 

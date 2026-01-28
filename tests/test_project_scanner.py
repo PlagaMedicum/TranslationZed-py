@@ -15,6 +15,8 @@ def test_scan_root_discovers_locales(tmp_path: Path) -> None:
         (root / loc / "ui.txt").write_text("dummy")
     (root / ".tzp-cache").mkdir()
     (root / "_TVRADIO_TRANSLATIONS").mkdir()
+    (root / ".git").mkdir()
+    (root / ".vscode").mkdir()
     result = scan_root(root)
     assert set(result) == {"EN", "EN UK", "PTBR"}
     assert all(isinstance(meta, LocaleMeta) for meta in result.values())
