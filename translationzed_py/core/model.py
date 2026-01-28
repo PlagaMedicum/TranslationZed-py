@@ -19,6 +19,7 @@ class Entry:
     span: tuple[int, int]  # byte offsets in raw file
     segments: tuple[int, ...]  # unescaped segment lengths
     gaps: tuple[bytes, ...]  # raw bytes between string literals
+    raw: bool = False  # plain-text entry (no quoted literal in file)
 
 
 class ParsedFile:
