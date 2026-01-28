@@ -162,6 +162,28 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Replace scope: File | Locale | Pool
   - Values persisted to `.tzp-config/settings.env`
 
+### Step 19 — Detail editors under table (Poedit-style) [≈ future]
+- Touchpoints: `gui/main_window.py`, new `gui/detail_editors.py`
+- Acceptance:
+  - Optional lower pane with two large text boxes (Source read‑only, Translation editable)
+  - Pane toggle placed in the **bottom bar**
+  - Table remains visible above; selection syncs into the detail editors
+  - Editing in detail Translation updates the table and undo stack
+
+### Step 20 — LanguageTool + Translation Memory (TM) [≈ future]
+- Touchpoints: new `core/tm.py`, `core/languagetool.py`, preferences, GUI suggestions panel
+- Acceptance:
+  - Import user TMs; generate project TM from accepted translations
+  - Suggestion ranking: **project‑TM** outranks imported TM; both outrank LanguageTool API suggestions
+  - LanguageTool uses configurable server URL and is optional/disabled by default
+  - No blocking UI; suggestions fetched asynchronously
+
+### Step 21 — File tree visibility toggle [≈ future]
+- Touchpoints: `gui/main_window.py`, `gui/file_tree_panel.py`
+- Acceptance:
+  - Left‑side toggle collapses/expands the file tree panel
+  - Toggle state persists per user preferences
+
 ### Step 12 — Dirty indicators from cache [✓]
 - Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
 - Acceptance:
@@ -177,6 +199,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Status bar updates on selection change (row index + file)
   - When search/replace is active, status bar shows scope indicator(s)
   - Use native icons (Qt theme) and standard spacing to align with GNOME/KDE HIG
+  - Table column sizes (Key/Status/Source/Translation) persist across files and restarts
 
 ### Step 14 — Golden‑file tests [✓]
 - Touchpoints: `tests/fixtures/*`, `tests/test_roundtrip.py` or new tests

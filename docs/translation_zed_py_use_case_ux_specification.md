@@ -188,13 +188,17 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 │ [Locales ▼] [Key|Source|Trans] [Regex☑] [🔍 Box] [Status ▼ (Proofread)] │
 └────────────────────────────────────────────────────┘
 ┌─QSplitter──────────────────────────────────────────┐
-│┌File Tree───────────┐┌Table (Key | Src | Trans)───┐│
+│◀│File Tree──────────┐┌Table (Key | Src | Trans)───┐│
 ││  files…            ││ key  | src  | translation ││
 ││  ● sub/dir/file.txt││ …                         ││
 │└────────────────────┘└────────────────────────────┘│
 └────────────────────────────────────────────────────┘
+┌─Detail editors (optional, Poedit-style)─────────────┐
+│ Source (read‑only, scrollable, multi‑line)          │
+│ Translation (editable, scrollable, multi‑line)      │
+└────────────────────────────────────────────────────┘
 ┌─Status bar───────────────────────────────────────────────────────────────────┐
-│ "Saved 12:34:56" | Row 123 / 450 | BE/sub/dir/file.txt                         │
+│ [Details] "Saved 12:34:56" | Row 123 / 450 | BE/sub/dir/file.txt                │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -236,16 +240,21 @@ UNTOUCHED ──────────────────────▶ 
 6. **Table UX invariants**:
    - Key column right‑aligned with left elide; Key/Status fixed by default but user‑resizable.
    - Source/Translation split remaining width equally by default; user resizable
-     while preserving total table width.
+     while preserving total table width; column sizes persist across files and restarts.
    - Vertical scrollbar always visible to avoid width jumps.
    - Wrap ON expands rows to show full text.
    - Wrap OFF: Source opens in read‑only multi‑line editor; Translation uses expanded
      multi‑line editor. Editor expands to remaining table width and height adapts to
-     content (min ~3 lines, max limited by table viewport); mouse‑wheel scroll stays
+     content (min ~2 lines, max to table bottom); mouse‑wheel scroll stays
      inside editor.
+     Future: optional **detail editors** below the table (Poedit‑style). When enabled,
+     Source shows read‑only and Translation is editable; table remains visible above.
+     Toggle is placed in the **bottom bar**.
 7. **Future visualization**: highlight escape sequences, tags, and repeated whitespace; optional
    glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation in both
    preview and edit.
+8. **Layout toggles**: file tree panel can be hidden/shown via a **left‑side toggle**; the
+   detail editor pane is toggled from the **bottom bar**.
 
 ---
-_Last updated: 2026‑01‑28 (v0.3.7)_
+_Last updated: 2026‑01‑28 (v0.3.10)_

@@ -90,18 +90,24 @@ From latest clarification:
 - **UI guidelines**: align with GNOME HIG + KDE HIG via native Qt widgets/dialogs.
 - **Table invariants**: Key column right-aligned with left elide; Key/Status widths fixed by default,
   user-resizable; Source/Translation share remaining width equally by default and remain stable across
-  file loads. Resizing any column keeps total width fixed.
+  file loads. Resizing any column keeps total width fixed and is persisted across files and restarts.
 - **Cell viewing/editing**:
   - Wrapping ON: rows expand to show full text in-table.
   - Wrapping OFF: Source opens in read-only multi-line editor on edit; Translation opens in editable
     multi-line editor. Editor expands to remaining table width and height adapts to content
-    (min ~3 lines, max limited by table viewport). Mouse-wheel scroll stays inside editor
+    (min ~2 lines, max to table bottom). Mouse-wheel scroll stays inside editor
     (table does not scroll while editor is active).
 - **Plain-text files**: if a file has no `=` tokens, it is treated as a single raw entry
   (key = filename) and saved back verbatim without quoting. Mixed/unsupported formats remain errors.
 - **Future text visualization**: add highlighting for escape sequences, tags, and repeated whitespace,
   plus optional glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation
   in both preview and edit.
+- **Future quality tooling**: LanguageTool server API integration for grammar/spell suggestions.
+- **Future translation memory**: allow importing user TMs and generating a project TM from edits;
+  local TM suggestions take priority over LanguageTool API results; **project‑TM** outranks imported TM.
+- **Future detail editors**: optional Poedit-style dual editor panes below the table (Source read-only,
+  Translation editable), keeping the table visible above; toggle is placed at the **bottom**.
+- **Future layout toggle**: add a left-side toggle to hide/show the file tree panel.
 
 ---
 

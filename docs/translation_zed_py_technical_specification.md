@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.2.12 · 2026‑01‑27**\
+**Version 0.3.5 · 2026‑01‑28**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -473,6 +473,11 @@ v0.1 uses **cache‑only** recovery:
 5. Simple editor for location `description.txt` files.
 6. Whitespace visualization (spaces/newlines glyphs) + highlighting of escape sequences,
    tags, and repeated whitespace in Source/Translation preview + edit.
+7. LanguageTool server API integration for grammar/spell suggestions.
+8. Translation memory (TM): import user TMs, generate a project TM from edits; local TM
+   suggestions outrank LanguageTool API results; **project‑TM** outranks imported TM.
+9. Optional Poedit-style dual editor panes under the table (Source read-only, Translation editable),
+   toggled from the bottom bar. Add a left-side toggle to hide/show the file tree panel.
 
 ## 13  Undo / Redo
 
@@ -490,4 +495,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: → 2026-01-28 (v0.3.2)*
+*Last updated: 2026-01-28 (v0.3.5)*
