@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+import sys
 import time
+import traceback
 from pathlib import Path
 
 import xxhash
@@ -65,7 +67,7 @@ from translationzed_py.core.status_cache import write as _write_status_cache
 from .entry_model import TranslationModel
 from .fs_model import FsModel
 from .commands import ChangeStatusCommand
-from .delegates import StatusDelegate
+from .delegates import KeyDelegate, MultiLineEditDelegate, StatusDelegate
 from .dialogs import LocaleChooserDialog, SaveFilesDialog
 from .preferences_dialog import PreferencesDialog
 
@@ -275,6 +277,9 @@ class MainWindow(QMainWindow):
         self._skip_search_autoselect = False
         self._key_column_width: int | None = None
         self._status_column_width: int | None = None
+        self._source_translation_ratio = 0.5
+        self._table_layout_guard = False
+        self._user_resized_columns = False
 
         # ── menu bar ───────────────────────────────────────────────────────
         menubar = self.menuBar()
@@ -310,8 +315,17 @@ class MainWindow(QMainWindow):
         self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setWordWrap(self._wrap_text)
+        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._key_delegate = KeyDelegate(self.table)
+        self.table.setItemDelegateForColumn(0, self._key_delegate)
+        self._source_delegate = MultiLineEditDelegate(self.table, read_only=True)
+        self.table.setItemDelegateForColumn(1, self._source_delegate)
+        self._value_delegate = MultiLineEditDelegate(self.table, read_only=False)
+        self.table.setItemDelegateForColumn(2, self._value_delegate)
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
+        self.table.horizontalHeader().sectionResized.connect(self._on_header_resized)
         splitter.addWidget(self.table)
 
         splitter.setSizes([220, 980])
@@ -504,6 +518,8 @@ class MainWindow(QMainWindow):
             except Exception:
                 return {}
             self._en_cache[en_path] = pf
+        if pf.entries and all(getattr(e, "raw", False) for e in pf.entries):
+            return {path.name: pf.entries[0].value}
         return {e.key: e.value for e in pf.entries}
 
     # ----------------------------------------------------------------- slots
@@ -642,7 +658,7 @@ class MainWindow(QMainWindow):
         try:
             pf = parse(path, encoding=encoding)
         except Exception as exc:
-            QMessageBox.warning(self, "Parse error", f"{path}\n\n{exc}")
+            self._report_parse_error(path, exc)
             return
 
         self._current_encoding = encoding
@@ -668,6 +684,7 @@ class MainWindow(QMainWindow):
                     e.span,
                     e.segments,
                     e.gaps,
+                    e.raw,
                 )
         self._current_pf = pf
         self._opened_files.add(path)
@@ -685,12 +702,18 @@ class MainWindow(QMainWindow):
         )
         self._current_model.dataChanged.connect(self._on_model_changed)
         self._current_model.dataChanged.connect(self._on_model_data_changed)
+        if not self._user_resized_columns:
+            self._source_translation_ratio = 0.5
+        self._table_layout_guard = True
         self.table.setModel(self._current_model)
         self._apply_table_layout()
+        self._table_layout_guard = False
         self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
         self._update_status_combo_from_selection()
         self._update_replace_enabled()
         self._update_status_bar()
+        if self._wrap_text:
+            self.table.resizeRowsToContents()
         if not self._last_saved_text:
             self._last_saved_text = "Ready"
             self._update_status_bar()
@@ -734,20 +757,80 @@ class MainWindow(QMainWindow):
             self.menu_edit.addAction(self.act_redo)
 
     def _apply_table_layout(self) -> None:
+        if not self.table.model():
+            return
         header = self.table.horizontalHeader()
         header.setStretchLastSection(False)
-        if self._key_column_width is None or self._status_column_width is None:
-            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-            header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-            self.table.resizeColumnsToContents()
-            self._key_column_width = header.sectionSize(0)
-            self._status_column_width = header.sectionSize(3)
-        header.setSectionResizeMode(0, QHeaderView.Fixed)
-        header.resizeSection(0, int(self._key_column_width or 0))
-        header.setSectionResizeMode(3, QHeaderView.Fixed)
-        header.resizeSection(3, int(self._status_column_width or 0))
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
+        if self._key_column_width is None:
+            self._key_column_width = 120
+        if self._status_column_width is None:
+            metrics = self.table.fontMetrics()
+            labels = [st.name.title() for st in Status]
+            max_label = max(labels, key=metrics.horizontalAdvance)
+            self._status_column_width = metrics.horizontalAdvance(max_label) + 24
+        key_width = int(self._key_column_width or 0)
+        status_width = int(self._status_column_width or 0)
+        viewport_width = max(0, self.table.viewport().width())
+        min_content = 90
+        available = max(0, viewport_width - key_width - status_width)
+        if viewport_width and available < min_content * 2:
+            shrink = min_content * 2 - available
+            if shrink > 0:
+                key_width = max(80, key_width - shrink)
+                available = max(0, viewport_width - key_width - status_width)
+        ratio = self._source_translation_ratio or 0.5
+        source_width = int(round(available * ratio))
+        translation_width = max(0, available - source_width)
+        self._table_layout_guard = True
+        try:
+            header.setSectionResizeMode(0, QHeaderView.Interactive)
+            header.resizeSection(0, key_width)
+            header.setSectionResizeMode(3, QHeaderView.Interactive)
+            header.resizeSection(3, status_width)
+            header.setSectionResizeMode(1, QHeaderView.Interactive)
+            header.setSectionResizeMode(2, QHeaderView.Interactive)
+            header.resizeSection(1, source_width)
+            header.resizeSection(2, translation_width)
+        finally:
+            self._table_layout_guard = False
+
+    def _on_header_resized(self, logical_index: int, _old: int, _new: int) -> None:
+        if self._table_layout_guard or not self.table.model():
+            return
+        if logical_index == 0:
+            self._key_column_width = max(60, _new)
+            self._apply_table_layout()
+            return
+        if logical_index == 3:
+            self._status_column_width = max(60, _new)
+            self._apply_table_layout()
+            return
+        if logical_index not in (1, 2):
+            return
+        header = self.table.horizontalHeader()
+        viewport_width = max(0, self.table.viewport().width())
+        key_width = header.sectionSize(0)
+        status_width = header.sectionSize(3)
+        available = max(0, viewport_width - key_width - status_width)
+        if available <= 0:
+            return
+        min_content = 60
+        if logical_index == 1:
+            source_width = max(min_content, min(available - min_content, _new))
+            translation_width = max(min_content, available - source_width)
+        else:
+            translation_width = max(min_content, min(available - min_content, _new))
+            source_width = max(min_content, available - translation_width)
+        self._table_layout_guard = True
+        try:
+            header.resizeSection(1, source_width)
+            header.resizeSection(2, translation_width)
+        finally:
+            self._table_layout_guard = False
+        total = source_width + translation_width
+        if total > 0:
+            self._source_translation_ratio = source_width / total
+            self._user_resized_columns = True
 
 
     def _save_current(self) -> bool:
@@ -898,7 +981,7 @@ class MainWindow(QMainWindow):
         try:
             pf = parse(path, encoding=encoding)
         except Exception as exc:
-            QMessageBox.warning(self, "Parse error", f"{path}\n\n{exc}")
+            self._report_parse_error(path, exc)
             return False
         changed: dict[str, str] = {}
         new_entries = []
@@ -909,7 +992,15 @@ class MainWindow(QMainWindow):
                 new_entries.append(e)
                 continue
             if rec.status != e.status:
-                e = type(e)(e.key, e.value, rec.status, e.span, e.segments, e.gaps)
+                e = type(e)(
+                    e.key,
+                    e.value,
+                    rec.status,
+                    e.span,
+                    e.segments,
+                    e.gaps,
+                    e.raw,
+                )
             if rec.value is not None:
                 changed[e.key] = rec.value
             new_entries.append(e)
@@ -1148,7 +1239,7 @@ class MainWindow(QMainWindow):
         try:
             pf = parse(path, encoding=encoding)
         except Exception as exc:
-            QMessageBox.warning(self, "Parse error", f"{path}\n\n{exc}")
+            self._report_parse_error(path, exc)
             return False
         cache_map = _read_status_cache(self._root, path)
         changed_keys: set[str] = set()
@@ -1188,6 +1279,7 @@ class MainWindow(QMainWindow):
                     entry.span,
                     entry.segments,
                     entry.gaps,
+                    entry.raw,
                 )
             new_entries.append(entry)
         _write_status_cache(
@@ -1199,6 +1291,12 @@ class MainWindow(QMainWindow):
         if changed_keys:
             self.fs_model.set_dirty(path, True)
         return True
+
+    def _report_parse_error(self, path: Path, exc: Exception) -> None:
+        message = f"{path}\n\n{exc}"
+        QMessageBox.warning(self, "Parse error", message)
+        print(f"[Parse error] {path}", file=sys.stderr)
+        traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
 
     def _rows_from_model(self) -> list[_SearchRow]:
         if not (self._current_model and self._current_pf):
@@ -1478,6 +1576,8 @@ class MainWindow(QMainWindow):
         if top_left.row() <= row <= bottom_right.row():
             if roles is None or Qt.EditRole in roles or Qt.DisplayRole in roles:
                 self._update_status_combo_from_selection()
+                if self._wrap_text:
+                    self.table.resizeRowToContents(row)
 
     def _on_selection_changed(self, _current, _previous) -> None:
         self._update_status_combo_from_selection()
@@ -1485,6 +1585,8 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        if self.table.model():
+            self._apply_table_layout()
         if self.replace_toolbar.isVisible():
             self._align_replace_bar()
 

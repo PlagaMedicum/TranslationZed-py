@@ -28,6 +28,7 @@ class EditValueCommand(QUndoCommand):
             old_entry.span,
             old_entry.segments,
             old_entry.gaps,
+            old_entry.raw,
         )
         self._new = Entry(
             new_entry.key,
@@ -36,6 +37,7 @@ class EditValueCommand(QUndoCommand):
             new_entry.span,
             new_entry.segments,
             new_entry.gaps,
+            new_entry.raw,
         )
         self._model = model
 
@@ -85,5 +87,6 @@ class ChangeStatusCommand(QUndoCommand):
             e.span,
             e.segments,
             e.gaps,
+            e.raw,
         )
         self._model._replace_entry(self._row, self._pf.entries[self._row], value_changed=False)

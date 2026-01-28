@@ -31,6 +31,8 @@ class LocaleChooserDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Select locales")
         self.setModal(True)
+        self.setMinimumWidth(420)
+        self.setMinimumHeight(520)
         preselected_set = set(preselected or [])
 
         main_layout = QVBoxLayout(self)
