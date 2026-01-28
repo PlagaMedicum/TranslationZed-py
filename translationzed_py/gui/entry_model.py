@@ -110,6 +110,19 @@ class TranslationModel(QAbstractTableModel):
 
         e = self._entries[index.row()]
 
+        if role == Qt.TextAlignmentRole and index.column() == 0:
+            return Qt.AlignRight | Qt.AlignVCenter
+        if role == Qt.ToolTipRole:
+            match index.column():
+                case 0:
+                    return e.key
+                case 1:
+                    return self._source_values.get(e.key, "")
+                case 2:
+                    return e.value
+                case 3:
+                    return e.status.name.title()
+
         # --- display text ----------------------------------------------------
         if role == Qt.DisplayRole:
             match index.column():
@@ -124,6 +137,10 @@ class TranslationModel(QAbstractTableModel):
 
         if role == Qt.EditRole:
             match index.column():
+                case 0:
+                    return e.key
+                case 1:
+                    return self._source_values.get(e.key, "")
                 case 2:
                     return e.value
                 case 3:
@@ -144,7 +161,7 @@ class TranslationModel(QAbstractTableModel):
 
     def flags(self, index: QModelIndex):  # noqa: N802
         base = super().flags(index)
-        if index.column() in (2, 3):  # Translation & Status columns
+        if index.column() in (1, 2, 3):  # Source (view), Translation & Status columns
             return base | Qt.ItemIsEditable
         return base
 
@@ -167,6 +184,7 @@ class TranslationModel(QAbstractTableModel):
                     e.span,
                     e.segments,
                     e.gaps,
+                    e.raw,
                 )
                 cmd = EditValueCommand(
                     self._pf,
