@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-01-27_
+_Last updated: 2026-01-28_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. This is the canonical plan to
@@ -198,6 +198,13 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Touchpoints: `gui/main_window.py` + new comparison view
 - Acceptance:
   - Source can switch from EN to another locale
+
+### Step 19 — Text visualization (future)
+- Touchpoints: `gui/delegates.py`, `gui/entry_model.py`, `gui/main_window.py`
+- Acceptance:
+  - Optional glyphs for spaces (grey dots) and newlines (grey symbol)
+  - Highlight escape sequences, tags, and repeated whitespace
+  - Applies to Source/Translation in both preview and edit
   - Separate window for per‑key comparisons
 
 ---

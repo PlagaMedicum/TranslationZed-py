@@ -233,6 +233,19 @@ UNTOUCHED ──────────────────────▶ 
    only** (see Technical Spec §5.9).  Cache is loaded on project open and
    ignored if missing or corrupt. Draft values are cleared from cache when
    originals are written.
+6. **Table UX invariants**:
+   - Key column right‑aligned with left elide; Key/Status fixed by default but user‑resizable.
+   - Source/Translation split remaining width equally by default; user resizable
+     while preserving total table width.
+   - Vertical scrollbar always visible to avoid width jumps.
+   - Wrap ON expands rows to show full text.
+   - Wrap OFF: Source opens in read‑only multi‑line editor; Translation uses expanded
+     multi‑line editor. Editor expands to remaining table width and height adapts to
+     content (min ~3 lines, max limited by table viewport); mouse‑wheel scroll stays
+     inside editor.
+7. **Future visualization**: highlight escape sequences, tags, and repeated whitespace; optional
+   glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation in both
+   preview and edit.
 
 ---
-_Last updated: 2026‑01‑27 (v0.3.6)_
+_Last updated: 2026‑01‑28 (v0.3.7)_
