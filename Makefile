@@ -5,7 +5,7 @@ VENV    ?= .venv
 VENV_ACT = . $(VENV)/bin/activate &&
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt lint typecheck test check run clean clean-cache dist
+.PHONY: venv install precommit fmt lint typecheck test check run clean clean-cache dist pack
 
 ## create .venv and populate dev deps (one-off)
 venv:
@@ -46,3 +46,6 @@ clean-cache:
 
 dist: clean
 	VENV=$(VENV) bash scripts/dist.sh
+
+pack: clean
+	VENV=$(VENV) bash scripts/pack.sh
