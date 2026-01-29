@@ -5,6 +5,12 @@
 
 <noscript><a href="https://liberapay.com/buljion"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a></noscript>
 
+# Builds (recommended)
+Prebuilt app folders are published as **draft releases** on GitHub (Linux/Windows/macOS).
+Download the ZIP for your OS, extract it, and run the executable inside the folder:
+- Linux/macOS: `TranslationZed-Py`
+- Windows: `TranslationZed-Py.exe`
+
 # TranslationZed-Py
 
 TranslationZed-Py is a Python Open-source re-implementation of [TranslationZed](https://pzwiki.net/wiki/TranslationZed) for platform-independent translation of Project Zomboid. It is built as a fast, lossless CAT tool for translators, by translators.
