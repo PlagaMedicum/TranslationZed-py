@@ -8,7 +8,8 @@ version         = "0.1.0"
 description     = "Python + Qt CAT tool for Project Zomboid localisation files."
 requires-python = ">=3.10"
 authors         = [ { name = "TranslationZed‑Py team" } ]
-license         = { file = "LICENSE" }
+license         = "GPL-3.0-only"
+license-files   = ["LICENSE"]
 readme          = "README.md"
 
 # Runtime deps — keep minimal
@@ -35,6 +36,10 @@ packaging = [
 
 [project.scripts]
 tz = "translationzed_py.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["translationzed_py*"]
+exclude = ["config*", "docs*", "scripts*", "tests*", "build*", "dist*"]
 
 [tool.ruff]
 line-length = 99
