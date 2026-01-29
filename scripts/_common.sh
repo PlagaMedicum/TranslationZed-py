@@ -8,6 +8,10 @@ VENV_PY="$ROOT_DIR/$VENV/bin/python"
 
 ensure_venv() {
   if [ ! -x "$VENV_PY" ]; then
+    if [ "${GITHUB_ACTIONS:-}" = "true" ] || [ "${CI:-}" = "true" ]; then
+      VENV_PY="$PY"
+      return 0
+    fi
     echo "No venv found at $ROOT_DIR/$VENV; run scripts/venv.sh first." >&2
     exit 1
   fi
