@@ -3,7 +3,7 @@ from translationzed_py.core import Status, parse
 
 def _tmp(txt: str, tmp_path):
     file = tmp_path / "f.txt"
-    file.write_text(txt)
+    file.write_text(txt, encoding="utf-8")
     return parse(file)
 
 

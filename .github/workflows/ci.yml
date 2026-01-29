@@ -17,6 +17,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: make ci-deps
       - name: Configure Qt offscreen (Linux)
         if: runner.os == 'Linux'
         run: echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
@@ -25,8 +28,8 @@ jobs:
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
       - name: Lint
-        run: python -m ruff check .
+        run: make lint
       - name: Typecheck
-        run: python -m mypy translationzed_py
+        run: make typecheck
       - name: Tests
-        run: python -m pytest
+        run: make test
