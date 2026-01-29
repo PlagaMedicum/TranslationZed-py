@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-01-28_
+_Last updated: 2026-01-29_
 
 ---
 
@@ -30,6 +30,17 @@ _Last updated: 2026-01-28_
 ### 2.3 GUI Smoke Tests
 - App starts headless (`QT_QPA_PLATFORM=offscreen`).
 - Table renders, basic editing works.
+
+### 2.4 Crash‑Resilience Tests (manual)
+- Edit several translations (ensure cache writes occur).
+- Force‑terminate the app (SIGKILL / task manager).
+- Relaunch and verify cached drafts + statuses are restored.
+- Confirm no original files were modified unless explicitly saved.
+
+### 2.5 Performance Smoke (manual)
+- Open a large locale (e.g., `Recorded_Media_*`) and verify UI responsiveness.
+- Measure time from app launch to first table render (target < 2s on cached project).
+- Run a regex search and confirm UI stays responsive (<100ms typical).
 
 ---
 

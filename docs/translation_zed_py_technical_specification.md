@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.3.7 · 2026‑01‑29**\
+**Version 0.3.8 · 2026‑01‑29**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -464,6 +464,13 @@ v0.1 uses **cache‑only** recovery:
 
 ---
 
+## 11  Build, Packaging, CI
+
+- **Source build**: `pip install -e .[dev]` for development; `make venv` + `make run` for local use.
+- **Executables**: PyInstaller is the baseline packager. Builds must be produced on each target OS
+  (Linux/Windows/macOS) and bundle LICENSE + README.
+- **CI**: GitHub Actions matrix (Linux/Windows/macOS) runs ruff, mypy, pytest; Linux runs Qt offscreen.
+
 ## 12  Backlog (Post‑v0.1)
 
 1. English diff colours (NEW / REMOVED / MODIFIED).
@@ -506,4 +513,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-01-29 (v0.3.7)*
+*Last updated: 2026-01-29 (v0.3.8)*

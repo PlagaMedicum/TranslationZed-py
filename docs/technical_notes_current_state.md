@@ -120,6 +120,9 @@ From latest clarification:
   third‑party license obligations before inclusion.
 - **License UI (current)**: Help → About dialog shows GPLv3 notice + no‑warranty text, with LICENSE
   content hidden by default and expandable in-place.
+- **Packaging (current)**: PyInstaller script added (`scripts/pack.sh`) to build native executables
+  per‑OS; build must be done on each target OS. CI now runs lint/mypy/tests on Linux/Windows/macOS.
+- **Metadata alignment**: `pyproject.toml` license field updated to reference LICENSE (GPLv3).
 
 ---
 
