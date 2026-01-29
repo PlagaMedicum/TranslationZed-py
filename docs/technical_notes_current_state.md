@@ -1,4 +1,4 @@
-# TranslationZed-Py: Technical Notes (2026-01-28)
+# TranslationZed-Py: Technical Notes (2026-01-29)
 
 Goal: capture *observed behavior*, *as-built architecture*, and *spec deltas* with
 minimal prose and maximal precision. These are diagnostic notes, not a roadmap.
@@ -108,6 +108,18 @@ From latest clarification:
 - **Future detail editors**: optional Poedit-style dual editor panes below the table (Source read-only,
   Translation editable), keeping the table visible above; toggle is placed at the **bottom**.
 - **Future layout toggle**: add a left-side toggle to hide/show the file tree panel.
+- **Future theming**: support dark system theme (OS-driven; avoid custom themes).
+- **String editor panel (current)**: dual Source/Translation editors below the table are now present,
+  toggled from the status bar icon (tooltip: “String editor”). Default is **open**; minimum height is
+  ~70px (font-dependent) and **default height is ~2× the minimum**. Panel is user-resizable via splitter.
+- **Layout reset (current)**: on next startup, stored window geometry + column sizes are cleared once
+  (`LAYOUT_RESET_REV=3` in preferences extras).
+- **License snapshot**: repository is GPLv3 (LICENSE). Interactive UI should surface “Appropriate Legal
+  Notices” (GPLv3 §0) and no‑warranty notice via Help/About. Using Codex is compatible as a tooling
+  choice, but requires complying with OpenAI terms/policies and reviewing any generated code for
+  third‑party license obligations before inclusion.
+- **License UI (current)**: Help → About dialog shows GPLv3 notice + no‑warranty text, with LICENSE
+  content hidden by default and expandable in-place.
 
 ---
 

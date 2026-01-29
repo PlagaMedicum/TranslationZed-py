@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-01-28_
+_Last updated: 2026-01-29_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. This is the canonical plan to
@@ -162,11 +162,11 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Replace scope: File | Locale | Pool
   - Values persisted to `.tzp-config/settings.env`
 
-### Step 19 — Detail editors under table (Poedit-style) [≈ future]
+### Step 19 — String editor under table (Poedit-style) [→ in progress]
 - Touchpoints: `gui/main_window.py`, new `gui/detail_editors.py`
 - Acceptance:
   - Optional lower pane with two large text boxes (Source read‑only, Translation editable)
-  - Pane toggle placed in the **bottom bar**
+  - Pane toggle placed in the **bottom bar**, default **open**
   - Table remains visible above; selection syncs into the detail editors
   - Editing in detail Translation updates the table and undo stack
 
@@ -183,6 +183,19 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Acceptance:
   - Left‑side toggle collapses/expands the file tree panel
   - Toggle state persists per user preferences
+
+### Step 22 — Dark system theme support [≈ future]
+- Touchpoints: `gui/app.py` (style init), preferences
+- Acceptance:
+  - Follow OS theme (light/dark) via native Qt styles
+  - No custom theming; use palette only when required
+
+### Step 23 — License compliance UI [→ in progress] 
+- Touchpoints: `gui/main_window.py`, new `gui/about_dialog.py`
+- Acceptance:
+  - Help/About dialog shows GPLv3 notice and “no warranty” text
+  - LICENSE text is hidden by default and expandable in the About dialog
+  - Distributions include source + license text
 
 ### Step 12 — Dirty indicators from cache [✓]
 - Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
