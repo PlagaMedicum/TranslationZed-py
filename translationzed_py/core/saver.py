@@ -26,7 +26,7 @@ def save(
                 remaining = remaining[seg_len:]
         return parts
 
-    def _normalize_encoding(enc: str, raw: bytes) -> str:
+    def _normalize_encoding(enc: str, raw: bytes | bytearray) -> str:
         norm = enc.lower().replace("_", "-")
         if norm in {"utf-16", "utf16"}:
             if raw.startswith(b"\xff\xfe"):

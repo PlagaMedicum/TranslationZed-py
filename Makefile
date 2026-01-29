@@ -5,7 +5,7 @@ VENV    ?= .venv
 VENV_ACT = . $(VENV)/bin/activate &&
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt lint typecheck test check run clean clean-cache dist pack
+.PHONY: venv install precommit fmt lint typecheck test check run clean clean-cache clean-config dist pack pack-win
 
 ## create .venv and populate dev deps (one-off)
 venv:
@@ -44,8 +44,14 @@ clean:
 clean-cache:
 	bash scripts/clean_cache.sh
 
+clean-config:
+	bash scripts/clean_config.sh
+
 dist: clean
 	VENV=$(VENV) bash scripts/dist.sh
 
 pack: clean
 	VENV=$(VENV) bash scripts/pack.sh
+
+pack-win:
+	pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/pack.ps1

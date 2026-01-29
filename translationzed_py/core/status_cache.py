@@ -71,16 +71,16 @@ def _read_rows_any(data: bytes) -> tuple[int, list[tuple[int, Status, str | None
         if len(data) >= _HEADER_V2.size:
             magic, last_opened, count = _HEADER_V2.unpack_from(data, 0)
             if magic == _MAGIC:
-                rows = _parse_rows(data, offset=_HEADER_V2.size, count=count)
-                if rows is not None:
-                    return last_opened, rows
+                parsed_rows = _parse_rows(data, offset=_HEADER_V2.size, count=count)
+                if parsed_rows is not None:
+                    return last_opened, parsed_rows
         # v1 header: magic + u32 count
         if len(data) >= _HEADER_V1.size:
             magic, count = _HEADER_V1.unpack_from(data, 0)
             if magic == _MAGIC:
-                rows = _parse_rows(data, offset=_HEADER_V1.size, count=count)
-                if rows is not None:
-                    return 0, rows
+                parsed_rows = _parse_rows(data, offset=_HEADER_V1.size, count=count)
+                if parsed_rows is not None:
+                    return 0, parsed_rows
         return None
 
     # --- legacy (status-only) format ---
@@ -91,7 +91,7 @@ def _read_rows_any(data: bytes) -> tuple[int, list[tuple[int, Status, str | None
     if len(data) < expected:
         return None
     offset = 4
-    rows: list[tuple[int, Status, str | None]] = []
+    legacy_rows: list[tuple[int, Status, str | None]] = []
     for _ in range(count):
         key_hash, status_byte = struct.unpack_from("<HB", data, offset)
         offset += struct.calcsize("<HB")
@@ -99,8 +99,8 @@ def _read_rows_any(data: bytes) -> tuple[int, list[tuple[int, Status, str | None
             status = Status(status_byte)
         except ValueError:
             continue
-        rows.append((key_hash, status, None))
-    return 0, rows
+        legacy_rows.append((key_hash, status, None))
+    return 0, legacy_rows
 
 
 def read(root: Path, file_path: Path) -> dict[int, CacheEntry]:
