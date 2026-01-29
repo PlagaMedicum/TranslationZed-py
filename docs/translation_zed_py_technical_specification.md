@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.3.5 · 2026‑01‑28**\
+**Version 0.3.7 · 2026‑01‑29**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -478,6 +478,7 @@ v0.1 uses **cache‑only** recovery:
    suggestions outrank LanguageTool API results; **project‑TM** outranks imported TM.
 9. Optional Poedit-style dual editor panes under the table (Source read-only, Translation editable),
    toggled from the bottom bar. Add a left-side toggle to hide/show the file tree panel.
+10. Dark system theme support (follow OS theme; no custom theming).
 
 ## 13  Undo / Redo
 
@@ -495,4 +496,14 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-01-28 (v0.3.5)*
+## 14  License & Compliance
+
+- **Project license**: GNU GPLv3 (see `LICENSE`). Distributions must provide source and preserve GPL
+  notices; interactive UI should expose **Appropriate Legal Notices** (GPLv3 §0) and a no‑warranty
+  notice via Help/About. LICENSE text is hidden by default and expandable in that dialog.
+- **Codex usage**: permissible as a development tool, but usage must comply with OpenAI Terms/Policies.
+  Generated code should be reviewed for third‑party license obligations before inclusion.
+
+---
+
+*Last updated: 2026-01-29 (v0.3.7)*

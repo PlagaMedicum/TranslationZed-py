@@ -198,7 +198,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 │ Translation (editable, scrollable, multi‑line)      │
 └────────────────────────────────────────────────────┘
 ┌─Status bar───────────────────────────────────────────────────────────────────┐
-│ [Details] "Saved 12:34:56" | Row 123 / 450 | BE/sub/dir/file.txt                │
+│ [String editor ⌄] "Saved 12:34:56" | Row 123 / 450 | BE/sub/dir/file.txt        │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -247,14 +247,14 @@ UNTOUCHED ──────────────────────▶ 
      multi‑line editor. Editor expands to remaining table width and height adapts to
      content (min ~2 lines, max to table bottom); mouse‑wheel scroll stays
      inside editor.
-     Future: optional **detail editors** below the table (Poedit‑style). When enabled,
-     Source shows read‑only and Translation is editable; table remains visible above.
-     Toggle is placed in the **bottom bar**.
+     **String editor** below the table (Poedit‑style). Source is read‑only and Translation is editable;
+     table remains visible above. Toggle is placed in the **bottom bar** and defaults to **open**.
 7. **Future visualization**: highlight escape sequences, tags, and repeated whitespace; optional
    glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation in both
    preview and edit.
 8. **Layout toggles**: file tree panel can be hidden/shown via a **left‑side toggle**; the
    detail editor pane is toggled from the **bottom bar**.
+9. **System theme**: future support for OS light/dark theme via native Qt styles (no custom theme).
 
 ---
-_Last updated: 2026‑01‑28 (v0.3.10)_
+_Last updated: 2026‑01‑29 (v0.3.13)_
