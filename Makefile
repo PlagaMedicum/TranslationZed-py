@@ -5,7 +5,7 @@ VENV    ?= .venv
 VENV_ACT = . $(VENV)/bin/activate &&
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt lint typecheck test check run clean clean-cache clean-config ci-deps dist pack pack-win
+.PHONY: venv install precommit fmt lint typecheck test check verify run clean clean-cache clean-config ci-deps dist pack pack-win
 
 ## create .venv and populate dev deps (one-off)
 venv:
@@ -33,6 +33,9 @@ test:
 
 ## run all quality gates
 check: fmt lint typecheck test
+
+## pre-commit verification (cleans caches + runs full checks)
+verify: clean-cache clean-config check
 
 ## convenience runner:  make run ARGS="--help"
 run:
