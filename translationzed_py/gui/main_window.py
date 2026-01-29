@@ -96,7 +96,10 @@ class MainWindow(QMainWindow):
     """Main window: left file-tree, right translation table."""
 
     def __init__(
-        self, project_root: str | None = None, *, selected_locales: list[str] | None = None
+        self,
+        project_root: str | None = None,
+        *,
+        selected_locales: list[str] | None = None,
     ) -> None:
         super().__init__()
         self._startup_aborted = False
@@ -321,6 +324,7 @@ class MainWindow(QMainWindow):
         self._suppress_search_update = False
         self._replace_visible = False
         self._skip_search_autoselect = False
+
         def _pref_int(name: str) -> int | None:
             raw = str(self._prefs_extras.get(name, "")).strip()
             if not raw:
@@ -360,7 +364,9 @@ class MainWindow(QMainWindow):
         if not self._selected_locales:
             self._startup_aborted = True
             return
-        self.fs_model = FsModel(self._root, [self._locales[c] for c in self._selected_locales])
+        self.fs_model = FsModel(
+            self._root, [self._locales[c] for c in self._selected_locales]
+        )
         self.tree.setModel(self.fs_model)
         # prevent in-place renaming on double-click; we use double-click to open
         self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -421,9 +427,13 @@ class MainWindow(QMainWindow):
         self._detail_translation.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self._detail_translation.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self._detail_translation.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._detail_translation.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self._detail_translation.setSizePolicy(
+            QSizePolicy.Preferred, QSizePolicy.Minimum
+        )
         self._detail_translation.setMinimumHeight(min_line_height)
-        self._detail_translation.textChanged.connect(self._on_detail_translation_changed)
+        self._detail_translation.textChanged.connect(
+            self._on_detail_translation_changed
+        )
         detail_layout.addWidget(self._detail_translation)
         margins = detail_layout.contentsMargins()
         label_total = (
@@ -533,12 +543,16 @@ class MainWindow(QMainWindow):
         self.detail_toggle.toggled.connect(self._toggle_detail_panel)
         self.statusBar().addPermanentWidget(self.detail_toggle)
         self.detail_toggle.setChecked(True)
-        self._search_scope_widget, self._search_scope_action, self._search_scope_icon = (
-            self._build_scope_indicator("edit-find", "Search scope")
-        )
-        self._replace_scope_widget, self._replace_scope_action, self._replace_scope_icon = (
-            self._build_scope_indicator("edit-find-replace", "Replace scope")
-        )
+        (
+            self._search_scope_widget,
+            self._search_scope_action,
+            self._search_scope_icon,
+        ) = self._build_scope_indicator("edit-find", "Search scope")
+        (
+            self._replace_scope_widget,
+            self._replace_scope_action,
+            self._replace_scope_icon,
+        ) = self._build_scope_indicator("edit-find-replace", "Replace scope")
         self.statusBar().addPermanentWidget(self._search_scope_widget)
         self.statusBar().addPermanentWidget(self._replace_scope_widget)
         self._update_status_bar()
@@ -556,7 +570,9 @@ class MainWindow(QMainWindow):
         action.setPixmap(
             QIcon.fromTheme(
                 icon_name,
-                self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView),
+                self.style().standardIcon(
+                    QStyle.StandardPixmap.SP_FileDialogContentsView
+                ),
             ).pixmap(14, 14)
         )
         widget.setVisible(False)
@@ -648,7 +664,11 @@ class MainWindow(QMainWindow):
         if not self._detail_panel.isVisible():
             self._detail_dirty = False
             return
-        idx = index if index is not None and index.isValid() else self.table.currentIndex()
+        idx = (
+            index
+            if index is not None and index.isValid()
+            else self.table.currentIndex()
+        )
         if not idx.isValid():
             self._detail_dirty = False
             return
@@ -695,7 +715,8 @@ class MainWindow(QMainWindow):
     def _scope_icon(self, scope: str) -> QIcon:
         if scope == "FILE":
             return QIcon.fromTheme(
-                "text-x-generic", self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon)
+                "text-x-generic",
+                self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon),
             )
         if scope == "LOCALE":
             return QIcon.fromTheme(
@@ -899,7 +920,9 @@ class MainWindow(QMainWindow):
         self._search_index_key = None
         self.table.setModel(None)
         self._set_status_combo(None)
-        self.fs_model = FsModel(self._root, [self._locales[c] for c in self._selected_locales])
+        self.fs_model = FsModel(
+            self._root, [self._locales[c] for c in self._selected_locales]
+        )
         self.tree.setModel(self.fs_model)
         self.tree.expandAll()
         self._mark_cached_dirty()
@@ -915,7 +938,9 @@ class MainWindow(QMainWindow):
         if not self._write_cache_current():
             return
         locale = self._locale_for_path(path)
-        encoding = self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
+        encoding = self._locales.get(
+            locale, LocaleMeta("", Path(), "", "utf-8")
+        ).charset
         try:
             pf = parse(path, encoding=encoding)
         except Exception as exc:
@@ -1098,8 +1123,9 @@ class MainWindow(QMainWindow):
         if total > 0:
             self._source_translation_ratio = source_width / total
             self._user_resized_columns = True
-            self._prefs_extras["TABLE_SRC_RATIO"] = f"{self._source_translation_ratio:.6f}"
-
+            self._prefs_extras["TABLE_SRC_RATIO"] = (
+                f"{self._source_translation_ratio:.6f}"
+            )
 
     def _save_current(self) -> bool:
         """Patch file on disk if there are unsaved value edits."""
@@ -1134,7 +1160,9 @@ class MainWindow(QMainWindow):
         self._write_cache_current()
         files = self._draft_files()
         if not files:
-            QMessageBox.information(self, "Nothing to write", "No draft changes to write.")
+            QMessageBox.information(
+                self, "Nothing to write", "No draft changes to write."
+            )
             return
         rel_files = [str(p.relative_to(self._root)) for p in files]
         dialog = SaveFilesDialog(rel_files, self)
@@ -1245,7 +1273,9 @@ class MainWindow(QMainWindow):
         if not any(entry.value is not None for entry in cached.values()):
             return True
         locale = self._locale_for_path(path)
-        encoding = self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
+        encoding = self._locales.get(
+            locale, LocaleMeta("", Path(), "", "utf-8")
+        ).charset
         try:
             pf = parse(path, encoding=encoding)
         except Exception as exc:
@@ -1510,7 +1540,9 @@ class MainWindow(QMainWindow):
         has_group_ref: bool,
     ) -> bool:
         locale = self._locale_for_path(path)
-        encoding = self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
+        encoding = self._locales.get(
+            locale, LocaleMeta("", Path(), "", "utf-8")
+        ).charset
         try:
             pf = parse(path, encoding=encoding)
         except Exception as exc:
@@ -1771,9 +1803,11 @@ class MainWindow(QMainWindow):
             lines: list[str] = []
             for row in sorted(set(full_rows)):
                 cols = [
-                    self._current_model.index(row, col).data(Qt.DisplayRole)
-                    if self._current_model
-                    else ""
+                    (
+                        self._current_model.index(row, col).data(Qt.DisplayRole)
+                        if self._current_model
+                        else ""
+                    )
                     for col in range(4)
                 ]
                 line = "\t".join("" if c is None else str(c) for c in cols)
@@ -1854,7 +1888,10 @@ class MainWindow(QMainWindow):
             self._update_status_combo_from_selection()
             if self._wrap_text:
                 self.table.resizeRowToContents(row)
-            if self._detail_panel.isVisible() and not self._detail_translation.hasFocus():
+            if (
+                self._detail_panel.isVisible()
+                and not self._detail_translation.hasFocus()
+            ):
                 self._sync_detail_editors()
 
     def _on_selection_changed(self, current, previous) -> None:

@@ -8,7 +8,7 @@ def test_en_hash_roundtrip(tmp_path: Path) -> None:
     en = root / "EN"
     en.mkdir(parents=True)
     file = en / "ui.txt"
-    file.write_text("HELLO = \"Hi\"\n", encoding="utf-8")
+    file.write_text('HELLO = "Hi"\n', encoding="utf-8")
 
     hashes = compute(root)
     assert hashes

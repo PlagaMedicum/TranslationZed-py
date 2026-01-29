@@ -76,7 +76,9 @@ def save(
         )
 
     # apply from end → start to keep original spans valid during the write
-    for start, end, literal in sorted(replacements, key=lambda item: item[0], reverse=True):
+    for start, end, literal in sorted(
+        replacements, key=lambda item: item[0], reverse=True
+    ):
         buf[start:end] = literal
 
     write_bytes_atomic(pf.path, bytes(buf))

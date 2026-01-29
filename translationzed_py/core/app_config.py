@@ -84,7 +84,9 @@ def load(root: Path | None = None) -> AppConfig:
                 cache_ext=_normalize_ext(str(ext)),
                 translation_ext=cfg.translation_ext,
                 comment_prefix=cfg.comment_prefix,
-                en_hash_filename=str(cache.get("en_hash_filename", cfg.en_hash_filename)),
+                en_hash_filename=str(
+                    cache.get("en_hash_filename", cfg.en_hash_filename)
+                ),
                 parser_adapter=cfg.parser_adapter,
                 ui_adapter=cfg.ui_adapter,
                 cache_adapter=cfg.cache_adapter,

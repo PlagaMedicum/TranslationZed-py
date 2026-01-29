@@ -89,4 +89,6 @@ class ChangeStatusCommand(QUndoCommand):
             e.gaps,
             e.raw,
         )
-        self._model._replace_entry(self._row, self._pf.entries[self._row], value_changed=False)
+        self._model._replace_entry(
+            self._row, self._pf.entries[self._row], value_changed=False
+        )
