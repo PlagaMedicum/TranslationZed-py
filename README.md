@@ -61,6 +61,10 @@ python -m PyInstaller --clean --noconsole --name TranslationZed-Py ^
 
 Artifacts are written to `dist/TranslationZed-Py/` (PyInstaller default).
 
+Releases:
+- Tagged pushes (`vX.Y.Z`) trigger multi‑OS builds in GitHub Actions.
+- Each release contains zipped app folders for Linux, Windows, and macOS.
+
 ## Contributing
 This codebase is largely written by AI (you are welcomed to help verify and improve it!). If you want to contribute, please read the `/docs`
 and try to follow the architecture and standards described there. It was made for LLM to store context and my vision of the project.

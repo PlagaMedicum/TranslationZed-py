@@ -216,6 +216,12 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Manual crash‑resilience checklist added
   - Manual performance smoke checklist added
 
+### Step 27 — Release workflow [→ in progress]
+- Touchpoints: `.github/workflows/release.yml`, `CHANGELOG.md`
+- Acceptance:
+  - Tag push `vX.Y.Z` builds per‑OS bundles and attaches artifacts to GitHub Release
+  - Release notes reference CHANGELOG
+
 ### Step 12 — Dirty indicators from cache [✓]
 - Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
 - Acceptance:

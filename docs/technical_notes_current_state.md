@@ -123,6 +123,8 @@ From latest clarification:
 - **Packaging (current)**: PyInstaller script added (`scripts/pack.sh`) to build native executables
   per‑OS; build must be done on each target OS. CI now runs lint/mypy/tests on Linux/Windows/macOS.
 - **Metadata alignment**: `pyproject.toml` license field updated to reference LICENSE (GPLv3).
+- **Release workflow (current)**: tag pushes (`vX.Y.Z`) build per‑OS bundles in CI and attach zipped
+  app folders to GitHub Releases. A `CHANGELOG.md` is maintained for release notes.
 
 ---
 
