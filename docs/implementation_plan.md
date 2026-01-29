@@ -197,6 +197,25 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - LICENSE text is hidden by default and expandable in the About dialog
   - Distributions include source + license text
 
+### Step 24 — Packaging (executables) [→ in progress]
+- Touchpoints: `scripts/pack.sh`, `README.md`
+- Acceptance:
+  - PyInstaller build produces app bundle on each OS (Linux/Windows/macOS)
+  - Build requires local OS (no cross‑compilation) and is documented
+  - LICENSE and README bundled in output
+
+### Step 25 — CI baseline [→ in progress]
+- Touchpoints: `.github/workflows/ci.yml`
+- Acceptance:
+  - Lint + mypy + pytest run on Linux, Windows, macOS
+  - Qt runs headless on Linux via `QT_QPA_PLATFORM=offscreen`
+
+### Step 26 — Performance & crash resilience checklist [→ in progress]
+- Touchpoints: `docs/testing_strategy.md`
+- Acceptance:
+  - Manual crash‑resilience checklist added
+  - Manual performance smoke checklist added
+
 ### Step 12 — Dirty indicators from cache [✓]
 - Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
 - Acceptance:
