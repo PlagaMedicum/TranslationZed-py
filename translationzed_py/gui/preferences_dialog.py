@@ -110,7 +110,9 @@ class PreferencesDialog(QDialog):
 
     def _browse_root(self) -> None:
         start_dir = self._default_root_edit.text().strip()
-        picked = QFileDialog.getExistingDirectory(self, "Select Project Root", start_dir)
+        picked = QFileDialog.getExistingDirectory(
+            self, "Select Project Root", start_dir
+        )
         if picked:
             self._default_root_edit.setText(str(Path(picked)))
 

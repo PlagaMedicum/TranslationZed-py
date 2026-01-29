@@ -10,6 +10,9 @@ avoid missing mandatory tasks.
 - **Run** `make verify`
   - Cleans `.tzp-cache` and `.tzp-config`
   - Runs formatter, linter, typecheck, and tests
+- **Update docs** whenever behavior, UX, or workflows change
+  - Keep specs and plan in sync with implemented features
+  - Add/adjust questions when requirements are unclear or changed
 - **Confirm** `make run` still works for a known fixture (e.g. `tests/fixtures/prod_like`)
 - **Review** any UI changes with a short manual smoke test (open file, edit, save)
 

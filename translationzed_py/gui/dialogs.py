@@ -62,8 +62,7 @@ class LocaleChooserDialog(QDialog):
         main_layout.addWidget(scroll)
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel,
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
             Qt.Orientation.Horizontal,
             self,
         )

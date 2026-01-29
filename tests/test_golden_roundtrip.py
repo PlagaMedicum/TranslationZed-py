@@ -4,7 +4,9 @@ from translationzed_py.core import parse
 from translationzed_py.core.saver import save
 
 
-def _run_case(tmp_path: Path, name: str, encoding: str, updates: dict[str, str]) -> None:
+def _run_case(
+    tmp_path: Path, name: str, encoding: str, updates: dict[str, str]
+) -> None:
     base = Path("tests/fixtures/golden")
     src = base / f"{name}_input.txt"
     expected = base / f"{name}_expected.txt"

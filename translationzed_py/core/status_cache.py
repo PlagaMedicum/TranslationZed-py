@@ -63,7 +63,9 @@ def _parse_rows(
     return rows
 
 
-def _read_rows_any(data: bytes) -> tuple[int, list[tuple[int, Status, str | None]]] | None:
+def _read_rows_any(
+    data: bytes,
+) -> tuple[int, list[tuple[int, Status, str | None]]] | None:
     if not data:
         return None
     if data.startswith(_MAGIC):

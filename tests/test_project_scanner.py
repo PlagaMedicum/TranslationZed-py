@@ -30,7 +30,9 @@ def test_scan_root_reads_language_txt(prod_like_root: Path) -> None:
     assert locales["KO"].charset.upper() == "UTF-16"
 
 
-def test_list_translatable_files_excludes_non_translatables(prod_like_root: Path) -> None:
+def test_list_translatable_files_excludes_non_translatables(
+    prod_like_root: Path,
+) -> None:
     en_path = prod_like_root / "EN"
     files = list_translatable_files(en_path)
     names = {p.name for p in files}
