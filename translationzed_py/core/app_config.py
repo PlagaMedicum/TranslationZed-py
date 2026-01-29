@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+import importlib
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
+tomllib: ModuleType | None
 try:  # Python 3.11+
-    import tomllib  # type: ignore
+    tomllib = importlib.import_module("tomllib")
 except ModuleNotFoundError:  # pragma: no cover
-    tomllib = None  # type: ignore
+    tomllib = None
 
 
 @dataclass(frozen=True, slots=True)
