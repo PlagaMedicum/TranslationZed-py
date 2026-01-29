@@ -9,8 +9,8 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QUndoStack
 
 from translationzed_py.core import Entry, Status
-from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 from translationzed_py.core.model import ParsedFile
+from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 
 _HEADERS = ("Key", "Source", "Translation", "Status")
 _BG = {

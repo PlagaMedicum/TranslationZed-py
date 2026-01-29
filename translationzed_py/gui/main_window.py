@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import re
 import sys
 import time
@@ -7,7 +8,7 @@ import traceback
 from pathlib import Path
 
 import xxhash
-from PySide6.QtCore import QByteArray, QItemSelectionModel, QPoint, QTimer, Qt, QUrl
+from PySide6.QtCore import QByteArray, QItemSelectionModel, QPoint, Qt, QTimer, QUrl
 from PySide6.QtGui import (
     QAction,
     QDesktopServices,
@@ -46,31 +47,37 @@ from translationzed_py.core import (
     parse,
     scan_root,
 )
+from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
+from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
+from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
 from translationzed_py.core.model import Status
+from translationzed_py.core.preferences import load as _load_preferences
+from translationzed_py.core.preferences import save as _save_preferences
 from translationzed_py.core.saver import save
 from translationzed_py.core.search import Match as _SearchMatch
 from translationzed_py.core.search import SearchField as _SearchField
 from translationzed_py.core.search import SearchRow as _SearchRow
 from translationzed_py.core.search import search as _search_rows
-from translationzed_py.core.app_config import load as _load_app_config
-from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
-from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
-from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
-from translationzed_py.core.preferences import load as _load_preferences
-from translationzed_py.core.preferences import save as _save_preferences
 from translationzed_py.core.status_cache import (
     CacheEntry,
+)
+from translationzed_py.core.status_cache import (
     read as _read_status_cache,
+)
+from translationzed_py.core.status_cache import (
     read_last_opened_from_path as _read_last_opened_from_path,
+)
+from translationzed_py.core.status_cache import (
     touch_last_opened as _touch_last_opened,
 )
 from translationzed_py.core.status_cache import write as _write_status_cache
 
-from .entry_model import TranslationModel
-from .fs_model import FsModel
 from .commands import ChangeStatusCommand
 from .delegates import KeyDelegate, MultiLineEditDelegate, StatusDelegate
 from .dialogs import AboutDialog, LocaleChooserDialog, SaveFilesDialog
+from .entry_model import TranslationModel
+from .fs_model import FsModel
 from .preferences_dialog import PreferencesDialog
 
 
@@ -111,10 +118,8 @@ class MainWindow(QMainWindow):
                 self._root = Path(picked).resolve()
                 self._default_root = str(self._root)
                 prefs_global["default_root"] = self._default_root
-                try:
+                with contextlib.suppress(Exception):
                     _save_preferences(prefs_global, None)
-                except Exception:
-                    pass
         else:
             self._root = Path(project_root).resolve()
         if not self._root.exists():
@@ -162,16 +167,12 @@ class MainWindow(QMainWindow):
                 self._prefs_extras.pop(key, None)
             self._prefs_extras["LAYOUT_RESET_REV"] = "3"
             prefs["__extras__"] = dict(self._prefs_extras)
-            try:
+            with contextlib.suppress(Exception):
                 _save_preferences(prefs, self._root)
-            except Exception:
-                pass
         geom = str(prefs.get("window_geometry", "")).strip()
         if geom:
-            try:
+            with contextlib.suppress(Exception):
                 self.restoreGeometry(QByteArray.fromBase64(geom.encode("ascii")))
-            except Exception:
-                pass
 
         self._tree_last_width = 220
         self._detail_last_height: int | None = None
@@ -1443,11 +1444,14 @@ class MainWindow(QMainWindow):
         files = self._files_for_scope(scope)
         if not files:
             return
-        if self._current_pf and self._current_pf.path in files:
-            if not self._replace_all_in_model(
+        if (
+            self._current_pf
+            and self._current_pf.path in files
+            and not self._replace_all_in_model(
                 pattern, replacement, use_regex, matches_empty, has_group_ref
-            ):
-                return
+            )
+        ):
+            return
         for path in files:
             if self._current_pf and path == self._current_pf.path:
                 continue
@@ -1483,7 +1487,9 @@ class MainWindow(QMainWindow):
                         template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
                         count = 1 if matches_empty else 0
                         new_text = pattern.sub(
-                            lambda m: m.expand(template), text, count=count
+                            lambda m, template=template: m.expand(template),
+                            text,
+                            count=count,
                         )
                     else:
                         new_text = pattern.sub(lambda _m: replacement, text)
@@ -1530,7 +1536,9 @@ class MainWindow(QMainWindow):
                                 template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
                                 count = 1 if matches_empty else 0
                                 new_value = pattern.sub(
-                                    lambda m: m.expand(template), text, count=count
+                                    lambda m, template=template: m.expand(template),
+                                    text,
+                                    count=count,
                                 )
                             else:
                                 new_value = pattern.sub(lambda _m: replacement, text)
@@ -1822,10 +1830,8 @@ class MainWindow(QMainWindow):
             "replace_scope": self._replace_scope,
             "__extras__": dict(self._prefs_extras),
         }
-        try:
+        with contextlib.suppress(Exception):
             _save_preferences(prefs, self._root)
-        except Exception:
-            pass
         if self._default_root:
             try:
                 global_prefs = _load_preferences(None)
@@ -1842,13 +1848,14 @@ class MainWindow(QMainWindow):
             self._update_status_combo_from_selection()
             return
         row = current.row()
-        if top_left.row() <= row <= bottom_right.row():
-            if roles is None or Qt.EditRole in roles or Qt.DisplayRole in roles:
-                self._update_status_combo_from_selection()
-                if self._wrap_text:
-                    self.table.resizeRowToContents(row)
-                if self._detail_panel.isVisible() and not self._detail_translation.hasFocus():
-                    self._sync_detail_editors()
+        if top_left.row() <= row <= bottom_right.row() and (
+            roles is None or Qt.EditRole in roles or Qt.DisplayRole in roles
+        ):
+            self._update_status_combo_from_selection()
+            if self._wrap_text:
+                self.table.resizeRowToContents(row)
+            if self._detail_panel.isVisible() and not self._detail_translation.hasFocus():
+                self._sync_detail_editors()
 
     def _on_selection_changed(self, current, previous) -> None:
         if previous is not None and previous.isValid():

@@ -137,7 +137,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     if last_root:
         lines.append(f"LAST_ROOT={last_root}")
     last_locales = prefs.get("last_locales", [])
-    if isinstance(last_locales, (list, tuple)) and last_locales:
+    if isinstance(last_locales, list | tuple) and last_locales:
         lines.append(f"LAST_LOCALES={','.join(str(v) for v in last_locales)}")
     geometry = str(prefs.get("window_geometry", "")).strip()
     if geometry:

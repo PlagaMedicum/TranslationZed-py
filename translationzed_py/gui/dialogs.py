@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import Iterable
-
-from PySide6.QtCore import Qt
+from collections.abc import Iterable
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -20,7 +19,6 @@ from PySide6.QtWidgets import (
 )
 
 from translationzed_py import __version__
-
 from translationzed_py.core.project_scanner import LocaleMeta
 
 

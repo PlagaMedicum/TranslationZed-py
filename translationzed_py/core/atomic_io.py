@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 
@@ -11,10 +12,8 @@ def write_bytes_atomic(path: Path, data: bytes) -> None:
     with open(tmp, "wb") as handle:
         handle.write(data)
         handle.flush()
-        try:
+        with contextlib.suppress(OSError):
             os.fsync(handle.fileno())
-        except OSError:
-            pass
     os.replace(tmp, path)
     _fsync_dir(path.parent)
 

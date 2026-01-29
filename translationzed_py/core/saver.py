@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from .atomic_io import write_bytes_atomic
 from .model import Entry, ParsedFile
 
@@ -67,7 +65,7 @@ def save(
         parts = _split_by_segments(new_value, e.segments)
         literals = [_encode_literal(p) for p in parts]
         region = literals[0]
-        for gap, literal in zip(e.gaps, literals[1:]):
+        for gap, literal in zip(e.gaps, literals[1:], strict=False):
             region += gap + literal
         replacements.append((e.span[0], e.span[1], region))
         changed_by_index[idx] = (
