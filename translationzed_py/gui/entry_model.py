@@ -161,7 +161,7 @@ class TranslationModel(QAbstractTableModel):
 
     def flags(self, index: QModelIndex):  # noqa: N802
         base = super().flags(index)
-        if index.column() in (1, 2, 3):  # Source (view), Translation & Status columns
+        if index.column() in (2, 3):  # Translation & Status columns
             return base | Qt.ItemIsEditable
         return base
 
