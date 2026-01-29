@@ -101,17 +101,14 @@ class MultiLineEditDelegate(QStyledItemDelegate):
         view = editor.parent()
         if hasattr(view, "viewport"):
             viewport = view.viewport()
-            max_width = max(40, viewport.width() - rect.x() - 4)
-            if max_width > rect.width():
-                rect.setWidth(max_width)
-            target = max(120, int(viewport.height() * 0.6))
             available = max(80, viewport.height() - rect.y() - 8)
-            max_height = min(target, available)
+            # Allow expansion up to the table bottom.
+            max_height = available
         else:
             max_height = 240
         if isinstance(editor, QPlainTextEdit):
             metrics = editor.fontMetrics()
-            min_height = metrics.lineSpacing() * 3 + 12
+            min_height = metrics.lineSpacing() * 2 + 12
             text = ""
             # Prefer index data when available to avoid timing issues.
             if _index and _index.isValid():

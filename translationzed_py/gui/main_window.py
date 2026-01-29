@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QPlainTextEdit,
     QSizePolicy,
     QSplitter,
     QStyle,
@@ -33,6 +34,7 @@ from PySide6.QtWidgets import (
     QToolBar,
     QToolButton,
     QTreeView,
+    QVBoxLayout,
     QWidget,
 )
 from shiboken6 import isValid
@@ -68,8 +70,19 @@ from .entry_model import TranslationModel
 from .fs_model import FsModel
 from .commands import ChangeStatusCommand
 from .delegates import KeyDelegate, MultiLineEditDelegate, StatusDelegate
-from .dialogs import LocaleChooserDialog, SaveFilesDialog
+from .dialogs import AboutDialog, LocaleChooserDialog, SaveFilesDialog
 from .preferences_dialog import PreferencesDialog
+
+
+class _CommitPlainTextEdit(QPlainTextEdit):
+    def __init__(self, commit_cb, parent=None) -> None:
+        super().__init__(parent)
+        self._commit_cb = commit_cb
+
+    def focusOutEvent(self, event) -> None:  # noqa: N802
+        super().focusOutEvent(event)
+        if self._commit_cb:
+            self._commit_cb()
 
 
 class MainWindow(QMainWindow):
@@ -142,6 +155,17 @@ class MainWindow(QMainWindow):
         self._last_locales = list(prefs.get("last_locales", []) or [])
         self._last_root = str(prefs.get("last_root", "") or self._root)
         self._prefs_extras = dict(prefs.get("__extras__", {}))
+        layout_reset_rev = str(self._prefs_extras.get("LAYOUT_RESET_REV", "")).strip()
+        if layout_reset_rev != "3":
+            prefs["window_geometry"] = ""
+            for key in ("TABLE_KEY_WIDTH", "TABLE_STATUS_WIDTH", "TABLE_SRC_RATIO"):
+                self._prefs_extras.pop(key, None)
+            self._prefs_extras["LAYOUT_RESET_REV"] = "3"
+            prefs["__extras__"] = dict(self._prefs_extras)
+            try:
+                _save_preferences(prefs, self._root)
+            except Exception:
+                pass
         geom = str(prefs.get("window_geometry", "")).strip()
         if geom:
             try:
@@ -149,15 +173,36 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-        splitter = QSplitter(self)
-        self.setCentralWidget(splitter)
+        self._tree_last_width = 220
+        self._detail_last_height: int | None = None
+        self._detail_min_height = 0
+        self._detail_syncing = False
+        self._detail_dirty = False
+
+        self._main_splitter = QSplitter(Qt.Vertical, self)
+        self._content_splitter = QSplitter(Qt.Horizontal, self)
+        self._main_splitter.addWidget(self._content_splitter)
+        self.setCentralWidget(self._main_splitter)
+        self._main_splitter.splitterMoved.connect(self._on_main_splitter_moved)
 
         # ── toolbar ────────────────────────────────────────────────────────
         self.toolbar = QToolBar("Toolbar", self)
         self.toolbar.setMovable(False)
         self.addToolBar(self.toolbar)
         self._updating_status_combo = False
-        self.toolbar.addWidget(QLabel("Status", self))
+        self.tree_toggle = QToolButton(self)
+        self.tree_toggle.setCheckable(True)
+        self.tree_toggle.setAutoRaise(True)
+        self.tree_toggle.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowLeft)
+        )
+        self.tree_toggle.setToolTip("Hide file tree")
+        self.tree_toggle.toggled.connect(self._toggle_tree_panel)
+        self.toolbar.addWidget(self.tree_toggle)
+        self.toolbar.addSeparator()
+        status_label = QLabel("Status:", self)
+        status_label.setContentsMargins(0, 0, 4, 0)
+        self.toolbar.addWidget(status_label)
         self.status_combo = QComboBox(self)
         self.status_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         for st in Status:
@@ -275,17 +320,38 @@ class MainWindow(QMainWindow):
         self._suppress_search_update = False
         self._replace_visible = False
         self._skip_search_autoselect = False
-        self._key_column_width: int | None = None
-        self._status_column_width: int | None = None
-        self._source_translation_ratio = 0.5
+        def _pref_int(name: str) -> int | None:
+            raw = str(self._prefs_extras.get(name, "")).strip()
+            if not raw:
+                return None
+            try:
+                val = int(raw)
+            except ValueError:
+                return None
+            return val if val > 0 else None
+
+        def _pref_float(name: str) -> float | None:
+            raw = str(self._prefs_extras.get(name, "")).strip()
+            if not raw:
+                return None
+            try:
+                val = float(raw)
+            except ValueError:
+                return None
+            return val if 0.05 <= val <= 0.95 else None
+
+        self._key_column_width: int | None = _pref_int("TABLE_KEY_WIDTH")
+        self._status_column_width: int | None = _pref_int("TABLE_STATUS_WIDTH")
+        self._source_translation_ratio = _pref_float("TABLE_SRC_RATIO") or 0.5
         self._table_layout_guard = False
-        self._user_resized_columns = False
+        self._user_resized_columns = bool(_pref_float("TABLE_SRC_RATIO"))
 
         # ── menu bar ───────────────────────────────────────────────────────
         menubar = self.menuBar()
         self.menu_general = menubar.addMenu("General")
         self.menu_edit = menubar.addMenu("Edit")
         self.menu_view = menubar.addMenu("View")
+        self.menu_help = menubar.addMenu("Help")
 
         # ── left pane: project tree ──────────────────────────────────────────
         self.tree = QTreeView()
@@ -301,7 +367,7 @@ class MainWindow(QMainWindow):
         self._mark_cached_dirty()
         self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
         self.tree.doubleClicked.connect(self._file_chosen)
-        splitter.addWidget(self.tree)
+        self._content_splitter.addWidget(self.tree)
 
         # ── proofread toggle ────────────────────────────────────────────────
         act_proof = QAction("&Mark Proofread", self)
@@ -326,9 +392,57 @@ class MainWindow(QMainWindow):
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
         self.table.horizontalHeader().sectionResized.connect(self._on_header_resized)
-        splitter.addWidget(self.table)
+        self._content_splitter.addWidget(self.table)
 
-        splitter.setSizes([220, 980])
+        self._detail_panel = QWidget(self)
+        self._detail_panel.setMinimumHeight(0)
+        self._detail_panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        detail_layout = QVBoxLayout(self._detail_panel)
+        detail_layout.setContentsMargins(2, 2, 2, 2)
+        detail_layout.setSpacing(2)
+        self._detail_source_label = QLabel("Source", self._detail_panel)
+        detail_layout.addWidget(self._detail_source_label)
+        self._detail_source = QPlainTextEdit(self._detail_panel)
+        self._detail_source.setReadOnly(True)
+        self._detail_source.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self._detail_source.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self._detail_source.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._detail_source.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        line_height = self._detail_source.fontMetrics().lineSpacing()
+        min_line_height = max(22, line_height + 6)
+        self._detail_source.setMinimumHeight(min_line_height)
+        detail_layout.addWidget(self._detail_source)
+        self._detail_translation_label = QLabel("Translation", self._detail_panel)
+        detail_layout.addWidget(self._detail_translation_label)
+        self._detail_translation = _CommitPlainTextEdit(
+            self._commit_detail_translation, self._detail_panel
+        )
+        self._detail_translation.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self._detail_translation.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self._detail_translation.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._detail_translation.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self._detail_translation.setMinimumHeight(min_line_height)
+        self._detail_translation.textChanged.connect(self._on_detail_translation_changed)
+        detail_layout.addWidget(self._detail_translation)
+        margins = detail_layout.contentsMargins()
+        label_total = (
+            self._detail_source_label.sizeHint().height()
+            + self._detail_translation_label.sizeHint().height()
+        )
+        self._detail_min_height = (
+            margins.top()
+            + margins.bottom()
+            + label_total
+            + min_line_height * 2
+            + detail_layout.spacing() * 3
+        )
+        self._detail_panel.setVisible(False)
+        self._main_splitter.addWidget(self._detail_panel)
+        self._main_splitter.setStretchFactor(0, 1)
+        self._main_splitter.setStretchFactor(1, 0)
+
+        self._content_splitter.setSizes([220, 980])
+        self._main_splitter.setSizes([1, 0])
         self.resize(1200, 800)
         self.act_undo: QAction | None = None
         self.act_redo: QAction | None = None
@@ -403,8 +517,21 @@ class MainWindow(QMainWindow):
         self.addAction(act_prompt)
         self.menu_view.addAction(act_wrap)
         self.menu_view.addAction(act_prompt)
+        act_about = QAction("&About", self)
+        act_about.triggered.connect(self._show_about)
+        self.addAction(act_about)
+        self.menu_help.addAction(act_about)
 
         # ── cache ──────────────────────────────────────────────────────
+        self.detail_toggle = QToolButton(self)
+        self.detail_toggle.setCheckable(True)
+        self.detail_toggle.setAutoRaise(True)
+        self.detail_toggle.setText("")
+        self.detail_toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self._update_detail_toggle(False)
+        self.detail_toggle.toggled.connect(self._toggle_detail_panel)
+        self.statusBar().addPermanentWidget(self.detail_toggle)
+        self.detail_toggle.setChecked(True)
         self._search_scope_widget, self._search_scope_action, self._search_scope_icon = (
             self._build_scope_indicator("edit-find", "Search scope")
         )
@@ -434,6 +561,135 @@ class MainWindow(QMainWindow):
         widget.setVisible(False)
         widget.setToolTip(tooltip)
         return widget, action, scope
+
+    def _update_detail_toggle(self, visible: bool) -> None:
+        if visible:
+            self.detail_toggle.setIcon(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
+            )
+            self.detail_toggle.setToolTip("Hide string editor")
+        else:
+            self.detail_toggle.setIcon(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
+            )
+            self.detail_toggle.setToolTip("Show string editor")
+
+    def _toggle_detail_panel(self, checked: bool) -> None:
+        min_height = max(70, self._detail_min_height)
+        if checked:
+            self._detail_panel.setVisible(True)
+            self._main_splitter.setCollapsible(1, False)
+            total = max(0, self._main_splitter.height())
+            if self._detail_last_height is None:
+                target = min_height * 2
+            else:
+                target = self._detail_last_height
+            self._detail_panel.setMinimumHeight(min_height)
+            height = min(max(min_height, target), max(min_height, total - 80))
+            top = max(80, total - height)
+            self._main_splitter.setSizes([top, height])
+            QTimer.singleShot(0, lambda: self._main_splitter.setSizes([top, height]))
+            self._sync_detail_editors()
+        else:
+            self._commit_detail_translation()
+            if self._detail_panel.isVisible():
+                self._detail_last_height = max(min_height, self._detail_panel.height())
+            self._detail_panel.setVisible(False)
+            self._main_splitter.setCollapsible(1, True)
+            self._main_splitter.setSizes([1, 0])
+        self._update_detail_toggle(checked)
+
+    def _on_main_splitter_moved(self, _pos: int, _index: int) -> None:
+        if not self._detail_panel.isVisible():
+            return
+        sizes = self._main_splitter.sizes()
+        if len(sizes) >= 2:
+            min_height = max(70, self._detail_min_height)
+            self._detail_last_height = max(min_height, sizes[1])
+
+    def _toggle_tree_panel(self, checked: bool) -> None:
+        if checked:
+            sizes = self._content_splitter.sizes()
+            if sizes:
+                self._tree_last_width = max(60, sizes[0])
+            self.tree.setVisible(False)
+            self.tree_toggle.setIcon(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowRight)
+            )
+            self.tree_toggle.setToolTip("Show file tree")
+            total = max(0, self._content_splitter.width())
+            if total <= 0 and sizes:
+                total = sum(sizes)
+            self._content_splitter.setSizes([0, max(100, total)])
+        else:
+            self.tree.setVisible(True)
+            width = max(80, self._tree_last_width)
+            sizes = self._content_splitter.sizes()
+            total = max(0, self._content_splitter.width())
+            if total <= 0 and sizes:
+                total = sum(sizes)
+            self._content_splitter.setSizes([width, max(100, total - width)])
+            self.tree_toggle.setIcon(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowLeft)
+            )
+            self.tree_toggle.setToolTip("Hide file tree")
+        if self.table.model():
+            self._apply_table_layout()
+
+    def _on_detail_translation_changed(self) -> None:
+        if self._detail_syncing:
+            return
+        self._detail_dirty = True
+
+    def _commit_detail_translation(self, index=None) -> None:
+        if not self._detail_dirty or not self._current_model:
+            return
+        if not self._detail_panel.isVisible():
+            self._detail_dirty = False
+            return
+        idx = index if index is not None and index.isValid() else self.table.currentIndex()
+        if not idx.isValid():
+            self._detail_dirty = False
+            return
+        model_index = self._current_model.index(idx.row(), 2)
+        new_text = self._detail_translation.toPlainText()
+        if model_index.data(Qt.EditRole) != new_text:
+            self._current_model.setData(model_index, new_text, Qt.EditRole)
+        self._detail_dirty = False
+
+    def _sync_detail_editors(self) -> None:
+        if not self._detail_panel.isVisible():
+            return
+        if not self._current_model:
+            self._detail_syncing = True
+            try:
+                self._detail_source.setPlainText("")
+                self._detail_translation.setPlainText("")
+            finally:
+                self._detail_syncing = False
+            self._detail_dirty = False
+            return
+        idx = self.table.currentIndex()
+        if not idx.isValid():
+            self._detail_syncing = True
+            try:
+                self._detail_source.setPlainText("")
+                self._detail_translation.setPlainText("")
+            finally:
+                self._detail_syncing = False
+            self._detail_dirty = False
+            return
+        source_index = self._current_model.index(idx.row(), 1)
+        value_index = self._current_model.index(idx.row(), 2)
+        source_text = str(source_index.data(Qt.EditRole) or "")
+        value_text = str(value_index.data(Qt.EditRole) or "")
+        self._detail_syncing = True
+        try:
+            self._detail_source.setPlainText(source_text)
+            self._detail_translation.setPlainText(value_text)
+        finally:
+            self._detail_syncing = False
+        self._detail_dirty = False
 
     def _scope_icon(self, scope: str) -> QIcon:
         if scope == "FILE":
@@ -593,6 +849,10 @@ class MainWindow(QMainWindow):
             return
         self._apply_preferences(dialog.values())
 
+    def _show_about(self) -> None:
+        dialog = AboutDialog(self)
+        dialog.exec()
+
     def _apply_preferences(self, values: dict) -> None:
         self._prompt_write_on_exit = bool(values.get("prompt_write_on_exit", True))
         self._wrap_text = bool(values.get("wrap_text", False))
@@ -711,6 +971,7 @@ class MainWindow(QMainWindow):
         self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
         self._update_status_combo_from_selection()
         self._update_replace_enabled()
+        self._sync_detail_editors()
         self._update_status_bar()
         if self._wrap_text:
             self.table.resizeRowsToContents()
@@ -793,16 +1054,21 @@ class MainWindow(QMainWindow):
             header.resizeSection(2, translation_width)
         finally:
             self._table_layout_guard = False
+        self._prefs_extras["TABLE_KEY_WIDTH"] = str(key_width)
+        self._prefs_extras["TABLE_STATUS_WIDTH"] = str(status_width)
+        self._prefs_extras["TABLE_SRC_RATIO"] = f"{ratio:.6f}"
 
     def _on_header_resized(self, logical_index: int, _old: int, _new: int) -> None:
         if self._table_layout_guard or not self.table.model():
             return
         if logical_index == 0:
             self._key_column_width = max(60, _new)
+            self._prefs_extras["TABLE_KEY_WIDTH"] = str(self._key_column_width)
             self._apply_table_layout()
             return
         if logical_index == 3:
             self._status_column_width = max(60, _new)
+            self._prefs_extras["TABLE_STATUS_WIDTH"] = str(self._status_column_width)
             self._apply_table_layout()
             return
         if logical_index not in (1, 2):
@@ -831,6 +1097,7 @@ class MainWindow(QMainWindow):
         if total > 0:
             self._source_translation_ratio = source_width / total
             self._user_resized_columns = True
+            self._prefs_extras["TABLE_SRC_RATIO"] = f"{self._source_translation_ratio:.6f}"
 
 
     def _save_current(self) -> bool:
@@ -1014,6 +1281,8 @@ class MainWindow(QMainWindow):
     def _write_cache_current(self) -> bool:
         if not (self._current_pf and self._current_model):
             return True
+        if self._detail_panel.isVisible():
+            self._commit_detail_translation()
         try:
             _write_status_cache(
                 self._root,
@@ -1578,10 +1847,21 @@ class MainWindow(QMainWindow):
                 self._update_status_combo_from_selection()
                 if self._wrap_text:
                     self.table.resizeRowToContents(row)
+                if self._detail_panel.isVisible() and not self._detail_translation.hasFocus():
+                    self._sync_detail_editors()
 
-    def _on_selection_changed(self, _current, _previous) -> None:
+    def _on_selection_changed(self, current, previous) -> None:
+        if previous is not None and previous.isValid():
+            self._commit_detail_translation(previous)
         self._update_status_combo_from_selection()
+        if self._detail_panel.isVisible():
+            self._sync_detail_editors()
         self._update_status_bar()
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        if self._detail_panel.isVisible():
+            self._toggle_detail_panel(True)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
