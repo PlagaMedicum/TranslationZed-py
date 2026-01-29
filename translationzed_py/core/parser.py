@@ -65,7 +65,7 @@ _PATTERNS = [
     (Kind.TRIVIA, r"[ \t]+"),
     (Kind.NEWLINE, r"\r?\n"),
     (Kind.COMMENT, r"--[^\n]*"),
-    (Kind.KEY, r"[^\s=\"\.][^=\r\n]*"),
+    (Kind.KEY, r"[^\s=\"\.][^=\r\n]*?(?=\s*=)"),
     (Kind.EQUAL, r"="),
     (Kind.CONCAT, r"\.\."),
     (Kind.BRACE, r"[{}]"),
@@ -191,6 +191,23 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
         }
 
     raw = path.read_bytes()
+    if b"=" not in raw:
+        text = _decode_text(raw, encoding)
+        return ParsedFile(
+            path,
+            [
+                Entry(
+                    path.name,
+                    text,
+                    Status.UNTOUCHED,
+                    (0, len(raw)),
+                    (len(text),),
+                    (),
+                    True,
+                )
+            ],
+            raw,
+        )
     if path.name.startswith("News_"):
         text = _decode_text(raw, encoding)
         return ParsedFile(
