@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Iterable
 
 from PySide6.QtCore import Qt
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -10,10 +12,14 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QLabel,
     QListWidget,
+    QPlainTextEdit,
     QScrollArea,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
+
+from translationzed_py import __version__
 
 from translationzed_py.core.project_scanner import LocaleMeta
 
@@ -120,3 +126,71 @@ class SaveFilesDialog(QDialog):
 
     def choice(self) -> str:
         return self._choice
+
+
+class AboutDialog(QDialog):
+    """About dialog with GPL notice and license text."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("About TranslationZed-Py")
+        self.setModal(True)
+        self.setMinimumWidth(520)
+        self.setMinimumHeight(420)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(f"<b>TranslationZed-Py</b> v{__version__}", self))
+        desc = QLabel(
+            "CAT tool for Project Zomboid translators, by translators. Created with Python.",
+            self,
+        )
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+        link = QLabel(
+            '<a href="https://github.com/PlagaMedicum/TranslationZed-py">'
+            "GitHub: TranslationZed-py"
+            "</a>",
+            self,
+        )
+        link.setOpenExternalLinks(True)
+        layout.addWidget(link)
+        layout.addWidget(
+            QLabel(
+                "Licensed under GNU GPLv3. This program comes with ABSOLUTELY NO WARRANTY.",
+                self,
+            )
+        )
+        toggle = QToolButton(self)
+        toggle.setCheckable(True)
+        toggle.setChecked(False)
+        toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        toggle.setArrowType(Qt.RightArrow)
+        toggle.setText("View License")
+        layout.addWidget(toggle)
+
+        self._license_text = QPlainTextEdit(self)
+        self._license_text.setReadOnly(True)
+        self._license_text.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self._license_text.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self._license_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._license_text.setPlainText(self._read_license())
+        self._license_text.setVisible(False)
+        layout.addWidget(self._license_text)
+
+        def _toggle_license(checked: bool) -> None:
+            self._license_text.setVisible(checked)
+            toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
+
+        toggle.toggled.connect(_toggle_license)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
+        buttons.rejected.connect(self.reject)
+        buttons.accepted.connect(self.accept)
+        layout.addWidget(buttons)
+
+    def _read_license(self) -> str:
+        try:
+            root = Path(__file__).resolve().parents[2]
+            return (root / "LICENSE").read_text(encoding="utf-8")
+        except Exception:
+            return "License text not available."
