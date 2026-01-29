@@ -18,9 +18,8 @@ _STATUS_MAP: dict[str, Status] = {}  # populated on first parse()
 
 def _unescape(raw: str) -> str:
     """Unescape only escaped quotes/backslashes; keep other escapes literal."""
-    if "\\" not in raw:
-        if '""' not in raw:
-            return raw
+    if "\\" not in raw and '""' not in raw:
+        return raw
     out: list[str] = []
     i = 0
     while i < len(raw):
@@ -79,14 +78,12 @@ _TOKEN_RE = re.compile(
 
 def _encoding_for_offsets(encoding: str, raw: bytes) -> tuple[str, int]:
     enc = encoding.lower().replace("_", "-")
-    if enc in {"utf-8", "utf8"}:
-        if raw.startswith(codecs.BOM_UTF8):
-            return "utf-8", 3
-    if enc in {"utf-16", "utf16"}:
-        if raw.startswith(b"\xff\xfe"):
-            return "utf-16-le", 2
-        if raw.startswith(b"\xfe\xff"):
-            return "utf-16-be", 2
+    if enc in {"utf-8", "utf8"} and raw.startswith(codecs.BOM_UTF8):
+        return "utf-8", 3
+    if enc in {"utf-16", "utf16"} and raw.startswith(b"\xff\xfe"):
+        return "utf-16-le", 2
+    if enc in {"utf-16", "utf16"} and raw.startswith(b"\xfe\xff"):
+        return "utf-16-be", 2
         return "utf-16-le", 0
     return encoding, 0
 
@@ -277,7 +274,7 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
                     break
                 k += 1
             gaps: list[bytes] = []
-            for prev, nxt in zip(seg_spans, seg_spans[1:]):
+            for prev, nxt in zip(seg_spans, seg_spans[1:], strict=False):
                 gaps.append(raw[prev[1] : nxt[0]])
             key_text = key_tok.text.strip()
             if not key_text:
