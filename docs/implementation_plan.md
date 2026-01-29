@@ -220,6 +220,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Touchpoints: `.github/workflows/release.yml`, `CHANGELOG.md`
 - Acceptance:
   - Tag push `vX.Y.Z` builds per‑OS bundles and attaches artifacts to GitHub Release
+  - Release is created as **draft** for review before publishing
   - Release notes reference CHANGELOG
 
 ### Step 12 — Dirty indicators from cache [✓]

@@ -122,9 +122,10 @@ From latest clarification:
   content hidden by default and expandable in-place.
 - **Packaging (current)**: PyInstaller script added (`scripts/pack.sh`) to build native executables
   per‑OS; build must be done on each target OS. CI now runs lint/mypy/tests on Linux/Windows/macOS.
-- **Metadata alignment**: `pyproject.toml` license field updated to reference LICENSE (GPLv3).
+- **Metadata alignment**: `pyproject.toml` license field updated to SPDX `GPL-3.0-only` and
+  `license-files` added; setuptools package discovery restricted to `translationzed_py*`.
 - **Release workflow (current)**: tag pushes (`vX.Y.Z`) build per‑OS bundles in CI and attach zipped
-  app folders to GitHub Releases. A `CHANGELOG.md` is maintained for release notes.
+  app folders to **draft** GitHub Releases for review. A `CHANGELOG.md` is maintained for release notes.
 
 ---
 
