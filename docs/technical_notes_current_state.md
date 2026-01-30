@@ -144,6 +144,9 @@ From latest clarification:
   - Platform plugin pruning keeps only OS‑required backends (Linux: `xcb` + `wayland`,
     macOS: `cocoa`, Windows: `qwindows`) and removes minimal/offscreen/vnc plugins.
   - Optional Qt libraries matching excluded modules are deleted when present.
+  - Image format plugins are pruned to common formats (PNG/SVG/JPEG + ICO/ICNS per OS),
+    and only `qsvgicon` is retained in `iconengines`.
+  - Additional strip pass runs on bundled `.so`/`.dylib` binaries when `strip` exists.
   - Release zips use maximum compression (`zip -9`, `Compress-Archive -CompressionLevel Optimal`).
   - UPX is used only when present; Linux/macOS builds use `--strip`.
   - `LICENSE` and `README.md` now land at the **dist root** (not in subfolders).

@@ -70,6 +70,33 @@ if (Test-Path $qtDir) {
                 Remove-Item -Recurse -Force $target
             }
         }
+
+        $imageFormats = Join-Path $plugins "imageformats"
+        if (Test-Path $imageFormats) {
+            $keep = @("qpng", "qsvg", "qjpeg", "qico")
+            Get-ChildItem -Path $imageFormats | ForEach-Object {
+                $name = $_.BaseName
+                $keepMatch = $false
+                foreach ($prefix in $keep) {
+                    if ($name.StartsWith($prefix)) {
+                        $keepMatch = $true
+                        break
+                    }
+                }
+                if (-not $keepMatch) {
+                    Remove-Item -Recurse -Force $_.FullName
+                }
+            }
+        }
+
+        $iconEngines = Join-Path $plugins "iconengines"
+        if (Test-Path $iconEngines) {
+            Get-ChildItem -Path $iconEngines | ForEach-Object {
+                if (-not $_.BaseName.StartsWith("qsvgicon")) {
+                    Remove-Item -Recurse -Force $_.FullName
+                }
+            }
+        }
     }
 }
 
