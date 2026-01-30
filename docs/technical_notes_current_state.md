@@ -420,6 +420,7 @@ Edit translations quickly     Works only after model is set
 Proofread workflow            Ctrl+P + Status combo
 Search + navigation           Toolbar search + F3/Shift+F3 (core.search)
 Save status persistence       Cache written for opened files only
+Bulk edits                    Multi-row status change + paste-to-translation
 ```
 
 ---
