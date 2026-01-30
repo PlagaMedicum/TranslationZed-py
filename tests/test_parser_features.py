@@ -73,6 +73,28 @@ def test_parse_unterminated_string_line(tmp_path):
     assert pf.entries[1].value == "Fine"
 
 
+def test_parse_block_comments(tmp_path):
+    text = """
+A = "1"
+/* comment */
+B = "2"
+"""
+    pf = _tmp(text, tmp_path)
+    keys = [e.key for e in pf.entries]
+    assert keys == ["A", "B"]
+
+
+def test_parse_stray_quote_with_markup(tmp_path):
+    text = """
+X = " <CENTRE> "<SIZE:large> hello",
+Y = "Ok"
+"""
+    pf = _tmp(text, tmp_path)
+    assert pf.entries[0].key == "X"
+    assert "<SIZE:large>" in pf.entries[0].value
+    assert pf.entries[1].key == "Y"
+
+
 def test_parse_keys_with_spaces_and_symbols(tmp_path):
     pf = _tmp('UI_optionscreen_binding_Equip/Unequip Handweapon = "Ok"\n', tmp_path)
     assert pf.entries[0].key == "UI_optionscreen_binding_Equip/Unequip Handweapon"
