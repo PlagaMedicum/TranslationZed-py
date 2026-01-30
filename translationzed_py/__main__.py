@@ -43,13 +43,14 @@ def _configure_qt_env() -> None:
         os.environ["QT_IM_MODULE"] = "none"
         if os.environ.get("TZP_DEBUG_QT", "") == "1":
             print("TranslationZed: QT_IM_MODULE=none", file=sys.stderr)
-    wayland_plugins = list(plugin_path.glob("platforms/libqwayland*.so*"))
-    if not wayland_plugins and "QT_QPA_PLATFORM" not in os.environ:
-        os.environ["QT_QPA_PLATFORM"] = "xcb"
-        print(
-            "TranslationZed: wayland plugin not bundled; forcing QT_QPA_PLATFORM=xcb",
-            file=sys.stderr,
-        )
+    if sys.platform.startswith("linux"):
+        wayland_plugins = list(plugin_path.glob("platforms/libqwayland*.so*"))
+        if not wayland_plugins and "QT_QPA_PLATFORM" not in os.environ:
+            os.environ["QT_QPA_PLATFORM"] = "xcb"
+            print(
+                "TranslationZed: wayland plugin not bundled; forcing QT_QPA_PLATFORM=xcb",
+                file=sys.stderr,
+            )
     if os.environ.get("TZP_DEBUG_QT", "") == "1":
         os.environ.setdefault("QT_DEBUG_PLUGINS", "1")
         print(f"TranslationZed: QT_PLUGIN_PATH={plugin_path}", file=sys.stderr)
