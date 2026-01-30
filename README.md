@@ -5,19 +5,19 @@
 
 <noscript><a href="https://liberapay.com/buljion"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a></noscript>
 
-# Builds (recommended)
-Prebuilt app folders are published as **draft releases** on GitHub (Linux/Windows/macOS).
-Download the ZIP for your OS, extract it, and run the executable inside the folder:
-- Linux/macOS: `TranslationZed-Py`
-- Windows: `TranslationZed-Py.exe`
-
 # TranslationZed-Py
 
-TranslationZed-Py is a Python Open-source re-implementation of [TranslationZed](https://pzwiki.net/wiki/TranslationZed) for platform-independent translation of Project Zomboid. It is built as a fast, lossless CAT tool for translators, by translators.
+TranslationZed-Py is a Python Open-source re-implementation of [TranslationZed](https://pzwiki.net/wiki/TranslationZed) for platform-independent translation of Project Zomboid. It is built as a fast, lossless CAT tool for translators, by translators. [Discussion on the PZ forum](https://theindiestone.com/forums/index.php?/topic/91297-translationzed-py-%E2%80%93-a-new-project-zomboid-translation-tool/).
 
 This project is currently WIP and not fully ready for production use.
 
 This code was written at free time with a broad AI usage.
+
+# Builds (recommended)
+Prebuilt app folders are published as **[releases](https://github.com/PlagaMedicum/TranslationZed-py/releases)** on GitHub (Linux/Windows/macOS).
+Download the ZIP for your OS, extract it, and run the executable inside the folder:
+- Linux/macOS: `TranslationZed-Py`
+- Windows: `TranslationZed-Py.exe`
 
 ## Build & Run (from source)
 
@@ -78,7 +78,4 @@ and try to follow the architecture and standards described there. It was made fo
 ## License
 This project is Open-source, licensed under GPLv3. Distributions must include source code and the license text.
 
-## Development tooling
-Developed with assistance from Codex in VSCodium (GPT‑Plus). Contributors should ensure their usage
-complies with OpenAI terms/policies and review any generated code for third‑party license obligations
-before inclusion.
+Developed with assistance from Codex in VSCodium (GPT‑Plus). Contributors should ensure their usage complies with OpenAI terms/policies and review any generated code for third‑party license obligations before inclusion.
