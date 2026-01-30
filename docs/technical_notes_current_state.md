@@ -389,7 +389,7 @@ Area                         Spec Expectation             As-Built Status
 ---------------------------  ---------------------------- -------------------------
 File open UX                 Double-click/Enter opens     Implemented (opens file)
 Translation table            QTableView + delegates       Status delegate implemented
-Status coloring              Background color             Proofread background implemented
+Status coloring              Background color             Translated green + Proofread light blue implemented
 Status dropdown              Toolbar "Status"             Implemented (combo + Ctrl+P)
 Source column                Key | Source | Translation   Key | Source | Value | Status
 EN as base (non-editable)    EN shown as Source           Implemented (EN source map)

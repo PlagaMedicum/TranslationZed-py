@@ -14,8 +14,8 @@ from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 
 _HEADERS = ("Key", "Source", "Translation", "Status")
 _BG_STATUS = {
-    Status.PROOFREAD: QColor("#ccffcc"),
     Status.TRANSLATED: QColor("#ccffcc"),
+    Status.PROOFREAD: QColor("#cce5ff"),
 }
 _BG_MISSING = QColor("#ffcccc")
 _BG_EMPTY = QColor("#ffd8a8")
