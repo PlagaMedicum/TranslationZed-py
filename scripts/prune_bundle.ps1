@@ -33,9 +33,16 @@ if (Test-Path $qtDir) {
     if (Test-Path $plugins) {
         $platforms = Join-Path $plugins "platforms"
         if (Test-Path $platforms) {
-            $keep = @("qwindows.dll")
+            $keepPrefixes = @("qwindows")
             Get-ChildItem -Path $platforms | ForEach-Object {
-                if ($keep -notcontains $_.Name) {
+                $keep = $false
+                foreach ($prefix in $keepPrefixes) {
+                    if ($_.BaseName.StartsWith($prefix)) {
+                        $keep = $true
+                        break
+                    }
+                }
+                if (-not $keep) {
                     Remove-Item -Recurse -Force $_.FullName
                 }
             }
