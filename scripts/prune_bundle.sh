@@ -86,6 +86,8 @@ if [[ -d "$qt_dir" ]]; then
     fi
     for name in \
       assetimporters \
+      accessible \
+      accessiblebridge \
       bearer \
       egldeviceintegrations \
       gamepads \
