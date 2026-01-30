@@ -1920,7 +1920,18 @@ class MainWindow(QMainWindow):
         if not self._current_model:
             return
         text = QGuiApplication.clipboard().text()
-        self._current_model.setData(idx, text, Qt.EditRole)
+        rows = self._selected_rows()
+        if len(rows) <= 1:
+            self._current_model.setData(idx, text, Qt.EditRole)
+            return
+        stack = self._current_model.undo_stack
+        stack.beginMacro("Set translation for selection")
+        try:
+            for row in rows:
+                model_index = self._current_model.index(row, 2)
+                self._current_model.setData(model_index, text, Qt.EditRole)
+        finally:
+            stack.endMacro()
 
     def _toggle_wrap_text(self, checked: bool) -> None:
         self._wrap_text = bool(checked)
@@ -2004,18 +2015,22 @@ class MainWindow(QMainWindow):
         if not self._current_model:
             self._set_status_combo(None)
             return
-        current = self.table.currentIndex()
-        if not current.isValid():
+        rows = self._selected_rows()
+        if not rows:
             self._set_status_combo(None)
             return
-        status = self._current_model.status_for_row(current.row())
-        self._set_status_combo(status)
+        statuses = {self._current_model.status_for_row(row) for row in rows}
+        statuses.discard(None)
+        if len(statuses) == 1:
+            self._set_status_combo(statuses.pop())
+        else:
+            self._set_status_combo(None)
 
     def _set_status_combo(self, status: Status | None) -> None:
         self._updating_status_combo = True
         try:
             if status is None:
-                self.status_combo.setEnabled(False)
+                self.status_combo.setEnabled(bool(self._selected_rows()))
                 self.status_combo.setCurrentIndex(-1)
                 return
             self.status_combo.setEnabled(True)
@@ -2032,18 +2047,39 @@ class MainWindow(QMainWindow):
             return
         if not self._current_model:
             return
-        current = self.table.currentIndex()
-        if not current.isValid():
-            return
         status = self.status_combo.currentData()
         if status is None:
             return
-        model_index = self._current_model.index(current.row(), 3)
-        self._current_model.setData(model_index, status, Qt.EditRole)
+        rows = self._selected_rows()
+        if not rows:
+            return
+        if len(rows) == 1:
+            model_index = self._current_model.index(rows[0], 3)
+            self._current_model.setData(model_index, status, Qt.EditRole)
+            return
+        if not any(self._current_model.status_for_row(row) != status for row in rows):
+            return
+        stack = self._current_model.undo_stack
+        stack.beginMacro("Set status for selection")
+        try:
+            for row in rows:
+                model_index = self._current_model.index(row, 3)
+                self._current_model.setData(model_index, status, Qt.EditRole)
+        finally:
+            stack.endMacro()
 
     def _set_saved_status(self) -> None:
         self._last_saved_text = time.strftime("Saved %H:%M:%S")
         self._update_status_bar()
+
+    def _selected_rows(self) -> list[int]:
+        sel = self.table.selectionModel()
+        if sel is None:
+            return []
+        rows = {idx.row() for idx in sel.selectedRows()}
+        if not rows:
+            rows = {idx.row() for idx in sel.selectedIndexes()}
+        return sorted(rows)
 
     def _update_status_bar(self) -> None:
         parts: list[str] = []
