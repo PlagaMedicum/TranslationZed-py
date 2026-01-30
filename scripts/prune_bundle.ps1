@@ -31,6 +31,15 @@ if (Test-Path $qtDir) {
 
     $plugins = Join-Path $qtDir "plugins"
     if (Test-Path $plugins) {
+        $platforms = Join-Path $plugins "platforms"
+        if (Test-Path $platforms) {
+            $keep = @("qwindows.dll")
+            Get-ChildItem -Path $platforms | ForEach-Object {
+                if ($keep -notcontains $_.Name) {
+                    Remove-Item -Recurse -Force $_.FullName
+                }
+            }
+        }
         $removePlugins = @(
             "assetimporters",
             "bearer",
@@ -62,6 +71,41 @@ if (Test-Path $qtDir) {
             }
         }
     }
+}
+
+foreach ($lib in @(
+    "Qt63DAnimation",
+    "Qt63DCore",
+    "Qt63DExtras",
+    "Qt63DInput",
+    "Qt63DLogic",
+    "Qt63DRender",
+    "Qt6Charts",
+    "Qt6DataVisualization",
+    "Qt6Multimedia",
+    "Qt6MultimediaWidgets",
+    "Qt6NetworkAuth",
+    "Qt6Pdf",
+    "Qt6PdfWidgets",
+    "Qt6Positioning",
+    "Qt6Quick",
+    "Qt6Quick3D",
+    "Qt6QuickControls2",
+    "Qt6QuickWidgets",
+    "Qt6Qml",
+    "Qt6Sensors",
+    "Qt6SerialPort",
+    "Qt6Sql",
+    "Qt6Test",
+    "Qt6TextToSpeech",
+    "Qt6WebChannel",
+    "Qt6WebEngineCore",
+    "Qt6WebEngineWidgets",
+    "Qt6WebEngine",
+    "Qt6WebSockets"
+)) {
+    Get-ChildItem -Path $qtDir -Recurse -File -Filter "$lib.dll" -ErrorAction SilentlyContinue |
+        ForEach-Object { Remove-Item -Force $_.FullName }
 }
 
 Get-ChildItem -Path $BundlePath -Recurse -Directory -Include "*.dist-info", "*.egg-info", "__pycache__" -ErrorAction SilentlyContinue |

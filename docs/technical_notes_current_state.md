@@ -141,6 +141,9 @@ From latest clarification:
   - Explicit exclusions for Qt3D/Quick/WebEngine/etc. in `pack.sh` + `pack.ps1`.
   - Post‑build pruning removes unused Qt plugin categories, Qt translations/QML, and
     `*.dist-info`/`*.egg-info`/`__pycache__` directories (`scripts/prune_bundle.*`).
+  - Platform plugin pruning keeps only OS‑required backends (Linux: `xcb` + `wayland`,
+    macOS: `cocoa`, Windows: `qwindows`) and removes minimal/offscreen/vnc plugins.
+  - Optional Qt libraries matching excluded modules are deleted when present.
   - Release zips use maximum compression (`zip -9`, `Compress-Archive -CompressionLevel Optimal`).
   - UPX is used only when present; Linux/macOS builds use `--strip`.
   - `LICENSE` and `README.md` now land at the **dist root** (not in subfolders).
