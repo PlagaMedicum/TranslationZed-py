@@ -259,16 +259,10 @@ class MainWindow(QMainWindow):
         self.search_next_btn.clicked.connect(self._search_next)
         self.toolbar.addWidget(self.search_next_btn)
         self.replace_toggle = QToolButton(self)
-        self.replace_toggle.setIcon(
-            QIcon.fromTheme(
-                "edit-find-replace",
-                self.style().standardIcon(QStyle.StandardPixmap.SP_DialogResetButton),
-            )
-        )
         self.replace_toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
-        self.replace_toggle.setToolTip("Show replace")
         self.replace_toggle.setCheckable(True)
         self.replace_toggle.toggled.connect(self._toggle_replace)
+        self._update_replace_toggle_icon(False)
         self.toolbar.addWidget(self.replace_toggle)
         self.search_column_label = QLabel("Search in:", self)
         self.search_column_label.setContentsMargins(8, 0, 4, 0)
@@ -582,12 +576,12 @@ class MainWindow(QMainWindow):
     def _update_detail_toggle(self, visible: bool) -> None:
         if visible:
             self.detail_toggle.setIcon(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
+                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
             )
             self.detail_toggle.setToolTip("Hide string editor")
         else:
             self.detail_toggle.setIcon(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
+                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
             )
             self.detail_toggle.setToolTip("Show string editor")
 
@@ -1359,8 +1353,18 @@ class MainWindow(QMainWindow):
         if self._replace_visible:
             self._align_replace_bar()
             QTimer.singleShot(0, self._align_replace_bar)
+        self._update_replace_toggle_icon(self._replace_visible)
         self._update_replace_enabled()
         self._update_status_bar()
+
+    def _update_replace_toggle_icon(self, visible: bool) -> None:
+        if visible:
+            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
+            self.replace_toggle.setToolTip("Hide replace")
+        else:
+            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
+            self.replace_toggle.setToolTip("Show replace")
+        self.replace_toggle.setIcon(icon)
 
     def _align_replace_bar(self) -> None:
         if not self.replace_toolbar.isVisible():

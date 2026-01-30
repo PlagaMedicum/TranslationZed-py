@@ -64,7 +64,7 @@ _PATTERNS = [
     (Kind.TRIVIA, r"[ \t]+"),
     (Kind.NEWLINE, r"\r?\n"),
     (Kind.COMMENT, r"--[^\n]*"),
-    (Kind.KEY, r"[^\s=\"\.][^=\r\n]*?(?=\s*=)"),
+    (Kind.KEY, r"[^\s=\"\.][^=\r\n]*?(?=\s*(?:=|{))"),
     (Kind.EQUAL, r"="),
     (Kind.CONCAT, r"\.\."),
     (Kind.BRACE, r"[{}]"),
@@ -109,6 +109,8 @@ def _read_string_token(text: str, pos: int) -> int:
     i = pos + 1
     while i < len(text):
         ch = text[i]
+        if ch in {"\r", "\n"}:
+            return i
         if ch == "\\":
             i += 2
             continue
@@ -126,7 +128,7 @@ def _read_string_token(text: str, pos: int) -> int:
             i += 1
             return i
         i += 1
-    raise SyntaxError("Unterminated string literal")
+    return i
 
 
 # ── The generator the test asked about ────────────────────────────────────────
@@ -247,7 +249,11 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
             span_end: int | None = None
             while j < len(toks):
                 if toks[j].kind is Kind.STRING:
-                    seg_text = _unescape(toks[j].text[1:-1])
+                    raw_text = toks[j].text
+                    if raw_text.endswith('"'):
+                        seg_text = _unescape(raw_text[1:-1])
+                    else:
+                        seg_text = _unescape(raw_text[1:])
                     parts.append(seg_text)
                     seg_lens.append(len(seg_text))
                     seg_spans.append(toks[j].span)

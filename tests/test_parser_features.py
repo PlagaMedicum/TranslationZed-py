@@ -53,6 +53,26 @@ def test_parse_dotted_keys(tmp_path):
     assert pf.entries[0].key == "EvolvedRecipeName_Base.CannedTomatoOpen"
 
 
+def test_parse_table_header_without_equals(tmp_path):
+    text = """
+DynamicRadio_BE {
+    AEBS_Intro = "Hello",
+}
+"""
+    pf = _tmp(text, tmp_path)
+    keys = [e.key for e in pf.entries]
+    assert "AEBS_Intro" in keys
+
+
+def test_parse_unterminated_string_line(tmp_path):
+    text = 'BAD = "Missing quote\nOK = "Fine"\n'
+    pf = _tmp(text, tmp_path)
+    assert pf.entries[0].key == "BAD"
+    assert pf.entries[0].value == "Missing quote"
+    assert pf.entries[1].key == "OK"
+    assert pf.entries[1].value == "Fine"
+
+
 def test_parse_keys_with_spaces_and_symbols(tmp_path):
     pf = _tmp('UI_optionscreen_binding_Equip/Unequip Handweapon = "Ok"\n', tmp_path)
     assert pf.entries[0].key == "UI_optionscreen_binding_Equip/Unequip Handweapon"
