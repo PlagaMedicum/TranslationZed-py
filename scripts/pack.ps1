@@ -58,3 +58,5 @@ python -m PyInstaller `
     @upxArgs `
     @excludeArgs `
     translationzed_py\__main__.py
+
+powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\prune_bundle.ps1" -BundlePath "dist\$Name"

@@ -29,12 +29,12 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           bash scripts/pack.sh
-          zip -r TranslationZed-Py-${{ runner.os }}.zip dist/TranslationZed-Py
+          zip -9 -r TranslationZed-Py-${{ runner.os }}.zip dist/TranslationZed-Py
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
           powershell -ExecutionPolicy Bypass -File scripts/pack.ps1
-          powershell -Command "Compress-Archive -Path dist\TranslationZed-Py -DestinationPath TranslationZed-Py-${{ runner.os }}.zip"
+          powershell -Command "Compress-Archive -Path dist\TranslationZed-Py -DestinationPath TranslationZed-Py-${{ runner.os }}.zip -CompressionLevel Optimal"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
