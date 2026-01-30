@@ -130,7 +130,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - 4 columns: Key | Source | Translation | Status
   - Undo/redo per file
   - Status editor (combo) + proofread shortcut
-  - Status background color (Proofread)
+- Status background colors (Translated = green, Proofread = light blue)
 
 ### Step 9 — Search & navigation [✓]
 - Touchpoints: `gui/main_window.py`
