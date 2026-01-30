@@ -53,6 +53,16 @@ def _configure_qt_env() -> None:
     if os.environ.get("TZP_DEBUG_QT", "") == "1":
         os.environ.setdefault("QT_DEBUG_PLUGINS", "1")
         print(f"TranslationZed: QT_PLUGIN_PATH={plugin_path}", file=sys.stderr)
+        print(
+            "TranslationZed: QT_QPA_PLATFORM="
+            f"{os.environ.get('QT_QPA_PLATFORM', '<auto>')}",
+            file=sys.stderr,
+        )
+        print(
+            "TranslationZed: QT_ACCESSIBILITY="
+            f"{os.environ.get('QT_ACCESSIBILITY', '<auto>')}",
+            file=sys.stderr,
+        )
 
 
 def main(argv: list[str] | None = None) -> None:
