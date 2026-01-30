@@ -240,8 +240,9 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ### Step 28 — Validation highlights (future) [→ pending]
 - Touchpoints: `gui/entry_model.py`, `gui/delegates.py`
 - Acceptance:
-  - Empty **Key** or **Source** cells render with red background
-  - Empty **Translation** cells render with orange background
+  - Empty **Key** or **Source** cells render with **red** background (highest priority).
+  - **Translated** cells render with **green** background (medium priority).
+  - Empty **Translation** cells render with **orange** background (low priority).
   - Colors are purely visual (no blocking) and can be toggled later in Preferences
 
 ---
