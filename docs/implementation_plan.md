@@ -210,6 +210,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - LICENSE and README bundled in output
   - Exclude unused Qt modules to keep bundles small
   - Post-build prune removes unused Qt plugins/QML/translations and Python metadata
+  - Platform plugins are pruned to OS-required backends (xcb/wayland, cocoa, qwindows)
+  - Optional Qt libraries matching excluded modules are removed when present
   - Archives use maximum compression (`zip -9`, `Compress-Archive -CompressionLevel Optimal`)
   - UPX/strip is optional and used only when available
   - Windows zip keeps the `TranslationZed-Py/` folder root with the `.exe` at top level
