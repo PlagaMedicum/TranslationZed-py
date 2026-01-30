@@ -2,8 +2,8 @@
 _Last updated: 2026-01-30_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
-explicit dependencies, and acceptance criteria. This is the canonical plan to
-finish v0.1 and guide further expansion.
+explicit dependencies, and acceptance criteria. v0.1 is shipped; this plan now
+anchors v0.2 preparation and subsequent expansion.
 
 Legend:
 - [✓] done
@@ -158,7 +158,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Last opened file per locale stored **inside cache headers** (no settings entry)
   - Preferences include **Search scope** and **Replace scope** (future UI)
 
-### Step 18 — Preferences window (planned)
+### Step 18 — Preferences window (planned) [✓]
 - Touchpoints: `gui/preferences_dialog.py` (new), `core/preferences.py`
 - Acceptance:
   - Preferences window groups settings: General, Search & Replace, View
@@ -167,7 +167,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Replace scope: File | Locale | Pool
   - Values persisted to `.tzp-config/settings.env`
 
-### Step 19 — String editor under table (Poedit-style) [→ in progress]
+### Step 19 — String editor under table (Poedit-style) [✓]
 - Touchpoints: `gui/main_window.py`, new `gui/detail_editors.py`
 - Acceptance:
   - Optional lower pane with two large text boxes (Source read‑only, Translation editable)
@@ -195,7 +195,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Follow OS theme (light/dark) via native Qt styles
   - No custom theming; use palette only when required
 
-### Step 23 — License compliance UI [→ in progress] 
+### Step 23 — License compliance UI [✓]
 - Touchpoints: `gui/main_window.py`, new `gui/about_dialog.py`
 - Acceptance:
   - Help/About dialog shows GPLv3 notice and “no warranty” text
@@ -218,19 +218,19 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - UPX/strip is optional and used only when available
   - Windows zip keeps the `TranslationZed-Py/` folder root with the `.exe` at top level
 
-### Step 25 — CI baseline [→ in progress]
+### Step 25 — CI baseline [✓]
 - Touchpoints: `.github/workflows/ci.yml`
 - Acceptance:
   - Lint + mypy + pytest run on Linux, Windows, macOS
   - Qt runs headless on Linux via `QT_QPA_PLATFORM=offscreen`
 
-### Step 26 — Performance & crash resilience checklist [→ in progress]
+### Step 26 — Performance & crash resilience checklist [✓]
 - Touchpoints: `docs/testing_strategy.md`
 - Acceptance:
   - Manual crash‑resilience checklist added
   - Manual performance smoke checklist added
 
-### Step 27 — Release workflow [→ in progress]
+### Step 27 — Release workflow [✓]
 - Touchpoints: `.github/workflows/release.yml`, `CHANGELOG.md`
 - Acceptance:
   - Tag push `vX.Y.Z` builds per‑OS bundles and attaches artifacts to GitHub Release
@@ -243,6 +243,28 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Empty **Key** or **Source** cells render with red background
   - Empty **Translation** cells render with orange background
   - Colors are purely visual (no blocking) and can be toggled later in Preferences
+
+---
+
+## 2.1) v0.2 Focus Plan (draft, ordered)
+
+Priority A — **Core workflow completeness**
+1) **Search/Replace scopes**
+   - Implement File | Locale | Pool behavior for search + replace (not just stored in prefs).
+   - Status bar clearly reflects active scope (search + replace independently).
+2) **Multi‑file search navigation**
+   - Results list anchored to search UI; selecting a hit highlights the file in the tree.
+   - Prev/Next wraps across files and keeps selection + row focus consistent.
+3) **Replace‑all safety**
+   - Replace‑all in Locale/Pool shows a file list confirmation; only applies to opened locales.
+
+Priority B — **Productivity/clarity**
+4) **Validation highlights** (Step 28).
+5) **File tree toggle** (Step 21).
+6) **Text visualization** (Step 19).
+
+Priority C — **Assistive tooling**
+7) **Translation memory** + **LanguageTool** (Step 20).
 
 ### Step 12 — Dirty indicators from cache [✓]
 - Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
@@ -310,10 +332,9 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 
 ## 4) Open Questions (need answers)
 
-1) **Core search scope**: should `core.search` accept a *single file model* now
-   and later expand to multi‑file, or should we design multi‑file up front?
-2) **Search results payload**: v0.1 returns `(file_path, row_index)` only; future
-   can add match spans/snippets for preview.
+1) **v0.2 priority order**: does the Priority A/B/C ordering above match your intent?
+2) **Replace‑all confirmation**: should the file list be a modal dialog or a side panel?
+3) **Pool scope meaning**: confirm Pool = “currently opened locales only,” not entire root.
 
 ---
 
