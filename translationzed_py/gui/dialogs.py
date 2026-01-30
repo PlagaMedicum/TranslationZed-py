@@ -125,6 +125,40 @@ class SaveFilesDialog(QDialog):
         return self._choice
 
 
+class ReplaceFilesDialog(QDialog):
+    """Confirm replace-all across multiple files."""
+
+    def __init__(self, files: Iterable[str], scope_label: str, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Replace in multiple files")
+        self.setModal(True)
+        self._confirmed = False
+
+        main_layout = QVBoxLayout(self)
+        main_layout.addWidget(QLabel(f"Replace matches in {scope_label} files:"))
+
+        list_widget = QListWidget(self)
+        list_widget.setSelectionMode(QAbstractItemView.NoSelection)
+        for item in files:
+            list_widget.addItem(item)
+        list_widget.setMaximumHeight(240)
+        main_layout.addWidget(list_widget)
+
+        buttons = QDialogButtonBox(self)
+        btn_replace = buttons.addButton("Replace", QDialogButtonBox.AcceptRole)
+        buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
+        btn_replace.clicked.connect(self._confirm)
+        buttons.rejected.connect(self.reject)
+        main_layout.addWidget(buttons)
+
+    def _confirm(self) -> None:
+        self._confirmed = True
+        self.accept()
+
+    def confirmed(self) -> bool:
+        return self._confirmed
+
+
 class AboutDialog(QDialog):
     """About dialog with GPL notice and license text."""
 

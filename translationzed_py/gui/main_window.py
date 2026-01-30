@@ -76,7 +76,12 @@ from translationzed_py.core.status_cache import write as _write_status_cache
 
 from .commands import ChangeStatusCommand
 from .delegates import KeyDelegate, MultiLineEditDelegate, StatusDelegate
-from .dialogs import AboutDialog, LocaleChooserDialog, SaveFilesDialog
+from .dialogs import (
+    AboutDialog,
+    LocaleChooserDialog,
+    ReplaceFilesDialog,
+    SaveFilesDialog,
+)
 from .entry_model import TranslationModel
 from .fs_model import FsModel
 from .preferences_dialog import PreferencesDialog
@@ -1491,6 +1496,21 @@ class MainWindow(QMainWindow):
         files = self._files_for_scope(scope)
         if not files:
             return
+        if scope != "FILE" and len(files) > 1:
+            if scope == "LOCALE":
+                locale = (
+                    self._locale_for_path(self._current_pf.path)
+                    if self._current_pf
+                    else None
+                )
+                scope_label = f"Locale {locale}" if locale else "Locale"
+            else:
+                scope_label = f"Pool ({len(self._selected_locales)})"
+            rel_files = [str(p.relative_to(self._root)) for p in files]
+            dialog = ReplaceFilesDialog(rel_files, scope_label, self)
+            dialog.exec()
+            if not dialog.confirmed():
+                return
         if (
             self._current_pf
             and self._current_pf.path in files
