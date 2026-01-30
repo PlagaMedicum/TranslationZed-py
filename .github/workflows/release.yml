@@ -34,7 +34,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           powershell -ExecutionPolicy Bypass -File scripts/pack.ps1
-          powershell -Command "Compress-Archive -Path dist\TranslationZed-Py\* -DestinationPath TranslationZed-Py-${{ runner.os }}.zip"
+          powershell -Command "Compress-Archive -Path dist\TranslationZed-Py -DestinationPath TranslationZed-Py-${{ runner.os }}.zip"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
