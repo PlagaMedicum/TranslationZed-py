@@ -95,6 +95,32 @@ Y = "Ok"
     assert pf.entries[1].key == "Y"
 
 
+def test_parse_inline_quotes_with_trailing_text(tmp_path):
+    text = (
+        'X = "Use /startrain "intensity", optional intensity is from 1 to 100",\n'
+        'Y = "Ok"\n'
+    )
+    pf = _tmp(text, tmp_path)
+    assert pf.entries[0].key == "X"
+    assert "intensity" in pf.entries[0].value
+    assert pf.entries[1].key == "Y"
+
+
+def test_parse_double_slash_comment(tmp_path):
+    text = """// Auto-generated file
+X = "Hello"
+"""
+    pf = _tmp(text, tmp_path)
+    assert pf.entries[0].key == "X"
+
+
+def test_parse_inner_quotes_with_ellipsis(tmp_path):
+    text = 'X = "...called "baldie", "egghead", "skinskull"..."\n'
+    pf = _tmp(text, tmp_path)
+    assert pf.entries[0].key == "X"
+    assert "skinskull" in pf.entries[0].value
+
+
 def test_parse_keys_with_spaces_and_symbols(tmp_path):
     pf = _tmp('UI_optionscreen_binding_Equip/Unequip Handweapon = "Ok"\n', tmp_path)
     assert pf.entries[0].key == "UI_optionscreen_binding_Equip/Unequip Handweapon"

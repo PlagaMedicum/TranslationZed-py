@@ -60,9 +60,11 @@ class Tok:
 
 
 # ── Regex table (spec §5.2) ───────────────────────────────────────────────────
+# PZ files include Lua tables, line comments, and occasional block comments.
+# The key regex accepts headers followed by "=" or "{" (e.g., `DynamicRadio_BE {`).
 _PATTERNS = [
     (Kind.TRIVIA, r"[ \t]+"),
-    (Kind.COMMENT, r"--[^\n]*|/\*.*?\*/"),
+    (Kind.COMMENT, r"--[^\n]*|//[^\n]*|/\*.*?\*/"),
     (Kind.NEWLINE, r"\r?\n"),
     (Kind.KEY, r"[^\s=\"\.][^=\r\n]*?(?=\s*(?:=|{))"),
     (Kind.EQUAL, r"="),
@@ -115,9 +117,6 @@ def _read_string_token(text: str, pos: int) -> int:
             i += 2
             continue
         if ch == '"':
-            if i == pos + 1:
-                i += 1
-                continue
             if i + 1 < len(text) and text[i + 1] == '"':
                 j = i + 2
                 if j >= len(text) or text[j] in {",", "}", "\r", "\n"}:
@@ -125,6 +124,8 @@ def _read_string_token(text: str, pos: int) -> int:
                     return i
                 i += 2
                 continue
+            # Close a string only if the next non-space token is a delimiter
+            # and there's no more non-comment text after it.
             j = i + 1
             while j < len(text) and text[j] in {" ", "\t"}:
                 j += 1
@@ -132,12 +133,34 @@ def _read_string_token(text: str, pos: int) -> int:
                 i += 1
                 return i
             if text[j] in {",", "}", "\r", "\n"}:
+                k = j + 1
+                while k < len(text) and text[k] in {" ", "\t"}:
+                    k += 1
+                if k >= len(text) or text[k] in {"\r", "\n"}:
+                    i += 1
+                    return i
+                if (
+                    text.startswith("--", k)
+                    or text.startswith("//", k)
+                    or text.startswith("/*", k)
+                ):
+                    i += 1
+                    return i
                 i += 1
-                return i
+                continue
             if text[j] == "." and j + 1 < len(text) and text[j + 1] == ".":
+                k = j + 2
+                while k < len(text) and text[k] in {" ", "\t"}:
+                    k += 1
+                if k < len(text) and text[k] == '"':
+                    i += 1
+                    return i
+                i += 1
+                continue
+            if text[j] == "-" and j + 1 < len(text) and text[j + 1] == "-":
                 i += 1
                 return i
-            if text[j] == "-" and j + 1 < len(text) and text[j + 1] == "-":
+            if text[j] == "/" and j + 1 < len(text) and text[j + 1] in {"/", "*"}:
                 i += 1
                 return i
             i += 1
@@ -158,15 +181,39 @@ def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
         )
 
     pos = 0
+    last_sig: Kind | None = None
     while pos < len(text):
         if text[pos] == '"':
             end = _read_string_token(text, pos)
             span = (offsets[pos] + bom_len, offsets[end] + bom_len)
             yield Tok(Kind.STRING, span, text[pos:end])
             pos = end
+            last_sig = Kind.STRING
             continue
         m = _TOKEN_RE.match(text, pos)
         if not m:
+            # Salvage malformed lines like:
+            #   KEY = bare text (missing opening quote)
+            # Used by some PZ files (e.g., Recorded_Media_*).
+            if last_sig is Kind.EQUAL:
+                end = pos
+                while end < len(text):
+                    if text[end] in {"\r", "\n"}:
+                        break
+                    if text[end] == ",":
+                        break
+                    if (
+                        text.startswith("--", end)
+                        or text.startswith("//", end)
+                        or text.startswith("/*", end)
+                    ):
+                        break
+                    end += 1
+                span = (offsets[pos] + bom_len, offsets[end] + bom_len)
+                yield Tok(Kind.STRING, span, text[pos:end])
+                pos = end
+                last_sig = Kind.STRING
+                continue
             line = text.count("\n", 0, pos) + 1
             col = pos - text.rfind("\n", 0, pos)
             ch = text[pos] if pos < len(text) else ""
@@ -189,6 +236,10 @@ def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
         )
         yield Tok(kind, span, m.group())
         pos = m.end()
+        if kind is Kind.NEWLINE:
+            last_sig = None
+        elif kind is not Kind.TRIVIA:
+            last_sig = kind
 
 
 # ── parse() placeholder – we’ll flesh this out next ───────────────────────────
@@ -265,10 +316,13 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
             while j < len(toks):
                 if toks[j].kind is Kind.STRING:
                     raw_text = toks[j].text
-                    if raw_text.endswith('"'):
-                        seg_text = _unescape(raw_text[1:-1])
+                    if raw_text.startswith('"'):
+                        if raw_text.endswith('"'):
+                            seg_text = _unescape(raw_text[1:-1])
+                        else:
+                            seg_text = _unescape(raw_text[1:])
                     else:
-                        seg_text = _unescape(raw_text[1:])
+                        seg_text = raw_text.rstrip()
                     parts.append(seg_text)
                     seg_lens.append(len(seg_text))
                     seg_spans.append(toks[j].span)

@@ -18,6 +18,7 @@ if command -v upx >/dev/null 2>&1; then
   UPX_ARGS+=(--upx-dir "$(dirname "$(command -v upx)")")
 fi
 
+# Exclude unused Qt modules to keep bundles small; PySide6 hooks pull in required parts.
 EXCLUDES=(
   PySide6.Qt3DAnimation
   PySide6.Qt3DCore

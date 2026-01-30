@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-01-29_
+_Last updated: 2026-01-30_
 
 ---
 
@@ -39,6 +39,11 @@ _Last updated: 2026-01-29_
 
 ### 2.5 Performance Smoke (manual)
 - Open a large locale (e.g., `Recorded_Media_*`) and verify UI responsiveness.
+- Windows edge-case smoke (prod repo):
+  - `BE/UI_BE.txt` (unescaped quotes in `/startrain "intensity"` strings)
+  - `RU/Stash_RU.txt` (`""zippees", ...` double-quote prefix)
+  - `KO/UI_KO.txt` (inner quotes + UTF‑16)
+  - `KO/Recorded_Media_KO.txt` (`// Auto-generated file` header + missing opening quotes)
 - Measure time from app launch to first table render (target < 2s on cached project).
 - Run a regex search and confirm UI stays responsive (<100ms typical).
 
