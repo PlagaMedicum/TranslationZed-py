@@ -34,6 +34,11 @@ def _configure_qt_env() -> None:
         return
     os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", str(plugin_path))
     os.environ.setdefault("QT_PLUGIN_PATH", str(plugin_path))
+    if (
+        os.environ.get("QT_ACCESSIBILITY", "") == ""
+        and os.environ.get("TZP_ALLOW_A11Y", "") != "1"
+    ):
+        os.environ["QT_ACCESSIBILITY"] = "0"
     wayland_plugins = list(plugin_path.glob("platforms/libqwayland*.so*"))
     if not wayland_plugins and "QT_QPA_PLATFORM" not in os.environ:
         os.environ["QT_QPA_PLATFORM"] = "xcb"
