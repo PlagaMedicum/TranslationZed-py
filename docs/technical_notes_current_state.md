@@ -160,6 +160,28 @@ From latest clarification:
 
 ---
 
+## 0.4) Current State Review (v0.1.0 release)
+
+**What is solid and shipped**
+- **Core parse/save/cache**: tolerant parser + lossless saver + per‑file cache; EN hash alerts;
+  search logic separated in core.
+- **GUI baseline**: locale chooser, file tree, table editing with undo/redo, status updates,
+  search/replace (file‑scope), status bar, preferences, and string editor panel.
+- **Tests & CI**: pytest + mypy + ruff run on Linux/Windows/macOS; golden files for UTF‑8/cp1251/UTF‑16.
+- **Packaging**: per‑OS PyInstaller builds, pruning scripts, draft release artifacts, about dialog +
+  license disclosure; fallback version for bundled builds.
+
+**Known gaps (candidate v0.2 focus)**
+- **Scopes**: search/replace scopes exist in preferences, but behavior is file‑only; multi‑file
+  search navigation + replace across locale/pool not yet implemented.
+- **Validation cues**: empty Key/Source/Translation highlighting is still pending.
+- **Visualization**: escape/tag/whitespace highlighting + glyph mode not implemented.
+- **TM/LanguageTool**: suggestion engine and TM import/project‑TM generation are future work.
+- **Layout toggles**: file tree hide/show toggle is planned but not implemented.
+- **Packaging size**: Linux/macOS bundles are still larger due to full Qt runtime.
+
+---
+
 ## 0.3) Production Repo Observations (ProjectZomboidTranslations)
 
 Top-level structure:
