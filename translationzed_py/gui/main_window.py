@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import math
 import re
 import sys
 import time
@@ -8,7 +9,15 @@ import traceback
 from pathlib import Path
 
 import xxhash
-from PySide6.QtCore import QByteArray, QItemSelectionModel, QPoint, Qt, QTimer, QUrl
+from PySide6.QtCore import (
+    QByteArray,
+    QItemSelectionModel,
+    QPoint,
+    QPointF,
+    Qt,
+    QTimer,
+    QUrl,
+)
 from PySide6.QtGui import (
     QAction,
     QDesktopServices,
@@ -17,6 +26,7 @@ from PySide6.QtGui import (
     QKeySequence,
     QPainter,
     QPalette,
+    QPen,
     QPixmap,
 )
 from PySide6.QtWidgets import (
@@ -265,8 +275,8 @@ class MainWindow(QMainWindow):
         self.replace_toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
         self.replace_toggle.setCheckable(True)
         self.replace_toggle.toggled.connect(self._toggle_replace)
-        self._replace_icon = self._make_text_icon("R")
-        self._replace_icon_active = self._make_text_icon("R", underline=True)
+        self._replace_icon = self._make_replace_icon(active=False)
+        self._replace_icon_active = self._make_replace_icon(active=True)
         self._update_replace_toggle_icon(False)
         self.toolbar.addWidget(self.replace_toggle)
         self.search_column_label = QLabel("Search in:", self)
@@ -1362,19 +1372,53 @@ class MainWindow(QMainWindow):
         self._update_replace_enabled()
         self._update_status_bar()
 
-    def _make_text_icon(self, text: str, *, underline: bool = False) -> QIcon:
-        size = 14
+    def _make_replace_icon(self, *, active: bool = False) -> QIcon:
+        size = 16
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.transparent)
         painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.TextAntialiasing)
-        font = painter.font()
-        font.setBold(True)
-        font.setUnderline(underline)
-        font.setPointSize(max(8, size - 4))
-        painter.setFont(font)
-        painter.setPen(self.palette().color(QPalette.ButtonText))
-        painter.drawText(pixmap.rect(), Qt.AlignCenter, text)
+        painter.setRenderHint(QPainter.Antialiasing)
+        color = self.palette().color(QPalette.ButtonText)
+        pen = QPen(color)
+        pen.setWidthF(2.1 if active else 1.6)
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        painter.setPen(pen)
+
+        rect = pixmap.rect().adjusted(2, 2, -2, -2)
+        painter.drawArc(rect, int(40 * 16), int(200 * 16))
+        painter.drawArc(rect, int(220 * 16), int(200 * 16))
+
+        def draw_arrow(angle_deg: float) -> None:
+            theta = math.radians(angle_deg)
+            cx = rect.center().x()
+            cy = rect.center().y()
+            rx = rect.width() / 2.0
+            ry = rect.height() / 2.0
+            x = cx + rx * math.cos(theta)
+            y = cy - ry * math.sin(theta)
+            tx = -math.sin(theta)
+            ty = -math.cos(theta)
+
+            def rotate(vx: float, vy: float, ang: float) -> tuple[float, float]:
+                return (
+                    vx * math.cos(ang) - vy * math.sin(ang),
+                    vx * math.sin(ang) + vy * math.cos(ang),
+                )
+
+            angle = math.radians(150)
+            left = rotate(tx, ty, angle)
+            right = rotate(tx, ty, -angle)
+            length = 4.2 if active else 3.6
+            p1 = QPointF(x, y)
+            p2 = QPointF(x + left[0] * length, y + left[1] * length)
+            p3 = QPointF(x + right[0] * length, y + right[1] * length)
+            painter.drawLine(p1, p2)
+            painter.drawLine(p1, p3)
+
+        draw_arrow(40)
+        draw_arrow(220)
+
         painter.end()
         return QIcon(pixmap)
 
