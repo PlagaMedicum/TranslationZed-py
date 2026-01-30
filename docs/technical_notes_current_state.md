@@ -139,6 +139,9 @@ From latest clarification:
 - **Packaging (current, size)**:
   - `--collect-all PySide6` was removed to avoid bundling unused Qt modules.
   - Explicit exclusions for Qt3D/Quick/WebEngine/etc. in `pack.sh` + `pack.ps1`.
+  - Post‑build pruning removes unused Qt plugin categories, Qt translations/QML, and
+    `*.dist-info`/`*.egg-info`/`__pycache__` directories (`scripts/prune_bundle.*`).
+  - Release zips use maximum compression (`zip -9`, `Compress-Archive -CompressionLevel Optimal`).
   - UPX is used only when present; Linux/macOS builds use `--strip`.
   - `LICENSE` and `README.md` now land at the **dist root** (not in subfolders).
   - Windows archive zips the `TranslationZed-Py/` folder (keeps the `.exe` at the root).

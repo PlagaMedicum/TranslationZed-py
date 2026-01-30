@@ -65,3 +65,5 @@ done
   ${UPX_ARGS:+${UPX_ARGS[@]}} \
   "${EXCLUDE_ARGS[@]}" \
   translationzed_py/__main__.py
+
+bash "$SCRIPT_DIR/prune_bundle.sh" "$SCRIPT_DIR/../dist/TranslationZed-Py"

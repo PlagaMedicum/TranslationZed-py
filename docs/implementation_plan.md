@@ -209,6 +209,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Build requires local OS (no cross‑compilation) and is documented
   - LICENSE and README bundled in output
   - Exclude unused Qt modules to keep bundles small
+  - Post-build prune removes unused Qt plugins/QML/translations and Python metadata
+  - Archives use maximum compression (`zip -9`, `Compress-Archive -CompressionLevel Optimal`)
   - UPX/strip is optional and used only when available
   - Windows zip keeps the `TranslationZed-Py/` folder root with the `.exe` at top level
 
