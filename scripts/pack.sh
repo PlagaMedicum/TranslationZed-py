@@ -18,6 +18,12 @@ if command -v upx >/dev/null 2>&1; then
   UPX_ARGS+=(--upx-dir "$(dirname "$(command -v upx)")")
 fi
 
+STRIP_ARGS=()
+case "${OSTYPE:-}" in
+  darwin*) STRIP_ARGS+=(--strip) ;;
+  *) if [[ "${TZP_STRIP:-}" == "1" ]]; then STRIP_ARGS+=(--strip); fi ;;
+esac
+
 # Exclude unused Qt modules to keep bundles small; PySide6 hooks pull in required parts.
 EXCLUDES=(
   PySide6.Qt3DAnimation
@@ -61,7 +67,7 @@ done
   --name TranslationZed-Py \
   --add-data "LICENSE${sep}." \
   --add-data "README.md${sep}." \
-  --strip \
+  ${STRIP_ARGS:+${STRIP_ARGS[@]}} \
   ${UPX_ARGS:+${UPX_ARGS[@]}} \
   "${EXCLUDE_ARGS[@]}" \
   translationzed_py/__main__.py
