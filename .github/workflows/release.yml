@@ -30,11 +30,35 @@ jobs:
         run: |
           bash scripts/pack.sh
           (cd dist && zip -9 -r -X ../TranslationZed-Py-${{ runner.os }}.zip TranslationZed-Py)
+      - name: Smoke run (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          TZP_SMOKE=1 TZP_SMOKE_TIMEOUT_MS=3000 TZP_ALLOW_A11Y=0 \
+            xvfb-run -a dist/TranslationZed-Py/TranslationZed-Py tests/fixtures/prod_like
+      - name: Smoke run (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if [ -x "dist/TranslationZed-Py.app/Contents/MacOS/TranslationZed-Py" ]; then
+            BIN="dist/TranslationZed-Py.app/Contents/MacOS/TranslationZed-Py"
+          else
+            BIN="dist/TranslationZed-Py/TranslationZed-Py"
+          fi
+          TZP_SMOKE=1 TZP_SMOKE_TIMEOUT_MS=3000 TZP_ALLOW_A11Y=0 \
+            "$BIN" tests/fixtures/prod_like
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: |
           powershell -ExecutionPolicy Bypass -File scripts/pack.ps1
           powershell -Command "Compress-Archive -Path dist\TranslationZed-Py -DestinationPath TranslationZed-Py-${{ runner.os }}.zip -CompressionLevel Optimal"
+      - name: Smoke run (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $env:TZP_SMOKE="1"
+          $env:TZP_SMOKE_TIMEOUT_MS="3000"
+          $env:TZP_ALLOW_A11Y="0"
+          & "dist\\TranslationZed-Py\\TranslationZed-Py.exe" "tests\\fixtures\\prod_like"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
