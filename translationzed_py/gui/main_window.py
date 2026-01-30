@@ -323,6 +323,7 @@ class MainWindow(QMainWindow):
         self._search_timer.timeout.connect(self._run_search)
         self._search_matches: list[_SearchMatch] = []
         self._search_index = -1
+        self._search_match_ranges: dict[Path, tuple[int, int]] = {}
         self._search_column = 0
         self._last_saved_text = ""
         self._search_index_by_file: dict[Path, list[_SearchRow]] = {}
@@ -1734,6 +1735,7 @@ class MainWindow(QMainWindow):
         if not query:
             self._search_matches = []
             self._search_index = -1
+            self._search_match_ranges.clear()
             return
         column = int(self.search_mode.currentData())
         self._search_column = column
@@ -1750,6 +1752,13 @@ class MainWindow(QMainWindow):
             rows.extend(file_rows)
         matches = _search_rows(rows, query, field, use_regex)
         self._search_matches = matches
+        self._search_match_ranges.clear()
+        for idx, match in enumerate(matches):
+            if match.file in self._search_match_ranges:
+                start, _end = self._search_match_ranges[match.file]
+                self._search_match_ranges[match.file] = (start, idx)
+            else:
+                self._search_match_ranges[match.file] = (idx, idx)
         if not self._search_matches:
             self._search_index = -1
             self._skip_search_autoselect = False
@@ -1757,6 +1766,7 @@ class MainWindow(QMainWindow):
         if self._skip_search_autoselect:
             self._search_index = -1
             self._skip_search_autoselect = False
+            self._sync_search_index_to_selection()
             return
         current_path = self._current_pf.path if self._current_pf else None
         initial_index = -1
@@ -1768,6 +1778,44 @@ class MainWindow(QMainWindow):
         self._search_index = initial_index
         if initial_index != -1:
             self._select_match(initial_index)
+
+    def _sync_search_index_to_selection(self) -> None:
+        if self._suppress_search_update:
+            return
+        if self._search_timer.isActive():
+            return
+        if not self.search_edit.text().strip():
+            return
+        if not self._search_matches or not self._current_pf:
+            return
+        current = self.table.currentIndex()
+        if not current.isValid():
+            return
+        current_row = current.row()
+        current_path = self._current_pf.path
+        match_range = self._search_match_ranges.get(current_path)
+        if not match_range:
+            self._search_index = -1
+            return
+        start, end = match_range
+        prev_idx: int | None = None
+        next_idx: int | None = None
+        for idx in range(start, end + 1):
+            match = self._search_matches[idx]
+            if match.row == current_row:
+                self._search_index = idx
+                return
+            if match.row < current_row:
+                prev_idx = idx
+            elif match.row > current_row:
+                next_idx = idx
+                break
+        if next_idx is not None:
+            self._search_index = next_idx - 1
+        elif prev_idx is not None:
+            self._search_index = prev_idx
+        else:
+            self._search_index = -1
 
     def _ensure_search_ready(self) -> None:
         if self._search_timer.isActive():
@@ -1937,6 +1985,7 @@ class MainWindow(QMainWindow):
         self._update_status_combo_from_selection()
         if self._detail_panel.isVisible():
             self._sync_detail_editors()
+        self._sync_search_index_to_selection()
         self._update_status_bar()
 
     def showEvent(self, event) -> None:  # noqa: N802
