@@ -13,9 +13,12 @@ from translationzed_py.core.model import ParsedFile
 from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 
 _HEADERS = ("Key", "Source", "Translation", "Status")
-_BG = {
+_BG_STATUS = {
     Status.PROOFREAD: QColor("#ccffcc"),
+    Status.TRANSLATED: QColor("#ccffcc"),
 }
+_BG_MISSING = QColor("#ffcccc")
+_BG_EMPTY = QColor("#ffd8a8")
 
 
 class TranslationModel(QAbstractTableModel):
@@ -146,9 +149,15 @@ class TranslationModel(QAbstractTableModel):
                 case 3:
                     return e.status
 
-        # --- background by status --------------------------------------------
+        # --- background highlights -------------------------------------------
         if role == Qt.BackgroundRole:
-            return _BG.get(e.status)
+            if index.column() == 0 and not (e.key or ""):
+                return _BG_MISSING
+            if index.column() == 1 and not (self._source_values.get(e.key, "") or ""):
+                return _BG_MISSING
+            if index.column() == 2 and not (e.value or ""):
+                return _BG_EMPTY
+            return _BG_STATUS.get(e.status)
 
         return None
 
