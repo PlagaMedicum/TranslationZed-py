@@ -237,7 +237,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Release is created as **draft** for review before publishing
   - Release notes reference CHANGELOG
 
-### Step 28 — Validation highlights (future) [→ pending]
+### Step 28 — Validation highlights (future) [✓]
 - Touchpoints: `gui/entry_model.py`, `gui/delegates.py`
 - Acceptance:
   - Empty **Key** or **Source** cells render with **red** background (highest priority).
