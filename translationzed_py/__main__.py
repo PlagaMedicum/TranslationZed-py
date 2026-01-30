@@ -40,9 +40,9 @@ def _configure_qt_env() -> None:
     ):
         os.environ["QT_ACCESSIBILITY"] = "0"
     if sys.platform.startswith("linux") and "QT_IM_MODULE" not in os.environ:
-        os.environ["QT_IM_MODULE"] = "compose"
+        os.environ["QT_IM_MODULE"] = "none"
         if os.environ.get("TZP_DEBUG_QT", "") == "1":
-            print("TranslationZed: QT_IM_MODULE=compose", file=sys.stderr)
+            print("TranslationZed: QT_IM_MODULE=none", file=sys.stderr)
     wayland_plugins = list(plugin_path.glob("platforms/libqwayland*.so*"))
     if not wayland_plugins and "QT_QPA_PLATFORM" not in os.environ:
         os.environ["QT_QPA_PLATFORM"] = "xcb"
