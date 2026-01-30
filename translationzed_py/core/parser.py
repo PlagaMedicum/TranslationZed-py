@@ -62,8 +62,8 @@ class Tok:
 # ── Regex table (spec §5.2) ───────────────────────────────────────────────────
 _PATTERNS = [
     (Kind.TRIVIA, r"[ \t]+"),
+    (Kind.COMMENT, r"--[^\n]*|/\*.*?\*/"),
     (Kind.NEWLINE, r"\r?\n"),
-    (Kind.COMMENT, r"--[^\n]*"),
     (Kind.KEY, r"[^\s=\"\.][^=\r\n]*?(?=\s*(?:=|{))"),
     (Kind.EQUAL, r"="),
     (Kind.CONCAT, r"\.\."),
@@ -125,8 +125,23 @@ def _read_string_token(text: str, pos: int) -> int:
                     return i
                 i += 2
                 continue
+            j = i + 1
+            while j < len(text) and text[j] in {" ", "\t"}:
+                j += 1
+            if j >= len(text):
+                i += 1
+                return i
+            if text[j] in {",", "}", "\r", "\n"}:
+                i += 1
+                return i
+            if text[j] == "." and j + 1 < len(text) and text[j + 1] == ".":
+                i += 1
+                return i
+            if text[j] == "-" and j + 1 < len(text) and text[j + 1] == "-":
+                i += 1
+                return i
             i += 1
-            return i
+            continue
         i += 1
     return i
 
