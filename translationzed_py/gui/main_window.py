@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import re
 import sys
 import time
@@ -105,6 +106,7 @@ class MainWindow(QMainWindow):
         self._startup_aborted = False
         self._root = Path(".").resolve()
         self._default_root = ""
+        self._smoke = os.environ.get("TZP_SMOKE", "") == "1"
         if project_root is None:
             prefs_global = _load_preferences(None)
             default_root = str(prefs_global.get("default_root", "")).strip()
@@ -141,7 +143,7 @@ class MainWindow(QMainWindow):
         self._en_cache: dict[Path, ParsedFile] = {}
         self._child_windows: list[MainWindow] = []
 
-        if not self._check_en_hash_cache():
+        if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
             return
         prefs = _load_preferences(self._root)
@@ -730,6 +732,13 @@ class MainWindow(QMainWindow):
         self._locales = scan_root(self._root)
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
 
+        if selected_locales is None and self._smoke:
+            if self._last_locales:
+                selected_locales = list(self._last_locales)
+            elif selectable:
+                selected_locales = [next(iter(selectable.keys()))]
+            else:
+                selected_locales = []
         if selected_locales is None:
             dialog = LocaleChooserDialog(
                 selectable.values(), self, preselected=self._last_locales
