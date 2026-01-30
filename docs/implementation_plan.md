@@ -313,6 +313,14 @@ Priority C — **Assistive tooling**
   - Applies to Source/Translation in both preview and edit
   - Separate window for per‑key comparisons
 
+### Step 20 — Bulk status edits (future)
+- Touchpoints: `gui/entry_model.py`, `gui/main_window.py`, `gui/commands.py`
+- Acceptance:
+  - Multi‑row selection (contiguous and non‑contiguous) supported in the table.
+  - Status change applies to all selected rows in one action.
+  - Single undo/redo entry for the bulk status change.
+  - Status bar reflects multi‑selection (e.g., “Status: Mixed” or a summary).
+
 ---
 
 ## 3) MVP Acceptance Checklist (v0.1)
