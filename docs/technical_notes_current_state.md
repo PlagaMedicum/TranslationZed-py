@@ -1,4 +1,4 @@
-# TranslationZed-Py: Technical Notes (2026-01-29)
+# TranslationZed-Py: Technical Notes (2026-01-30)
 
 Goal: capture *observed behavior*, *as-built architecture*, and *spec deltas* with
 minimal prose and maximal precision. These are diagnostic notes, not a roadmap.
@@ -99,6 +99,15 @@ From latest clarification:
     (table does not scroll while editor is active).
 - **Plain-text files**: if a file has no `=` tokens, it is treated as a single raw entry
   (key = filename) and saved back verbatim without quoting. Mixed/unsupported formats remain errors.
+- **Parser tolerances (current)**:
+  - Accepts Lua table headers without `=` (e.g., `DynamicRadio_BE {`).
+  - Accepts block comments `/* ... */` and line comments `-- ...` / `// ...`.
+  - Stray quotes inside strings are tolerated; string token ends only when a closing `"` is followed
+    by a valid delimiter (comma/brace/concat/comment/newline) or end of line.
+  - Unterminated strings at end-of-line are treated as closed at the line break to salvage parsing.
+  - Bare values after `=` (missing opening quote) are accepted to avoid hard parse failures.
+  - Quote-heavy lines (e.g., `"intensity"` / `"egghead"` / `""zippees"`) are parsed as literal text.
+  - Ellipsis near quotes (`..."`) is treated as text, not concat.
 - **Future text visualization**: add highlighting for escape sequences, tags, and repeated whitespace,
   plus optional glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation
   in both preview and edit.
@@ -112,6 +121,9 @@ From latest clarification:
 - **String editor panel (current)**: dual Source/Translation editors below the table are now present,
   toggled from the status bar icon (tooltip: “String editor”). Default is **open**; minimum height is
   ~70px (font-dependent) and **default height is ~2× the minimum**. Panel is user-resizable via splitter.
+- **Toggle icon cues (current)**:
+  - Replace toggle shows **down arrow** when hidden / **up arrow** when visible.
+  - String editor toggle shows **up arrow** when hidden / **down arrow** when visible.
 - **Layout reset (current)**: on next startup, stored window geometry + column sizes are cleared once
   (`LAYOUT_RESET_REV=3` in preferences extras).
 - **License snapshot**: repository is GPLv3 (LICENSE). Interactive UI should surface “Appropriate Legal
@@ -122,10 +134,18 @@ From latest clarification:
   content hidden by default and expandable in-place.
 - **Packaging (current)**: PyInstaller script added (`scripts/pack.sh`) to build native executables
   per‑OS; build must be done on each target OS. CI now runs lint/mypy/tests on Linux/Windows/macOS.
+- **Packaging (current, size)**:
+  - `--collect-all PySide6` was removed to avoid bundling unused Qt modules.
+  - Explicit exclusions for Qt3D/Quick/WebEngine/etc. in `pack.sh` + `pack.ps1`.
+  - UPX is used only when present; Linux/macOS builds use `--strip`.
+  - `LICENSE` and `README.md` now land at the **dist root** (not in subfolders).
+  - Windows archive zips the `TranslationZed-Py/` folder (keeps the `.exe` at the root).
 - **Metadata alignment**: `pyproject.toml` license field updated to SPDX `GPL-3.0-only` and
   `license-files` added; setuptools package discovery restricted to `translationzed_py*`.
 - **Release workflow (current)**: tag pushes (`vX.Y.Z`) build per‑OS bundles in CI and attach zipped
   app folders to **draft** GitHub Releases for review. A `CHANGELOG.md` is maintained for release notes.
+- **Release workflow (current)**: GitHub Actions needs `permissions: contents: write` to create draft
+  releases (403 otherwise).
 
 ---
 

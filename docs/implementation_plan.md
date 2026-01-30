@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-01-29_
+_Last updated: 2026-01-30_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. This is the canonical plan to
@@ -86,6 +86,11 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Acceptance:
   - Escaped quotes decode correctly
   - Concat chains parsed into segments; span covers literals
+  - Lua table headers without `=` parse (e.g., `DynamicRadio_BE {`)
+  - Block comments (`/* ... */`) do not break tokenization
+  - Stray quotes inside strings are tolerated with delimiter-aware closing
+  - `//` line comments do not break tokenization
+  - Bare values after `=` (missing opening quote) are accepted
   - UTF‑8 / cp1251 / UTF‑16 tokenization succeeds
 
 ### Step 4 — Saver fidelity + atomic writes [✓]
@@ -203,6 +208,9 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - PyInstaller build produces app bundle on each OS (Linux/Windows/macOS)
   - Build requires local OS (no cross‑compilation) and is documented
   - LICENSE and README bundled in output
+  - Exclude unused Qt modules to keep bundles small
+  - UPX/strip is optional and used only when available
+  - Windows zip keeps the `TranslationZed-Py/` folder root with the `.exe` at top level
 
 ### Step 25 — CI baseline [→ in progress]
 - Touchpoints: `.github/workflows/ci.yml`

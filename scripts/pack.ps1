@@ -12,6 +12,7 @@ if ($upx) {
     $upxArgs = @("--upx-dir", $upx.Source | Split-Path)
 }
 
+# Exclude unused Qt modules to keep bundles small; PySide6 hooks pull in required parts.
 $excludes = @(
     "PySide6.Qt3DAnimation",
     "PySide6.Qt3DCore",
