@@ -157,7 +157,7 @@ if [[ -n "$strip_tool" ]]; then
   if [[ "$os_name" == "Darwin" ]]; then
     find "$bundle" -type f \( -name "*.dylib" -o -name "*.so" -o -name "*.so.*" \) -print0 \
       | xargs -0 -n1 strip -x 2>/dev/null || true
-  else
+  elif [[ "${TZP_EXTRA_STRIP:-}" == "1" ]]; then
     find "$bundle" -type f \( -name "*.so" -o -name "*.so.*" \) -print0 \
       | xargs -0 -n1 strip --strip-unneeded 2>/dev/null || true
   fi
