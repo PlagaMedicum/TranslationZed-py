@@ -97,6 +97,8 @@ From latest clarification:
     multi-line editor. Editor expands to remaining table width and height adapts to content
     (min ~2 lines, max to table bottom). Mouse-wheel scroll stays inside editor
     (table does not scroll while editor is active).
+- **Future validation cues**: empty **Key/Source** cells should be red; empty **Translation** cells
+  should be orange. (Planned; not yet implemented.)
 - **Plain-text files**: if a file has no `=` tokens, it is treated as a single raw entry
   (key = filename) and saved back verbatim without quoting. Mixed/unsupported formats remain errors.
 - **Parser tolerances (current)**:

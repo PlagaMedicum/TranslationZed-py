@@ -231,6 +231,13 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Release is created as **draft** for review before publishing
   - Release notes reference CHANGELOG
 
+### Step 28 — Validation highlights (future) [→ pending]
+- Touchpoints: `gui/entry_model.py`, `gui/delegates.py`
+- Acceptance:
+  - Empty **Key** or **Source** cells render with red background
+  - Empty **Translation** cells render with orange background
+  - Colors are purely visual (no blocking) and can be toggled later in Preferences
+
 ### Step 12 — Dirty indicators from cache [✓]
 - Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
 - Acceptance:

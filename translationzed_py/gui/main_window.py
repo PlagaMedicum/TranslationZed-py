@@ -15,6 +15,9 @@ from PySide6.QtGui import (
     QGuiApplication,
     QIcon,
     QKeySequence,
+    QPainter,
+    QPalette,
+    QPixmap,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -262,6 +265,8 @@ class MainWindow(QMainWindow):
         self.replace_toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
         self.replace_toggle.setCheckable(True)
         self.replace_toggle.toggled.connect(self._toggle_replace)
+        self._replace_icon = self._make_text_icon("R")
+        self._replace_icon_active = self._make_text_icon("R", underline=True)
         self._update_replace_toggle_icon(False)
         self.toolbar.addWidget(self.replace_toggle)
         self.search_column_label = QLabel("Search in:", self)
@@ -1357,14 +1362,29 @@ class MainWindow(QMainWindow):
         self._update_replace_enabled()
         self._update_status_bar()
 
+    def _make_text_icon(self, text: str, *, underline: bool = False) -> QIcon:
+        size = 14
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.TextAntialiasing)
+        font = painter.font()
+        font.setBold(True)
+        font.setUnderline(underline)
+        font.setPointSize(max(8, size - 4))
+        painter.setFont(font)
+        painter.setPen(self.palette().color(QPalette.ButtonText))
+        painter.drawText(pixmap.rect(), Qt.AlignCenter, text)
+        painter.end()
+        return QIcon(pixmap)
+
     def _update_replace_toggle_icon(self, visible: bool) -> None:
         if visible:
-            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
+            self.replace_toggle.setIcon(self._replace_icon_active)
             self.replace_toggle.setToolTip("Hide replace")
         else:
-            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
+            self.replace_toggle.setIcon(self._replace_icon)
             self.replace_toggle.setToolTip("Show replace")
-        self.replace_toggle.setIcon(icon)
 
     def _align_replace_bar(self) -> None:
         if not self.replace_toolbar.isVisible():
