@@ -16,6 +16,7 @@ if [[ ! -d "$bundle" ]]; then
   exit 1
 fi
 
+os_name="$(uname -s)"
 pyside_dir="$(find "$bundle" -type d -name PySide6 -prune -print -quit || true)"
 if [[ -z "${pyside_dir:-}" ]]; then
   echo "PySide6 not found under $bundle; skipping prune." >&2
@@ -42,6 +43,39 @@ if [[ -d "$qt_dir" ]]; then
           fi
         done
       fi
+    fi
+    imageformats="$plugins/imageformats"
+    if [[ -d "$imageformats" ]]; then
+      keep_image=()
+      case "$os_name" in
+        Darwin) keep_image=("libqpng" "libqsvg" "libqjpeg" "libqicns") ;;
+        Linux) keep_image=("libqpng" "libqsvg" "libqjpeg") ;;
+      esac
+      if (( ${#keep_image[@]} > 0 )); then
+        for entry in "$imageformats"/*; do
+          base="$(basename "$entry")"
+          keep=false
+          for prefix in "${keep_image[@]}"; do
+            if [[ "$base" == "$prefix"* ]]; then
+              keep=true
+              break
+            fi
+          done
+          if [[ "$keep" == "false" ]]; then
+            rm -rf "$entry"
+          fi
+        done
+      fi
+    fi
+
+    iconengines="$plugins/iconengines"
+    if [[ -d "$iconengines" ]]; then
+      for entry in "$iconengines"/*; do
+        base="$(basename "$entry")"
+        if [[ "$base" != libqsvgicon* ]]; then
+          rm -rf "$entry"
+        fi
+      done
     fi
     for name in \
       assetimporters \
@@ -108,3 +142,14 @@ fi
 
 find "$bundle" -type d \( -name "*.dist-info" -o -name "*.egg-info" \) -prune -exec rm -rf {} + || true
 find "$bundle" -type d -name "__pycache__" -prune -exec rm -rf {} + || true
+
+strip_tool="$(command -v strip || true)"
+if [[ -n "$strip_tool" ]]; then
+  if [[ "$os_name" == "Darwin" ]]; then
+    find "$bundle" -type f \( -name "*.dylib" -o -name "*.so" -o -name "*.so.*" \) -print0 \
+      | xargs -0 -n1 strip -x 2>/dev/null || true
+  else
+    find "$bundle" -type f \( -name "*.so" -o -name "*.so.*" \) -print0 \
+      | xargs -0 -n1 strip --strip-unneeded 2>/dev/null || true
+  fi
+fi

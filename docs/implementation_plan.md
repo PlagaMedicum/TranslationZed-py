@@ -212,6 +212,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Post-build prune removes unused Qt plugins/QML/translations and Python metadata
   - Platform plugins are pruned to OS-required backends (xcb/wayland, cocoa, qwindows)
   - Optional Qt libraries matching excluded modules are removed when present
+  - Image format plugins keep only common formats; `iconengines` keeps `qsvgicon` only
+  - Post-build strip removes symbols from bundled `.so`/`.dylib` when available
   - Archives use maximum compression (`zip -9`, `Compress-Archive -CompressionLevel Optimal`)
   - UPX/strip is optional and used only when available
   - Windows zip keeps the `TranslationZed-Py/` folder root with the `.exe` at top level
