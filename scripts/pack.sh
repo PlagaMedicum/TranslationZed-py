@@ -61,6 +61,6 @@ done
   --add-data "LICENSE${sep}." \
   --add-data "README.md${sep}." \
   --strip \
-  "${UPX_ARGS[@]}" \
+  ${UPX_ARGS:+${UPX_ARGS[@]}} \
   "${EXCLUDE_ARGS[@]}" \
   translationzed_py/__main__.py
