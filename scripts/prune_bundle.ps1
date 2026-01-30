@@ -48,8 +48,6 @@ if (Test-Path $qtDir) {
             }
         }
         $removePlugins = @(
-            "accessible",
-            "accessiblebridge",
             "assetimporters",
             "bearer",
             "egldeviceintegrations",
