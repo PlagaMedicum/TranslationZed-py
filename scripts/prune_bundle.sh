@@ -17,6 +17,12 @@ if [[ ! -d "$bundle" ]]; then
 fi
 
 os_name="$(uname -s)"
+skip_qt_prune=false
+if [[ "$os_name" == "Linux" ]]; then
+  # Linux bundles have been unstable after aggressive pruning.
+  # Keep Qt files intact here to prioritize a working executable.
+  skip_qt_prune=true
+fi
 pyside_dir="$(find "$bundle" -type d -name PySide6 -prune -print -quit || true)"
 if [[ -z "${pyside_dir:-}" ]]; then
   echo "PySide6 not found under $bundle; skipping prune." >&2
@@ -24,7 +30,7 @@ if [[ -z "${pyside_dir:-}" ]]; then
 fi
 
 qt_dir="$pyside_dir/Qt"
-if [[ -d "$qt_dir" ]]; then
+if [[ -d "$qt_dir" && "$skip_qt_prune" == "false" ]]; then
   rm -rf "$qt_dir/qml" "$qt_dir/translations"
   plugins="$qt_dir/plugins"
   if [[ -d "$plugins" ]]; then
