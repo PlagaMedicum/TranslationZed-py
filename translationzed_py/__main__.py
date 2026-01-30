@@ -3,13 +3,53 @@
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 from pathlib import Path
 
 from translationzed_py import __version__
-from translationzed_py.gui import launch
+
+
+def _configure_qt_env() -> None:
+    if not getattr(sys, "frozen", False):
+        return
+    roots = []
+    if hasattr(sys, "_MEIPASS"):
+        roots.append(Path(sys._MEIPASS))
+    roots.append(Path(sys.executable).resolve().parent / "_internal")
+    plugin_path = None
+    for root in roots:
+        candidate = root / "PySide6" / "Qt" / "plugins"
+        if candidate.is_dir():
+            plugin_path = candidate
+            break
+    if plugin_path is None:
+        tried = ", ".join(str(r / "PySide6/Qt/plugins") for r in roots)
+        print(
+            f"TranslationZed: Qt plugin path not found in bundle (tried: {tried})",
+            file=sys.stderr,
+        )
+        if os.environ.get("TZP_DEBUG_QT", "") == "1":
+            os.environ.setdefault("QT_DEBUG_PLUGINS", "1")
+        return
+    os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", str(plugin_path))
+    os.environ.setdefault("QT_PLUGIN_PATH", str(plugin_path))
+    wayland_plugins = list(plugin_path.glob("platforms/libqwayland*.so*"))
+    if not wayland_plugins and "QT_QPA_PLATFORM" not in os.environ:
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
+        print(
+            "TranslationZed: wayland plugin not bundled; forcing QT_QPA_PLATFORM=xcb",
+            file=sys.stderr,
+        )
+    if os.environ.get("TZP_DEBUG_QT", "") == "1":
+        os.environ.setdefault("QT_DEBUG_PLUGINS", "1")
+        print(f"TranslationZed: QT_PLUGIN_PATH={plugin_path}", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> None:
+    _configure_qt_env()
+    from translationzed_py.gui import launch
+
     parser = argparse.ArgumentParser(
         prog="translationzed-py",
         description="Open the TranslationZed GUI, optionally pointing at a project root.",
