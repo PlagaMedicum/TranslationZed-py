@@ -35,7 +35,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb libegl1 libxcb-cursor0
-          TZP_SMOKE=1 TZP_SMOKE_TIMEOUT_MS=3000 TZP_ALLOW_A11Y=0 \
+          QT_QPA_PLATFORM=offscreen TZP_SMOKE=1 TZP_SMOKE_TIMEOUT_MS=3000 TZP_ALLOW_A11Y=0 \
             xvfb-run -a dist/TranslationZed-Py/TranslationZed-Py tests/fixtures/prod_like
       - name: Smoke run (macOS)
         if: runner.os == 'macOS'
