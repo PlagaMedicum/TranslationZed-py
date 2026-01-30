@@ -30,15 +30,22 @@ if [[ -d "$qt_dir" ]]; then
   if [[ -d "$plugins" ]]; then
     platforms="$plugins/platforms"
     if [[ -d "$platforms" ]]; then
-      keep=()
-      case "$(uname -s)" in
-        Darwin) keep=("libqcocoa.dylib") ;;
-        Linux) keep=("libqxcb.so" "libqwayland-egl.so" "libqwayland-generic.so") ;;
+      keep_prefixes=()
+      case "$os_name" in
+        Darwin) keep_prefixes=("libqcocoa") ;;
+        Linux) keep_prefixes=("libqxcb" "libqwayland-egl" "libqwayland-generic") ;;
       esac
-      if (( ${#keep[@]} > 0 )); then
+      if (( ${#keep_prefixes[@]} > 0 )); then
         for entry in "$platforms"/*; do
           base="$(basename "$entry")"
-          if [[ ! " ${keep[*]} " =~ " ${base} " ]]; then
+          keep=false
+          for prefix in "${keep_prefixes[@]}"; do
+            if [[ "$base" == "$prefix"* ]]; then
+              keep=true
+              break
+            fi
+          done
+          if [[ "$keep" == "false" ]]; then
             rm -rf "$entry"
           fi
         done
