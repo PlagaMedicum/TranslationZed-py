@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import argparse
-from importlib import metadata
 from pathlib import Path
 
+from translationzed_py import __version__
 from translationzed_py.gui import launch
 
 
@@ -23,7 +23,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"%(prog)s {metadata.version('translationzed_py')}",
+        version=f"%(prog)s {__version__}",
     )
 
     args = parser.parse_args(argv)
