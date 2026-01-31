@@ -104,7 +104,7 @@ They include:
   for UTF‑8/CP1251/UTF‑16 with byte‑exact output.
 - Saver basics: span updates, concat preservation, escape encoding.
 - Saver structure preservation on edge cases (stray quotes/markup, `//` headers,
-  trivia spacing, raw file replacement).
+  trivia spacing, raw file replacement, and large‑file slices (Recorded_Media/News/Stash).
 - Cache: status cache read/write + last_opened header.
 - Core search: plain + regex paths.
 - GUI smoke: open, table fill, search navigation, edit/save, undo/redo.
