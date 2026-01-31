@@ -1,4 +1,4 @@
-"""TranslationZed – all public symbols are re-exported from .core."""
+"""TranslationZed-Py – all public symbols are re-exported from .core."""
 
 from importlib import metadata
 

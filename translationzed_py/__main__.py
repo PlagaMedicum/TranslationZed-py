@@ -26,7 +26,7 @@ def _configure_qt_env() -> None:
     if plugin_path is None:
         tried = ", ".join(str(r / "PySide6/Qt/plugins") for r in roots)
         print(
-            f"TranslationZed: Qt plugin path not found in bundle (tried: {tried})",
+            f"TranslationZed-Py: Qt plugin path not found in bundle (tried: {tried})",
             file=sys.stderr,
         )
         if os.environ.get("TZP_DEBUG_QT", "") == "1":
@@ -42,25 +42,25 @@ def _configure_qt_env() -> None:
     if sys.platform.startswith("linux") and "QT_IM_MODULE" not in os.environ:
         os.environ["QT_IM_MODULE"] = "none"
         if os.environ.get("TZP_DEBUG_QT", "") == "1":
-            print("TranslationZed: QT_IM_MODULE=none", file=sys.stderr)
+            print("TranslationZed-Py: QT_IM_MODULE=none", file=sys.stderr)
     if sys.platform.startswith("linux"):
         wayland_plugins = list(plugin_path.glob("platforms/libqwayland*.so*"))
         if not wayland_plugins and "QT_QPA_PLATFORM" not in os.environ:
             os.environ["QT_QPA_PLATFORM"] = "xcb"
             print(
-                "TranslationZed: wayland plugin not bundled; forcing QT_QPA_PLATFORM=xcb",
+                "TranslationZed-Py: wayland plugin not bundled; forcing QT_QPA_PLATFORM=xcb",
                 file=sys.stderr,
             )
     if os.environ.get("TZP_DEBUG_QT", "") == "1":
         os.environ.setdefault("QT_DEBUG_PLUGINS", "1")
-        print(f"TranslationZed: QT_PLUGIN_PATH={plugin_path}", file=sys.stderr)
+        print(f"TranslationZed-Py: QT_PLUGIN_PATH={plugin_path}", file=sys.stderr)
         print(
-            "TranslationZed: QT_QPA_PLATFORM="
+            "TranslationZed-Py: QT_QPA_PLATFORM="
             f"{os.environ.get('QT_QPA_PLATFORM', '<auto>')}",
             file=sys.stderr,
         )
         print(
-            "TranslationZed: QT_ACCESSIBILITY="
+            "TranslationZed-Py: QT_ACCESSIBILITY="
             f"{os.environ.get('QT_ACCESSIBILITY', '<auto>')}",
             file=sys.stderr,
         )
@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> None:
 
     parser = argparse.ArgumentParser(
         prog="translationzed-py",
-        description="Open the TranslationZed GUI, optionally pointing at a project root.",
+        description="Open the TranslationZed-Py GUI, optionally pointing at a project root.",
     )
     parser.add_argument(
         "project",
