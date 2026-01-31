@@ -1,0 +1,12 @@
+// Header
+/* Block comment
+   second line */
+
+KEY_ONE = "One changed"  -- trailing
+
+KEY_TWO    =   "Two"   // inline
+KEY_THREE = "Wor"  ..  "ld!"   /* block */
+
+-- Section
+KEY_FOUR = "X" .. "Y" .. "Z"    -- tail
+KEY_FIVE	=    "Spaced out"
