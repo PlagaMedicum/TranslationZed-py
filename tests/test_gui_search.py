@@ -21,6 +21,7 @@ def test_search_selects_first_match(qtbot, tmp_path: Path):
     ix = win.fs_model.index_for_path(dst / "BE" / "ui.txt")
     win._file_chosen(ix)
     win.search_edit.setText("beto")
+    win._trigger_search()
     qtbot.waitUntil(lambda: len(win._search_matches) == 1, timeout=1000)
     current = win.table.currentIndex()
     assert current.isValid()
@@ -42,6 +43,7 @@ def test_search_moves_to_other_file(qtbot, tmp_path: Path):
     win._search_index_by_file.clear()
     win._search_index_key = None
     win.search_edit.setText("Two")
+    win._trigger_search()
     qtbot.waitUntil(lambda: bool(win._search_matches), timeout=1000)
     win._search_next()
     qtbot.waitUntil(
