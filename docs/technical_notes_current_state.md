@@ -362,6 +362,8 @@ Notes:
 - Collisions are possible by design; no collision mitigation exists.
 - Saver does not update inline status comments; status changes are persisted
   only via the cache. If files contain legacy comment tags, they can diverge.
+- Multi-file search caches per-file row data (LRU) and skips loading Source/Translation
+  data when the active search column does not require it.
 
 Clarified direction:
 - Inline comments in localization files are **read-only** unless they are

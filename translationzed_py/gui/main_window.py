@@ -6,6 +6,7 @@ import re
 import sys
 import time
 import traceback
+from collections import OrderedDict
 from pathlib import Path
 
 import xxhash
@@ -328,6 +329,10 @@ class MainWindow(QMainWindow):
         self._last_saved_text = ""
         self._search_index_by_file: dict[Path, list[_SearchRow]] = {}
         self._search_index_key: tuple | None = None
+        self._search_rows_cache: OrderedDict[
+            tuple[Path, bool, bool], tuple[tuple[int, int, int], list[_SearchRow]]
+        ] = OrderedDict()
+        self._search_cache_max = 64
         self._suppress_search_update = False
         self._replace_visible = False
         self._skip_search_autoselect = False
@@ -1645,14 +1650,24 @@ class MainWindow(QMainWindow):
         print(f"[Parse error] {path}", file=sys.stderr)
         traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
 
-    def _rows_from_model(self) -> list[_SearchRow]:
+    def _rows_from_model(
+        self, *, include_source: bool = True, include_value: bool = True
+    ) -> list[_SearchRow]:
         if not (self._current_model and self._current_pf):
             return []
         rows: list[_SearchRow] = []
         for row in range(self._current_model.rowCount()):
             key = self._current_model.index(row, 0).data(Qt.DisplayRole) or ""
-            source = self._current_model.index(row, 1).data(Qt.DisplayRole) or ""
-            value = self._current_model.index(row, 2).data(Qt.DisplayRole) or ""
+            source = (
+                self._current_model.index(row, 1).data(Qt.DisplayRole) or ""
+                if include_source
+                else ""
+            )
+            value = (
+                self._current_model.index(row, 2).data(Qt.DisplayRole) or ""
+                if include_value
+                else ""
+            )
             rows.append(
                 _SearchRow(
                     file=self._current_pf.path,
@@ -1664,21 +1679,30 @@ class MainWindow(QMainWindow):
             )
         return rows
 
-    def _rows_from_file(self, path: Path, locale: str) -> list[_SearchRow]:
+    def _rows_from_file(
+        self,
+        path: Path,
+        locale: str,
+        *,
+        include_source: bool = True,
+        include_value: bool = True,
+    ) -> list[_SearchRow]:
         meta = self._locales.get(locale)
         encoding = meta.charset if meta else "utf-8"
         try:
             pf = parse(path, encoding=encoding)
         except Exception:
             return []
-        cache_map = _read_status_cache(self._root, path)
-        source_values = self._load_en_source(path, locale)
+        cache_map = _read_status_cache(self._root, path) if include_value else {}
+        source_values = self._load_en_source(path, locale) if include_source else {}
         rows: list[_SearchRow] = []
         for idx, entry in enumerate(pf.entries):
             key = entry.key
-            key_hash = xxhash.xxh64(key.encode("utf-8")).intdigest() & 0xFFFF
-            rec = cache_map.get(key_hash)
-            value = rec.value if rec and rec.value is not None else entry.value
+            value = ""
+            if include_value:
+                key_hash = xxhash.xxh64(key.encode("utf-8")).intdigest() & 0xFFFF
+                rec = cache_map.get(key_hash)
+                value = rec.value if rec and rec.value is not None else entry.value
             rows.append(
                 _SearchRow(
                     file=path,
@@ -1690,22 +1714,81 @@ class MainWindow(QMainWindow):
             )
         return rows
 
-    def _ensure_search_index(self) -> None:
+    def _cached_rows_from_file(
+        self,
+        path: Path,
+        locale: str,
+        *,
+        include_source: bool,
+        include_value: bool,
+    ) -> list[_SearchRow]:
+        try:
+            file_mtime = path.stat().st_mtime_ns
+        except OSError:
+            return []
+        cache_mtime = 0
+        source_mtime = 0
+        if include_value:
+            try:
+                rel = path.relative_to(self._root)
+            except ValueError:
+                rel = None
+            if rel is not None:
+                cache_path = (
+                    self._root / self._app_config.cache_dir / rel
+                ).with_suffix(self._app_config.cache_ext)
+                with contextlib.suppress(OSError):
+                    cache_mtime = cache_path.stat().st_mtime_ns
+        if include_source:
+            en_path = self._en_path_for(path, locale)
+            if en_path:
+                with contextlib.suppress(OSError):
+                    source_mtime = en_path.stat().st_mtime_ns
+        stamp = (file_mtime, cache_mtime, source_mtime)
+        key = (path, include_source, include_value)
+        cached = self._search_rows_cache.get(key)
+        if cached and cached[0] == stamp:
+            self._search_rows_cache.move_to_end(key)
+            return cached[1]
+        rows = self._rows_from_file(
+            path,
+            locale,
+            include_source=include_source,
+            include_value=include_value,
+        )
+        self._search_rows_cache[key] = (stamp, rows)
+        self._search_rows_cache.move_to_end(key)
+        if len(self._search_rows_cache) > self._search_cache_max:
+            self._search_rows_cache.popitem(last=False)
+        return rows
+
+    def _ensure_search_index(
+        self, *, include_source: bool, include_value: bool
+    ) -> None:
         scope = self._search_scope
         current_path = self._current_pf.path if self._current_pf else None
         current_locale = self._locale_for_path(current_path) if current_path else None
         if scope == "FILE":
             if not current_path or not self._current_model:
                 self._search_index_by_file.clear()
-                self._search_index_key = ("FILE", None)
+                self._search_index_key = ("FILE", None, include_source, include_value)
                 return
-            self._search_index_by_file = {current_path: self._rows_from_model()}
-            self._search_index_key = ("FILE", current_path)
+            self._search_index_by_file = {
+                current_path: self._rows_from_model(
+                    include_source=include_source, include_value=include_value
+                )
+            }
+            self._search_index_key = (
+                "FILE",
+                current_path,
+                include_source,
+                include_value,
+            )
             return
         if scope == "LOCALE":
-            key = ("LOCALE", current_locale)
+            key = ("LOCALE", current_locale, include_source, include_value)
         else:
-            key = ("POOL", tuple(self._selected_locales))
+            key = ("POOL", tuple(self._selected_locales), include_source, include_value)
         if key != self._search_index_key:
             self._search_index_by_file.clear()
             self._search_index_key = key
@@ -1721,14 +1804,23 @@ class MainWindow(QMainWindow):
                     continue
                 for path in list_translatable_files(meta.path):
                     if self._current_pf and path == self._current_pf.path:
-                        rows = self._rows_from_model()
+                        rows = self._rows_from_model(
+                            include_source=include_source, include_value=include_value
+                        )
                     else:
-                        rows = self._rows_from_file(path, locale)
+                        rows = self._cached_rows_from_file(
+                            path,
+                            locale,
+                            include_source=include_source,
+                            include_value=include_value,
+                        )
                     if rows:
                         self._search_index_by_file[path] = rows
             return
         if self._current_pf and self._current_model:
-            self._search_index_by_file[self._current_pf.path] = self._rows_from_model()
+            self._search_index_by_file[self._current_pf.path] = self._rows_from_model(
+                include_source=include_source, include_value=include_value
+            )
 
     def _run_search(self) -> None:
         query = self.search_edit.text()
@@ -1746,7 +1838,11 @@ class MainWindow(QMainWindow):
             2: _SearchField.TRANSLATION,
         }
         field = field_map.get(column, _SearchField.TRANSLATION)
-        self._ensure_search_index()
+        include_source = field is _SearchField.SOURCE
+        include_value = field is _SearchField.TRANSLATION
+        self._ensure_search_index(
+            include_source=include_source, include_value=include_value
+        )
         rows: list[_SearchRow] = []
         for file_rows in self._search_index_by_file.values():
             rows.extend(file_rows)
