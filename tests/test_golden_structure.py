@@ -10,15 +10,16 @@ def _run_case(
     fixture: str,
     filename: str,
     updates: dict[str, str],
+    expected: str | None = None,
 ) -> None:
     base = Path("tests/fixtures/golden")
     src = base / f"{fixture}_input.txt"
-    expected = base / f"{fixture}_expected.txt"
+    expected_path = base / (expected or f"{fixture}_expected.txt")
     dest = tmp_path / filename
     dest.write_bytes(src.read_bytes())
     pf = parse(dest, encoding="utf-8")
     save(pf, updates, encoding="utf-8")
-    assert dest.read_bytes() == expected.read_bytes()
+    assert dest.read_bytes() == expected_path.read_bytes()
 
 
 def test_structure_recorded_media_slice(tmp_path: Path) -> None:
@@ -48,4 +49,29 @@ def test_structure_news_raw(tmp_path: Path) -> None:
         fixture="news_raw",
         filename="News_BE.txt",
         updates={"News_BE.txt": "New raw content\nLine 2\n"},
+    )
+
+
+def test_structure_mixed_single(tmp_path: Path) -> None:
+    _run_case(
+        tmp_path,
+        fixture="mixed",
+        filename="Mixed_BE.txt",
+        updates={"KEY_TWO": "Two updated"},
+        expected="mixed_expected_single.txt",
+    )
+
+
+def test_structure_mixed_multi(tmp_path: Path) -> None:
+    _run_case(
+        tmp_path,
+        fixture="mixed",
+        filename="Mixed_BE.txt",
+        updates={
+            "KEY_ONE": "One changed",
+            "KEY_THREE": "World!",
+            "KEY_FOUR": "XYZ",
+            "KEY_FIVE": "Spaced out",
+        },
+        expected="mixed_expected_multi.txt",
     )
