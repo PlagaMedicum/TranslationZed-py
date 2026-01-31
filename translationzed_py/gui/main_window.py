@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import itertools
 import os
 import re
 import sys
@@ -146,6 +147,7 @@ class MainWindow(QMainWindow):
         self._current_model: TranslationModel | None = None
         self._opened_files: set[Path] = set()
         self._cache_map: dict[int, CacheEntry] = {}
+        self._files_by_locale: dict[str, list[Path]] = {}
         self._en_cache: dict[Path, ParsedFile] = {}
         self._child_windows: list[MainWindow] = []
 
@@ -249,6 +251,7 @@ class MainWindow(QMainWindow):
         self.search_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.search_edit.setMinimumWidth(320)
         self.search_edit.textChanged.connect(self._schedule_search)
+        self.search_edit.returnPressed.connect(self._trigger_search)
         self.toolbar.addWidget(self.search_edit)
         self.search_prev_btn = QToolButton(self)
         self.search_prev_btn.setIcon(
@@ -336,6 +339,7 @@ class MainWindow(QMainWindow):
         self._suppress_search_update = False
         self._replace_visible = False
         self._skip_search_autoselect = False
+        self._search_needs_run = False
 
         def _pref_int(name: str) -> int | None:
             raw = str(self._prefs_extras.get(name, "")).strip()
@@ -742,6 +746,7 @@ class MainWindow(QMainWindow):
     def _init_locales(self, selected_locales: list[str] | None) -> None:
         self._locales = scan_root(self._root)
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
+        self._files_by_locale.clear()
 
         if selected_locales is None and self._smoke:
             if self._last_locales:
@@ -930,6 +935,7 @@ class MainWindow(QMainWindow):
         if not selected:
             return
         self._selected_locales = selected
+        self._files_by_locale.clear()
         self._opened_files.clear()
         self._current_pf = None
         self._current_model = None
@@ -968,29 +974,31 @@ class MainWindow(QMainWindow):
 
         self._current_encoding = encoding
 
-        base_values = {e.key: e.value for e in pf.entries}
         source_values = self._load_en_source(path, locale)
         self._cache_map = _read_status_cache(self._root, path)
         _touch_last_opened(self._root, path, int(time.time()))
         changed_keys: set[str] = set()
-        for idx, e in enumerate(pf.entries):
-            h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
-            if h not in self._cache_map:
-                continue
-            rec = self._cache_map[h]
-            new_value = rec.value if rec.value is not None else e.value
-            if rec.value is not None and rec.value != e.value:
-                changed_keys.add(e.key)
-            if new_value != e.value or rec.status != e.status:
-                pf.entries[idx] = type(e)(
-                    e.key,
-                    new_value,
-                    rec.status,
-                    e.span,
-                    e.segments,
-                    e.gaps,
-                    e.raw,
-                )
+        baseline_by_row: dict[int, str] = {}
+        if self._cache_map:
+            for idx, e in enumerate(pf.entries):
+                h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
+                if h not in self._cache_map:
+                    continue
+                rec = self._cache_map[h]
+                new_value = rec.value if rec.value is not None else e.value
+                if rec.value is not None and rec.value != e.value:
+                    changed_keys.add(e.key)
+                    baseline_by_row[idx] = e.value
+                if new_value != e.value or rec.status != e.status:
+                    pf.entries[idx] = type(e)(
+                        e.key,
+                        new_value,
+                        rec.status,
+                        e.span,
+                        e.segments,
+                        e.gaps,
+                        e.raw,
+                    )
         self._current_pf = pf
         self._opened_files.add(path)
         if self._current_model:
@@ -1001,8 +1009,7 @@ class MainWindow(QMainWindow):
                 pass
         self._current_model = TranslationModel(
             pf,
-            base_values=base_values,
-            changed_keys=changed_keys,
+            baseline_by_row=baseline_by_row,
             source_values=source_values,
         )
         self._current_model.dataChanged.connect(self._on_model_changed)
@@ -1359,15 +1366,23 @@ class MainWindow(QMainWindow):
         self.search_edit.setFocus()
         self.search_edit.selectAll()
 
+    def _trigger_search(self) -> None:
+        if self._search_timer.isActive():
+            self._search_timer.stop()
+        self._run_search()
+
     def _open_regex_help(self) -> None:
         QDesktopServices.openUrl(QUrl("https://docs.python.org/3/library/re.html"))
 
     def _schedule_search(self, *_args) -> None:
         self._update_replace_enabled()
         self._update_status_bar()
+        self._search_needs_run = bool(self.search_edit.text().strip())
+        self._search_matches = []
+        self._search_index = -1
+        self._search_match_ranges.clear()
         if self._search_timer.isActive():
             self._search_timer.stop()
-        self._search_timer.start()
 
     def _on_search_mode_changed(self, *_args) -> None:
         self._schedule_search()
@@ -1442,16 +1457,21 @@ class MainWindow(QMainWindow):
             locale = self._locale_for_path(self._current_pf.path)
             if not locale:
                 return []
-            meta = self._locales.get(locale)
-            if not meta:
-                return []
-            return list_translatable_files(meta.path)
+            return list(self._files_for_locale(locale))
         files: list[Path] = []
         for locale in self._selected_locales:
-            meta = self._locales.get(locale)
-            if not meta:
-                continue
-            files.extend(list_translatable_files(meta.path))
+            files.extend(self._files_for_locale(locale))
+        return files
+
+    def _files_for_locale(self, locale: str) -> list[Path]:
+        cached = self._files_by_locale.get(locale)
+        if cached is not None:
+            return cached
+        meta = self._locales.get(locale)
+        if not meta:
+            return []
+        files = list_translatable_files(meta.path)
+        self._files_by_locale[locale] = files
         return files
 
     def _replace_current(self) -> None:
@@ -1655,29 +1675,11 @@ class MainWindow(QMainWindow):
     ) -> list[_SearchRow]:
         if not (self._current_model and self._current_pf):
             return []
-        rows: list[_SearchRow] = []
-        for row in range(self._current_model.rowCount()):
-            key = self._current_model.index(row, 0).data(Qt.DisplayRole) or ""
-            source = (
-                self._current_model.index(row, 1).data(Qt.DisplayRole) or ""
-                if include_source
-                else ""
+        return list(
+            self._current_model.iter_search_rows(
+                include_source=include_source, include_value=include_value
             )
-            value = (
-                self._current_model.index(row, 2).data(Qt.DisplayRole) or ""
-                if include_value
-                else ""
-            )
-            rows.append(
-                _SearchRow(
-                    file=self._current_pf.path,
-                    row=row,
-                    key=str(key),
-                    source=str(source),
-                    value=str(value),
-                )
-            )
-        return rows
+        )
 
     def _rows_from_file(
         self,
@@ -1694,15 +1696,19 @@ class MainWindow(QMainWindow):
         except Exception:
             return []
         cache_map = _read_status_cache(self._root, path) if include_value else {}
+        use_cache = include_value and bool(cache_map)
         source_values = self._load_en_source(path, locale) if include_source else {}
         rows: list[_SearchRow] = []
         for idx, entry in enumerate(pf.entries):
             key = entry.key
             value = ""
             if include_value:
-                key_hash = xxhash.xxh64(key.encode("utf-8")).intdigest() & 0xFFFF
-                rec = cache_map.get(key_hash)
-                value = rec.value if rec and rec.value is not None else entry.value
+                if use_cache:
+                    key_hash = xxhash.xxh64(key.encode("utf-8")).intdigest() & 0xFFFF
+                    rec = cache_map.get(key_hash)
+                    value = rec.value if rec and rec.value is not None else entry.value
+                else:
+                    value = entry.value
             rows.append(
                 _SearchRow(
                     file=path,
@@ -1765,6 +1771,9 @@ class MainWindow(QMainWindow):
     def _ensure_search_index(
         self, *, include_source: bool, include_value: bool
     ) -> None:
+        query = self.search_edit.text().strip()
+        if not query:
+            return
         scope = self._search_scope
         current_path = self._current_pf.path if self._current_pf else None
         current_locale = self._locale_for_path(current_path) if current_path else None
@@ -1799,10 +1808,7 @@ class MainWindow(QMainWindow):
             else:
                 locales = list(self._selected_locales)
             for locale in locales:
-                meta = self._locales.get(locale)
-                if not meta:
-                    continue
-                for path in list_translatable_files(meta.path):
+                for path in self._files_for_locale(locale):
                     if self._current_pf and path == self._current_pf.path:
                         rows = self._rows_from_model(
                             include_source=include_source, include_value=include_value
@@ -1824,6 +1830,7 @@ class MainWindow(QMainWindow):
 
     def _run_search(self) -> None:
         query = self.search_edit.text()
+        self._search_needs_run = False
         if not query:
             self._search_matches = []
             self._search_index = -1
@@ -1843,9 +1850,7 @@ class MainWindow(QMainWindow):
         self._ensure_search_index(
             include_source=include_source, include_value=include_value
         )
-        rows: list[_SearchRow] = []
-        for file_rows in self._search_index_by_file.values():
-            rows.extend(file_rows)
+        rows = itertools.chain.from_iterable(self._search_index_by_file.values())
         matches = _search_rows(rows, query, field, use_regex)
         self._search_matches = matches
         self._search_match_ranges.clear()
@@ -1916,6 +1921,8 @@ class MainWindow(QMainWindow):
     def _ensure_search_ready(self) -> None:
         if self._search_timer.isActive():
             self._search_timer.stop()
+            self._run_search()
+        if self._search_needs_run:
             self._run_search()
 
     def _select_match(self, idx: int) -> None:

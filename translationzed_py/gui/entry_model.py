@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor, QUndoStack
 
 from translationzed_py.core import Entry, Status
 from translationzed_py.core.model import ParsedFile
+from translationzed_py.core.search import SearchRow
 from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 
 _HEADERS = ("Key", "Source", "Translation", "Status")
@@ -28,17 +29,16 @@ class TranslationModel(QAbstractTableModel):
         self,
         pf: ParsedFile,
         *,
-        base_values: dict[str, str] | None = None,
-        changed_keys: set[str] | None = None,
+        baseline_by_row: dict[int, str] | None = None,
         source_values: dict[str, str] | None = None,
     ):
         super().__init__()
         self._pf = pf
         self._entries = list(pf.entries)
         self._source_values = source_values or {}
-        self._base_values = base_values or {e.key: e.value for e in self._entries}
-        self._changed_values: set[str] = set(changed_keys or set())
-        self._dirty = bool(self._changed_values)
+        self._baseline_by_row = dict(baseline_by_row or {})
+        self._changed_rows: set[int] = set(self._baseline_by_row)
+        self._dirty = bool(self._baseline_by_row)
         self._pf.dirty = self._dirty
 
         self.undo_stack = QUndoStack()
@@ -48,11 +48,13 @@ class TranslationModel(QAbstractTableModel):
         """Called by EditValueCommand to swap immutable Entry objects."""
         self._entries[row] = entry
         if value_changed:
-            base_value = self._base_values.get(entry.key)
-            if base_value is not None and entry.value == base_value:
-                self._changed_values.discard(entry.key)
+            baseline = self._baseline_by_row.get(row)
+            if baseline is not None and entry.value == baseline:
+                self._baseline_by_row.pop(row, None)
+                self._changed_rows.discard(row)
             else:
-                self._changed_values.add(entry.key)
+                if baseline is not None:
+                    self._changed_rows.add(row)
         left = self.index(row, 0)
         right = self.index(row, self.columnCount() - 1)
         self.dataChanged.emit(
@@ -61,19 +63,24 @@ class TranslationModel(QAbstractTableModel):
             [Qt.DisplayRole, Qt.EditRole, Qt.ForegroundRole, Qt.BackgroundRole],
         )
         if value_changed:
-            self._dirty = bool(self._changed_values)
+            self._dirty = bool(self._baseline_by_row)
             self._pf.dirty = self._dirty
 
     def changed_values(self) -> dict[str, str]:
         """Return only values that were edited (no status-only changes)."""
         out = {}
-        for e in self._entries:
-            if e.key in self._changed_values:
+        for row in self._baseline_by_row:
+            if 0 <= row < len(self._entries):
+                e = self._entries[row]
                 out[e.key] = e.value
         return out
 
     def changed_keys(self) -> set[str]:
-        return set(self._changed_values)
+        keys: set[str] = set()
+        for row in self._baseline_by_row:
+            if 0 <= row < len(self._entries):
+                keys.add(self._entries[row].key)
+        return keys
 
     def status_for_row(self, row: int) -> Status | None:
         if 0 <= row < len(self._entries):
@@ -81,14 +88,29 @@ class TranslationModel(QAbstractTableModel):
         return None
 
     def clear_changed_values(self) -> None:
-        self._changed_values.clear()
+        self._baseline_by_row.clear()
+        self._changed_rows.clear()
         self._dirty = False
         self._pf.dirty = False
 
     def reset_baseline(self) -> None:
         """After writing to disk, treat current values as the new baseline."""
-        self._base_values = {e.key: e.value for e in self._entries}
         self.clear_changed_values()
+
+    def iter_search_rows(
+        self, *, include_source: bool = True, include_value: bool = True
+    ):
+        """Yield search rows without going through QModelIndex lookups."""
+        for idx, entry in enumerate(self._entries):
+            source = self._source_by_row[idx] if include_source else ""
+            value = entry.value if include_value else ""
+            yield SearchRow(
+                file=self._pf.path,
+                row=idx,
+                key=entry.key,
+                source=source,
+                value=value,
+            )
 
     # Qt mandatory overrides ----------------------------------------------------
     def rowCount(  # noqa: N802
@@ -186,6 +208,8 @@ class TranslationModel(QAbstractTableModel):
         if col == 2:
             e = self._entries[index.row()]
             if value != e.value:
+                if row not in self._baseline_by_row:
+                    self._baseline_by_row[row] = e.value
                 new_entry = Entry(
                     e.key,
                     str(value),
