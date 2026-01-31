@@ -1,13 +1,14 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-01-30_
+_Last updated: 2026-01-31_
 
 ---
 
 ## 1) Priorities
 
-1) **Core correctness first** (parser/saver/cache/metadata).
-2) **GUI smoke + integration** second (Qt event wiring).
-3) Keep tests deterministic and runnable headless.
+1) **Saver correctness + structure preservation** (bytes, comments, spacing, concat chains).
+2) **Encoding preservation per locale** (no implicit transcoding on save).
+3) **GUI smoke + integration** second (Qt event wiring).
+4) Keep tests deterministic and runnable headless.
 
 ---
 
@@ -17,6 +18,8 @@ _Last updated: 2026-01-30_
 - Parser tokenization and span integrity.
 - UTF‑8 / cp1251 / UTF‑16 decoding behavior.
 - Concat preservation in save (no collapsing).
+- Byte‑exact structure preservation on save (comments/spacing/ordering).
+- Encoding preserved on save for each locale’s declared charset.
 - Status cache read/write for edited files only.
 - EN hash cache index read/write (implemented).
 - Core search behavior (once `core.search` is introduced).
@@ -25,6 +28,7 @@ _Last updated: 2026-01-30_
 ### 2.2 Integration Tests
 - Open project, select locale, load table.
 - Edit + save path writes file + cache.
+- Save preserves original file bytes outside literal spans.
 - EN hash change dialog (implemented).
 
 ### 2.3 GUI Smoke Tests
@@ -69,7 +73,9 @@ Cost:
 
 Decision: maintain a **golden set** for UTF‑8, cp1251, and UTF‑16 to guarantee
 byte‑exact preservation across encodings. Golden inputs/outputs are now present
-under `tests/fixtures/golden/` and validated in tests.
+under `tests/fixtures/golden/` and validated in tests. Prefer deriving fixtures
+from the `ProjectZomboidTranslations` repo (reference only) to capture real
+edge‑cases in structure and encoding.
 
 ---
 
@@ -84,6 +90,8 @@ They include:
 - UTF‑16 (KO) and cp1251 (RU)
 - Subfolders with punctuation
 - `_TVRADIO_TRANSLATIONS` to ignore
+- Real‑world samples should be derived from `ProjectZomboidTranslations/` when possible
+  (reference only; do not vendor full repo into tests).
 
 ---
 
@@ -91,3 +99,4 @@ They include:
 
 - Core modules: target ≥ 95% line coverage.
 - GUI: smoke and integration coverage sufficient to validate wiring.
+- Cover **all known structure/encoding edge‑cases** found in production files.

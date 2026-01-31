@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-01-30_
+_Last updated: 2026-01-31_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.1 is shipped; this plan now
@@ -135,13 +135,13 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ### Step 9 — Search & navigation [✓]
 - Touchpoints: `gui/main_window.py`
 - Acceptance:
-  - Debounced search across Key/Source/Trans
   - Regex toggle
   - F3 / Shift+F3 navigation
   - Replace row toggle + Replace / Replace All (current file, Translation only)
   - Multi-file search caches per-file rows (LRU) and skips unused columns for speed
   - Active-file search rows are generated from model data (no QModelIndex lookups)
   - All scopes search only on Enter or prev/next actions (no live scanning)
+  - Enter triggers search for file-scope (manual, not live)
   - Baseline values stored only for edited rows (lazy baseline capture)
   - Future: locale‑scope Replace All (current locale only, scope explicitly labeled)
 
@@ -161,6 +161,47 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Last locale selection remembered
   - Last opened file per locale stored **inside cache headers** (no settings entry)
   - Preferences include **Search scope** and **Replace scope** (future UI)
+  - Pool scope means **currently opened locales only** (not entire root)
+
+### Step 12 — Dirty indicators from cache [✓]
+- Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
+- Acceptance:
+  - Dots shown on startup for files with cached draft values
+  - Dots update immediately on edit/save
+
+### Step 13 — Status bar + UX polish [✓]
+- Touchpoints: `gui/main_window.py`
+- Acceptance:
+  - Status bar shows “Saved HH:MM:SS”
+  - Row indicator (e.g., `Row 123 / 450`)
+  - File path label (e.g., `BE/sub/dir/file.txt`)
+  - Status bar updates on selection change (row index + file)
+  - When search/replace is active, status bar shows scope indicator(s)
+  - Use native icons (Qt theme) and standard spacing to align with GNOME/KDE HIG
+  - Table column sizes (Key/Status/Source/Translation) persist across files and restarts
+
+### Step 14 — Golden‑file tests [✓]
+- Touchpoints: `tests/fixtures/*`, `tests/test_roundtrip.py` or new tests
+- Acceptance:
+  - Golden inputs/outputs for UTF‑8, cp1251, UTF‑16
+  - Byte‑exact comparison after edit (structure/comments/spacing preserved)
+  - Dedicated fixtures derived from real PZ files for edge‑cases
+  - Locale encoding is preserved on save (no implicit transcoding)
+
+### Step 15 — Core search interface (clean separation) [✓] (required)
+- Touchpoints: `core/search.py`, `gui/main_window.py`
+- Acceptance:
+  - GUI uses core search module instead of direct model scanning
+  - Search API supports multi-file search
+
+### Step 16 — Status‑only dirty semantics [✓]
+- Decision: **no dot** for status‑only changes until a future option allows
+  writing status comments to original files.
+
+### Step 17 — Reference locale comparisons [≈ future]
+- Touchpoints: `gui/main_window.py` + new comparison view
+- Acceptance:
+  - Source can switch from EN to another locale
 
 ### Step 18 — Preferences window (planned) [✓]
 - Touchpoints: `gui/preferences_dialog.py` (new), `core/preferences.py`
@@ -179,15 +220,16 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Table remains visible above; selection syncs into the detail editors
   - Editing in detail Translation updates the table and undo stack
 
-### Step 20 — LanguageTool + Translation Memory (TM) [≈ future]
-- Touchpoints: new `core/tm.py`, `core/languagetool.py`, preferences, GUI suggestions panel
+### Step 20 — Bulk edits (status + translation) [✓]
+- Touchpoints: `gui/entry_model.py`, `gui/main_window.py`, `gui/commands.py`
 - Acceptance:
-  - Import user TMs; generate project TM from accepted translations
-  - Suggestion ranking: **project‑TM** outranks imported TM; both outrank LanguageTool API suggestions
-  - LanguageTool uses configurable server URL and is optional/disabled by default
-  - No blocking UI; suggestions fetched asynchronously
+  - Multi‑row selection (contiguous and non‑contiguous) supported in the table.
+  - Status change applies to all selected rows in one action.
+  - Single undo/redo entry for the bulk status change.
+  - Paste in Translation applies to all selected rows (single undo/redo entry).
+  - Status bar “mixed” indicator is deferred (future).
 
-### Step 21 — File tree visibility toggle [≈ future]
+### Step 21 — File tree visibility toggle [✓]
 - Touchpoints: `gui/main_window.py`, `gui/file_tree_panel.py`
 - Acceptance:
   - Left‑side toggle collapses/expands the file tree panel
@@ -206,7 +248,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - LICENSE text is hidden by default and expandable in the About dialog
   - Distributions include source + license text
 
-### Step 24 — Packaging (executables) [→ in progress]
+### Step 24 — Packaging (executables) [✓]
 - Touchpoints: `scripts/pack.sh`, `README.md`
 - Acceptance:
   - PyInstaller build produces app bundle on each OS (Linux/Windows/macOS)
@@ -241,7 +283,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Release is created as **draft** for review before publishing
   - Release notes reference CHANGELOG
 
-### Step 28 — Validation highlights (future) [✓]
+### Step 28 — Validation highlights [✓]
 - Touchpoints: `gui/entry_model.py`, `gui/delegates.py`
 - Acceptance:
   - Empty **Key** or **Source** cells render with **red** background (highest priority).
@@ -249,85 +291,13 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Empty **Translation** cells render with **orange** background (low priority).
   - Colors are purely visual (no blocking) and can be toggled later in Preferences
 
----
-
-## 2.1) v0.2 Focus Plan (draft, ordered)
-
-Priority A — **Core workflow completeness**
-1) **Search/Replace scopes**
-   - Implement File | Locale | Pool behavior for search + replace (not just stored in prefs).
-   - Status bar clearly reflects active scope (search + replace independently).
-2) **Multi‑file search navigation**
-   - Results list anchored to search UI; selecting a hit highlights the file in the tree.
-   - Prev/Next wraps across files and keeps selection + row focus consistent.
-3) **Replace‑all safety**
-   - Replace‑all in Locale/Pool shows a file list confirmation; only applies to opened locales.
-4) **Large‑file performance**
-   - Windowed/virtualized table model with row cache margin (visible rows + prefetch).
-   - Streaming parser or on‑demand row materialization to avoid full file in RAM.
-
-Priority B — **Productivity/clarity**
-5) **Validation highlights** (Step 28).
-6) **File tree toggle** (Step 21).
-7) **Text visualization** (Step 19).
-
-Priority C — **Assistive tooling**
-8) **Translation memory** + **LanguageTool** (Step 20).
-
-### Step 12 — Dirty indicators from cache [✓]
-- Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
+### Step 29 — LanguageTool + Translation Memory (TM) [≈ future]
+- Touchpoints: new `core/tm.py`, `core/languagetool.py`, preferences, GUI suggestions panel
 - Acceptance:
-  - Dots shown on startup for files with cached draft values
-  - Dots update immediately on edit/save
-
-### Step 13 — Status bar + UX polish [✓]
-- Touchpoints: `gui/main_window.py`
-- Acceptance:
-  - Status bar shows “Saved HH:MM:SS”
-  - Row indicator (e.g., `Row 123 / 450`)
-  - File path label (e.g., `BE/sub/dir/file.txt`)
-  - Status bar updates on selection change (row index + file)
-  - When search/replace is active, status bar shows scope indicator(s)
-  - Use native icons (Qt theme) and standard spacing to align with GNOME/KDE HIG
-  - Table column sizes (Key/Status/Source/Translation) persist across files and restarts
-
-### Step 14 — Golden‑file tests [✓]
-- Touchpoints: `tests/fixtures/*`, `tests/test_roundtrip.py` or new tests
-- Acceptance:
-  - Golden inputs/outputs for UTF‑8, cp1251, UTF‑16
-  - Byte‑exact comparison after edit
-
-### Step 15 — Core search interface (clean separation) [✓] (required)
-- Touchpoints: `core/search.py`, `gui/main_window.py`
-- Acceptance:
-  - GUI uses core search module instead of direct model scanning
-  - Search API supports multi-file search
-
-### Step 16 — Status‑only dirty semantics [✓]
-- Decision: **no dot** for status‑only changes until a future option allows
-  writing status comments to original files.
-
-### Step 17 — Reference locale comparisons [≈ future]
-- Touchpoints: `gui/main_window.py` + new comparison view
-- Acceptance:
-  - Source can switch from EN to another locale
-
-### Step 19 — Text visualization (future)
-- Touchpoints: `gui/delegates.py`, `gui/entry_model.py`, `gui/main_window.py`
-- Acceptance:
-  - Optional glyphs for spaces (grey dots) and newlines (grey symbol)
-  - Highlight escape sequences, tags, and repeated whitespace
-  - Applies to Source/Translation in both preview and edit
-  - Separate window for per‑key comparisons
-
-### Step 20 — Bulk edits (status + translation) [✓]
-- Touchpoints: `gui/entry_model.py`, `gui/main_window.py`, `gui/commands.py`
-- Acceptance:
-  - Multi‑row selection (contiguous and non‑contiguous) supported in the table.
-  - Status change applies to all selected rows in one action.
-  - Single undo/redo entry for the bulk status change.
-  - Paste in Translation applies to all selected rows (single undo/redo entry).
-  - Status bar “mixed” indicator is deferred (future).
+  - Import user TMs; generate project TM from accepted translations
+  - Suggestion ranking: **project‑TM** outranks imported TM; both outrank LanguageTool API suggestions
+  - LanguageTool uses configurable server URL and is optional/disabled by default
+  - No blocking UI; suggestions fetched asynchronously
 
 ---
 
@@ -347,15 +317,46 @@ Priority C — **Assistive tooling**
 
 ---
 
-## 4) Open Questions (need answers)
+## 4) v0.2 Focus Plan (draft, ordered)
 
-1) **v0.2 priority order**: does the Priority A/B/C ordering above match your intent?
-2) **Replace‑all confirmation**: should the file list be a modal dialog or a side panel?
-3) **Pool scope meaning**: confirm Pool = “currently opened locales only,” not entire root.
+Priority A — **Core workflow completeness**
+1) **Search/Replace scopes**
+   - Implement File | Locale | Pool behavior for search + replace (not just stored in prefs).
+   - Status bar clearly reflects active scope (search + replace independently).
+2) **Multi‑file search navigation**
+   - Results list anchored to search UI; selecting a hit highlights the file in the tree.
+   - Prev/Next wraps across files and keeps selection + row focus consistent.
+3) **Replace‑all safety**
+   - Replace‑all in Locale/Pool shows a file list confirmation; only applies to opened locales.
+4) **Large‑file performance**
+   - Windowed/virtualized table model with row cache margin based on **viewport %**.
+   - Streaming parser or on‑demand row materialization to avoid full file in RAM.
+5) **Automated regression coverage**
+   - Expand golden/round‑trip tests to cover **structure preservation** (comments, spacing,
+     concat chains, stray quotes, block/line comments, raw tables) using real samples.
+   - Add **encoding‑specific** fixtures per locale (cp1251, UTF‑16, UTF‑8 variants) and
+     assert byte‑exact round‑trip output preserves the original encoding.
+   - Use the `ProjectZomboidTranslations` repo as a reference source for edge‑case inputs.
+
+Priority B — **Productivity/clarity**
+6) **Validation highlights** (Step 28).
+7) **File tree toggle** (Step 21).
+8) **Text visualization** (Step 19).
+
+Priority C — **Assistive tooling**
+9) **Translation memory** + **LanguageTool** (Step 29).
 
 ---
 
-## 5) Deferred Items (post‑v0.1)
+## 5) Decisions (recorded)
+
+- **v0.2 priority order**: confirmed (Priority A/B/C as listed).
+- **Replace‑all confirmation**: modal dialog now; future sidebar is acceptable (VSCode‑style).
+- **Pool scope**: Pool = currently opened locales only (not entire root).
+
+---
+
+## 6) Deferred Items (post‑v0.1)
 
 - Reference locale comparison window
 - Program‑generated comments (`TZP:`) with optional write‑back
