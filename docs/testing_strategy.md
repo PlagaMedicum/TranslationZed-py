@@ -95,7 +95,37 @@ They include:
 
 ---
 
-## 5) Coverage Goals
+## 5) Current Automated Coverage vs Gaps
+
+**Covered (automated today):**
+- Parser edge cases: escaped quotes, concat chains, block comments, `//` lines,
+  stray quotes/markup, dotted keys, keys with symbols, raw/plain‑text files.
+- Encodings: parse CP1251 + UTF‑16 from prod‑like fixtures; golden round‑trip tests
+  for UTF‑8/CP1251/UTF‑16 with byte‑exact output.
+- Saver basics: span updates, concat preservation, escape encoding.
+- Cache: status cache read/write + last_opened header.
+- Core search: plain + regex paths.
+- GUI smoke: open, table fill, search navigation, edit/save, undo/redo.
+- Scanner: locale discovery, language.txt parsing, ignore rules.
+
+**Not covered yet (automation gaps):**
+- Saver structure preservation for **all** parser edge cases (e.g., stray quotes with
+  markup, `//` header lines, raw news tables, and mixed comment/trivia layouts).
+- Encoding preservation when **GUI save** is used (ensure locale encoding from
+  `language.txt` is honored end‑to‑end).
+- Cache‑only vs Write behavior in GUI prompts (no regression tests yet).
+- Full‑file diff invariants on large prod files (Recorded_Media/News/Stash cases).
+- Multi‑file replace‑all across scope with confirmation list (future).
+
+**Planned test expansions:**
+- Golden save fixtures derived from real PZ files (small slices) that include
+  tricky comments/spacing/concat chains and raw tables.
+- Locale‑driven encoding save tests (write via GUI/controller and compare bytes).
+- Regression test suite for previously reported parse/saver failures (screenshots).
+
+---
+
+## 6) Coverage Goals
 
 - Core modules: target ≥ 95% line coverage.
 - GUI: smoke and integration coverage sufficient to validate wiring.
