@@ -2172,6 +2172,9 @@ class MainWindow(QMainWindow):
         sel = self.table.selectionModel()
         if sel is None:
             return []
+        current = self.table.currentIndex()
+        if current.isValid() and not sel.isSelected(current):
+            return [current.row()]
         rows = {idx.row() for idx in sel.selectedRows()}
         if not rows:
             rows = {idx.row() for idx in sel.selectedIndexes()}
