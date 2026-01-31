@@ -138,7 +138,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Invalid project root", str(self._root))
             self._startup_aborted = True
             return
-        self.setWindowTitle(f"TranslationZed – {self._root}")
+        self.setWindowTitle(f"TranslationZed-Py – {self._root}")
         self._locales: dict[str, LocaleMeta] = {}
         self._selected_locales: list[str] = []
         self._current_encoding = "utf-8"
