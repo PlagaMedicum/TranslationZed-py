@@ -363,7 +363,17 @@ Notes:
 - Saver does not update inline status comments; status changes are persisted
   only via the cache. If files contain legacy comment tags, they can diverge.
 - Multi-file search caches per-file row data (LRU) and skips loading Source/Translation
-  data when the active search column does not require it.
+  data when the active search column does not require it. Locale/Pool searches run
+  only on Enter or prev/next actions (no live scanning).
+- Active-file search rows are generated directly from the model (no QModelIndex data()
+  lookups). Cache hashing is skipped when no cache entries exist for a file.
+- Baselines are stored lazily for edited rows only (row->original value). Source text
+  stays key-based to avoid duplicating full per-row lists.
+- Search only runs on explicit actions (Enter / prev / next), so no live scans.
+
+Limits:
+- Parsed files are still held fully in memory (Entry list). True streaming/windowed
+  parsing remains a future optimization for very large files.
 
 Clarified direction:
 - Inline comments in localization files are **read-only** unless they are
