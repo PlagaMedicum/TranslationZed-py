@@ -103,17 +103,16 @@ They include:
 - Encodings: parse CP1251 + UTF‑16 from prod‑like fixtures; golden round‑trip tests
   for UTF‑8/CP1251/UTF‑16 with byte‑exact output.
 - Saver basics: span updates, concat preservation, escape encoding.
+- Saver structure preservation on edge cases (stray quotes/markup, `//` headers,
+  trivia spacing, raw file replacement).
 - Cache: status cache read/write + last_opened header.
 - Core search: plain + regex paths.
 - GUI smoke: open, table fill, search navigation, edit/save, undo/redo.
+- GUI save prompts: cache‑only vs write‑to‑original.
+- GUI save encoding: cp1251 + UTF‑16 write‑back via locale `language.txt`.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
 
 **Not covered yet (automation gaps):**
-- Saver structure preservation for **all** parser edge cases (e.g., stray quotes with
-  markup, `//` header lines, raw news tables, and mixed comment/trivia layouts).
-- Encoding preservation when **GUI save** is used (ensure locale encoding from
-  `language.txt` is honored end‑to‑end).
-- Cache‑only vs Write behavior in GUI prompts (no regression tests yet).
 - Full‑file diff invariants on large prod files (Recorded_Media/News/Stash cases).
 - Multi‑file replace‑all across scope with confirmation list (future).
 
