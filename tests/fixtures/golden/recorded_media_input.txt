@@ -1,0 +1,5 @@
+// Auto-generated file
+MEDIA_INTRO = "Welcome to the show"
+MEDIA_DETAIL = "A \"quoted\" word and a backslash \\"
+MEDIA_CHAIN = "Hel"  ..  "lo" -- cmt
+MEDIA_END = "Bye"

@@ -1,0 +1,4 @@
+[VERSION] 41 - Initial Beta Release
+[SECTION]
+[NODOT] <CENTRE><SIZE:large> Build 41
+Line with "quotes" and = signs
