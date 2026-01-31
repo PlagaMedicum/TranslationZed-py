@@ -139,7 +139,10 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Regex toggle
   - F3 / Shift+F3 navigation
   - Replace row toggle + Replace / Replace All (current file, Translation only)
-  - Multi-file search caches per-file rows and skips unused columns for speed
+  - Multi-file search caches per-file rows (LRU) and skips unused columns for speed
+  - Active-file search rows are generated from model data (no QModelIndex lookups)
+  - All scopes search only on Enter or prev/next actions (no live scanning)
+  - Baseline values stored only for edited rows (lazy baseline capture)
   - Future: locale‑scope Replace All (current locale only, scope explicitly labeled)
 
 ### Step 10 — Save flows + prompts [✓]
@@ -259,14 +262,17 @@ Priority A — **Core workflow completeness**
    - Prev/Next wraps across files and keeps selection + row focus consistent.
 3) **Replace‑all safety**
    - Replace‑all in Locale/Pool shows a file list confirmation; only applies to opened locales.
+4) **Large‑file performance**
+   - Windowed/virtualized table model with row cache margin (visible rows + prefetch).
+   - Streaming parser or on‑demand row materialization to avoid full file in RAM.
 
 Priority B — **Productivity/clarity**
-4) **Validation highlights** (Step 28).
-5) **File tree toggle** (Step 21).
-6) **Text visualization** (Step 19).
+5) **Validation highlights** (Step 28).
+6) **File tree toggle** (Step 21).
+7) **Text visualization** (Step 19).
 
 Priority C — **Assistive tooling**
-7) **Translation memory** + **LanguageTool** (Step 20).
+8) **Translation memory** + **LanguageTool** (Step 20).
 
 ### Step 12 — Dirty indicators from cache [✓]
 - Touchpoints: `gui/main_window.py`, `gui/fs_model.py`
