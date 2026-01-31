@@ -13,7 +13,7 @@ This project is currently WIP and not fully ready for production use.
 
 This code was written at free time with a broad AI usage.
 
-# Builds (recommended)
+# Releases
 Prebuilt app folders are published as **[releases](https://github.com/PlagaMedicum/TranslationZed-py/releases)** on GitHub (Linux/Windows/macOS).
 Download the ZIP for your OS, extract it, and run the executable inside the folder:
 - Linux/macOS: `TranslationZed-Py`
