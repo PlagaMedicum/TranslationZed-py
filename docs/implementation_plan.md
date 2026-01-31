@@ -139,6 +139,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Regex toggle
   - F3 / Shift+F3 navigation
   - Replace row toggle + Replace / Replace All (current file, Translation only)
+  - Multi-file search caches per-file rows and skips unused columns for speed
   - Future: locale‑scope Replace All (current locale only, scope explicitly labeled)
 
 ### Step 10 — Save flows + prompts [✓]
