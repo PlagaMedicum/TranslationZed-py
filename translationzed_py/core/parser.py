@@ -253,6 +253,8 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
         _STATUS_MAP = {
             "TRANSLATED": Status.TRANSLATED,
             "PROOFREAD": Status.PROOFREAD,
+            "FOR REVIEW": Status.FOR_REVIEW,
+            "FOR_REVIEW": Status.FOR_REVIEW,
         }
 
     raw = path.read_bytes()

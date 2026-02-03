@@ -7,8 +7,20 @@ from pathlib import Path
 
 class Status(enum.IntEnum):
     UNTOUCHED = 0
-    TRANSLATED = 1
-    PROOFREAD = 2  # spec §5.3 :contentReference[oaicite:1]{index=1}
+    FOR_REVIEW = 1
+    TRANSLATED = 2
+    PROOFREAD = 3  # spec §5.3 :contentReference[oaicite:1]{index=1}
+
+    def label(self) -> str:
+        return self.name.replace("_", " ").title()
+
+
+STATUS_ORDER = (
+    Status.UNTOUCHED,
+    Status.FOR_REVIEW,
+    Status.TRANSLATED,
+    Status.PROOFREAD,
+)
 
 
 @dataclass(frozen=True, slots=True)

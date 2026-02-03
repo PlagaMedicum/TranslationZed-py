@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import struct
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,15 +12,37 @@ from translationzed_py.core.atomic_io import write_bytes_atomic
 from translationzed_py.core.model import Entry, Status
 
 _MAGIC = b"TZC1"
+_MAGIC_V3 = b"TZC2"
+_MAGIC_V4 = b"TZC3"
 _HEADER_V1 = struct.Struct("<4sI")
 _HEADER_V2 = struct.Struct("<4sQI")
-_RECORD = struct.Struct("<HBBI")
+_HEADER_V3 = struct.Struct("<4sQI")
+_RECORD_V2 = struct.Struct("<HBBI")
+_RECORD_V3 = struct.Struct("<HBBII")
 
 
 @dataclass(frozen=True, slots=True)
 class CacheEntry:
     status: Status
     value: str | None
+    original: str | None = None
+
+
+_LEGACY_STATUS_MAP = {
+    0: Status.UNTOUCHED,
+    1: Status.TRANSLATED,
+    2: Status.PROOFREAD,
+    3: Status.FOR_REVIEW,
+}
+
+
+def _status_from_byte(status_byte: int, *, legacy: bool) -> Status | None:
+    if legacy:
+        return _LEGACY_STATUS_MAP.get(status_byte)
+    try:
+        return Status(status_byte)
+    except ValueError:
+        return None
 
 
 def _hash_key(key: str) -> int:
@@ -38,15 +61,15 @@ def cache_path(root: Path, file_path: Path) -> Path:
     return _cache_path(root, file_path)
 
 
-def _parse_rows(
-    data: bytes, *, offset: int, count: int
-) -> list[tuple[int, Status, str | None]] | None:
-    rows: list[tuple[int, Status, str | None]] = []
+def _parse_rows_v2(
+    data: bytes, *, offset: int, count: int, legacy: bool
+) -> list[tuple[int, Status, str | None, str | None]] | None:
+    rows: list[tuple[int, Status, str | None, str | None]] = []
     for _ in range(count):
-        if offset + _RECORD.size > len(data):
+        if offset + _RECORD_V2.size > len(data):
             return None
-        key_hash, status_byte, flags, value_len = _RECORD.unpack_from(data, offset)
-        offset += _RECORD.size
+        key_hash, status_byte, flags, value_len = _RECORD_V2.unpack_from(data, offset)
+        offset += _RECORD_V2.size
         value: str | None = None
         if flags & 0x1:
             end = offset + value_len
@@ -55,34 +78,91 @@ def _parse_rows(
             raw = data[offset:end]
             offset = end
             value = raw.decode("utf-8", errors="replace")
-        try:
-            status = Status(status_byte)
-        except ValueError:
+        status = _status_from_byte(status_byte, legacy=legacy)
+        if status is None:
             continue
-        rows.append((key_hash, status, value))
+        rows.append((key_hash, status, value, None))
+    return rows
+
+
+def _parse_rows_v3(
+    data: bytes, *, offset: int, count: int, legacy: bool
+) -> list[tuple[int, Status, str | None, str | None]] | None:
+    rows: list[tuple[int, Status, str | None, str | None]] = []
+    for _ in range(count):
+        if offset + _RECORD_V3.size > len(data):
+            return None
+        key_hash, status_byte, flags, value_len, original_len = _RECORD_V3.unpack_from(
+            data, offset
+        )
+        offset += _RECORD_V3.size
+        value: str | None = None
+        original: str | None = None
+        if flags & 0x1:
+            end = offset + value_len
+            if end > len(data):
+                return None
+            raw = data[offset:end]
+            offset = end
+            value = raw.decode("utf-8", errors="replace")
+        if flags & 0x2:
+            end = offset + original_len
+            if end > len(data):
+                return None
+            raw = data[offset:end]
+            offset = end
+            original = raw.decode("utf-8", errors="replace")
+        status = _status_from_byte(status_byte, legacy=legacy)
+        if status is None:
+            continue
+        rows.append((key_hash, status, value, original))
     return rows
 
 
 def _read_rows_any(
     data: bytes,
-) -> tuple[int, list[tuple[int, Status, str | None]]] | None:
+) -> tuple[int, list[tuple[int, Status, str | None, str | None]], bool] | None:
     if not data:
+        return None
+    if data.startswith(_MAGIC_V4):
+        if len(data) >= _HEADER_V3.size:
+            magic, last_opened, count = _HEADER_V3.unpack_from(data, 0)
+            if magic == _MAGIC_V4:
+                parsed_rows = _parse_rows_v3(
+                    data, offset=_HEADER_V3.size, count=count, legacy=False
+                )
+                if parsed_rows is not None:
+                    return last_opened, parsed_rows, False
+        return None
+    if data.startswith(_MAGIC_V3):
+        if len(data) >= _HEADER_V3.size:
+            magic, last_opened, count = _HEADER_V3.unpack_from(data, 0)
+            if magic == _MAGIC_V3:
+                parsed_rows = _parse_rows_v3(
+                    data, offset=_HEADER_V3.size, count=count, legacy=True
+                )
+                if parsed_rows is not None:
+                    return last_opened, parsed_rows, True
         return None
     if data.startswith(_MAGIC):
         # v2 header: magic + u64 last_opened + u32 count
         if len(data) >= _HEADER_V2.size:
             magic, last_opened, count = _HEADER_V2.unpack_from(data, 0)
             if magic == _MAGIC:
-                parsed_rows = _parse_rows(data, offset=_HEADER_V2.size, count=count)
+                parsed_rows = _parse_rows_v2(
+                    data, offset=_HEADER_V2.size, count=count, legacy=True
+                )
                 if parsed_rows is not None:
-                    return last_opened, parsed_rows
+                    return last_opened, parsed_rows, True
         # v1 header: magic + u32 count
         if len(data) >= _HEADER_V1.size:
             magic, count = _HEADER_V1.unpack_from(data, 0)
             if magic == _MAGIC:
-                parsed_rows = _parse_rows(data, offset=_HEADER_V1.size, count=count)
+                parsed_rows = _parse_rows_v2(
+                    data, offset=_HEADER_V1.size, count=count, legacy=True
+                )
                 if parsed_rows is not None:
-                    return 0, parsed_rows
+                    return 0, parsed_rows, True
         return None
 
     # --- legacy (status-only) format ---
@@ -93,16 +173,15 @@ def _read_rows_any(
     if len(data) < expected:
         return None
     offset = 4
-    legacy_rows: list[tuple[int, Status, str | None]] = []
+    legacy_rows: list[tuple[int, Status, str | None, str | None]] = []
     for _ in range(count):
         key_hash, status_byte = struct.unpack_from("<HB", data, offset)
         offset += struct.calcsize("<HB")
-        try:
-            status = Status(status_byte)
-        except ValueError:
+        status = _status_from_byte(status_byte, legacy=True)
+        if status is None:
             continue
-        legacy_rows.append((key_hash, status, None))
-    return 0, legacy_rows
+        legacy_rows.append((key_hash, status, None, None))
+    return 0, legacy_rows, True
 
 
 def read(root: Path, file_path: Path) -> dict[int, CacheEntry]:
@@ -116,10 +195,13 @@ def read(root: Path, file_path: Path) -> dict[int, CacheEntry]:
         parsed = _read_rows_any(data)
         if not parsed:
             return {}
-        _, rows = parsed
+        last_opened, rows, legacy = parsed
         out: dict[int, CacheEntry] = {}
-        for key_hash, status, value in rows:
-            out[key_hash] = CacheEntry(status, value)
+        for key_hash, status, value, original in rows:
+            out[key_hash] = CacheEntry(status, value, original)
+        if legacy:
+            with contextlib.suppress(OSError):
+                _write_rows(status_file, rows, last_opened)
         return out
     except (OSError, struct.error):
         return {}
@@ -132,6 +214,8 @@ def write(
     *,
     changed_keys: set[str] | None = None,
     last_opened: int | None = None,
+    original_values: dict[str, str] | None = None,
+    force_original: set[str] | None = None,
 ) -> None:
     """
     Write current in-memory statuses and (optional) draft translations into
@@ -139,13 +223,25 @@ def write(
     """
     status_file = _cache_path(root, file_path)
     changed_keys = changed_keys or set()
-    rows: list[tuple[int, Status, str | None]] = []
+    rows: list[tuple[int, Status, str | None, str | None]] = []
+    original_values = original_values or {}
+    force_original = force_original or set()
+    existing = {}
+    if changed_keys and status_file.exists():
+        existing = read(root, file_path)
     for e in entries:
         include = e.status != Status.UNTOUCHED or e.key in changed_keys
         if not include:
             continue
         value = e.value if e.key in changed_keys else None
-        rows.append((_hash_key(e.key), e.status, value))
+        original: str | None = None
+        if e.key in changed_keys:
+            prev = existing.get(_hash_key(e.key))
+            if prev and prev.original is not None and e.key not in force_original:
+                original = prev.original
+            else:
+                original = original_values.get(e.key)
+        rows.append((_hash_key(e.key), e.status, value, original))
     if not rows:
         if status_file.exists():
             status_file.unlink()
@@ -164,6 +260,18 @@ def read_last_opened_from_path(path: Path) -> int:
     except OSError:
         return 0
     if len(data) < _HEADER_V1.size:
+        return 0
+    if data.startswith(_MAGIC_V4):
+        if len(data) >= _HEADER_V3.size:
+            magic, last_opened, _count = _HEADER_V3.unpack_from(data, 0)
+            if magic == _MAGIC_V4:
+                return int(last_opened or 0)
+        return 0
+    if data.startswith(_MAGIC_V3):
+        if len(data) >= _HEADER_V3.size:
+            magic, last_opened, _count = _HEADER_V3.unpack_from(data, 0)
+            if magic == _MAGIC_V3:
+                return int(last_opened or 0)
         return 0
     if not data.startswith(_MAGIC):
         return 0
@@ -186,23 +294,37 @@ def touch_last_opened(root: Path, file_path: Path, last_opened: int) -> bool:
     parsed = _read_rows_any(data)
     if not parsed:
         return False
-    _, rows = parsed
+    _, rows, _legacy = parsed
     _write_rows(status_file, rows, last_opened)
     return True
 
 
 def _write_rows(
     status_file: Path,
-    rows: list[tuple[int, Status, str | None]],
+    rows: list[tuple[int, Status, str | None, str | None]],
     last_opened: int,
 ) -> None:
     buf = bytearray()
-    buf += _HEADER_V2.pack(_MAGIC, int(last_opened), len(rows))
-    for key_hash, status, value in rows:
+    buf += _HEADER_V3.pack(_MAGIC_V4, int(last_opened), len(rows))
+    for key_hash, status, value, original in rows:
+        flags = 0
+        raw_value = b""
+        raw_original = b""
         if value is None:
-            buf += _RECORD.pack(key_hash, status.value, 0, 0)
+            value_len = 0
         else:
-            raw = value.encode("utf-8")
-            buf += _RECORD.pack(key_hash, status.value, 1, len(raw))
-            buf += raw
+            flags |= 0x1
+            raw_value = value.encode("utf-8")
+            value_len = len(raw_value)
+        if original is None:
+            original_len = 0
+        else:
+            flags |= 0x2
+            raw_original = original.encode("utf-8")
+            original_len = len(raw_original)
+        buf += _RECORD_V3.pack(key_hash, status.value, flags, value_len, original_len)
+        if raw_value:
+            buf += raw_value
+        if raw_original:
+            buf += raw_original
     write_bytes_atomic(status_file, bytes(buf))
