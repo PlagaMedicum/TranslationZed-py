@@ -102,6 +102,7 @@ def save(
                     seg_lens,
                     e.gaps,
                     raw_entry,
+                    e.key_hash,
                 )
             )
         else:
@@ -116,6 +117,7 @@ def save(
                     e.segments,
                     e.gaps,
                     e.raw,
+                    e.key_hash,
                 )
             )
     pf.entries = new_list

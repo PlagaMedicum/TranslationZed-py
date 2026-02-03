@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import codecs
 
+import xxhash
+
 
 def _unescape(raw: str) -> str:
     """Unescape only escaped quotes/backslashes; keep other escapes literal."""
@@ -52,3 +54,7 @@ def _decode_text(data: bytes, encoding: str) -> str:
     if text.startswith("\ufeff"):
         return text[1:]
     return text
+
+
+def _hash_key_u64(key: str) -> int:
+    return int(xxhash.xxh64(key.encode("utf-8")).intdigest()) & 0xFFFFFFFFFFFFFFFF

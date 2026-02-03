@@ -29,6 +29,7 @@ class EditValueCommand(QUndoCommand):
             old_entry.segments,
             old_entry.gaps,
             old_entry.raw,
+            old_entry.key_hash,
         )
         self._new = Entry(
             new_entry.key,
@@ -38,6 +39,7 @@ class EditValueCommand(QUndoCommand):
             new_entry.segments,
             new_entry.gaps,
             new_entry.raw,
+            new_entry.key_hash,
         )
         self._model = model
 
@@ -88,6 +90,7 @@ class ChangeStatusCommand(QUndoCommand):
             e.segments,
             e.gaps,
             e.raw,
+            e.key_hash,
         )
         self._model._replace_entry(
             self._row, self._pf.entries[self._row], value_changed=False

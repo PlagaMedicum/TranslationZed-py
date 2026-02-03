@@ -14,6 +14,7 @@ if TYPE_CHECKING:  # forward-refs for mypy, no runtime cycle
 from translationzed_py.core.lazy_entries import EntryMeta, LazyEntries
 from translationzed_py.core.parse_utils import (
     _decode_text,
+    _hash_key_u64,
     _resolve_encoding,
     _unescape,
 )
@@ -284,6 +285,7 @@ def _parse_entries_stream(
         gaps: list[bytes] = []
         for prev, nxt in zip(seg_spans, seg_spans[1:], strict=False):
             gaps.append(raw[prev[1] : nxt[0]])
+        key_hash = _hash_key_u64(key_text)
         if lazy_values:
             assert entries_meta is not None
             entries_meta.append(
@@ -295,6 +297,7 @@ def _parse_entries_stream(
                     tuple(gaps),
                     False,
                     tuple(seg_spans),
+                    key_hash,
                 )
             )
         else:
@@ -308,6 +311,8 @@ def _parse_entries_stream(
                     (span_start, span_end or span_start),
                     tuple(seg_lens) if seg_lens else (len(value),),
                     tuple(gaps),
+                    False,
+                    key_hash,
                 )
             )
         current_key = None
@@ -377,6 +382,7 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
     resolved_encoding, _ = _resolve_encoding(encoding, raw)
     if b"=" not in raw or path.name.startswith("News_"):
         text = _decode_text(raw, resolved_encoding)
+        key_hash = _hash_key_u64(path.name)
         return ParsedFile(
             path,
             [
@@ -388,6 +394,7 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
                     (len(text),),
                     (),
                     True,
+                    key_hash,
                 )
             ],
             raw,
@@ -402,6 +409,7 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
     if not entries:
         if not saw_equal:
             text = _decode_text(raw, resolved_encoding)
+            key_hash = _hash_key_u64(path.name)
             return ParsedFile(
                 path,
                 [
@@ -413,6 +421,7 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
                         (len(text),),
                         (),
                         True,
+                        key_hash,
                     )
                 ],
                 raw,
@@ -447,6 +456,7 @@ def parse_lazy(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
             (),
             True,
             ((0, len(raw)),),
+            _hash_key_u64(path.name),
         )
         return ParsedFile(path, LazyEntries(raw, encoding, [meta]), raw)
 
@@ -467,6 +477,7 @@ def parse_lazy(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
                 (),
                 True,
                 ((0, len(raw)),),
+                _hash_key_u64(path.name),
             )
             return ParsedFile(path, LazyEntries(raw, encoding, [meta]), raw)
         raise ValueError("Unsupported file format (no translatable entries found).")

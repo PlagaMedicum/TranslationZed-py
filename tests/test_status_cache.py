@@ -29,7 +29,7 @@ def test_roundtrip():
 
         write(root, path, pf.entries)
         cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
-        assert cache_path.read_bytes().startswith(b"TZC4")
+        assert cache_path.read_bytes().startswith(b"TZC5")
         assert list(read(root, path).values()) == [
             CacheEntry(Status.TRANSLATED, None, None)
         ]
@@ -140,4 +140,4 @@ def test_migrate_all_upgrades_u16_cache(tmp_path):
     migrated = migrate_all(root)
     assert migrated == 1
     data = cache_path.read_bytes()
-    assert data.startswith(b"TZC4")
+    assert data.startswith(b"TZC5")

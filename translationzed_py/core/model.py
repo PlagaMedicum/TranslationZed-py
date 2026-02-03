@@ -44,6 +44,7 @@ class Entry:
     segments: tuple[int, ...]  # unescaped segment lengths
     gaps: tuple[bytes, ...]  # raw bytes between string literals
     raw: bool = False  # plain-text entry (no quoted literal in file)
+    key_hash: int | None = None  # precomputed xxhash64 of key
 
 
 class ParsedFile:

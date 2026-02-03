@@ -238,8 +238,8 @@ Observed hotspots and their current shape (code references are indicative):
 **C) File tree + dirty indicator**
 - **Tree build**: `gui/fs_model.py` builds all file items at startup with `rglob`.
 - **Dirty dot updates**: `FsModel.set_dirty` now uses a path→item map (O(1) per file).
-  `_mark_cached_dirty()` still walks **all cache files** and
-  reads each cache to see if draft values exist.
+  `_mark_cached_dirty()` reads cache headers for a draft flag (O(1) per cache file);
+  legacy cache versions fall back to full read until rewritten.
 
 **D) Table rendering / row sizing**
 - **Word‑wrap**: `resizeRowsToContents()` is called on wrap toggle and row edit;
