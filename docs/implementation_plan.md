@@ -357,6 +357,7 @@ A4 [→] **Large‑file performance** (more urgent now)
      - **Target**: first paint within a tight budget; defer non‑critical work (row sizing, full search cache).
      - **Implemented**: cache overlay uses hash index + lazy value decode (no full value materialization on open).
      - **Implemented**: EN source rows are lazy for large files; values resolve on demand.
+     - **Implemented**: post‑open deferral for large files (prefetch, row resize, search refresh).
    - [✓] **u64 cache key hash** + migration to reduce collisions.
 A5 [ ] **Automated regression coverage**
    - **Problem**: current tests cover typical cases, not “worst‑case” structures and sizes.

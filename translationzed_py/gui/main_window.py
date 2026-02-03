@@ -1294,15 +1294,18 @@ class MainWindow(QMainWindow):
         self._update_replace_enabled()
         self._sync_detail_editors()
         self._update_status_bar()
-        self._prefetch_visible_rows()
-        if self._wrap_text:
-            self._schedule_row_resize()
         if not self._last_saved_text:
             self._last_saved_text = "Ready"
             self._update_status_bar()
-        if self.search_edit.text() and not self._suppress_search_update:
-            self._skip_search_autoselect = True
-            self._schedule_search()
+        if self._should_defer_post_open():
+            self._schedule_post_open_tasks(path)
+        else:
+            self._prefetch_visible_rows()
+            if self._wrap_text:
+                self._schedule_row_resize()
+            if self.search_edit.text() and not self._suppress_search_update:
+                self._skip_search_autoselect = True
+                self._schedule_search()
         if changed_keys:
             self.fs_model.set_dirty(self._current_pf.path, True)
         if not self._skip_conflict_check:
@@ -1448,6 +1451,22 @@ class MainWindow(QMainWindow):
             self._current_model.rowCount() - 1, end + self._lazy_row_prefetch_margin
         )
         self._current_model.prefetch_rows(start, end)
+
+    def _should_defer_post_open(self) -> bool:
+        return self._is_large_file()
+
+    def _schedule_post_open_tasks(self, path: Path) -> None:
+        def _run() -> None:
+            if not self._current_pf or self._current_pf.path != path:
+                return
+            self._prefetch_visible_rows()
+            if self._wrap_text:
+                self._schedule_row_resize()
+            if self.search_edit.text() and not self._suppress_search_update:
+                self._skip_search_autoselect = True
+                self._schedule_search()
+
+        QTimer.singleShot(0, _run)
 
     def _schedule_row_resize(self, *, full: bool = False) -> None:
         if not self._wrap_text or not self._current_model:
