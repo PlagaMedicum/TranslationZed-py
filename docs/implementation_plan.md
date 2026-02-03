@@ -80,6 +80,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Locale discovery ignores `_TVRADIO_TRANSLATIONS`, `.tzp-cache`, `.tzp-config`
   - `language.txt` parsed for charset + display name
   - `language.txt` and `credits.txt` excluded from translatable list
+  - Malformed `language.txt` triggers a warning and the locale is skipped
 
 ### Step 3 — Parser + model + spans [✓]
 - Touchpoints: `core/parser.py`, `core/model.py`

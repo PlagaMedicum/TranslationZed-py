@@ -61,6 +61,19 @@ def list_translatable_files(locale_path: Path) -> list[Path]:
 
 def scan_root(root: Path) -> dict[str, LocaleMeta]:
     """Return mapping {locale_code: LocaleMeta} for locale dirs in *root*."""
+    locales, errors = _scan_root_collect(root)
+    if errors:
+        detail = "\n".join(errors)
+        raise LanguageFileError(f"Invalid language.txt:\n{detail}")
+    return locales
+
+
+def scan_root_with_errors(root: Path) -> tuple[dict[str, LocaleMeta], list[str]]:
+    """Return locales plus language.txt errors, skipping invalid locales."""
+    return _scan_root_collect(root)
+
+
+def _scan_root_collect(root: Path) -> tuple[dict[str, LocaleMeta], list[str]]:
     if not root.is_dir():
         raise NotADirectoryError(root)
 
@@ -86,7 +99,4 @@ def scan_root(root: Path) -> dict[str, LocaleMeta]:
             display_name=display_name,
             charset=charset,
         )
-    if errors:
-        detail = "\n".join(errors)
-        raise LanguageFileError(f"Invalid language.txt:\n{detail}")
-    return locales
+    return locales, errors

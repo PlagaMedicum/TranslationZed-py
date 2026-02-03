@@ -62,7 +62,7 @@ from translationzed_py.core import (
     ParsedFile,
     list_translatable_files,
     parse,
-    scan_root,
+    scan_root_with_errors,
 )
 from translationzed_py.core.app_config import load as _load_app_config
 from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
@@ -793,15 +793,29 @@ class MainWindow(QMainWindow):
 
     def _init_locales(self, selected_locales: list[str] | None) -> None:
         try:
-            self._locales = scan_root(self._root)
+            self._locales, errors = scan_root_with_errors(self._root)
         except Exception as exc:
             QMessageBox.critical(self, "Invalid language.txt", str(exc))
             self._locales = {}
             self._selected_locales = []
             return
+        if errors:
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle("Malformed language.txt")
+            msg.setText(
+                "Some locales were skipped due to malformed language.txt. "
+                "Fix those files to enable the locales."
+            )
+            msg.setDetailedText("\n".join(errors))
+            msg.exec()
         self._schedule_cache_migration()
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
         self._files_by_locale.clear()
+
+        if not selectable and selected_locales is None:
+            self._selected_locales = []
+            return
 
         if selected_locales is None and self._smoke:
             if self._last_locales:

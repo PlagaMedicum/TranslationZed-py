@@ -106,7 +106,7 @@ From latest clarification:
 - **Status order (desired)**: Untouched → For review → Translated → Proofread.
 - **Cache key width**: **u64** hash to avoid collisions (u16 retired).
 - **UTF‑16 without BOM**: allow heuristic decoding **only** when `language.txt` declares UTF‑16.
-- **Language metadata**: `language.txt` is **mandatory**; missing file or missing `charset` is a hard error.
+- **Language metadata**: `language.txt` is **mandatory**; missing/malformed or missing `charset` yields a per-locale warning in the GUI and the locale is skipped. `scan_root` remains strict and raises on invalid `language.txt`.
 - **Plain-text files**: if a file has no `=` tokens, it is treated as a single raw entry
   (key = filename) and saved back verbatim without quoting. Mixed/unsupported formats remain errors.
 - **Parser tolerances (current)**:

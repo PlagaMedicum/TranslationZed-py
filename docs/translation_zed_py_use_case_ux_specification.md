@@ -54,6 +54,7 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 | **Alternate Flow A1** | *Unsaved Drafts Present* – SYS MUST auto‑persist drafts to `.tzp-cache` before changing the project root (no prompt). |
 | **Alternate Flow A2** | *No locale selected* – SYS aborts opening the project and closes the window. |
 | **Alternate Flow A3** | *No cache timestamps* – SYS opens no file until user selects one. |
+| **Alternate Flow A4** | *Malformed `language.txt`* – SYS shows a warning; invalid locales are skipped and cannot be opened until fixed. Other selected locales open normally. |
 | **Post‑condition** | Target locale(s) are active; window title updated to `TranslationZed‑Py – <root>`. |
 
 ### UC‑02  Switch Locale
@@ -250,7 +251,7 @@ UNTOUCHED ──────────────────────▶ 
 
 ---
 ## 7  Assumptions & Open Issues
-1. **File Encoding**: Each locale *may* use a different charset.  SYS MUST read `<locale>/language.txt` for the `charset = …` setting (e.g. `Cp1251`) and decode all files accordingly.  When saving, files SHOULD be written back in the same charset; missing `charset` is a hard error.
+1. **File Encoding**: Each locale *may* use a different charset.  SYS MUST read `<locale>/language.txt` for the `charset = …` setting (e.g. `Cp1251`) and decode all files accordingly.  When saving, files SHOULD be written back in the same charset; missing `charset` is a hard error for that locale and the locale cannot open until fixed (warning shown, other locales still open).
 2. **Multiline Strings**: handled via parser token concatenation; no GUI wrap concerns beyond row height.
 3. **Locale Names**: mapping code → English name shipped in static JSON (ISO‑639‑1).
 4. **Accessibility**: basic; no screen‑reader optimisation in MVP.\

@@ -128,6 +128,8 @@ def scan_root(root: Path) -> dict[str, Path]:
 - Parse `language.txt` for:
   - `charset` (encoding for all files in that locale; **required**)
   - `text` (human‑readable language name for UI)
+- `scan_root` raises if any `language.txt` is missing or malformed.
+- GUI uses a non-raising variant to collect errors, skip invalid locales, and show a warning.
 
 ### 5.2  `core.parser`
 
