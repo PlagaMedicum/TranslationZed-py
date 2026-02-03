@@ -7,7 +7,7 @@ import sys
 import time
 import traceback
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 import xxhash
@@ -94,6 +94,9 @@ from translationzed_py.core.status_cache import (
     read as _read_status_cache,
 )
 from translationzed_py.core.status_cache import (
+    read_has_drafts_from_path as _read_has_drafts_from_path,
+)
+from translationzed_py.core.status_cache import (
     read_last_opened_from_path as _read_last_opened_from_path,
 )
 from translationzed_py.core.status_cache import (
@@ -132,7 +135,7 @@ class _SourceLookup(Mapping[str, str]):
     def __init__(
         self,
         *,
-        by_row: list[str] | None = None,
+        by_row: Sequence[str] | None = None,
         keys: list[str] | None = None,
         by_key: dict[str, str] | None = None,
     ) -> None:
@@ -141,7 +144,7 @@ class _SourceLookup(Mapping[str, str]):
         self._by_key = by_key
 
     @property
-    def by_row(self) -> list[str] | None:
+    def by_row(self) -> Sequence[str] | None:
         return self._by_row
 
     def _ensure_by_key(self) -> dict[str, str]:
@@ -167,6 +170,22 @@ class _SourceLookup(Mapping[str, str]):
 
     def __len__(self) -> int:
         return len(self._ensure_by_key())
+
+
+class _LazySourceRows:
+    __slots__ = ("_entries",)
+
+    def __init__(self, entries: Sequence[Entry]) -> None:
+        self._entries = entries
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            start, stop, step = idx.indices(len(self._entries))
+            return [self._entries[i].value for i in range(start, stop, step)]
+        return self._entries[idx].value
 
 
 class MainWindow(QMainWindow):
@@ -949,8 +968,22 @@ class MainWindow(QMainWindow):
         path: Path,
         locale: str | None,
         *,
-        target_entries: list[Entry] | None = None,
+        target_entries: Sequence[Entry] | None = None,
     ) -> _SourceLookup:
+        def _key_at(entries: Sequence[Entry], idx: int) -> str:
+            if hasattr(entries, "key_at"):
+                return entries.key_at(idx)
+            return entries[idx].key
+
+        def _keys_match(a: Sequence[Entry], b: Sequence[Entry]) -> bool:
+            count = len(a)
+            if count != len(b):
+                return False
+            return all(_key_at(a, idx) == _key_at(b, idx) for idx in range(count))
+
+        def _keys_list(entries: Sequence[Entry]) -> list[str]:
+            return [_key_at(entries, idx) for idx in range(len(entries))]
+
         en_path = self._en_path_for(path, locale)
         if not en_path:
             return _SourceLookup(by_key={})
@@ -960,29 +993,41 @@ class MainWindow(QMainWindow):
             en_meta = self._locales.get("EN")
             encoding = en_meta.charset if en_meta else "utf-8"
             try:
-                pf = parse(en_path, encoding=encoding)
+                if self._should_parse_lazy(en_path):
+                    pf = parse_lazy(en_path, encoding=encoding)
+                else:
+                    pf = parse(en_path, encoding=encoding)
             except Exception:
                 return _SourceLookup(by_key={})
             self._en_cache[en_path] = pf
-        if pf.entries and all(getattr(e, "raw", False) for e in pf.entries):
-            raw_value = pf.entries[0].value
-            if (
-                target_entries
-                and len(target_entries) == 1
-                and target_entries[0].key == path.name
-            ):
-                return _SourceLookup(by_row=[raw_value], keys=[path.name])
-            return _SourceLookup(by_key={path.name: raw_value})
-        if target_entries and len(target_entries) == len(pf.entries):
-            keys_match = all(
-                entry.key == pf.entries[idx].key
-                for idx, entry in enumerate(target_entries)
-            )
-            if keys_match:
-                by_row = [entry.value for entry in pf.entries]
-                keys = [entry.key for entry in target_entries]
-                return _SourceLookup(by_row=by_row, keys=keys)
-        return _SourceLookup(by_key={entry.key: entry.value for entry in pf.entries})
+        entries = pf.entries
+        if entries:
+            if hasattr(entries, "meta_at"):
+                if len(entries) == 1 and entries.meta_at(0).raw:
+                    raw_value = entries[0].value
+                    if (
+                        target_entries
+                        and len(target_entries) == 1
+                        and _key_at(target_entries, 0) == path.name
+                    ):
+                        return _SourceLookup(by_row=[raw_value], keys=[path.name])
+                    return _SourceLookup(by_key={path.name: raw_value})
+            elif all(getattr(e, "raw", False) for e in entries):
+                raw_value = entries[0].value
+                if (
+                    target_entries
+                    and len(target_entries) == 1
+                    and _key_at(target_entries, 0) == path.name
+                ):
+                    return _SourceLookup(by_row=[raw_value], keys=[path.name])
+                return _SourceLookup(by_key={path.name: raw_value})
+        if target_entries and _keys_match(target_entries, entries):
+            keys = _keys_list(target_entries)
+            if hasattr(entries, "prefetch"):
+                return _SourceLookup(by_row=_LazySourceRows(entries), keys=keys)
+            by_row = [entry.value for entry in entries]
+            return _SourceLookup(by_row=by_row, keys=keys)
+        return _SourceLookup(by_key={entry.key: entry.value for entry in entries})
 
     # ----------------------------------------------------------------- slots
     def _check_en_hash_cache(self) -> bool:
@@ -1156,35 +1201,72 @@ class MainWindow(QMainWindow):
         conflict_originals: dict[str, str] = {}
         original_values: dict[str, str] = {}
         if self._cache_map:
-            for idx, e in enumerate(pf.entries):
-                h = self._hash_for_cache(e.key, self._cache_map)
-                if h not in self._cache_map:
-                    continue
-                rec = self._cache_map[h]
-                if (
-                    rec.value is not None
-                    and rec.original is not None
-                    and rec.original != e.value
-                ):
-                    conflict_originals[e.key] = e.value
-                new_value = rec.value if rec.value is not None else e.value
-                if rec.value is not None and rec.value != e.value:
-                    changed_keys.add(e.key)
-                    baseline_by_row[idx] = e.value
-                    if rec.original is not None:
-                        original_values[e.key] = rec.original
-                    else:
-                        original_values[e.key] = e.value
-                if new_value != e.value or rec.status != e.status:
-                    pf.entries[idx] = type(e)(
-                        e.key,
-                        new_value,
-                        rec.status,
-                        e.span,
-                        e.segments,
-                        e.gaps,
-                        e.raw,
-                    )
+            if hasattr(pf.entries, "index_by_hash") and hasattr(pf.entries, "meta_at"):
+                entries = pf.entries
+                hash_bits = getattr(self._cache_map, "hash_bits", 64)
+                index_by_hash = entries.index_by_hash(bits=hash_bits)
+                for key_hash, rec in self._cache_map.items():
+                    indices = index_by_hash.get(key_hash)
+                    if not indices:
+                        continue
+                    for idx in indices:
+                        meta = entries.meta_at(idx)
+                        file_value = entries[idx].value
+                        if (
+                            rec.value is not None
+                            and rec.original is not None
+                            and rec.original != file_value
+                        ):
+                            conflict_originals[meta.key] = file_value
+                        new_value = rec.value if rec.value is not None else file_value
+                        if rec.value is not None and rec.value != file_value:
+                            changed_keys.add(meta.key)
+                            baseline_by_row[idx] = file_value
+                            original_values[meta.key] = (
+                                rec.original if rec.original is not None else file_value
+                            )
+                        if new_value != file_value or rec.status != meta.status:
+                            entries[idx] = Entry(
+                                meta.key,
+                                new_value,
+                                rec.status,
+                                meta.span,
+                                meta.segments,
+                                meta.gaps,
+                                meta.raw,
+                                meta.key_hash,
+                            )
+            else:
+                for idx, e in enumerate(pf.entries):
+                    h = self._hash_for_cache(e, self._cache_map)
+                    if h not in self._cache_map:
+                        continue
+                    rec = self._cache_map[h]
+                    if (
+                        rec.value is not None
+                        and rec.original is not None
+                        and rec.original != e.value
+                    ):
+                        conflict_originals[e.key] = e.value
+                    new_value = rec.value if rec.value is not None else e.value
+                    if rec.value is not None and rec.value != e.value:
+                        changed_keys.add(e.key)
+                        baseline_by_row[idx] = e.value
+                        if rec.original is not None:
+                            original_values[e.key] = rec.original
+                        else:
+                            original_values[e.key] = e.value
+                    if new_value != e.value or rec.status != e.status:
+                        pf.entries[idx] = type(e)(
+                            e.key,
+                            new_value,
+                            rec.status,
+                            e.span,
+                            e.segments,
+                            e.gaps,
+                            e.raw,
+                            getattr(e, "key_hash", None),
+                        )
         self._current_pf = pf
         self._opened_files.add(path)
         if self._current_model:
@@ -1506,8 +1588,7 @@ class MainWindow(QMainWindow):
                 continue
             if original not in self._opened_files:
                 continue
-            cached = _read_status_cache(self._root, original)
-            if any(entry.value is not None for entry in cached.values()):
+            if _read_has_drafts_from_path(cache_path):
                 files.append(original)
         return sorted(set(files))
 
@@ -1524,8 +1605,7 @@ class MainWindow(QMainWindow):
             original = (self._root / rel).with_suffix(self._app_config.translation_ext)
             if not original.exists():
                 continue
-            cached = _read_status_cache(self._root, original)
-            if any(entry.value is not None for entry in cached.values()):
+            if _read_has_drafts_from_path(cache_path):
                 files.append(original)
         return sorted(set(files))
 
@@ -1533,8 +1613,17 @@ class MainWindow(QMainWindow):
         for path in self._all_draft_files():
             self.fs_model.set_dirty(path, True)
 
-    def _hash_for_cache(self, key: str, cache_map: dict[int, CacheEntry]) -> int:
-        digest = int(xxhash.xxh64(key.encode("utf-8")).intdigest())
+    def _hash_for_cache(
+        self, key: str | Entry, cache_map: dict[int, CacheEntry]
+    ) -> int:
+        if isinstance(key, Entry):
+            digest = key.key_hash
+            key_text = key.key
+        else:
+            digest = None
+            key_text = key
+        if digest is None:
+            digest = int(xxhash.xxh64(key_text.encode("utf-8")).intdigest())
         bits = getattr(cache_map, "hash_bits", 64)
         if bits == 16:
             return digest & 0xFFFF
@@ -1696,7 +1785,7 @@ class MainWindow(QMainWindow):
         changed: dict[str, str] = {}
         new_entries = []
         for e in pf.entries:
-            h = self._hash_for_cache(e.key, cached)
+            h = self._hash_for_cache(e, cached)
             rec = cached.get(h)
             if rec is None:
                 new_entries.append(e)
@@ -1710,6 +1799,7 @@ class MainWindow(QMainWindow):
                     e.segments,
                     e.gaps,
                     e.raw,
+                    getattr(e, "key_hash", None),
                 )
             if rec.value is not None:
                 changed[e.key] = rec.value
@@ -2005,7 +2095,7 @@ class MainWindow(QMainWindow):
         original_values: dict[str, str] = {}
         new_entries = []
         for entry in pf.entries:
-            key_hash = self._hash_for_cache(entry.key, cache_map)
+            key_hash = self._hash_for_cache(entry, cache_map)
             cache = cache_map.get(key_hash)
             value = cache.value if cache and cache.value is not None else entry.value
             status = cache.status if cache else entry.status
@@ -2043,6 +2133,7 @@ class MainWindow(QMainWindow):
                     entry.segments,
                     entry.gaps,
                     entry.raw,
+                    getattr(entry, "key_hash", None),
                 )
             new_entries.append(entry)
         _write_status_cache(
@@ -2217,6 +2308,7 @@ class MainWindow(QMainWindow):
                     entry.segments,
                     entry.gaps,
                     entry.raw,
+                    getattr(entry, "key_hash", None),
                 )
         _write_status_cache(
             self._root,
@@ -2422,7 +2514,7 @@ class MainWindow(QMainWindow):
                 value = ""
                 if include_value:
                     if use_cache:
-                        key_hash = self._hash_for_cache(key, cache_map)
+                        key_hash = self._hash_for_cache(entry, cache_map)
                         rec = cache_map.get(key_hash)
                         value = (
                             rec.value if rec and rec.value is not None else entry.value

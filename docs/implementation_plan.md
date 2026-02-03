@@ -343,18 +343,20 @@ A4 [→] **Large‑file performance** (more urgent now)
    - [→] **Streaming parser / on‑demand rows**
      - **Problem**: parser materializes full token lists + entry values; large files spike RAM and stall UI.
      - **Target**: stream tokens; keep entry metadata but materialize values on demand with a row‑window prefetch.
-   - [ ] **Precompute/store per‑entry hash**
+   - [✓] **Precompute/store per‑entry hash**
      - **Problem**: xxhash64 computed for every entry on every open; O(n) hot path.
      - **Target**: compute once per file load and reuse across cache lookups and conflicts.
    - [✓] **Lazy EN source map**: row‑aligned list with lazy dict fallback to avoid duplicating payloads.
    - [✓] **Lazy + bounded search rows**: no per‑scope index; cache only small files.
-   - [→] **Dirty dot index O(1)**
+   - [✓] **Dirty dot index O(1)**
      - **Problem**: dot detection still walks cache files on startup.
      - **Target**: cache‑header draft flag so “dirty” can be read without parsing rows.
    - [✓] **Progressive multi‑file search** with status‑bar progress.
    - [→] **Fast initial open**
      - **Problem**: first render still pays parse + layout costs before user can act.
      - **Target**: first paint within a tight budget; defer non‑critical work (row sizing, full search cache).
+     - **Implemented**: cache overlay uses hash index + lazy value decode (no full value materialization on open).
+     - **Implemented**: EN source rows are lazy for large files; values resolve on demand.
    - [✓] **u64 cache key hash** + migration to reduce collisions.
 A5 [ ] **Automated regression coverage**
    - **Problem**: current tests cover typical cases, not “worst‑case” structures and sizes.

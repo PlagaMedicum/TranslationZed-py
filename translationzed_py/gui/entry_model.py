@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from PySide6.QtCore import (
     QAbstractTableModel,
@@ -33,7 +33,7 @@ class TranslationModel(QAbstractTableModel):
         *,
         baseline_by_row: dict[int, str] | None = None,
         source_values: Mapping[str, str] | None = None,
-        source_by_row: list[str] | None = None,
+        source_by_row: Sequence[str] | None = None,
     ):
         super().__init__()
         self._pf = pf
@@ -255,6 +255,7 @@ class TranslationModel(QAbstractTableModel):
                     e.segments,
                     e.gaps,
                     e.raw,
+                    e.key_hash,
                 )
                 cmd = EditValueCommand(
                     self._pf,

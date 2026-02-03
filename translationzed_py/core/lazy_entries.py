@@ -20,6 +20,7 @@ class EntryMeta:
     gaps: tuple[bytes, ...]
     raw: bool
     seg_spans: tuple[tuple[int, int], ...]
+    key_hash: int
 
 
 class LazyEntries:
@@ -29,6 +30,8 @@ class LazyEntries:
         self._metas = metas
         self._value_cache: dict[int, str] = {}
         self._overrides: dict[int, Entry] = {}
+        self._index_by_hash64: dict[int, list[int]] | None = None
+        self._index_by_hash16: dict[int, list[int]] | None = None
 
     def __len__(self) -> int:
         return len(self._metas)
@@ -44,6 +47,21 @@ class LazyEntries:
         for idx in range(len(self._metas)):
             yield self._entry_at(idx, cache_value=False)
 
+    def meta_at(self, index: int) -> EntryMeta:
+        return self._metas[index]
+
+    def key_at(self, index: int) -> str:
+        return self._metas[index].key
+
+    def index_by_hash(self, *, bits: int = 64) -> dict[int, list[int]]:
+        if bits == 16:
+            if self._index_by_hash16 is None:
+                self._index_by_hash16 = self._build_index_by_hash(bits=16)
+            return self._index_by_hash16
+        if self._index_by_hash64 is None:
+            self._index_by_hash64 = self._build_index_by_hash(bits=64)
+        return self._index_by_hash64
+
     def prefetch(self, start: int, end: int) -> None:
         if not self._metas:
             return
@@ -54,6 +72,14 @@ class LazyEntries:
                 continue
             meta = self._metas[idx]
             self._value_cache[idx] = self._value_for_meta(meta)
+
+    def _build_index_by_hash(self, *, bits: int) -> dict[int, list[int]]:
+        mask = 0xFFFF if bits == 16 else 0xFFFFFFFFFFFFFFFF
+        out: dict[int, list[int]] = {}
+        for idx, meta in enumerate(self._metas):
+            key_hash = meta.key_hash & mask
+            out.setdefault(key_hash, []).append(idx)
+        return out
 
     def _entry_at(self, index: int, *, cache_value: bool) -> Entry:
         if index in self._overrides:
@@ -74,6 +100,7 @@ class LazyEntries:
             meta.segments,
             meta.gaps,
             meta.raw,
+            meta.key_hash,
         )
 
     def _value_for_meta(self, meta: EntryMeta) -> str:
