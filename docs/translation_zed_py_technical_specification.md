@@ -126,7 +126,7 @@ def scan_root(root: Path) -> dict[str, Path]:
   where `translation_ext` comes from `config/app.toml` (`[formats]`).
   excluding `language.txt` and `credits.txt` in each locale.
 - Parse `language.txt` for:
-  - `charset` (encoding for all files in that locale)
+  - `charset` (encoding for all files in that locale; **required**)
   - `text` (human‑readable language name for UI)
 
 ### 5.2  `core.parser`
@@ -144,7 +144,7 @@ Tokenizer regex patterns:
 
 Parse algorithm:
 
-1. Read raw bytes using the locale‑specific `encoding` (from `language.txt`; default *utf‑8*).
+1. Read raw bytes using the locale‑specific `encoding` (from `language.txt`; **mandatory**).
    - If `encoding` is UTF‑16 and no BOM is present, **still attempt** decoding using the
      declared charset (heuristic fallback). Fail hard only if decoding errors occur.
 2. Tokenize entire file → `list[Token]` with `(type, text, start, end)`.

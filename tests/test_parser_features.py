@@ -35,6 +35,20 @@ def test_parse_utf16(prod_like_root):
     assert pf.entries[0].key == "UI_OK"
 
 
+def test_parse_utf16_no_bom_le(tmp_path):
+    path = tmp_path / "utf16le.txt"
+    path.write_bytes('UI_OK = "Test"\n'.encode("utf-16-le"))
+    pf = parse(path, encoding="UTF-16")
+    assert pf.entries[0].value == "Test"
+
+
+def test_parse_utf16_no_bom_be(tmp_path):
+    path = tmp_path / "utf16be.txt"
+    path.write_bytes('UI_OK = "Test"\n'.encode("utf-16-be"))
+    pf = parse(path, encoding="UTF-16")
+    assert pf.entries[0].value == "Test"
+
+
 def test_parse_lua_table_blocks(tmp_path):
     text = """
 Challenge_BE = {

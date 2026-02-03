@@ -9,6 +9,10 @@ _IGNORE_DIRS = {"_TVRADIO_TRANSLATIONS", ".git", ".vscode"}
 _IGNORE_FILES = {"language.txt", "credits.txt"}
 
 
+class LanguageFileError(ValueError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class LocaleMeta:
     code: str
@@ -18,12 +22,14 @@ class LocaleMeta:
 
 
 def _parse_language_file(path: Path) -> tuple[str, str]:
+    if not path.exists():
+        raise LanguageFileError(f"Missing language.txt: {path}")
     display_name = path.parent.name
-    charset = "utf-8"
+    charset: str | None = None
     try:
-        content = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return display_name, charset
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise LanguageFileError(f"Failed to read language.txt: {path}") from exc
 
     for line in content.splitlines():
         if "=" not in line:
@@ -34,8 +40,10 @@ def _parse_language_file(path: Path) -> tuple[str, str]:
         value = value.strip('"').strip("'")
         if key == "text":
             display_name = value or display_name
-        elif key == "charset":
-            charset = value or charset
+        elif key == "charset" and value:
+            charset = value
+    if not charset:
+        raise LanguageFileError(f"Missing charset in language.txt: {path}")
     return display_name, charset
 
 
@@ -58,6 +66,7 @@ def scan_root(root: Path) -> dict[str, LocaleMeta]:
 
     cfg = _load_app_config(root)
     locales: dict[str, LocaleMeta] = {}
+    errors: list[str] = []
     for child in root.iterdir():
         if not child.is_dir():
             continue
@@ -66,11 +75,18 @@ def scan_root(root: Path) -> dict[str, LocaleMeta]:
         if child.name in {cfg.cache_dir, cfg.config_dir}:
             continue
         lang_file = child / "language.txt"
-        display_name, charset = _parse_language_file(lang_file)
+        try:
+            display_name, charset = _parse_language_file(lang_file)
+        except LanguageFileError as exc:
+            errors.append(f"{child.name}: {exc}")
+            continue
         locales[child.name] = LocaleMeta(
             code=child.name,
             path=child.resolve(),
             display_name=display_name,
             charset=charset,
         )
+    if errors:
+        detail = "\n".join(errors)
+        raise LanguageFileError(f"Invalid language.txt:\n{detail}")
     return locales

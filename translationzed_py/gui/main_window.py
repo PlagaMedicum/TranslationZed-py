@@ -778,7 +778,13 @@ class MainWindow(QMainWindow):
         )
 
     def _init_locales(self, selected_locales: list[str] | None) -> None:
-        self._locales = scan_root(self._root)
+        try:
+            self._locales = scan_root(self._root)
+        except Exception as exc:
+            QMessageBox.critical(self, "Invalid language.txt", str(exc))
+            self._locales = {}
+            self._selected_locales = []
+            return
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
         self._files_by_locale.clear()
 

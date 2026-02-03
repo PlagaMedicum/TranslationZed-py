@@ -14,6 +14,9 @@ def test_search_selects_first_match(qtbot, tmp_path: Path):
     dst.mkdir()
     for loc in ("EN", "BE"):
         (dst / loc).mkdir()
+        (dst / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n", encoding="utf-8"
+        )
     (dst / "EN" / "ui.txt").write_text('UI_ALPHA = "Alpha"\nUI_BETA = "Beta"\n')
     (dst / "BE" / "ui.txt").write_text('UI_ALPHA = "Alfa"\nUI_BETA = "Beto"\n')
     win = MainWindow(str(dst), selected_locales=["BE"])
@@ -33,6 +36,9 @@ def test_search_moves_to_other_file(qtbot, tmp_path: Path):
     dst.mkdir()
     for loc in ("EN", "BE"):
         (dst / loc).mkdir()
+        (dst / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n", encoding="utf-8"
+        )
     (dst / "BE" / "first.txt").write_text('UI_FIRST = "One"\n')
     (dst / "BE" / "second.txt").write_text('UI_SECOND = "Two"\n')
     win = MainWindow(str(dst), selected_locales=["BE"])

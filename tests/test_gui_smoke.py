@@ -13,6 +13,9 @@ def test_table_fills(qtbot, tmp_path: Path):
     dst.mkdir()
     for loc in ("EN", "BE"):
         (dst / loc).mkdir()
+        (dst / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n", encoding="utf-8"
+        )
         (dst / loc / "ui.txt").write_text('UI_YES = "Yes"\n')
     win = MainWindow(str(dst), selected_locales=["BE"])
     qtbot.addWidget(win)

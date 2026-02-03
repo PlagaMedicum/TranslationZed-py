@@ -78,7 +78,7 @@ _TOKEN_RE = re.compile(
 )
 
 
-def _encoding_for_offsets(encoding: str, raw: bytes) -> tuple[str, int]:
+def _resolve_encoding(encoding: str, raw: bytes) -> tuple[str, int]:
     enc = encoding.lower().replace("_", "-")
     if enc in {"utf-8", "utf8"} and raw.startswith(codecs.BOM_UTF8):
         return "utf-8", 3
@@ -86,6 +86,15 @@ def _encoding_for_offsets(encoding: str, raw: bytes) -> tuple[str, int]:
         return "utf-16-le", 2
     if enc in {"utf-16", "utf16"} and raw.startswith(b"\xfe\xff"):
         return "utf-16-be", 2
+    if enc in {"utf-16", "utf16"}:
+        if not raw:
+            return "utf-16-le", 0
+        even_zeros = sum(1 for i in range(0, len(raw), 2) if raw[i] == 0)
+        odd_zeros = sum(1 for i in range(1, len(raw), 2) if raw[i] == 0)
+        if odd_zeros > even_zeros:
+            return "utf-16-le", 0
+        if even_zeros > odd_zeros:
+            return "utf-16-be", 0
         return "utf-16-le", 0
     return encoding, 0
 
@@ -171,9 +180,9 @@ def _read_string_token(text: str, pos: int) -> int:
 
 # ── The generator the test asked about ────────────────────────────────────────
 def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
-    text = _decode_text(data, encoding)
-    enc_for_map, bom_len = _encoding_for_offsets(encoding, data)
-    offsets = _build_offset_map(text, enc_for_map)
+    enc_for_text, bom_len = _resolve_encoding(encoding, data)
+    text = _decode_text(data, enc_for_text)
+    offsets = _build_offset_map(text, enc_for_text)
     expected_len = len(data) - bom_len
     if offsets[-1] != expected_len:
         raise ValueError(
@@ -258,8 +267,9 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
         }
 
     raw = path.read_bytes()
+    resolved_encoding, _ = _resolve_encoding(encoding, raw)
     if b"=" not in raw:
-        text = _decode_text(raw, encoding)
+        text = _decode_text(raw, resolved_encoding)
         return ParsedFile(
             path,
             [
@@ -276,7 +286,7 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
             raw,
         )
     if path.name.startswith("News_"):
-        text = _decode_text(raw, encoding)
+        text = _decode_text(raw, resolved_encoding)
         return ParsedFile(
             path,
             [

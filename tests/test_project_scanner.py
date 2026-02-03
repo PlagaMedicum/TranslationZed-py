@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from translationzed_py.core import LocaleMeta, list_translatable_files, scan_root
 
 
@@ -28,6 +30,23 @@ def test_scan_root_reads_language_txt(prod_like_root: Path) -> None:
     assert locales["EN"].charset.upper() == "UTF-8"
     assert locales["RU"].charset.upper() == "CP1251"
     assert locales["KO"].charset.upper() == "UTF-16"
+
+
+def test_scan_root_requires_language_txt(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "EN").mkdir()
+    with pytest.raises(ValueError):
+        scan_root(root)
+
+
+def test_scan_root_requires_charset(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "EN").mkdir()
+    (root / "EN" / "language.txt").write_text("text = English,\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        scan_root(root)
 
 
 def test_list_translatable_files_excludes_non_translatables(
