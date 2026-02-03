@@ -215,13 +215,15 @@ From latest clarification:
 Observed hotspots and their current shape (code references are indicative):
 
 **A) File open / parse path**
-- **Full‑file read + token list**: `core/parser.py::parse()` reads bytes, builds a
-  full token list (`list(_tokenise(...))`), then walks it to build `Entry` objects.
-  Large files (Recorded_Media, UI) allocate both the raw bytes **and** the token list.
+- **Full‑file read + streaming parse**: `core/parser.py::parse()` reads bytes and
+  streams tokens (no full token list). Entry metadata is still materialized, but
+  values may be lazy depending on parse mode.
 - **Offset map**: `_build_offset_map` encodes every character to compute byte offsets,
   which is O(n) with non‑trivial constant factors for UTF‑16 and long strings.
 - **Cache application**: `gui/main_window.py::_file_chosen` walks every entry and
   computes xxhash64 per key to reconcile cache rows; O(n) per open.
+- **Lazy values**: large files can use `parse_lazy`, caching only a viewport‑window of
+  values while keeping spans/segments for lossless saves.
 - **Source map duplication**: `_load_en_source` now prefers a row‑aligned list when
   EN keys match target keys; key→value dicts are built lazily only if required.
 

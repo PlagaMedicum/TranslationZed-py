@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .model import Entry, ParsedFile, Status
-from .parser import parse
+from .parser import parse, parse_lazy
 from .project_scanner import (
     LocaleMeta,
     list_translatable_files,
@@ -17,6 +17,7 @@ __all__ = [
     "scan_root_with_errors",
     "list_translatable_files",
     "parse",
+    "parse_lazy",
     "LocaleMeta",
     "Entry",
     "Status",

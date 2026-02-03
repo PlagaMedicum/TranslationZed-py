@@ -63,6 +63,7 @@ from translationzed_py.core import (
     ParsedFile,
     list_translatable_files,
     parse,
+    parse_lazy,
     scan_root_with_errors,
 )
 from translationzed_py.core.app_config import load as _load_app_config
@@ -445,6 +446,8 @@ class MainWindow(QMainWindow):
         self._row_cache_margin_pct = 0.5
         self._large_file_row_threshold = 5000
         self._pending_row_span: tuple[int, int] | None = None
+        self._lazy_parse_min_bytes = 1_000_000
+        self._lazy_row_prefetch_margin = 200
 
         def _pref_int(name: str) -> int | None:
             raw = str(self._prefs_extras.get(name, "")).strip()
@@ -1135,7 +1138,10 @@ class MainWindow(QMainWindow):
             locale, LocaleMeta("", Path(), "", "utf-8")
         ).charset
         try:
-            pf = parse(path, encoding=encoding)
+            if self._should_parse_lazy(path):
+                pf = parse_lazy(path, encoding=encoding)
+            else:
+                pf = parse(path, encoding=encoding)
         except Exception as exc:
             self._report_parse_error(path, exc)
             return
@@ -1206,6 +1212,7 @@ class MainWindow(QMainWindow):
         self._update_replace_enabled()
         self._sync_detail_editors()
         self._update_status_bar()
+        self._prefetch_visible_rows()
         if self._wrap_text:
             self._schedule_row_resize()
         if not self._last_saved_text:
@@ -1320,6 +1327,12 @@ class MainWindow(QMainWindow):
             and self._current_model.rowCount() >= self._large_file_row_threshold
         )
 
+    def _should_parse_lazy(self, path: Path) -> bool:
+        try:
+            return path.stat().st_size >= self._lazy_parse_min_bytes
+        except OSError:
+            return False
+
     def _visible_row_span(self) -> tuple[int, int] | None:
         if not self._current_model:
             return None
@@ -1340,6 +1353,19 @@ class MainWindow(QMainWindow):
         start = max(0, first - margin)
         end = min(total - 1, last + margin)
         return start, end
+
+    def _prefetch_visible_rows(self) -> None:
+        if not self._current_model:
+            return
+        span = self._visible_row_span()
+        if not span:
+            return
+        start, end = span
+        start = max(0, start - self._lazy_row_prefetch_margin)
+        end = min(
+            self._current_model.rowCount() - 1, end + self._lazy_row_prefetch_margin
+        )
+        self._current_model.prefetch_rows(start, end)
 
     def _schedule_row_resize(self, *, full: bool = False) -> None:
         if not self._wrap_text or not self._current_model:
@@ -1367,6 +1393,7 @@ class MainWindow(QMainWindow):
         self._pending_row_span = None
 
     def _on_table_scrolled(self, *_args) -> None:
+        self._prefetch_visible_rows()
         if not self._wrap_text or not self._is_large_file():
             return
         self._schedule_row_resize()
@@ -2373,7 +2400,10 @@ class MainWindow(QMainWindow):
         meta = self._locales.get(locale)
         encoding = meta.charset if meta else "utf-8"
         try:
-            pf = parse(path, encoding=encoding)
+            if self._should_parse_lazy(path):
+                pf = parse_lazy(path, encoding=encoding)
+            else:
+                pf = parse(path, encoding=encoding)
         except Exception:
             return (), 0
         cache_map = _read_status_cache(self._root, path) if include_value else {}

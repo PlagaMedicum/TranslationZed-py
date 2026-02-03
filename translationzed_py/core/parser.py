@@ -6,37 +6,20 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, overload
 
 if TYPE_CHECKING:  # forward-refs for mypy, no runtime cycle
     from .model import Entry, ParsedFile, Status
 
+from translationzed_py.core.lazy_entries import EntryMeta, LazyEntries
+from translationzed_py.core.parse_utils import (
+    _decode_text,
+    _resolve_encoding,
+    _unescape,
+)
 
 # ── helper --------------------------------------------------------------------
 _STATUS_MAP: dict[str, Status] = {}  # populated on first parse()
-
-
-def _unescape(raw: str) -> str:
-    """Unescape only escaped quotes/backslashes; keep other escapes literal."""
-    if "\\" not in raw and '""' not in raw:
-        return raw
-    out: list[str] = []
-    i = 0
-    while i < len(raw):
-        ch = raw[i]
-        if ch == "\\" and i + 1 < len(raw):
-            nxt = raw[i + 1]
-            if nxt in {'"', "\\"}:
-                out.append(nxt)
-                i += 2
-                continue
-        if ch == '"' and i + 1 < len(raw) and raw[i + 1] == '"':
-            out.append('"')
-            i += 2
-            continue
-        out.append(ch)
-        i += 1
-    return "".join(out)
 
 
 # ── Token meta ────────────────────────────────────────────────────────────────
@@ -78,27 +61,6 @@ _TOKEN_RE = re.compile(
 )
 
 
-def _resolve_encoding(encoding: str, raw: bytes) -> tuple[str, int]:
-    enc = encoding.lower().replace("_", "-")
-    if enc in {"utf-8", "utf8"} and raw.startswith(codecs.BOM_UTF8):
-        return "utf-8", 3
-    if enc in {"utf-16", "utf16"} and raw.startswith(b"\xff\xfe"):
-        return "utf-16-le", 2
-    if enc in {"utf-16", "utf16"} and raw.startswith(b"\xfe\xff"):
-        return "utf-16-be", 2
-    if enc in {"utf-16", "utf16"}:
-        if not raw:
-            return "utf-16-le", 0
-        even_zeros = sum(1 for i in range(0, len(raw), 2) if raw[i] == 0)
-        odd_zeros = sum(1 for i in range(1, len(raw), 2) if raw[i] == 0)
-        if odd_zeros > even_zeros:
-            return "utf-16-le", 0
-        if even_zeros > odd_zeros:
-            return "utf-16-be", 0
-        return "utf-16-le", 0
-    return encoding, 0
-
-
 def _build_offset_map(text: str, encoding: str) -> list[int]:
     encoder = codecs.getincrementalencoder(encoding)()
     offsets = [0]
@@ -107,13 +69,6 @@ def _build_offset_map(text: str, encoding: str) -> list[int]:
         total += len(encoder.encode(ch))
         offsets.append(total)
     return offsets
-
-
-def _decode_text(data: bytes, encoding: str) -> str:
-    text = data.decode(encoding, errors="replace")
-    if text.startswith("\ufeff"):
-        return text[1:]
-    return text
 
 
 def _read_string_token(text: str, pos: int) -> int:
@@ -252,6 +207,158 @@ def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
 
 
 # ── parse() placeholder – we’ll flesh this out next ───────────────────────────
+def _segment_text(raw_text: str) -> str:
+    if raw_text.startswith('"'):
+        if raw_text.endswith('"'):
+            return _unescape(raw_text[1:-1])
+        return _unescape(raw_text[1:])
+    return raw_text.rstrip()
+
+
+@overload
+def _parse_entries_stream(
+    raw: bytes,
+    *,
+    encoding: str,
+    lazy_values: Literal[False],
+) -> tuple[list[Entry], bool]: ...
+
+
+@overload
+def _parse_entries_stream(
+    raw: bytes,
+    *,
+    encoding: str,
+    lazy_values: Literal[True],
+) -> tuple[list[EntryMeta], bool]: ...
+
+
+def _parse_entries_stream(
+    raw: bytes,
+    *,
+    encoding: str,
+    lazy_values: bool,
+) -> tuple[list[Entry] | list[EntryMeta], bool]:
+    # local import avoids an import cycle
+    from .model import Entry, Status
+
+    entries_meta: list[EntryMeta] | None = None
+    entries_eager: list[Entry] | None = None
+    if lazy_values:
+        entries_meta = []
+    else:
+        entries_eager = []
+    current_key: Tok | None = None
+    collecting = False
+    seg_lens: list[int] = []
+    seg_spans: list[tuple[int, int]] = []
+    span_start: int | None = None
+    span_end: int | None = None
+    status = Status.UNTOUCHED
+    parts: list[str] = []
+    saw_equal = False
+
+    def _finalize_entry() -> None:
+        nonlocal current_key, collecting, seg_lens, seg_spans, span_start, span_end, status, parts
+        if not (collecting and current_key and seg_spans and span_start is not None):
+            current_key = None
+            collecting = False
+            seg_lens = []
+            seg_spans = []
+            span_start = None
+            span_end = None
+            status = Status.UNTOUCHED
+            parts = []
+            return
+        key_text = current_key.text.strip()
+        if not key_text:
+            current_key = None
+            collecting = False
+            seg_lens = []
+            seg_spans = []
+            span_start = None
+            span_end = None
+            status = Status.UNTOUCHED
+            parts = []
+            return
+        gaps: list[bytes] = []
+        for prev, nxt in zip(seg_spans, seg_spans[1:], strict=False):
+            gaps.append(raw[prev[1] : nxt[0]])
+        if lazy_values:
+            assert entries_meta is not None
+            entries_meta.append(
+                EntryMeta(
+                    key_text,
+                    status,
+                    (span_start, span_end or span_start),
+                    tuple(seg_lens) if seg_lens else (0,),
+                    tuple(gaps),
+                    False,
+                    tuple(seg_spans),
+                )
+            )
+        else:
+            value = "".join(parts)
+            assert entries_eager is not None
+            entries_eager.append(
+                Entry(
+                    key_text,
+                    value,
+                    status,
+                    (span_start, span_end or span_start),
+                    tuple(seg_lens) if seg_lens else (len(value),),
+                    tuple(gaps),
+                )
+            )
+        current_key = None
+        collecting = False
+        seg_lens = []
+        seg_spans = []
+        span_start = None
+        span_end = None
+        status = Status.UNTOUCHED
+        parts = []
+
+    for tok in _tokenise(raw, encoding=encoding):
+        if tok.kind is Kind.KEY and not collecting:
+            current_key = tok
+            continue
+        if tok.kind is Kind.EQUAL:
+            saw_equal = True
+            if current_key is None:
+                continue
+            collecting = True
+            seg_lens = []
+            seg_spans = []
+            span_start = None
+            span_end = None
+            status = Status.UNTOUCHED
+            parts = []
+            continue
+        if collecting and tok.kind is Kind.STRING:
+            seg_text = _segment_text(tok.text)
+            seg_lens.append(len(seg_text))
+            seg_spans.append(tok.span)
+            if span_start is None:
+                span_start = tok.span[0]
+            span_end = tok.span[1]
+            if not lazy_values:
+                parts.append(seg_text)
+            continue
+        if collecting and tok.kind is Kind.COMMENT and seg_spans:
+            tag = tok.text[2:].strip().upper()
+            status = _STATUS_MAP.get(tag, Status.UNTOUCHED)
+            continue
+        if tok.kind is Kind.NEWLINE:
+            _finalize_entry()
+            continue
+
+    _finalize_entry()
+    if lazy_values:
+        return (entries_meta or []), saw_equal
+    return (entries_eager or []), saw_equal
+
+
 def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
     """Read *path*, tokenise, and build a ParsedFile with stable spans."""
     # local import avoids an import cycle
@@ -268,7 +375,7 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
 
     raw = path.read_bytes()
     resolved_encoding, _ = _resolve_encoding(encoding, raw)
-    if b"=" not in raw:
+    if b"=" not in raw or path.name.startswith("News_"):
         text = _decode_text(raw, resolved_encoding)
         return ParsedFile(
             path,
@@ -285,107 +392,16 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
             ],
             raw,
         )
-    if path.name.startswith("News_"):
-        text = _decode_text(raw, resolved_encoding)
-        return ParsedFile(
-            path,
-            [
-                Entry(
-                    path.name,
-                    text,
-                    Status.UNTOUCHED,
-                    (0, len(raw)),
-                    (len(text),),
-                    (),
-                    True,
-                )
-            ],
-            raw,
-        )
-    toks = list(_tokenise(raw, encoding=encoding))
-    saw_equal = any(tok.kind is Kind.EQUAL for tok in toks)
 
-    entries: list[Entry] = []
-    i = 0
-    while i < len(toks):
-        #  KEY … = …
-        if toks[i].kind is Kind.KEY:
-            key_tok = toks[i]
-            # skip trivia, expect '='
-            j = i + 1
-            while j < len(toks) and toks[j].kind is Kind.TRIVIA:
-                j += 1
-            if j >= len(toks) or toks[j].kind is not Kind.EQUAL:
-                i += 1
-                continue
-            j += 1  # after '='
-            # gather one or more STRING [TRIVIA] CONCAT [TRIVIA] STRING …
-            parts: list[str] = []
-            seg_lens: list[int] = []
-            seg_spans: list[tuple[int, int]] = []
-            span_start: int | None = None
-            span_end: int | None = None
-            while j < len(toks):
-                if toks[j].kind is Kind.STRING:
-                    raw_text = toks[j].text
-                    if raw_text.startswith('"'):
-                        if raw_text.endswith('"'):
-                            seg_text = _unescape(raw_text[1:-1])
-                        else:
-                            seg_text = _unescape(raw_text[1:])
-                    else:
-                        seg_text = raw_text.rstrip()
-                    parts.append(seg_text)
-                    seg_lens.append(len(seg_text))
-                    seg_spans.append(toks[j].span)
-                    if span_start is None:
-                        span_start = toks[j].span[0]
-                    span_end = toks[j].span[1]
-                    j += 1
-                elif toks[j].kind in (Kind.TRIVIA, Kind.CONCAT):
-                    j += 1
-                else:
-                    break
-            # TODO: preserve original concat/whitespace tokens for loss-less edits.
-            if span_start is None or span_end is None:
-                i += 1
-                continue
-            value = "".join(parts)
-            # find comment on the same line
-            status = Status.UNTOUCHED
-            k = j
-            while k < len(toks) and toks[k].kind is not Kind.NEWLINE:
-                if toks[k].kind is Kind.COMMENT:
-                    tag = toks[k].text[2:].strip().upper()
-                    status = _STATUS_MAP.get(tag, Status.UNTOUCHED)
-                    break
-                k += 1
-            gaps: list[bytes] = []
-            for prev, nxt in zip(seg_spans, seg_spans[1:], strict=False):
-                gaps.append(raw[prev[1] : nxt[0]])
-            key_text = key_tok.text.strip()
-            if not key_text:
-                i += 1
-                continue
-            entries.append(
-                Entry(
-                    key_text,
-                    value,
-                    status,
-                    (span_start, span_end),
-                    tuple(seg_lens) if seg_lens else (len(value),),
-                    tuple(gaps),
-                )
-            )
-            # fast-forward to newline to continue loop
-            while j < len(toks) and toks[j].kind is not Kind.NEWLINE:
-                j += 1
-            i = j
-        i += 1
+    entries, saw_equal = _parse_entries_stream(
+        raw,
+        encoding=encoding,
+        lazy_values=False,
+    )
 
     if not entries:
         if not saw_equal:
-            text = _decode_text(raw, encoding)
+            text = _decode_text(raw, resolved_encoding)
             return ParsedFile(
                 path,
                 [
@@ -404,3 +420,55 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
         raise ValueError("Unsupported file format (no translatable entries found).")
 
     return ParsedFile(path, entries, raw)
+
+
+def parse_lazy(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
+    """Read *path* and build a ParsedFile with lazy entry values."""
+    from .model import ParsedFile, Status
+
+    global _STATUS_MAP
+    if not _STATUS_MAP:  # fill once
+        _STATUS_MAP = {
+            "TRANSLATED": Status.TRANSLATED,
+            "PROOFREAD": Status.PROOFREAD,
+            "FOR REVIEW": Status.FOR_REVIEW,
+            "FOR_REVIEW": Status.FOR_REVIEW,
+        }
+
+    raw = path.read_bytes()
+    resolved_encoding, _ = _resolve_encoding(encoding, raw)
+    if b"=" not in raw or path.name.startswith("News_"):
+        text = _decode_text(raw, resolved_encoding)
+        meta = EntryMeta(
+            path.name,
+            Status.UNTOUCHED,
+            (0, len(raw)),
+            (len(text),),
+            (),
+            True,
+            ((0, len(raw)),),
+        )
+        return ParsedFile(path, LazyEntries(raw, encoding, [meta]), raw)
+
+    entries, saw_equal = _parse_entries_stream(
+        raw,
+        encoding=encoding,
+        lazy_values=True,
+    )
+
+    if not entries:
+        if not saw_equal:
+            text = _decode_text(raw, resolved_encoding)
+            meta = EntryMeta(
+                path.name,
+                Status.UNTOUCHED,
+                (0, len(raw)),
+                (len(text),),
+                (),
+                True,
+                ((0, len(raw)),),
+            )
+            return ParsedFile(path, LazyEntries(raw, encoding, [meta]), raw)
+        raise ValueError("Unsupported file format (no translatable entries found).")
+
+    return ParsedFile(path, LazyEntries(raw, encoding, list(entries)), raw)

@@ -340,9 +340,9 @@ A3 [ ] **Replace‑all safety**
    - **Target**: confirmation dialog listing affected files + counts; applies only to opened locales.
 A4 [→] **Large‑file performance** (more urgent now)
    - [✓] **Windowed row sizing**: only visible rows + viewport margin, debounced.
-   - [ ] **Streaming parser / on‑demand rows**
-     - **Problem**: parser materializes full token lists + entries; large files spike RAM and stall UI.
-     - **Target**: stream tokens and materialize entries on demand or in chunks; keep raw bytes once.
+   - [→] **Streaming parser / on‑demand rows**
+     - **Problem**: parser materializes full token lists + entry values; large files spike RAM and stall UI.
+     - **Target**: stream tokens; keep entry metadata but materialize values on demand with a row‑window prefetch.
    - [ ] **Precompute/store per‑entry hash**
      - **Problem**: xxhash64 computed for every entry on every open; O(n) hot path.
      - **Target**: compute once per file load and reuse across cache lookups and conflicts.

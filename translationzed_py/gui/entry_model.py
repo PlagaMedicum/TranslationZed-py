@@ -37,7 +37,10 @@ class TranslationModel(QAbstractTableModel):
     ):
         super().__init__()
         self._pf = pf
-        self._entries = list(pf.entries)
+        if hasattr(pf.entries, "prefetch"):
+            self._entries = pf.entries
+        else:
+            self._entries = list(pf.entries)
         self._source_values = source_values or {}
         self._source_by_row = source_by_row
         self._baseline_by_row = dict(baseline_by_row or {})
@@ -129,6 +132,10 @@ class TranslationModel(QAbstractTableModel):
                 source=source,
                 value=value,
             )
+
+    def prefetch_rows(self, start: int, end: int) -> None:
+        if hasattr(self._entries, "prefetch"):
+            self._entries.prefetch(start, end)
 
     # Qt mandatory overrides ----------------------------------------------------
     def rowCount(  # noqa: N802

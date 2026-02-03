@@ -1,8 +1,20 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
+
+
+class EntrySequence(Protocol):
+    def __len__(self) -> int: ...
+
+    def __getitem__(self, index: int) -> Entry: ...
+
+    def __setitem__(self, index: int, entry: Entry) -> None: ...
+
+    def __iter__(self) -> Iterator[Entry]: ...
 
 
 class Status(enum.IntEnum):
@@ -35,7 +47,7 @@ class Entry:
 
 
 class ParsedFile:
-    def __init__(self, path: Path, entries: list[Entry], raw: bytes) -> None:
+    def __init__(self, path: Path, entries: EntrySequence, raw: bytes) -> None:
         self.path = path
         self.entries = entries
         self._raw = bytearray(raw)
