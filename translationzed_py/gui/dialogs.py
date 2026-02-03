@@ -6,19 +6,13 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QButtonGroup,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
-    QHeaderView,
     QLabel,
     QListWidget,
-    QMessageBox,
     QPlainTextEdit,
-    QRadioButton,
     QScrollArea,
-    QTableWidget,
-    QTableWidgetItem,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -210,115 +204,6 @@ class ConflictChoiceDialog(QDialog):
             event.ignore()
             return
         super().closeEvent(event)
-
-
-class ConflictMergeDialog(QDialog):
-    """Resolve cache/original conflicts row by row."""
-
-    def __init__(self, rows: Iterable[tuple[str, str, str, str]], parent=None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Resolve conflicts")
-        self.setModal(True)
-        self._rows: list[
-            tuple[str, QTableWidgetItem, QTableWidgetItem, QRadioButton, QRadioButton]
-        ] = []
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(
-            QLabel("Choose Original or Cache for each row (no defaults).", self)
-        )
-
-        table = QTableWidget(self)
-        table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(
-            ["Key", "Source", "Original", "Cache", "Original ✓", "Cache ✓"]
-        )
-        table.setRowCount(0)
-        table.setWordWrap(True)
-        table.setEditTriggers(
-            QAbstractItemView.EditTrigger.DoubleClicked
-            | QAbstractItemView.EditTrigger.EditKeyPressed
-        )
-        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
-        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-
-        for key, source, original, cache in rows:
-            row = table.rowCount()
-            table.insertRow(row)
-
-            key_item = QTableWidgetItem(key)
-            key_item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
-            table.setItem(row, 0, key_item)
-
-            source_item = QTableWidgetItem(source)
-            source_item.setFlags(
-                Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
-            )
-            table.setItem(row, 1, source_item)
-
-            original_item = QTableWidgetItem(original)
-            original_item.setFlags(
-                Qt.ItemFlag.ItemIsSelectable
-                | Qt.ItemFlag.ItemIsEnabled
-                | Qt.ItemFlag.ItemIsEditable
-            )
-            table.setItem(row, 2, original_item)
-
-            cache_item = QTableWidgetItem(cache)
-            cache_item.setFlags(
-                Qt.ItemFlag.ItemIsSelectable
-                | Qt.ItemFlag.ItemIsEnabled
-                | Qt.ItemFlag.ItemIsEditable
-            )
-            table.setItem(row, 3, cache_item)
-
-            group = QButtonGroup(self)
-            group.setExclusive(True)
-            btn_original = QRadioButton(self)
-            btn_cache = QRadioButton(self)
-            group.addButton(btn_original)
-            group.addButton(btn_cache)
-            table.setCellWidget(row, 4, btn_original)
-            table.setCellWidget(row, 5, btn_cache)
-
-            self._rows.append((key, original_item, cache_item, btn_original, btn_cache))
-
-        table.resizeColumnsToContents()
-        table.horizontalHeader().setStretchLastSection(False)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
-        table.setMinimumHeight(320)
-        layout.addWidget(table)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
-            Qt.Orientation.Horizontal,
-            self,
-        )
-        buttons.accepted.connect(self._on_accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def _on_accept(self) -> None:
-        for _key, _orig_item, _cache_item, btn_original, btn_cache in self._rows:
-            if not (btn_original.isChecked() or btn_cache.isChecked()):
-                QMessageBox.warning(
-                    self,
-                    "Incomplete selection",
-                    "Choose Original or Cache for every row.",
-                )
-                return
-        self.accept()
-
-    def resolutions(self) -> dict[str, tuple[str, str]]:
-        out: dict[str, tuple[str, str]] = {}
-        for key, orig_item, cache_item, btn_original, btn_cache in self._rows:
-            if btn_original.isChecked():
-                out[key] = (orig_item.text(), "original")
-            elif btn_cache.isChecked():
-                out[key] = (cache_item.text(), "cache")
-        return out
 
 
 class AboutDialog(QDialog):

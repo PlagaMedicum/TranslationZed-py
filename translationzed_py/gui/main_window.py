@@ -1843,6 +1843,8 @@ class MainWindow(QMainWindow):
             changed_keys=changed_keys,
             original_values=original_values,
         )
+        if not changed_keys:
+            self.fs_model.set_dirty(path, False)
         self._clear_conflicts(path)
         self._reload_file(path)
         return True
@@ -1936,6 +1938,8 @@ class MainWindow(QMainWindow):
             original_values=original_values,
             force_original=keep_conflict,
         )
+        if not changed_keys:
+            self.fs_model.set_dirty(path, False)
         self._clear_conflicts(path)
         self._reload_file(path)
         return True
