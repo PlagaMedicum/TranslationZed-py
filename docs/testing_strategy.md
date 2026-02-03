@@ -17,6 +17,7 @@ _Last updated: 2026-01-31_
 ### 2.1 Core Unit Tests (highest priority)
 - Parser tokenization and span integrity.
 - UTF‑8 / cp1251 / UTF‑16 decoding behavior.
+- UTF‑16 decoding **without BOM** when `language.txt` declares UTF‑16 (heuristic fallback).
 - Concat preservation in save (no collapsing).
 - Byte‑exact structure preservation on save (comments/spacing/ordering).
 - Encoding preserved on save for each locale’s declared charset.
@@ -92,6 +93,8 @@ They include:
 - `_TVRADIO_TRANSLATIONS` to ignore
 - Real‑world samples should be derived from `ProjectZomboidTranslations/` when possible
   (reference only; do not vendor full repo into tests).
+- Manual conflict fixture: `tests/fixtures/conflict_manual/` (prebuilt cache + changed file)
+  to exercise the conflict resolution UI.
 
 ---
 
@@ -102,6 +105,7 @@ They include:
   stray quotes/markup, dotted keys, keys with symbols, raw/plain‑text files.
 - Encodings: parse CP1251 + UTF‑16 from prod‑like fixtures; golden round‑trip tests
   for UTF‑8/CP1251/UTF‑16 with byte‑exact output.
+- Add a UTF‑16 **no‑BOM** fixture to validate heuristic decoding based on `language.txt`.
 - Saver basics: span updates, concat preservation, escape encoding.
 - Saver structure preservation on edge cases (stray quotes/markup, `//` headers,
   trivia spacing, raw file replacement, and large‑file slices (Recorded_Media/News/Stash).
@@ -115,12 +119,17 @@ They include:
 **Not covered yet (automation gaps):**
 - Full‑file diff invariants on large prod files (Recorded_Media/News/Stash cases).
 - Multi‑file replace‑all across scope with confirmation list (future).
+- Cache/original conflict detection + merge decisions (new requirement).
 
 **Planned test expansions:**
 - Golden save fixtures derived from real PZ files (small slices) that include
   tricky comments/spacing/concat chains and raw tables.
 - Locale‑driven encoding save tests (write via GUI/controller and compare bytes).
 - Regression test suite for previously reported parse/saver failures (screenshots).
+- Conflict tests:
+  - Detect cache vs original divergence for a file with cached drafts.
+  - Ensure write‑original is blocked until conflicts resolved.
+  - Merge dialog decisions persist chosen values back into cache.
 
 ---
 

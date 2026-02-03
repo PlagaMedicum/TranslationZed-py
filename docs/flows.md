@@ -1,5 +1,5 @@
 # TranslationZed-Py — Key Flows
-_Last updated: 2026-01-28_
+_Last updated: 2026-01-31_
 
 ---
 
@@ -36,7 +36,29 @@ User: Project ▸ Open
 
 ---
 
-## 3) Edit + Save (single file)
+## 3) Open File + Conflict Scan
+
+```
+User selects file in tree
+  -> parse file (encoding from language.txt)
+  -> load cache draft (if present)
+  -> if cache has draft + original snapshot:
+       compare original snapshot vs current file value(s)
+       if mismatch:
+         show modal: Drop cache | Drop original | Merge
+           - Drop cache: discard conflicting cache values
+           - Drop original: keep cache values (original changes discarded on next save)
+           - Merge: replace main table view with conflict table
+             - Choosing Original sets status to For review; choosing Cache keeps cache status
+             (Key | Source | Original | Cache)
+             per-row choice (radio) + editable original/cache cells
+             file tree + editor disabled until resolved
+           - No deferral; conflicts must be resolved before continuing
+```
+
+---
+
+## 4) Edit + Save (single file)
 
 ```
 User edits cell
@@ -49,6 +71,7 @@ User: Save
   -> prompt shows a scrollable list of files to be written (opened this session)
   -> Cache only: keep drafts in cache; originals unchanged
   -> Write:
+       if conflicts for current file: block save until resolved
        saver preserves concat structure + trivia
        write file.tmp -> replace
        write .tzp-cache/<locale>/<rel>.bin (status only)
@@ -57,7 +80,7 @@ User: Save
 
 ---
 
-## 4) Status Update
+## 5) Status Update
 
 ```
 User: Status ▼ or Ctrl+P
@@ -68,7 +91,7 @@ User: Status ▼ or Ctrl+P
 
 ---
 
-## 5) Locale Switch
+## 6) Locale Switch
 
 ```
 User: Project ▸ Switch Locale(s)

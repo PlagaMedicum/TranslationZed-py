@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.6 · 2026‑01‑27_
+_version 0.3.14 · 2026‑01‑31_
 
 ---
 ## 1  Actors
@@ -89,7 +89,14 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 | **Trigger** | `Ctrl+P` or context‑menu → **Mark Proofread** on selected rows. |
 | **Flow** |
 |  1 | SYS sets `Entry.status = PROOFREAD`. |
-|  2 | Table delegate re‑paints cell background light‑green. |
+|  2 | Table delegate re‑paints cell background light‑blue. |
+|  3 | Toolbar **Status ▼** label reflects the selected row status. |
+
+### UC‑04b  Mark as For Review
+| **Trigger** | Status ▼ → **For review** on selected rows (shortcut TBD). |
+| **Flow** |
+|  1 | SYS sets `Entry.status = FOR_REVIEW`. |
+|  2 | Table delegate re‑paints cell background **orange**. |
 |  3 | Toolbar **Status ▼** label reflects the selected row status. |
 
 ### UC‑05  Search & Navigate
@@ -111,6 +118,21 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  4 | **Replace All** updates all matches in the current file. |
 |  5 | If the regex can match empty strings (e.g., `(.*)`), SYS performs a single replacement per cell. |
 | **Future** | A locale‑scope **Replace All** will apply to all files in the **current locale only** and must be explicitly labeled to avoid ambiguity. |
+
+### UC‑06  Resolve Cache/Original Conflicts
+| Field | Value |
+|-------|-------|
+| **Goal** | Resolve conflicts between cached drafts and modified originals. |
+| **Primary Actor** | TR / PR |
+| **Trigger** | Opening a file **or** attempting to write originals. |
+| **Main Success Scenario** |
+|  1 | SYS compares cached **original snapshots** (stored per key) against current file values. |
+|  2 | If any mismatch is found, SYS shows a **modal** choice: **Drop cache** / **Drop original** / **Merge**. |
+|  3 | **Drop cache** discards conflicting cache values for this file. |
+|  4 | **Drop original** keeps cache values (statuses preserved); original changes will be overwritten on save. |
+|  5 | **Merge** replaces the main table view with a conflict table: `Key | Source | Original | Cache`, with per‑row radio choice; both Original/Cache cells are editable and only the chosen cell is persisted to cache. No default selection. Choosing **Original** sets status to **For review**; choosing **Cache** keeps the cache status. |
+|  6 | While the conflict table is visible, SYS MUST disable normal editing and file switching. |
+| **Post‑condition** | Conflicts resolved before returning to normal editing; cache updated accordingly. |
 
 ### UC‑09  Preferences (Settings)
 | Field | Value |
@@ -203,7 +225,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 ```
 
 ---
-## 5  Sequence Diagram – UC‑06 (Save)
+## 5  Sequence Diagram – Save (Write Originals)
 ```
 TR         SYS:model        SYS:saver          OS
  |  Ctrl+S   |                |                |
@@ -219,11 +241,11 @@ TR         SYS:model        SYS:saver          OS
 ---
 ## 6  Data‑State Transitions (Entry)
 ```
-          user edits / Ctrl+P
-UNTOUCHED ──────────────────────▶ TRANSLATED ───▶ PROOFREAD
-               (change)                ▲
-               (status=Translated)     │ cancelled / undo
-                                       └───────────────
+          user edits / Status ▼
+UNTOUCHED ──────────────────────▶ FOR_REVIEW ───▶ TRANSLATED ───▶ PROOFREAD
+               (status change)               ▲
+                                             │ cancelled / undo
+                                             └───────────────
 ```
 
 ---
@@ -249,6 +271,8 @@ UNTOUCHED ──────────────────────▶ 
      inside editor.
      **String editor** below the table (Poedit‑style). Source is read‑only and Translation is editable;
      table remains visible above. Toggle is placed in the **bottom bar** and defaults to **open**.
+   - Status palette: **For review** = orange, **Translated** = green, **Proofread** = light‑blue (higher priority than Translated).
+   - Validation priority: **empty cell = red** (overrides any status color).
 7. **Future visualization**: highlight escape sequences, tags, and repeated whitespace; optional
    glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation in both
    preview and edit.
@@ -257,4 +281,4 @@ UNTOUCHED ──────────────────────▶ 
 9. **System theme**: future support for OS light/dark theme via native Qt styles (no custom theme).
 
 ---
-_Last updated: 2026‑01‑29 (v0.3.13)_
+_Last updated: 2026‑01‑31 (v0.3.14)_

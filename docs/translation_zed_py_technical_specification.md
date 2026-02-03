@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.3.8 · 2026‑01‑29**\
+**Version 0.3.9 · 2026‑01‑31**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -35,7 +35,8 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 - One file open at a time in the table (no tabs in MVP).
 - On startup, open the **most recently opened file** across the selected locales.
   The timestamp is stored in each file’s cache header for fast lookup.
-- Status per Entry: **Untouched** (initial state), **Translated**, **Proofread**.  Future statuses pluggable.
+- Status per Entry: **Untouched** (initial state), **For review**, **Translated**, **Proofread**.
+  Future statuses remain pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
 - Live plain / regex search over Key / Source / Translation with `F3` / `Shift+F3` navigation.
 - Reference‑locale switching without reloading UI (future; English is base in MVP).
@@ -144,6 +145,8 @@ Tokenizer regex patterns:
 Parse algorithm:
 
 1. Read raw bytes using the locale‑specific `encoding` (from `language.txt`; default *utf‑8*).
+   - If `encoding` is UTF‑16 and no BOM is present, **still attempt** decoding using the
+     declared charset (heuristic fallback). Fail hard only if decoding errors occur.
 2. Tokenize entire file → `list[Token]` with `(type, text, start, end)`.
 3. For each `STRING` immediately right of `IDENT "="`, create **Entry** whose
    `span` covers *only* the string literal region (including the quotes), even
@@ -168,6 +171,7 @@ Parse algorithm:
 ```python
 class Status(Enum):
     UNTOUCHED   = auto()  # never edited in current session
+    FOR_REVIEW  = auto()
     TRANSLATED  = auto()
     PROOFREAD   = auto()
 
@@ -333,10 +337,14 @@ if dirty_files and not prompt_save():
 - Inherits `QTableView`, uses `TranslationTableModel`.
 - Override `keyPressEvent` to commit on `Qt.Key_Return` then `QModelIndex.sibling(row+1, col)`.
 - Column delegates:
-  - **StatusDelegate**: background colours (Untouched‑none, Translated‑default, Proofread‑#ccffcc).
+  - **StatusDelegate**: background colours
+    - **Empty cell**: red (highest priority; overrides status colours)
+    - Untouched: none
+    - For review: orange (#ffd8a8)
+    - Translated: light‑green (#ccffcc)
+    - Proofread: light‑blue (#cce5ff)
   - **EditDelegate**  : plain `QLineEdit`.
 - Key bindings: `Ctrl+F` opens search, `F3`/`Shift+F3` next/prev match, `Ctrl+P` mark Proofread.
-  - **EditDelegate**  : plain `QLineEdit`.
 
 ### 5.9  `core.status_cache`
 
@@ -347,18 +355,31 @@ hidden `.tzp-cache/` subfolder under the repo root, preserving relative paths.
 
 | Offset | Type | Description |
 |--------|------|-------------|
-| 0      | 4s   | magic `TZC1` |
+| 0      | 4s   | magic `TZC3` |
 | 4      | u64  | `last_opened_unix` |
 | 12     | u32  | entry-count |
-| 16     | …   | repeated: `u16 key-hash` • `u8 status` • `u8 flags` • `u32 len` • `bytes[len]` |
+| 16     | …   | repeated: `u64 key-hash` • `u8 status` • `u8 flags` • `u32 draft_len` • `u32 orig_len` • `draft bytes` • `orig bytes` |
 
-  *Key-hash* is `xxhash16(key_bytes)`.  
+  *Key-hash* is `xxhash64(key_bytes)` stored as **u64** (collision‑resistant).  
   Status byte values follow `core.model.Status` order.  
-  Flags: bit0 = `has_value`. When `has_value=1`, `len` bytes of UTF‑8 value follow.
+  Flags: bit0 = `has_draft`, bit1 = `has_original`.
+  When set, the corresponding UTF‑8 byte payload follows (`draft_len` / `orig_len`).
+
+Legacy caches:
+- `TZC2` uses the **old** status order (Untouched=0, Translated=1, Proofread=2, For review=3).
+- On read, legacy bytes are mapped into the new enum order and rewritten as `TZC3`.
 
 ```python
 def read(root: Path, file_path: Path) -> dict[int, CacheEntry]: ...
-def write(root: Path, file_path: Path, entries: list[Entry], *, changed_keys: set[str] | None = None) -> None: ...
+def write(
+    root: Path,
+    file_path: Path,
+    entries: list[Entry],
+    *,
+    changed_keys: set[str] | None = None,
+    original_values: dict[str, str] | None = None,
+    force_original: set[str] | None = None,
+) -> None: ...
 ```
   - Loaded when a file is opened; `ParsedFile.entries` values + statuses are
     patched in memory from cache.
@@ -367,6 +388,7 @@ def write(root: Path, file_path: Path, entries: list[Entry], *, changed_keys: se
   - `last_opened_unix` is updated on file open.
   - Written automatically on edit and on file switch. Draft values are stored
     **only** for `changed_keys`; statuses stored when `status != UNTOUCHED`.
+  - **Original snapshots** are stored for draft keys to detect cache/original conflicts.
   - On “Write Original”, draft values are cleared from cache; statuses persist.
   - `last_opened_unix` is written **only when a cache file exists** (no empty cache files).
   - If no statuses or drafts exist, cache file MUST be absent (or removed).
@@ -386,6 +408,14 @@ Track hashes of English files (raw bytes) to detect upstream changes.
 
 A missing or corrupt cache MUST be ignored gracefully (all entries fall back to
 UNTOUCHED).
+
+---
+
+### 5.10 Conflict resolution (cache vs original)
+
+- Conflicts compare cached **original snapshots** to current file values (value-only compare).
+- If the user keeps the **cache** value, the entry status is taken from the cache.
+- If the user keeps the **original** value, the entry status is forced to **For review**.
 
 ---
 
@@ -513,4 +543,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-01-29 (v0.3.8)*
+*Last updated: 2026-01-31 (v0.3.9)*

@@ -1,4 +1,4 @@
-# TranslationZed-Py: Technical Notes (2026-01-30)
+# TranslationZed-Py: Technical Notes (2026-01-31)
 
 Goal: capture *observed behavior*, *as-built architecture*, and *spec deltas* with
 minimal prose and maximal precision. These are diagnostic notes, not a roadmap.
@@ -97,8 +97,15 @@ From latest clarification:
     multi-line editor. Editor expands to remaining table width and height adapts to content
     (min ~2 lines, max to table bottom). Mouse-wheel scroll stays inside editor
     (table does not scroll while editor is active).
-- **Future validation cues**: empty **Key/Source** cells should be red; empty **Translation** cells
-  should be orange. (Planned; not yet implemented.)
+- **Validation cues**: any **empty cell** is red and overrides status color
+  (implemented).
+- **Status palette**:
+  - **For review**: orange background (implemented).
+  - **Translated**: green background.
+  - **Proofread**: light‑blue background (higher priority than Translated).
+- **Status order (desired)**: Untouched → For review → Translated → Proofread.
+- **Cache key width**: move to **u64** hash to avoid collisions (u16 is unsafe).
+- **UTF‑16 without BOM**: allow heuristic decoding **only** when `language.txt` declares UTF‑16.
 - **Plain-text files**: if a file has no `=` tokens, it is treated as a single raw entry
   (key = filename) and saved back verbatim without quoting. Mixed/unsupported formats remain errors.
 - **Parser tolerances (current)**:
@@ -158,6 +165,24 @@ From latest clarification:
 - **Release workflow (current)**: GitHub Actions needs `permissions: contents: write` to create draft
   releases (403 otherwise).
 
+### Conflict resolution (new requirement)
+- **Trigger**: on **file open**, if cache drafts exist and the original file’s translations
+  have changed since the cache snapshot, detect conflicts asynchronously (do not block editor).
+- **Notification**: when conflict scan completes, show a blocking modal with choices:
+  1) **Drop cache** (discard conflicting cache values)
+  2) **Drop original** (keep cache values; original changes will be overwritten on save)
+  3) **Merge** (open conflict resolution dialog)
+- **Merge view**: replaces the main table with a conflict table; **normal editing + file switching blocked while active**:
+  - Key | Source | Original | Cache
+  - per‑row choice: **Original** or **Cache** (mutually exclusive checkbox)
+  - both Original/Cache cells are editable; only the chosen cell is written back to cache
+  - Choosing **Original** forces status to **For review**; choosing **Cache** keeps cache status
+- **Deferral**: removed; conflicts must be resolved before returning to editing.
+- **Scope**: only for the **currently opened file**.
+- **Comparison basis**: compare **translation values only** (no whitespace normalization).
+- **Cache requirements**: cache must store **original translation snapshot** (per key) to detect
+  file‑changes vs cache drafts.
+
 ---
 
 ## 0.4) Current State Review (v0.1.0 release)
@@ -179,6 +204,80 @@ From latest clarification:
 - **TM/LanguageTool**: suggestion engine and TM import/project‑TM generation are future work.
 - **Layout toggles**: file tree hide/show toggle is planned but not implemented.
 - **Packaging size**: Linux/macOS bundles are still larger due to full Qt runtime.
+
+---
+
+## 0.5) Performance Audit (as-built, v0.1.0)
+
+Observed hotspots and their current shape (code references are indicative):
+
+**A) File open / parse path**
+- **Full‑file read + token list**: `core/parser.py::parse()` reads bytes, builds a
+  full token list (`list(_tokenise(...))`), then walks it to build `Entry` objects.
+  Large files (Recorded_Media, UI) allocate both the raw bytes **and** the token list.
+- **Offset map**: `_build_offset_map` encodes every character to compute byte offsets,
+  which is O(n) with non‑trivial constant factors for UTF‑16 and long strings.
+- **Cache application**: `gui/main_window.py::_file_chosen` walks every entry and
+  computes xxhash per key (16‑bit truncation) to reconcile cache rows; O(n) per open.
+- **Source map duplication**: `_load_en_source` builds a dict `{key: value}` for EN;
+  this duplicates string payloads for large files (Source and Translation both held).
+
+**B) Search & replace**
+- **Multi‑file search**: `_ensure_search_index` materializes full `SearchRow` lists
+  per file for Locale/Pool scope; each file parse + cache read + source load happens
+  to build in‑memory rows even if only a few hits exist.
+- **Search cache**: `_search_rows_cache` caches rows by `(mtime, cache mtime)` but still
+  stores full lists (memory‑heavy for large files).
+- **Regex compilation**: `core/search.py::search` compiles every run; ok for small files,
+  but multi‑file searches repeatedly re‑compile for the same query.
+
+**C) File tree + dirty indicator**
+- **Tree build**: `gui/fs_model.py` builds all file items at startup with `rglob`.
+- **Dirty dot updates**: `FsModel.set_dirty` uses `match(..., MatchRecursive)` which
+  is O(n) in tree size per update. `_mark_cached_dirty()` walks **all cache files** and
+  reads each cache to see if draft values exist.
+
+**D) Table rendering / row sizing**
+- **Word‑wrap**: `resizeRowsToContents()` is called on wrap toggle and row edit;
+  for large files this is expensive, especially if invoked frequently.
+- **Detail editors**: `_sync_detail_editors` runs on selection + data changes; for large
+  selections or rapid edits this can add UI overhead.
+
+**E) Replace‑all (scope > FILE)**
+- `_replace_all_in_file` parses each target file and walks all entries, performing
+  regex checks row‑by‑row. This is correct but expensive for large scopes.
+
+Current mitigations already present:
+- Search is **manual** (Enter / prev / next only); keystrokes only schedule, not run.
+- Search row cache is LRU‑bounded (default 64 files).
+- Cache stores **draft values only for changed keys**, limiting cache size.
+- `TranslationModel` tracks a **baseline map** only for edited rows.
+
+Performance opportunities (candidate v0.2 work):
+- **Windowed model**: load only visible rows + a viewport‑percent margin; avoid materializing
+  every `Entry` for large files and keep a row cache window.
+- **Streaming parse**: avoid `list(_tokenise)`; parse line‑by‑line or generator‑driven
+  to build only the requested row window.
+- **Key‑hash precompute**: store an entry hash alongside `Entry` to avoid per‑open xxhash.
+- **EN source lazy map**: compute source values on demand; avoid building full `{key: value}`
+  when a row window is active.
+- **Dirty index**: maintain a per‑session dirty file set and/or cache header bit
+  “has draft values” to avoid reading full cache files at startup.
+- **Tree index map**: store a `path -> QStandardItem` dict in `FsModel` for O(1) dirty updates.
+- **Search index**: build per‑file search indices lazily and reuse across queries when safe;
+  scan in chunks for large files to keep memory bounded.
+- **Row sizing**: only resize visible rows; debounce resize operations after edits.
+
+Pending performance questions (need product guidance):
+- Are there target limits (max file size, max locale count) that must remain responsive?
+- Is background indexing acceptable, or must all search remain synchronous?
+- Do we accept “initial open is slower, scrolling is fast,” or must first open be fast too?
+
+Answers (2026‑01‑31):
+- **Largest prod file** must load smoothly; lazy‑load is expected to mitigate most issues.
+- **Search** may be progressive; surface progress in the **status bar**.
+- **Initial open must be fast** (first table render is a priority).
+- **Performance is the top priority** for v0.2 work.
 
 ---
 
@@ -382,15 +481,21 @@ Clarified direction:
 
 Cache file layout (actual):
 ```
-4s magic ("TZC1")
+4s  magic ("TZC3")
+u64 last_opened_unix
 u32 count
 repeat count:
   u16 key_hash
-  u8  status
-  u8  flags (bit0 = has_value)
+  u8  status (UNTOUCHED=0, FOR_REVIEW=1, TRANSLATED=2, PROOFREAD=3)
+  u8  flags (bit0 = has_value, bit1 = has_original)
   u32 value_len
+  u32 original_len
   bytes[value_len] (UTF-8)
+  bytes[original_len] (UTF-8)
 ```
+Legacy caches:
+- `TZC2` uses the old status order (Untouched=0, Translated=1, Proofread=2, For review=3).
+- Legacy bytes are mapped to the new enum order on read and rewritten as `TZC3`.
 
 ---
 
@@ -401,7 +506,7 @@ Area                         Spec Expectation             As-Built Status
 ---------------------------  ---------------------------- -------------------------
 File open UX                 Double-click/Enter opens     Implemented (opens file)
 Translation table            QTableView + delegates       Status delegate implemented
-Status coloring              Background color             Translated green + Proofread light blue implemented
+Status coloring              Background color             For review orange + Translated green + Proofread light blue implemented
 Status dropdown              Toolbar "Status"             Implemented (combo + Ctrl+P)
 Source column                Key | Source | Translation   Key | Source | Value | Status
 EN as base (non-editable)    EN shown as Source           Implemented (EN source map)

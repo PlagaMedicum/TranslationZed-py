@@ -286,9 +286,10 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ### Step 28 — Validation highlights [✓]
 - Touchpoints: `gui/entry_model.py`, `gui/delegates.py`
 - Acceptance:
-  - Empty **Key** or **Source** cells render with **red** background (highest priority).
-  - **Translated** cells render with **green** background (medium priority).
-  - Empty **Translation** cells render with **orange** background (low priority).
+  - Any **empty cell** renders with **red** background (highest priority; overrides status colors).
+  - **For review** cells render with **orange** background.
+  - **Translated** cells render with **green** background.
+  - **Proofread** cells render with **light‑blue** background (higher priority than Translated).
   - Colors are purely visual (no blocking) and can be toggled later in Preferences
 
 ### Step 29 — LanguageTool + Translation Memory (TM) [≈ future]
@@ -331,20 +332,47 @@ Priority A — **Core workflow completeness**
 4) **Large‑file performance**
    - Windowed/virtualized table model with row cache margin based on **viewport %**.
    - Streaming parser or on‑demand row materialization to avoid full file in RAM.
+   - Precompute/store per‑entry hash to avoid repeated xxhash on open.
+   - Lazy EN source map (avoid full `{key: value}` dict for large files).
+   - Search index should be **lazy + bounded** (avoid building row lists for every file).
+   - Dirty dot index should be **O(1)** per file (path→item map + cache header flag).
+   - Row sizing should be **visible‑rows only**; debounce resizes after edits.
+   - **Progressive multi‑file search** with status‑bar progress (non‑blocking).
+   - **Fast initial open**: prioritize “first table render” under a tight budget.
+   - Upgrade cache key hash to **u64** (reduce collisions); add cache migration.
 5) **Automated regression coverage**
    - Expand golden/round‑trip tests to cover **structure preservation** (comments, spacing,
      concat chains, stray quotes, block/line comments, raw tables) using real samples.
    - Add **encoding‑specific** fixtures per locale (cp1251, UTF‑16, UTF‑8 variants) and
      assert byte‑exact round‑trip output preserves the original encoding.
    - Use the `ProjectZomboidTranslations` repo as a reference source for edge‑case inputs.
+   - Add **performance regression** checks (profiling or timing budgets) for:
+     - open‑file latency (large files),
+     - search‑across‑files latency,
+     - cache write latency on status/value edits.
+6) **Cache/original conflict handling (new)**
+   - On file open, compare cached draft values vs **original file translations**.
+   - If conflicts exist, show **modal notification** with choices:
+     1) Drop cache (discard conflicting cache values)
+     2) Drop original (keep cache values; original changes overwritten on save)
+     3) Merge (open conflict resolution dialog)
+   - Conflict merge view:
+     - Table columns: Key | Source | Original | Cache
+     - Mutually exclusive per‑row choice (Original vs Cache)
+     - Original/Cache cells editable; only chosen cell stored back into cache
+     - If **Original** is chosen, set status to **For review**; if **Cache** is chosen, keep cache status
+     - While merge view is active, **block normal editing and file switching**
+   - Saving to originals is **blocked** until conflicts for the current file are resolved.
+   - Scope: **only opened file**; detection runs in background, notification shown when ready.
+   - Cache schema must store **original translation snapshot** per key for comparisons.
 
 Priority B — **Productivity/clarity**
-6) **Validation highlights** (Step 28).
-7) **File tree toggle** (Step 21).
-8) **Text visualization** (Step 19).
+7) **Validation highlights** (Step 28).
+8) **File tree toggle** (Step 21).
+9) **Text visualization** (Step 19).
 
 Priority C — **Assistive tooling**
-9) **Translation memory** + **LanguageTool** (Step 29).
+10) **Translation memory** + **LanguageTool** (Step 29).
 
 ---
 
@@ -353,6 +381,8 @@ Priority C — **Assistive tooling**
 - **v0.2 priority order**: confirmed (Priority A/B/C as listed).
 - **Replace‑all confirmation**: modal dialog now; future sidebar is acceptable (VSCode‑style).
 - **Pool scope**: Pool = currently opened locales only (not entire root).
+- **Cache hash width**: use **u64** key hashes (current u16 is collision‑prone).
+- **UTF‑16 without BOM**: heuristic decode is allowed **only when** `language.txt` declares UTF‑16.
 
 ---
 
