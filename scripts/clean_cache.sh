@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURE_ROOT="$ROOT_DIR/tests/fixtures"
+# Preserve committed fixture caches to keep make verify non-destructive.
 
 while IFS= read -r cache_dir; do
   case "$cache_dir" in
