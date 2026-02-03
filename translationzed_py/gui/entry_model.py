@@ -17,9 +17,9 @@ _HEADERS = ("Key", "Source", "Translation", "Status")
 _BG_STATUS = {
     Status.TRANSLATED: QColor("#ccffcc"),
     Status.PROOFREAD: QColor("#cce5ff"),
+    Status.FOR_REVIEW: QColor("#ffd8a8"),
 }
 _BG_MISSING = QColor("#ffcccc")
-_BG_EMPTY = QColor("#ffd8a8")
 
 
 class TranslationModel(QAbstractTableModel):
@@ -81,6 +81,14 @@ class TranslationModel(QAbstractTableModel):
             if 0 <= row < len(self._entries):
                 keys.add(self._entries[row].key)
         return keys
+
+    def baseline_values(self) -> dict[str, str]:
+        """Return original values for rows that currently track edits."""
+        out: dict[str, str] = {}
+        for row, baseline in self._baseline_by_row.items():
+            if 0 <= row < len(self._entries):
+                out[self._entries[row].key] = baseline
+        return out
 
     def status_for_row(self, row: int) -> Status | None:
         if 0 <= row < len(self._entries):
@@ -146,7 +154,7 @@ class TranslationModel(QAbstractTableModel):
                 case 2:
                     return e.value
                 case 3:
-                    return e.status.name.title()
+                    return e.status.label()
 
         # --- display text ----------------------------------------------------
         if role == Qt.DisplayRole:
@@ -158,7 +166,7 @@ class TranslationModel(QAbstractTableModel):
                 case 2:
                     return e.value
                 case 3:
-                    return e.status.name.title()
+                    return e.status.label()
 
         if role == Qt.EditRole:
             match index.column():
@@ -178,7 +186,7 @@ class TranslationModel(QAbstractTableModel):
             if index.column() == 1 and not (self._source_values.get(e.key, "") or ""):
                 return _BG_MISSING
             if index.column() == 2 and not (e.value or ""):
-                return _BG_EMPTY
+                return _BG_MISSING
             return _BG_STATUS.get(e.status)
 
         return None
@@ -235,7 +243,7 @@ class TranslationModel(QAbstractTableModel):
                 st = value
             else:
                 try:
-                    st = Status[str(value).upper()]
+                    st = Status[str(value).upper().replace(" ", "_")]
                 except KeyError:
                     return False
             if st != e.status:

@@ -11,7 +11,15 @@ from collections import OrderedDict
 from pathlib import Path
 
 import xxhash
-from PySide6.QtCore import QByteArray, QItemSelectionModel, QPoint, Qt, QTimer, QUrl
+from PySide6.QtCore import (
+    QByteArray,
+    QEventLoop,
+    QItemSelectionModel,
+    QPoint,
+    Qt,
+    QTimer,
+    QUrl,
+)
 from PySide6.QtGui import (
     QAction,
     QDesktopServices,
@@ -21,6 +29,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -31,10 +40,15 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
+    QPushButton,
+    QRadioButton,
     QSizePolicy,
     QSplitter,
+    QStackedWidget,
     QStyle,
     QTableView,
+    QTableWidget,
+    QTableWidgetItem,
     QToolBar,
     QToolButton,
     QTreeView,
@@ -54,7 +68,7 @@ from translationzed_py.core.app_config import load as _load_app_config
 from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
-from translationzed_py.core.model import Status
+from translationzed_py.core.model import STATUS_ORDER, Status
 from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.preferences import save as _save_preferences
 from translationzed_py.core.saver import save
@@ -80,6 +94,7 @@ from .commands import ChangeStatusCommand
 from .delegates import KeyDelegate, MultiLineEditDelegate, StatusDelegate
 from .dialogs import (
     AboutDialog,
+    ConflictChoiceDialog,
     LocaleChooserDialog,
     ReplaceFilesDialog,
     SaveFilesDialog,
@@ -147,6 +162,11 @@ class MainWindow(QMainWindow):
         self._current_model: TranslationModel | None = None
         self._opened_files: set[Path] = set()
         self._cache_map: dict[int, CacheEntry] = {}
+        self._conflict_files: dict[Path, dict[str, str]] = {}
+        self._conflict_sources: dict[Path, dict[str, str]] = {}
+        self._conflict_notified: set[Path] = set()
+        self._skip_conflict_check = False
+        self._skip_cache_write = False
         self._files_by_locale: dict[str, list[Path]] = {}
         self._en_cache: dict[Path, ParsedFile] = {}
         self._child_windows: list[MainWindow] = []
@@ -192,6 +212,13 @@ class MainWindow(QMainWindow):
         self._detail_min_height = 0
         self._detail_syncing = False
         self._detail_dirty = False
+        self._merge_active = False
+        self._merge_rows: list[
+            tuple[str, QTableWidgetItem, QTableWidgetItem, QRadioButton, QRadioButton]
+        ] = []
+        self._merge_result: dict[str, tuple[str, str]] | None = None
+        self._merge_loop: QEventLoop | None = None
+        self._merge_apply_btn: QPushButton | None = None
 
         self._main_splitter = QSplitter(Qt.Vertical, self)
         self._content_splitter = QSplitter(Qt.Horizontal, self)
@@ -219,8 +246,8 @@ class MainWindow(QMainWindow):
         self.toolbar.addWidget(status_label)
         self.status_combo = QComboBox(self)
         self.status_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
-        for st in Status:
-            self.status_combo.addItem(st.name.title(), st)
+        for st in STATUS_ORDER:
+            self.status_combo.addItem(st.label(), st)
         self.status_combo.setCurrentIndex(-1)
         self.status_combo.setEnabled(False)
         self.status_combo.currentIndexChanged.connect(self._status_combo_changed)
@@ -415,7 +442,14 @@ class MainWindow(QMainWindow):
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
         self.table.horizontalHeader().sectionResized.connect(self._on_header_resized)
-        self._content_splitter.addWidget(self.table)
+        self._right_stack = QStackedWidget(self)
+        self._table_container = QWidget(self)
+        table_layout = QVBoxLayout(self._table_container)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.addWidget(self.table)
+        self._right_stack.addWidget(self._table_container)
+        self._merge_container: QWidget | None = None
+        self._content_splitter.addWidget(self._right_stack)
 
         self._detail_panel = QWidget(self)
         self._detail_panel.setMinimumHeight(0)
@@ -937,6 +971,9 @@ class MainWindow(QMainWindow):
         self._selected_locales = selected
         self._files_by_locale.clear()
         self._opened_files.clear()
+        self._conflict_files.clear()
+        self._conflict_sources.clear()
+        self._conflict_notified.clear()
         self._current_pf = None
         self._current_model = None
         self._search_matches = []
@@ -960,8 +997,18 @@ class MainWindow(QMainWindow):
         path = Path(raw_path) if raw_path else None
         if not (path and path.suffix == self._app_config.translation_ext):
             return
-        if not self._write_cache_current():
+        if (
+            self._current_pf
+            and self._current_pf.path == path
+            and not self._skip_cache_write
+        ):
             return
+        self._conflict_notified.discard(path)
+        if self._skip_cache_write:
+            self._skip_cache_write = False
+        else:
+            if not self._write_cache_current():
+                return
         locale = self._locale_for_path(path)
         encoding = self._locales.get(
             locale, LocaleMeta("", Path(), "", "utf-8")
@@ -979,12 +1026,19 @@ class MainWindow(QMainWindow):
         _touch_last_opened(self._root, path, int(time.time()))
         changed_keys: set[str] = set()
         baseline_by_row: dict[int, str] = {}
+        conflict_originals: dict[str, str] = {}
         if self._cache_map:
             for idx, e in enumerate(pf.entries):
                 h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
                 if h not in self._cache_map:
                     continue
                 rec = self._cache_map[h]
+                if (
+                    rec.value is not None
+                    and rec.original is not None
+                    and rec.original != e.value
+                ):
+                    conflict_originals[e.key] = e.value
                 new_value = rec.value if rec.value is not None else e.value
                 if rec.value is not None and rec.value != e.value:
                     changed_keys.add(e.key)
@@ -1035,6 +1089,16 @@ class MainWindow(QMainWindow):
             self._schedule_search()
         if changed_keys:
             self.fs_model.set_dirty(self._current_pf.path, True)
+        if not self._skip_conflict_check:
+            if conflict_originals:
+                conflict_sources = {
+                    key: source_values.get(key, "") for key in conflict_originals
+                }
+                self._register_conflicts(path, conflict_originals, conflict_sources)
+            else:
+                self._clear_conflicts(path)
+        else:
+            self._skip_conflict_check = False
 
         # (re)create undo/redo actions bound to this file’s stack
         for action in list(self.menu_edit.actions()):
@@ -1078,7 +1142,7 @@ class MainWindow(QMainWindow):
             self._key_column_width = 120
         if self._status_column_width is None:
             metrics = self.table.fontMetrics()
-            labels = [st.name.title() for st in Status]
+            labels = [st.label() for st in STATUS_ORDER]
             max_label = max(labels, key=metrics.horizontalAdvance)
             self._status_column_width = metrics.horizontalAdvance(max_label) + 24
         key_width = int(self._key_column_width or 0)
@@ -1157,6 +1221,8 @@ class MainWindow(QMainWindow):
         """Patch file on disk if there are unsaved value edits."""
         if not (self._current_pf and self._current_model):
             return True
+        if not self._ensure_conflicts_resolved(self._current_pf.path):
+            return False
         if not self._current_model.changed_keys():
             return True
 
@@ -1295,6 +1361,8 @@ class MainWindow(QMainWindow):
             self._set_saved_status()
 
     def _save_file_from_cache(self, path: Path) -> bool:
+        if not self._ensure_conflicts_resolved(path):
+            return False
         cached = _read_status_cache(self._root, path)
         if not any(entry.value is not None for entry in cached.values()):
             return True
@@ -1341,12 +1409,14 @@ class MainWindow(QMainWindow):
         if self._detail_panel.isVisible():
             self._commit_detail_translation()
         try:
+            original_values = self._current_model.baseline_values()
             _write_status_cache(
                 self._root,
                 self._current_pf.path,
                 self._current_pf.entries,
                 changed_keys=self._current_model.changed_keys(),
                 last_opened=int(time.time()),
+                original_values=original_values,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Cache write failed", str(exc))
@@ -1613,6 +1683,7 @@ class MainWindow(QMainWindow):
             return False
         cache_map = _read_status_cache(self._root, path)
         changed_keys: set[str] = set()
+        original_values: dict[str, str] = {}
         new_entries = []
         for entry in pf.entries:
             key_hash = xxhash.xxh64(entry.key.encode("utf-8")).intdigest() & 0xFFFF
@@ -1643,6 +1714,7 @@ class MainWindow(QMainWindow):
             if new_value != text:
                 status = Status.TRANSLATED
                 changed_keys.add(entry.key)
+                original_values[entry.key] = text
             if new_value != entry.value or status != entry.status:
                 entry = type(entry)(
                     entry.key,
@@ -1659,6 +1731,8 @@ class MainWindow(QMainWindow):
             path,
             new_entries,
             changed_keys=changed_keys,
+            original_values=original_values,
+            force_original=set(original_values),
         )
         if changed_keys:
             self.fs_model.set_dirty(path, True)
@@ -1669,6 +1743,319 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "Parse error", message)
         print(f"[Parse error] {path}", file=sys.stderr)
         traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+
+    # ── conflict handling -------------------------------------------------
+    def _register_conflicts(
+        self,
+        path: Path,
+        originals: dict[str, str],
+        sources: dict[str, str],
+    ) -> None:
+        self._conflict_files[path] = originals
+        self._conflict_sources[path] = sources
+        if path not in self._conflict_notified:
+            self._conflict_notified.add(path)
+            QTimer.singleShot(0, lambda p=path: self._prompt_conflicts(p))
+
+    def _clear_conflicts(self, path: Path) -> None:
+        self._conflict_files.pop(path, None)
+        self._conflict_sources.pop(path, None)
+        self._conflict_notified.discard(path)
+
+    def _has_conflicts(self, path: Path) -> bool:
+        return bool(self._conflict_files.get(path))
+
+    def _prompt_conflicts(self, path: Path, *, for_save: bool = False) -> bool:
+        if not self._has_conflicts(path):
+            return True
+        if not self._current_pf or self._current_pf.path != path:
+            return not for_save
+        rel = str(path.relative_to(self._root))
+        dialog = ConflictChoiceDialog(rel, len(self._conflict_files[path]), self)
+        dialog.exec()
+        choice = dialog.choice()
+        if choice is None:
+            return False
+        if choice == "drop_cache":
+            return self._resolve_conflicts_drop_cache(path)
+        if choice == "drop_original":
+            return self._resolve_conflicts_drop_original(path)
+        if choice == "merge":
+            return self._resolve_conflicts_merge(path)
+        return False
+
+    def _ensure_conflicts_resolved(self, path: Path) -> bool:
+        if not self._has_conflicts(path):
+            return True
+        return self._prompt_conflicts(path, for_save=True)
+
+    def _reload_file(self, path: Path) -> None:
+        index = self.fs_model.index_for_path(path)
+        if not index.isValid():
+            return
+        self._skip_conflict_check = True
+        self._skip_cache_write = True
+        self._file_chosen(index)
+
+    def _resolve_conflicts_drop_cache(self, path: Path) -> bool:
+        if not (self._current_pf and self._current_model):
+            return False
+        if self._current_pf.path != path:
+            return False
+        conflict_keys = set(self._conflict_files.get(path, {}))
+        changed_keys = set(self._current_model.changed_keys()) - conflict_keys
+        original_values = self._current_model.baseline_values()
+        _write_status_cache(
+            self._root,
+            path,
+            self._current_pf.entries,
+            changed_keys=changed_keys,
+            original_values=original_values,
+        )
+        self._clear_conflicts(path)
+        self._reload_file(path)
+        return True
+
+    def _resolve_conflicts_drop_original(self, path: Path) -> bool:
+        if not (self._current_pf and self._current_model):
+            return False
+        if self._current_pf.path != path:
+            return False
+        conflict_originals = self._conflict_files.get(path, {})
+        changed_keys = set(self._current_model.changed_keys())
+        original_values = self._current_model.baseline_values()
+        original_values.update(conflict_originals)
+        _write_status_cache(
+            self._root,
+            path,
+            self._current_pf.entries,
+            changed_keys=changed_keys,
+            original_values=original_values,
+            force_original=set(conflict_originals),
+        )
+        self._clear_conflicts(path)
+        self._reload_file(path)
+        return True
+
+    def _resolve_conflicts_merge(self, path: Path) -> bool:
+        if not (self._current_pf and self._current_model):
+            return False
+        if self._current_pf.path != path:
+            return False
+        conflict_originals = self._conflict_files.get(path, {})
+        if not conflict_originals:
+            return True
+        sources = self._conflict_sources.get(path, {})
+        cache_values = {
+            entry.key: entry.value
+            for entry in self._current_pf.entries
+            if entry.key in conflict_originals
+        }
+        rows = [
+            (
+                key,
+                sources.get(key, ""),
+                conflict_originals.get(key, ""),
+                cache_values.get(key, ""),
+            )
+            for key in sorted(conflict_originals)
+        ]
+        resolutions = self._run_merge_ui(path, rows)
+        if not resolutions:
+            return False
+        changed_keys = set(self._current_model.changed_keys())
+        original_values = self._current_model.baseline_values()
+        keep_conflict: set[str] = set()
+        updates: dict[str, str] = {}
+        status_updates: dict[str, Status] = {}
+        for key, (chosen_value, _choice) in resolutions.items():
+            original_value = conflict_originals.get(key, "")
+            if chosen_value == original_value:
+                changed_keys.discard(key)
+            else:
+                changed_keys.add(key)
+                original_values[key] = original_value
+                keep_conflict.add(key)
+            if chosen_value != cache_values.get(key, ""):
+                updates[key] = chosen_value
+            if _choice == "original":
+                status_updates[key] = Status.FOR_REVIEW
+        if updates or status_updates:
+            for idx, entry in enumerate(self._current_pf.entries):
+                if entry.key not in updates and entry.key not in status_updates:
+                    continue
+                new_value = updates.get(entry.key, entry.value)
+                new_status = status_updates.get(entry.key, entry.status)
+                if new_value == entry.value and new_status == entry.status:
+                    continue
+                self._current_pf.entries[idx] = type(entry)(
+                    entry.key,
+                    new_value,
+                    new_status,
+                    entry.span,
+                    entry.segments,
+                    entry.gaps,
+                    entry.raw,
+                )
+        _write_status_cache(
+            self._root,
+            path,
+            self._current_pf.entries,
+            changed_keys=changed_keys,
+            original_values=original_values,
+            force_original=keep_conflict,
+        )
+        self._clear_conflicts(path)
+        self._reload_file(path)
+        return True
+
+    def _run_merge_ui(
+        self, path: Path, rows: list[tuple[str, str, str, str]]
+    ) -> dict[str, tuple[str, str]] | None:
+        if self._merge_active:
+            return None
+        self._merge_result = None
+        self._build_merge_view(path, rows)
+        self._set_merge_active(True)
+        loop = QEventLoop()
+        self._merge_loop = loop
+        loop.exec()
+        self._merge_loop = None
+        self._set_merge_active(False)
+        return self._merge_result
+
+    def _build_merge_view(
+        self, path: Path, rows: list[tuple[str, str, str, str]]
+    ) -> None:
+        if self._merge_container is not None:
+            self._right_stack.removeWidget(self._merge_container)
+            self._merge_container.deleteLater()
+        self._merge_rows = []
+        self._merge_container = QWidget(self)
+        layout = QVBoxLayout(self._merge_container)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(6)
+        rel = str(path.relative_to(self._root))
+        layout.addWidget(QLabel(f"Resolve conflicts for {rel}", self._merge_container))
+
+        table = QTableWidget(self._merge_container)
+        table.setColumnCount(6)
+        table.setHorizontalHeaderLabels(
+            ["Key", "Source", "Original", "Cache", "Original ✓", "Cache ✓"]
+        )
+        table.setRowCount(0)
+        table.setWordWrap(True)
+        table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+        )
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+
+        for key, source, original, cache in rows:
+            row = table.rowCount()
+            table.insertRow(row)
+
+            key_item = QTableWidgetItem(key)
+            key_item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+            table.setItem(row, 0, key_item)
+
+            source_item = QTableWidgetItem(source)
+            source_item.setFlags(
+                Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+            )
+            table.setItem(row, 1, source_item)
+
+            original_item = QTableWidgetItem(original)
+            original_item.setFlags(
+                Qt.ItemFlag.ItemIsSelectable
+                | Qt.ItemFlag.ItemIsEnabled
+                | Qt.ItemFlag.ItemIsEditable
+            )
+            table.setItem(row, 2, original_item)
+
+            cache_item = QTableWidgetItem(cache)
+            cache_item.setFlags(
+                Qt.ItemFlag.ItemIsSelectable
+                | Qt.ItemFlag.ItemIsEnabled
+                | Qt.ItemFlag.ItemIsEditable
+            )
+            table.setItem(row, 3, cache_item)
+
+            group = QButtonGroup(self._merge_container)
+            group.setExclusive(True)
+            btn_original = QRadioButton(self._merge_container)
+            btn_cache = QRadioButton(self._merge_container)
+            group.addButton(btn_original)
+            group.addButton(btn_cache)
+            table.setCellWidget(row, 4, btn_original)
+            table.setCellWidget(row, 5, btn_cache)
+            btn_original.toggled.connect(self._update_merge_apply_enabled)
+            btn_cache.toggled.connect(self._update_merge_apply_enabled)
+
+            self._merge_rows.append(
+                (key, original_item, cache_item, btn_original, btn_cache)
+            )
+
+        table.resizeColumnsToContents()
+        table.horizontalHeader().setStretchLastSection(False)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
+        table.setMinimumHeight(320)
+        layout.addWidget(table)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        apply_btn = QPushButton("Apply", self._merge_container)
+        apply_btn.setEnabled(False)
+        apply_btn.clicked.connect(self._apply_merge_resolutions)
+        btn_row.addWidget(apply_btn)
+        layout.addLayout(btn_row)
+
+        self._merge_apply_btn = apply_btn
+        self._right_stack.addWidget(self._merge_container)
+
+    def _update_merge_apply_enabled(self) -> None:
+        if not self._merge_rows or self._merge_apply_btn is None:
+            return
+        ready = all(
+            btn_original.isChecked() or btn_cache.isChecked()
+            for _key, _orig_item, _cache_item, btn_original, btn_cache in self._merge_rows
+        )
+        self._merge_apply_btn.setEnabled(bool(ready))
+
+    def _apply_merge_resolutions(self) -> None:
+        for _key, _orig_item, _cache_item, btn_original, btn_cache in self._merge_rows:
+            if not (btn_original.isChecked() or btn_cache.isChecked()):
+                QMessageBox.warning(
+                    self,
+                    "Incomplete selection",
+                    "Choose Original or Cache for every row.",
+                )
+                return
+        out: dict[str, tuple[str, str]] = {}
+        for key, orig_item, cache_item, btn_original, btn_cache in self._merge_rows:
+            if btn_original.isChecked():
+                out[key] = (orig_item.text(), "original")
+            elif btn_cache.isChecked():
+                out[key] = (cache_item.text(), "cache")
+        self._merge_result = out
+        if self._merge_loop is not None and self._merge_loop.isRunning():
+            self._merge_loop.quit()
+
+    def _set_merge_active(self, active: bool) -> None:
+        self._merge_active = active
+        self.tree.setEnabled(not active)
+        self.table.setEnabled(not active)
+        self.toolbar.setEnabled(not active)
+        self.replace_toolbar.setEnabled(not active)
+        self.menuBar().setEnabled(not active)
+        self._detail_panel.setVisible(not active)
+        if active and self._merge_container is not None:
+            self._right_stack.setCurrentWidget(self._merge_container)
+        else:
+            self._right_stack.setCurrentWidget(self._table_container)
 
     def _rows_from_model(
         self, *, include_source: bool = True, include_value: bool = True
@@ -2257,6 +2644,9 @@ class MainWindow(QMainWindow):
         self._update_status_combo_from_selection()
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        if self._merge_active:
+            event.ignore()
+            return
         self._write_cache_current()
         if self._prompt_write_on_exit:
             files = self._draft_files()

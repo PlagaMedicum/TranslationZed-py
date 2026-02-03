@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCursor, QTextDocument
 from PySide6.QtWidgets import QComboBox, QPlainTextEdit, QStyledItemDelegate
 
-from translationzed_py.core.model import Status
+from translationzed_py.core.model import STATUS_ORDER, Status
 
 
 class StatusDelegate(QStyledItemDelegate):
@@ -12,8 +12,8 @@ class StatusDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent, _option, _index):  # noqa: N802
         combo = QComboBox(parent)
-        for st in Status:
-            combo.addItem(st.name.title(), st)
+        for st in STATUS_ORDER:
+            combo.addItem(st.label(), st)
         combo.setEditable(False)
         return combo
 
@@ -24,7 +24,7 @@ class StatusDelegate(QStyledItemDelegate):
         status = raw if isinstance(raw, Status) else None
         if status is None:
             try:
-                status = Status[str(raw).upper()]
+                status = Status[str(raw).upper().replace(" ", "_")]
             except Exception:
                 status = None
         if status is None:
@@ -43,7 +43,7 @@ class StatusDelegate(QStyledItemDelegate):
         if status is None:
             text = editor.currentText()
             try:
-                status = Status[str(text).upper()]
+                status = Status[str(text).upper().replace(" ", "_")]
             except Exception:
                 return
         model.setData(index, status, Qt.EditRole)
