@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from PySide6.QtCore import (
     QAbstractTableModel,
     QModelIndex,
@@ -30,12 +32,14 @@ class TranslationModel(QAbstractTableModel):
         pf: ParsedFile,
         *,
         baseline_by_row: dict[int, str] | None = None,
-        source_values: dict[str, str] | None = None,
+        source_values: Mapping[str, str] | None = None,
+        source_by_row: list[str] | None = None,
     ):
         super().__init__()
         self._pf = pf
         self._entries = list(pf.entries)
         self._source_values = source_values or {}
+        self._source_by_row = source_by_row
         self._baseline_by_row = dict(baseline_by_row or {})
         self._changed_rows: set[int] = set(self._baseline_by_row)
         self._dirty = bool(self._baseline_by_row)
@@ -110,7 +114,13 @@ class TranslationModel(QAbstractTableModel):
     ):
         """Yield search rows without going through QModelIndex lookups."""
         for idx, entry in enumerate(self._entries):
-            source = self._source_by_row[idx] if include_source else ""
+            if include_source:
+                if self._source_by_row is not None and idx < len(self._source_by_row):
+                    source = self._source_by_row[idx]
+                else:
+                    source = self._source_values.get(entry.key, "")
+            else:
+                source = ""
             value = entry.value if include_value else ""
             yield SearchRow(
                 file=self._pf.path,
@@ -150,6 +160,10 @@ class TranslationModel(QAbstractTableModel):
                 case 0:
                     return e.key
                 case 1:
+                    if self._source_by_row is not None and index.row() < len(
+                        self._source_by_row
+                    ):
+                        return self._source_by_row[index.row()]
                     return self._source_values.get(e.key, "")
                 case 2:
                     return e.value
@@ -162,6 +176,10 @@ class TranslationModel(QAbstractTableModel):
                 case 0:
                     return e.key
                 case 1:
+                    if self._source_by_row is not None and index.row() < len(
+                        self._source_by_row
+                    ):
+                        return self._source_by_row[index.row()]
                     return self._source_values.get(e.key, "")
                 case 2:
                     return e.value
@@ -173,6 +191,10 @@ class TranslationModel(QAbstractTableModel):
                 case 0:
                     return e.key
                 case 1:
+                    if self._source_by_row is not None and index.row() < len(
+                        self._source_by_row
+                    ):
+                        return self._source_by_row[index.row()]
                     return self._source_values.get(e.key, "")
                 case 2:
                     return e.value

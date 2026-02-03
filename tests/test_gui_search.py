@@ -46,8 +46,6 @@ def test_search_moves_to_other_file(qtbot, tmp_path: Path):
     ix = win.fs_model.index_for_path(dst / "BE" / "first.txt")
     win._file_chosen(ix)
     win._search_scope = "POOL"
-    win._search_index_by_file.clear()
-    win._search_index_key = None
     win.search_edit.setText("Two")
     win._trigger_search()
     qtbot.waitUntil(lambda: bool(win._search_matches), timeout=1000)

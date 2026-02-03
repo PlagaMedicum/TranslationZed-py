@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-01-31_
+_Last updated: 2026-02-03_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.1 is shipped; this plan now
@@ -321,27 +321,26 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 
 ## 4) v0.2 Focus Plan (draft, ordered)
 
-Priority A — **Core workflow completeness**
-1) **Search/Replace scopes**
+Priority A — **Core workflow completeness** (ordered, status)
+A1 [ ] **Search/Replace scopes**
    - Implement File | Locale | Pool behavior for search + replace (not just stored in prefs).
    - Status bar clearly reflects active scope (search + replace independently).
-2) **Multi‑file search navigation**
+A2 [ ] **Multi‑file search navigation**
    - Results list anchored to search UI; selecting a hit highlights the file in the tree.
    - Prev/Next wraps across files and keeps selection + row focus consistent.
-3) **Replace‑all safety**
+A3 [ ] **Replace‑all safety**
    - Replace‑all in Locale/Pool shows a file list confirmation; only applies to opened locales.
-4) **Large‑file performance**
-   - Windowed/virtualized table model with row cache margin based on **viewport %**.
-   - Streaming parser or on‑demand row materialization to avoid full file in RAM.
-   - Precompute/store per‑entry hash to avoid repeated xxhash on open.
-   - Lazy EN source map (avoid full `{key: value}` dict for large files).
-   - Search index should be **lazy + bounded** (avoid building row lists for every file).
-   - Dirty dot index should be **O(1)** per file (path→item map + cache header flag).
-   - Row sizing should be **visible‑rows only**; debounce resizes after edits.
-   - **Progressive multi‑file search** with status‑bar progress (non‑blocking).
-   - **Fast initial open**: prioritize “first table render” under a tight budget.
-   - Upgrade cache key hash to **u64** (reduce collisions); add cache migration. **[✓]**
-5) **Automated regression coverage**
+A4 [→] **Large‑file performance** (more urgent now)
+   - [✓] Windowed row sizing (visible rows + viewport margin) + debounce.
+   - [ ] Streaming parser / on‑demand row materialization to avoid full file in RAM.
+   - [ ] Precompute/store per‑entry hash to avoid repeated xxhash on open.
+   - [✓] Lazy EN source map (row‑aligned list; lazy dict only if needed).
+   - [✓] Search rows are lazy + bounded (no full per‑scope index; LRU cache only for small files).
+   - [→] Dirty dot index O(1): path→item map done; cache‑header draft flag pending.
+   - [✓] Progressive multi‑file search with status‑bar progress (non‑blocking).
+   - [→] Fast initial open: defer row sizing for large files; tighten budget targets next.
+   - [✓] Upgrade cache key hash to u64 (reduce collisions); add cache migration.
+A5 [ ] **Automated regression coverage**
    - Expand golden/round‑trip tests to cover **structure preservation** (comments, spacing,
      concat chains, stray quotes, block/line comments, raw tables) using real samples.
    - Add **encoding‑specific** fixtures per locale (cp1251, UTF‑16, UTF‑8 variants) and
@@ -351,7 +350,7 @@ Priority A — **Core workflow completeness**
      - open‑file latency (large files),
      - search‑across‑files latency,
      - cache write latency on status/value edits.
-6) **Cache/original conflict handling (new)**
+A6 [✓] **Cache/original conflict handling**
    - On file open, compare cached draft values vs **original file translations**.
    - If conflicts exist, show **modal notification** with choices:
      1) Drop cache (discard conflicting cache values)
@@ -368,12 +367,12 @@ Priority A — **Core workflow completeness**
    - Cache schema must store **original translation snapshot** per key for comparisons.
 
 Priority B — **Productivity/clarity**
-7) **Validation highlights** (Step 28).
-8) **File tree toggle** (Step 21).
-9) **Text visualization** (Step 19).
+B1 [ ] **Validation highlights** (Step 28).
+B2 [✓] **File tree toggle** (Step 21).
+B3 [ ] **Text visualization** (Step 19).
 
 Priority C — **Assistive tooling**
-10) **Translation memory** + **LanguageTool** (Step 29).
+C1 [ ] **Translation memory** + **LanguageTool** (Step 29).
 
 ---
 

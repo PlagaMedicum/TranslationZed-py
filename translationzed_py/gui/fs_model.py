@@ -14,6 +14,7 @@ class FsModel(QStandardItemModel):
     def __init__(self, root: Path, locales: list[LocaleMeta]) -> None:
         super().__init__()
         self._root = root  # keep for helpers
+        self._path_items: dict[str, QStandardItem] = {}
         self.setHorizontalHeaderLabels(["Project files"])
 
         for meta in locales:
@@ -26,23 +27,15 @@ class FsModel(QStandardItemModel):
                     Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
                 )
                 # store absolute path string in UserRole
-                file_item.setData(str(txt), int(Qt.ItemDataRole.UserRole))
+                abs_path = str(txt)
+                file_item.setData(abs_path, int(Qt.ItemDataRole.UserRole))
                 file_item.setData(rel, int(Qt.ItemDataRole.UserRole) + 1)
                 loc_item.appendRow(file_item)
+                self._path_items[abs_path] = file_item
             self.appendRow(loc_item)
 
     def set_dirty(self, path: Path, dirty: bool) -> None:
-        matches = self.match(
-            self.index(0, 0),
-            Qt.UserRole,
-            str(path),
-            hits=1,
-            flags=Qt.MatchRecursive | Qt.MatchExactly,
-        )
-        if not matches:
-            return
-        index = matches[0]
-        item = self.itemFromIndex(index)
+        item = self._path_items.get(str(path))
         if item is None:
             return
         base = item.data(int(Qt.ItemDataRole.UserRole) + 1) or item.text()
@@ -52,11 +45,5 @@ class FsModel(QStandardItemModel):
     # ------------------------------------------------------------------ helper
     def index_for_path(self, path: Path) -> QModelIndex:
         """Return QModelIndex of *path* inside the tree."""
-        matches = self.match(
-            self.index(0, 0),
-            Qt.UserRole,
-            str(path),
-            hits=1,
-            flags=Qt.MatchRecursive | Qt.MatchExactly,
-        )
-        return matches[0] if matches else QModelIndex()
+        item = self._path_items.get(str(path))
+        return item.index() if item is not None else QModelIndex()

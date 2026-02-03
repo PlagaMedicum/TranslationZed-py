@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import contextlib
-import itertools
 import os
 import re
 import sys
 import time
 import traceback
 from collections import OrderedDict
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import xxhash
@@ -58,6 +58,7 @@ from PySide6.QtWidgets import (
 from shiboken6 import isValid
 
 from translationzed_py.core import (
+    Entry,
     LocaleMeta,
     ParsedFile,
     list_translatable_files,
@@ -122,6 +123,49 @@ class _CommitPlainTextEdit(QPlainTextEdit):
         super().focusOutEvent(event)
         if self._commit_cb:
             self._commit_cb()
+
+
+class _SourceLookup(Mapping[str, str]):
+    __slots__ = ("_by_row", "_keys", "_by_key")
+
+    def __init__(
+        self,
+        *,
+        by_row: list[str] | None = None,
+        keys: list[str] | None = None,
+        by_key: dict[str, str] | None = None,
+    ) -> None:
+        self._by_row = by_row
+        self._keys = keys
+        self._by_key = by_key
+
+    @property
+    def by_row(self) -> list[str] | None:
+        return self._by_row
+
+    def _ensure_by_key(self) -> dict[str, str]:
+        if self._by_key is None:
+            if self._by_row is None or self._keys is None:
+                self._by_key = {}
+            else:
+                by_key: dict[str, str] = {}
+                limit = min(len(self._keys), len(self._by_row))
+                for idx in range(limit):
+                    by_key[self._keys[idx]] = self._by_row[idx]
+                self._by_key = by_key
+        return self._by_key
+
+    def get(self, key: str, default: str = "") -> str:
+        return self._ensure_by_key().get(key, default)
+
+    def __getitem__(self, key: str) -> str:
+        return self.get(key, "")
+
+    def __iter__(self):
+        return iter(self._ensure_by_key())
+
+    def __len__(self) -> int:
+        return len(self._ensure_by_key())
 
 
 class MainWindow(QMainWindow):
@@ -371,16 +415,36 @@ class MainWindow(QMainWindow):
         self._search_match_ranges: dict[Path, tuple[int, int]] = {}
         self._search_column = 0
         self._last_saved_text = ""
-        self._search_index_by_file: dict[Path, list[_SearchRow]] = {}
-        self._search_index_key: tuple | None = None
         self._search_rows_cache: OrderedDict[
             tuple[Path, bool, bool], tuple[tuple[int, int, int], list[_SearchRow]]
         ] = OrderedDict()
         self._search_cache_max = 64
+        self._search_cache_row_limit = 5000
         self._suppress_search_update = False
         self._replace_visible = False
         self._skip_search_autoselect = False
         self._search_needs_run = False
+        self._search_job_timer = QTimer(self)
+        self._search_job_timer.setSingleShot(False)
+        self._search_job_timer.setInterval(0)
+        self._search_job_timer.timeout.connect(self._run_search_batch)
+        self._search_job_query = ""
+        self._search_job_field = _SearchField.TRANSLATION
+        self._search_job_use_regex = False
+        self._search_job_include_source = False
+        self._search_job_include_value = False
+        self._search_job_files: list[Path] = []
+        self._search_job_index = 0
+        self._search_progress_text = ""
+        self._search_batch_budget_ms = 20
+        self._search_batch_size = 2
+        self._row_resize_timer = QTimer(self)
+        self._row_resize_timer.setSingleShot(True)
+        self._row_resize_timer.setInterval(80)
+        self._row_resize_timer.timeout.connect(self._resize_visible_rows)
+        self._row_cache_margin_pct = 0.5
+        self._large_file_row_threshold = 5000
+        self._pending_row_span: tuple[int, int] | None = None
 
         def _pref_int(name: str) -> int | None:
             raw = str(self._prefs_extras.get(name, "")).strip()
@@ -447,6 +511,7 @@ class MainWindow(QMainWindow):
         self.table.setWordWrap(self._wrap_text)
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.table.verticalScrollBar().valueChanged.connect(self._on_table_scrolled)
         self._key_delegate = KeyDelegate(self.table)
         self.table.setItemDelegateForColumn(0, self._key_delegate)
         self._source_delegate = MultiLineEditDelegate(self.table, read_only=True)
@@ -876,10 +941,16 @@ class MainWindow(QMainWindow):
                     return alt_path
         return None
 
-    def _load_en_source(self, path: Path, locale: str | None) -> dict[str, str]:
+    def _load_en_source(
+        self,
+        path: Path,
+        locale: str | None,
+        *,
+        target_entries: list[Entry] | None = None,
+    ) -> _SourceLookup:
         en_path = self._en_path_for(path, locale)
         if not en_path:
-            return {}
+            return _SourceLookup(by_key={})
         if en_path in self._en_cache:
             pf = self._en_cache[en_path]
         else:
@@ -888,11 +959,27 @@ class MainWindow(QMainWindow):
             try:
                 pf = parse(en_path, encoding=encoding)
             except Exception:
-                return {}
+                return _SourceLookup(by_key={})
             self._en_cache[en_path] = pf
         if pf.entries and all(getattr(e, "raw", False) for e in pf.entries):
-            return {path.name: pf.entries[0].value}
-        return {e.key: e.value for e in pf.entries}
+            raw_value = pf.entries[0].value
+            if (
+                target_entries
+                and len(target_entries) == 1
+                and target_entries[0].key == path.name
+            ):
+                return _SourceLookup(by_row=[raw_value], keys=[path.name])
+            return _SourceLookup(by_key={path.name: raw_value})
+        if target_entries and len(target_entries) == len(pf.entries):
+            keys_match = all(
+                entry.key == pf.entries[idx].key
+                for idx, entry in enumerate(target_entries)
+            )
+            if keys_match:
+                by_row = [entry.value for entry in pf.entries]
+                keys = [entry.key for entry in target_entries]
+                return _SourceLookup(by_row=by_row, keys=keys)
+        return _SourceLookup(by_key={entry.key: entry.value for entry in pf.entries})
 
     # ----------------------------------------------------------------- slots
     def _check_en_hash_cache(self) -> bool:
@@ -973,7 +1060,8 @@ class MainWindow(QMainWindow):
         self._prompt_write_on_exit = bool(values.get("prompt_write_on_exit", True))
         self._wrap_text = bool(values.get("wrap_text", False))
         self.table.setWordWrap(self._wrap_text)
-        self.table.resizeRowsToContents()
+        if self._wrap_text:
+            self._schedule_row_resize()
         self._default_root = str(values.get("default_root", "")).strip()
         search_scope = str(values.get("search_scope", "FILE")).upper()
         if search_scope not in {"FILE", "LOCALE", "POOL"}:
@@ -983,8 +1071,6 @@ class MainWindow(QMainWindow):
             replace_scope = "FILE"
         if search_scope != self._search_scope:
             self._search_scope = search_scope
-            self._search_index_by_file.clear()
-            self._search_index_key = None
             if self.search_edit.text():
                 self._schedule_search()
         self._replace_scope = replace_scope
@@ -1014,8 +1100,7 @@ class MainWindow(QMainWindow):
         self._current_model = None
         self._search_matches = []
         self._search_index = -1
-        self._search_index_by_file.clear()
-        self._search_index_key = None
+        self._cancel_search_job()
         self.table.setModel(None)
         self._set_status_combo(None)
         self.fs_model = FsModel(
@@ -1057,7 +1142,7 @@ class MainWindow(QMainWindow):
 
         self._current_encoding = encoding
 
-        source_values = self._load_en_source(path, locale)
+        source_lookup = self._load_en_source(path, locale, target_entries=pf.entries)
         self._cache_map = _read_status_cache(self._root, path)
         _touch_last_opened(self._root, path, int(time.time()))
         changed_keys: set[str] = set()
@@ -1105,7 +1190,8 @@ class MainWindow(QMainWindow):
         self._current_model = TranslationModel(
             pf,
             baseline_by_row=baseline_by_row,
-            source_values=source_values,
+            source_values=source_lookup,
+            source_by_row=source_lookup.by_row,
         )
         self._current_model.dataChanged.connect(self._on_model_changed)
         self._current_model.dataChanged.connect(self._on_model_data_changed)
@@ -1121,7 +1207,7 @@ class MainWindow(QMainWindow):
         self._sync_detail_editors()
         self._update_status_bar()
         if self._wrap_text:
-            self.table.resizeRowsToContents()
+            self._schedule_row_resize()
         if not self._last_saved_text:
             self._last_saved_text = "Ready"
             self._update_status_bar()
@@ -1133,7 +1219,7 @@ class MainWindow(QMainWindow):
         if not self._skip_conflict_check:
             if conflict_originals:
                 conflict_sources = {
-                    key: source_values.get(key, "") for key in conflict_originals
+                    key: source_lookup.get(key, "") for key in conflict_originals
                 }
                 self._register_conflicts(path, conflict_originals, conflict_sources)
             else:
@@ -1227,6 +1313,63 @@ class MainWindow(QMainWindow):
         self._prefs_extras["TABLE_KEY_WIDTH"] = str(key_width)
         self._prefs_extras["TABLE_STATUS_WIDTH"] = str(status_width)
         self._prefs_extras["TABLE_SRC_RATIO"] = f"{ratio:.6f}"
+
+    def _is_large_file(self) -> bool:
+        return bool(
+            self._current_model
+            and self._current_model.rowCount() >= self._large_file_row_threshold
+        )
+
+    def _visible_row_span(self) -> tuple[int, int] | None:
+        if not self._current_model:
+            return None
+        total = self._current_model.rowCount()
+        if total <= 0:
+            return None
+        viewport = self.table.viewport()
+        if viewport is None:
+            return None
+        first = self.table.rowAt(0)
+        last = self.table.rowAt(max(0, viewport.height() - 1))
+        if first < 0:
+            first = 0
+        if last < 0:
+            last = total - 1
+        visible = max(1, last - first + 1)
+        margin = max(2, int(visible * self._row_cache_margin_pct))
+        start = max(0, first - margin)
+        end = min(total - 1, last + margin)
+        return start, end
+
+    def _schedule_row_resize(self, *, full: bool = False) -> None:
+        if not self._wrap_text or not self._current_model:
+            return
+        if full or not self._is_large_file():
+            self.table.resizeRowsToContents()
+            return
+        span = self._visible_row_span()
+        if not span:
+            return
+        self._pending_row_span = span
+        if self._row_resize_timer.isActive():
+            self._row_resize_timer.stop()
+        self._row_resize_timer.start()
+
+    def _resize_visible_rows(self) -> None:
+        if not self._wrap_text or not self._current_model:
+            return
+        span = self._pending_row_span or self._visible_row_span()
+        if not span:
+            return
+        start, end = span
+        for row in range(start, end + 1):
+            self.table.resizeRowToContents(row)
+        self._pending_row_span = None
+
+    def _on_table_scrolled(self, *_args) -> None:
+        if not self._wrap_text or not self._is_large_file():
+            return
+        self._schedule_row_resize()
 
     def _on_header_resized(self, logical_index: int, _old: int, _new: int) -> None:
         if self._table_layout_guard or not self.table.model():
@@ -1599,6 +1742,7 @@ class MainWindow(QMainWindow):
         self._search_matches = []
         self._search_index = -1
         self._search_match_ranges.clear()
+        self._cancel_search_job()
         if self._search_timer.isActive():
             self._search_timer.stop()
 
@@ -2211,13 +2355,11 @@ class MainWindow(QMainWindow):
 
     def _rows_from_model(
         self, *, include_source: bool = True, include_value: bool = True
-    ) -> list[_SearchRow]:
+    ) -> Iterable[_SearchRow]:
         if not (self._current_model and self._current_pf):
-            return []
-        return list(
-            self._current_model.iter_search_rows(
-                include_source=include_source, include_value=include_value
-            )
+            return ()
+        return self._current_model.iter_search_rows(
+            include_source=include_source, include_value=include_value
         )
 
     def _rows_from_file(
@@ -2227,37 +2369,51 @@ class MainWindow(QMainWindow):
         *,
         include_source: bool = True,
         include_value: bool = True,
-    ) -> list[_SearchRow]:
+    ) -> tuple[Iterable[_SearchRow], int]:
         meta = self._locales.get(locale)
         encoding = meta.charset if meta else "utf-8"
         try:
             pf = parse(path, encoding=encoding)
         except Exception:
-            return []
+            return (), 0
         cache_map = _read_status_cache(self._root, path) if include_value else {}
         use_cache = include_value and bool(cache_map)
-        source_values = self._load_en_source(path, locale) if include_source else {}
-        rows: list[_SearchRow] = []
-        for idx, entry in enumerate(pf.entries):
-            key = entry.key
-            value = ""
-            if include_value:
-                if use_cache:
-                    key_hash = self._hash_for_cache(key, cache_map)
-                    rec = cache_map.get(key_hash)
-                    value = rec.value if rec and rec.value is not None else entry.value
-                else:
-                    value = entry.value
-            rows.append(
-                _SearchRow(
+        source_lookup = (
+            self._load_en_source(path, locale, target_entries=pf.entries)
+            if include_source
+            else _SourceLookup(by_key={})
+        )
+        source_by_row = source_lookup.by_row
+        entry_count = len(pf.entries)
+
+        def _iter_rows() -> Iterable[_SearchRow]:
+            for idx, entry in enumerate(pf.entries):
+                key = entry.key
+                value = ""
+                if include_value:
+                    if use_cache:
+                        key_hash = self._hash_for_cache(key, cache_map)
+                        rec = cache_map.get(key_hash)
+                        value = (
+                            rec.value if rec and rec.value is not None else entry.value
+                        )
+                    else:
+                        value = entry.value
+                yield _SearchRow(
                     file=path,
                     row=idx,
                     key=key,
-                    source=source_values.get(key, ""),
+                    source=(
+                        source_by_row[idx]
+                        if source_by_row is not None and idx < len(source_by_row)
+                        else source_lookup.get(key, "")
+                    ),
                     value="" if value is None else str(value),
                 )
-            )
-        return rows
+
+        if entry_count <= self._search_cache_row_limit:
+            return list(_iter_rows()), entry_count
+        return _iter_rows(), entry_count
 
     def _cached_rows_from_file(
         self,
@@ -2266,7 +2422,7 @@ class MainWindow(QMainWindow):
         *,
         include_source: bool,
         include_value: bool,
-    ) -> list[_SearchRow]:
+    ) -> Iterable[_SearchRow]:
         try:
             file_mtime = path.stat().st_mtime_ns
         except OSError:
@@ -2295,110 +2451,55 @@ class MainWindow(QMainWindow):
         if cached and cached[0] == stamp:
             self._search_rows_cache.move_to_end(key)
             return cached[1]
-        rows = self._rows_from_file(
+        rows, entry_count = self._rows_from_file(
             path,
             locale,
             include_source=include_source,
             include_value=include_value,
         )
-        self._search_rows_cache[key] = (stamp, rows)
-        self._search_rows_cache.move_to_end(key)
-        if len(self._search_rows_cache) > self._search_cache_max:
-            self._search_rows_cache.popitem(last=False)
+        if isinstance(rows, list) and entry_count <= self._search_cache_row_limit:
+            self._search_rows_cache[key] = (stamp, rows)
+            self._search_rows_cache.move_to_end(key)
+            if len(self._search_rows_cache) > self._search_cache_max:
+                self._search_rows_cache.popitem(last=False)
         return rows
 
-    def _ensure_search_index(
-        self, *, include_source: bool, include_value: bool
-    ) -> None:
-        query = self.search_edit.text().strip()
-        if not query:
-            return
-        scope = self._search_scope
-        current_path = self._current_pf.path if self._current_pf else None
-        current_locale = self._locale_for_path(current_path) if current_path else None
-        if scope == "FILE":
-            if not current_path or not self._current_model:
-                self._search_index_by_file.clear()
-                self._search_index_key = ("FILE", None, include_source, include_value)
-                return
-            self._search_index_by_file = {
-                current_path: self._rows_from_model(
-                    include_source=include_source, include_value=include_value
-                )
-            }
-            self._search_index_key = (
-                "FILE",
-                current_path,
-                include_source,
-                include_value,
-            )
-            return
-        if scope == "LOCALE":
-            key = ("LOCALE", current_locale, include_source, include_value)
-        else:
-            key = ("POOL", tuple(self._selected_locales), include_source, include_value)
-        if key != self._search_index_key:
-            self._search_index_by_file.clear()
-            self._search_index_key = key
-            locales = []
-            if scope == "LOCALE":
-                if current_locale:
-                    locales = [current_locale]
-            else:
-                locales = list(self._selected_locales)
-            for locale in locales:
-                for path in self._files_for_locale(locale):
-                    if self._current_pf and path == self._current_pf.path:
-                        rows = self._rows_from_model(
-                            include_source=include_source, include_value=include_value
-                        )
-                    else:
-                        rows = self._cached_rows_from_file(
-                            path,
-                            locale,
-                            include_source=include_source,
-                            include_value=include_value,
-                        )
-                    if rows:
-                        self._search_index_by_file[path] = rows
-            return
-        if self._current_pf and self._current_model:
-            self._search_index_by_file[self._current_pf.path] = self._rows_from_model(
-                include_source=include_source, include_value=include_value
-            )
+    def _search_files_for_scope(self) -> list[Path]:
+        files = list(self._files_for_scope(self._search_scope))
+        if self._current_pf and self._current_pf.path in files:
+            current = self._current_pf.path
+            files = [current, *[p for p in files if p != current]]
+        return files
 
-    def _run_search(self) -> None:
-        query = self.search_edit.text()
-        self._search_needs_run = False
-        if not query:
-            self._search_matches = []
-            self._search_index = -1
-            self._search_match_ranges.clear()
+    def _process_search_file(self, path: Path) -> None:
+        locale = self._locale_for_path(path)
+        if not locale:
             return
-        column = int(self.search_mode.currentData())
-        self._search_column = column
-        use_regex = self.regex_check.isChecked()
-        field_map = {
-            0: _SearchField.KEY,
-            1: _SearchField.SOURCE,
-            2: _SearchField.TRANSLATION,
-        }
-        field = field_map.get(column, _SearchField.TRANSLATION)
-        include_source = field is _SearchField.SOURCE
-        include_value = field is _SearchField.TRANSLATION
-        self._ensure_search_index(
-            include_source=include_source, include_value=include_value
+        if self._current_pf and self._current_model and path == self._current_pf.path:
+            rows = self._rows_from_model(
+                include_source=self._search_job_include_source,
+                include_value=self._search_job_include_value,
+            )
+        else:
+            rows = self._cached_rows_from_file(
+                path,
+                locale,
+                include_source=self._search_job_include_source,
+                include_value=self._search_job_include_value,
+            )
+        matches = _search_rows(
+            rows,
+            self._search_job_query,
+            self._search_job_field,
+            self._search_job_use_regex,
         )
-        rows = itertools.chain.from_iterable(self._search_index_by_file.values())
-        matches = _search_rows(rows, query, field, use_regex)
-        self._search_matches = matches
-        self._search_match_ranges.clear()
-        for idx, match in enumerate(matches):
-            if match.file in self._search_match_ranges:
-                start, _end = self._search_match_ranges[match.file]
-                self._search_match_ranges[match.file] = (start, idx)
-            else:
-                self._search_match_ranges[match.file] = (idx, idx)
+        if not matches:
+            return
+        start = len(self._search_matches)
+        self._search_matches.extend(matches)
+        self._search_match_ranges[path] = (start, start + len(matches) - 1)
+
+    def _finalize_search_results(self) -> None:
         if not self._search_matches:
             self._search_index = -1
             self._skip_search_autoselect = False
@@ -2418,6 +2519,130 @@ class MainWindow(QMainWindow):
         self._search_index = initial_index
         if initial_index != -1:
             self._select_match(initial_index)
+
+    def _cancel_search_job(self) -> None:
+        if self._search_job_timer.isActive():
+            self._search_job_timer.stop()
+        self._search_job_files = []
+        self._search_job_index = 0
+        self._search_progress_text = ""
+
+    def _update_search_progress(self) -> None:
+        total = len(self._search_job_files)
+        if total:
+            self._search_progress_text = f"Searching {self._search_job_index}/{total}"
+        else:
+            self._search_progress_text = ""
+        self._update_status_bar()
+
+    def _finish_search_job(self) -> None:
+        if self._search_job_timer.isActive():
+            self._search_job_timer.stop()
+        self._search_progress_text = ""
+        self._search_job_files = []
+        self._search_job_index = 0
+        self._update_status_bar()
+        self._finalize_search_results()
+
+    def _finish_search_job_immediately(self) -> None:
+        if self._search_job_timer.isActive():
+            self._search_job_timer.stop()
+        while self._search_job_index < len(self._search_job_files):
+            path = self._search_job_files[self._search_job_index]
+            self._search_job_index += 1
+            self._process_search_file(path)
+        self._finish_search_job()
+
+    def _start_search_job(
+        self,
+        files: list[Path],
+        *,
+        query: str,
+        field: _SearchField,
+        use_regex: bool,
+        include_source: bool,
+        include_value: bool,
+    ) -> None:
+        self._search_job_query = query
+        self._search_job_field = field
+        self._search_job_use_regex = use_regex
+        self._search_job_include_source = include_source
+        self._search_job_include_value = include_value
+        self._search_job_files = files
+        self._search_job_index = 0
+        self._search_matches = []
+        self._search_match_ranges.clear()
+        self._update_search_progress()
+        self._search_job_timer.start()
+
+    def _run_search_batch(self) -> None:
+        if not self._search_job_files:
+            self._finish_search_job()
+            return
+        start = time.monotonic()
+        processed = 0
+        total = len(self._search_job_files)
+        while self._search_job_index < total:
+            path = self._search_job_files[self._search_job_index]
+            self._search_job_index += 1
+            self._process_search_file(path)
+            processed += 1
+            elapsed = (time.monotonic() - start) * 1000
+            if (
+                processed >= self._search_batch_size
+                or elapsed >= self._search_batch_budget_ms
+            ):
+                break
+        self._update_search_progress()
+        if self._search_job_index >= total:
+            self._finish_search_job()
+
+    def _run_search(self) -> None:
+        query = self.search_edit.text().strip()
+        self._search_needs_run = False
+        self._cancel_search_job()
+        if not query:
+            self._search_matches = []
+            self._search_index = -1
+            self._search_match_ranges.clear()
+            return
+        column = int(self.search_mode.currentData())
+        self._search_column = column
+        use_regex = self.regex_check.isChecked()
+        field_map = {
+            0: _SearchField.KEY,
+            1: _SearchField.SOURCE,
+            2: _SearchField.TRANSLATION,
+        }
+        field = field_map.get(column, _SearchField.TRANSLATION)
+        include_source = field is _SearchField.SOURCE
+        include_value = field is _SearchField.TRANSLATION
+        files = self._search_files_for_scope()
+        if not files:
+            self._search_matches = []
+            self._search_index = -1
+            self._search_match_ranges.clear()
+            return
+        self._search_job_query = query
+        self._search_job_field = field
+        self._search_job_use_regex = use_regex
+        self._search_job_include_source = include_source
+        self._search_job_include_value = include_value
+        if self._search_scope == "FILE" or len(files) <= 1:
+            self._search_matches = []
+            self._search_match_ranges.clear()
+            for path in files:
+                self._process_search_file(path)
+            self._finalize_search_results()
+            return
+        self._start_search_job(
+            files,
+            query=query,
+            field=field,
+            use_regex=use_regex,
+            include_source=include_source,
+            include_value=include_value,
+        )
 
     def _sync_search_index_to_selection(self) -> None:
         if self._suppress_search_update:
@@ -2461,6 +2686,8 @@ class MainWindow(QMainWindow):
         if self._search_timer.isActive():
             self._search_timer.stop()
             self._run_search()
+        if self._search_job_timer.isActive():
+            self._finish_search_job_immediately()
         if self._search_needs_run:
             self._run_search()
 
@@ -2578,7 +2805,8 @@ class MainWindow(QMainWindow):
     def _toggle_wrap_text(self, checked: bool) -> None:
         self._wrap_text = bool(checked)
         self.table.setWordWrap(self._wrap_text)
-        self.table.resizeRowsToContents()
+        if self._wrap_text:
+            self._schedule_row_resize()
         self._persist_preferences()
 
     def _toggle_prompt_on_exit(self, checked: bool) -> None:
@@ -2625,7 +2853,10 @@ class MainWindow(QMainWindow):
         ):
             self._update_status_combo_from_selection()
             if self._wrap_text:
-                self.table.resizeRowToContents(row)
+                if self._is_large_file():
+                    self._schedule_row_resize()
+                else:
+                    self.table.resizeRowToContents(row)
             if (
                 self._detail_panel.isVisible()
                 and not self._detail_translation.hasFocus()
@@ -2650,6 +2881,8 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if self.table.model():
             self._apply_table_layout()
+            if self._wrap_text and self._is_large_file():
+                self._schedule_row_resize()
         if self.replace_toolbar.isVisible():
             self._align_replace_bar()
 
@@ -2730,6 +2963,8 @@ class MainWindow(QMainWindow):
         parts: list[str] = []
         if self._last_saved_text:
             parts.append(self._last_saved_text)
+        if self._search_progress_text:
+            parts.append(self._search_progress_text)
         if self._current_model:
             idx = self.table.currentIndex()
             if idx.isValid():

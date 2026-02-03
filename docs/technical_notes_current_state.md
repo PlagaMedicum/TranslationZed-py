@@ -222,22 +222,21 @@ Observed hotspots and their current shape (code references are indicative):
   which is O(n) with non‑trivial constant factors for UTF‑16 and long strings.
 - **Cache application**: `gui/main_window.py::_file_chosen` walks every entry and
   computes xxhash64 per key to reconcile cache rows; O(n) per open.
-- **Source map duplication**: `_load_en_source` builds a dict `{key: value}` for EN;
-  this duplicates string payloads for large files (Source and Translation both held).
+- **Source map duplication**: `_load_en_source` now prefers a row‑aligned list when
+  EN keys match target keys; key→value dicts are built lazily only if required.
 
 **B) Search & replace**
-- **Multi‑file search**: `_ensure_search_index` materializes full `SearchRow` lists
-  per file for Locale/Pool scope; each file parse + cache read + source load happens
-  to build in‑memory rows even if only a few hits exist.
-- **Search cache**: `_search_rows_cache` caches rows by `(mtime, cache mtime)` but still
-  stores full lists (memory‑heavy for large files).
+- **Multi‑file search**: Locale/Pool search runs in batches with status‑bar progress;
+  rows are produced lazily per file rather than materializing a full index up front.
+- **Search cache**: `_search_rows_cache` is still LRU‑bounded, but now only caches
+  rows for smaller files; large files stream rows without extra list allocation.
 - **Regex compilation**: `core/search.py::search` compiles every run; ok for small files,
   but multi‑file searches repeatedly re‑compile for the same query.
 
 **C) File tree + dirty indicator**
 - **Tree build**: `gui/fs_model.py` builds all file items at startup with `rglob`.
-- **Dirty dot updates**: `FsModel.set_dirty` uses `match(..., MatchRecursive)` which
-  is O(n) in tree size per update. `_mark_cached_dirty()` walks **all cache files** and
+- **Dirty dot updates**: `FsModel.set_dirty` now uses a path→item map (O(1) per file).
+  `_mark_cached_dirty()` still walks **all cache files** and
   reads each cache to see if draft values exist.
 
 **D) Table rendering / row sizing**
