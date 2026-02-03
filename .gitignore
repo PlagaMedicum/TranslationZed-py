@@ -25,6 +25,12 @@ env/
 htmlcov/
 .tzp-cache/
 ProjectZomboidTranslations/
+!tests/fixtures/conflict_manual/.tzp-cache/
+!tests/fixtures/conflict_manual/.tzp-cache/**
+!tests/fixtures/conflict_manual_cp1251/.tzp-cache/
+!tests/fixtures/conflict_manual_cp1251/.tzp-cache/**
+!tests/fixtures/conflict_manual_utf16/.tzp-cache/
+!tests/fixtures/conflict_manual_utf16/.tzp-cache/**
 
 # ─── Dev tool config ───────────────────────────────────────────────────────────
 .idea/

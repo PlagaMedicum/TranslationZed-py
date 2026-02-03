@@ -1,0 +1,2 @@
+text = Korean,
+charset = UTF-16,

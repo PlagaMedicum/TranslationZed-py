@@ -1,0 +1,2 @@
+text = Russian,
+charset = CP1251,

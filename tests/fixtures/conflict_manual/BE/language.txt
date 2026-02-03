@@ -1,0 +1,2 @@
+text = Belarusian,
+charset = UTF-8,
