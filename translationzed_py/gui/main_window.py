@@ -80,6 +80,9 @@ from translationzed_py.core.status_cache import (
     CacheEntry,
 )
 from translationzed_py.core.status_cache import (
+    migrate_all as _migrate_status_caches,
+)
+from translationzed_py.core.status_cache import (
     read as _read_status_cache,
 )
 from translationzed_py.core.status_cache import (
@@ -785,6 +788,10 @@ class MainWindow(QMainWindow):
             self._locales = {}
             self._selected_locales = []
             return
+        try:
+            _migrate_status_caches(self._root, self._locales)
+        except Exception as exc:
+            QMessageBox.warning(self, "Cache migration failed", str(exc))
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
         self._files_by_locale.clear()
 

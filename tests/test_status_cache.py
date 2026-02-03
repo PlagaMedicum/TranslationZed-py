@@ -8,6 +8,7 @@ from translationzed_py.core import parse
 from translationzed_py.core.model import Status
 from translationzed_py.core.status_cache import (
     CacheEntry,
+    migrate_all,
     read,
     read_last_opened_from_path,
     write,
@@ -116,3 +117,27 @@ def test_legacy_status_mapping_v3():
 
         data = cache_path.read_bytes()
         assert data.startswith(b"TZC3")
+
+
+def test_migrate_all_upgrades_u16_cache(tmp_path):
+    root = tmp_path / "root"
+    (root / "EN").mkdir(parents=True)
+    (root / "EN" / "language.txt").write_text(
+        "text = English,\ncharset = UTF-8,\n", encoding="utf-8"
+    )
+    path = root / "EN" / "dummy.txt"
+    path.write_text('HELLO = "Hi"\n', encoding="utf-8")
+
+    cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+    key = "HELLO"
+    key_hash = int(xxhash.xxh64(key.encode("utf-8")).intdigest()) & 0xFFFF
+    header = struct.pack("<4sQI", b"TZC3", 0, 1)
+    rec = struct.pack("<HBBII", key_hash, 2, 1, 2, 0) + b"Yo"
+    cache_path.write_bytes(header + rec)
+
+    migrated = migrate_all(root)
+    assert migrated == 1
+    data = cache_path.read_bytes()
+    assert data.startswith(b"TZC4")

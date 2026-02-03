@@ -10,6 +10,7 @@ import xxhash
 from translationzed_py.core.app_config import load as _load_app_config
 from translationzed_py.core.atomic_io import write_bytes_atomic
 from translationzed_py.core.model import Entry, Status
+from translationzed_py.core.project_scanner import LocaleMeta
 
 _MAGIC_V1 = b"TZC1"
 _MAGIC_V2 = b"TZC2"
@@ -90,6 +91,79 @@ def _cache_path(root: Path, file_path: Path) -> Path:
 
 def cache_path(root: Path, file_path: Path) -> Path:
     return _cache_path(root, file_path)
+
+
+def _original_path_from_cache(root: Path, cache_path: Path) -> Path | None:
+    cfg = _load_app_config(root)
+    cache_root = root / cfg.cache_dir
+    try:
+        rel = cache_path.relative_to(cache_root)
+    except ValueError:
+        return None
+    if not rel.parts:
+        return None
+    if rel.name == cfg.en_hash_filename:
+        return None
+    return (root / rel).with_suffix(cfg.translation_ext)
+
+
+def migrate_all(root: Path, locales: dict[str, LocaleMeta] | None = None) -> int:
+    cfg = _load_app_config(root)
+    cache_root = root / cfg.cache_dir
+    if not cache_root.exists():
+        return 0
+    if locales is None:
+        from translationzed_py.core.project_scanner import scan_root
+
+        locales = scan_root(root)
+    migrated = 0
+    for cache_path in cache_root.rglob(f"*{cfg.cache_ext}"):
+        if cache_path.name == cfg.en_hash_filename:
+            continue
+        try:
+            data = cache_path.read_bytes()
+        except OSError:
+            continue
+        parsed = _read_rows_any(data)
+        if not parsed or parsed.hash_bits == 64:
+            continue
+        original = _original_path_from_cache(root, cache_path)
+        if not original or not original.exists():
+            continue
+        try:
+            rel = original.relative_to(root)
+        except ValueError:
+            continue
+        if not rel.parts:
+            continue
+        locale = rel.parts[0]
+        meta = locales.get(locale)
+        if not meta:
+            continue
+        try:
+            from translationzed_py.core import parse
+
+            pf = parse(original, encoding=meta.charset)
+        except Exception:
+            continue
+        legacy_map = {
+            key_hash: CacheEntry(status, value, original_value)
+            for key_hash, status, value, original_value in parsed.rows
+        }
+        rows: list[tuple[int, Status, str | None, str | None]] = []
+        for entry in pf.entries:
+            key16 = _hash_key(entry.key, bits=16)
+            rec = legacy_map.get(key16)
+            if rec is None:
+                continue
+            rows.append(
+                (_hash_key(entry.key, bits=64), rec.status, rec.value, rec.original)
+            )
+        if not rows:
+            continue
+        _write_rows(cache_path, rows, parsed.last_opened, hash_bits=64)
+        migrated += 1
+    return migrated
 
 
 def _parse_rows_v2(
