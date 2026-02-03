@@ -24,6 +24,7 @@ These are **always-on** constraints; any new feature must preserve them.
 5) **Clean separation**: core is Qt-free; GUI uses adapters.
 6) **Config-driven**: formats/paths/adapter names come from `config/app.toml`.
 7) **Productivity**: fast startup/search; avoid expensive scans on startup.
+8) **Metadata files are read-only**: `language.txt`/`credits.txt` are never modified by the app.
 
 ---
 
@@ -80,6 +81,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Locale discovery ignores `_TVRADIO_TRANSLATIONS`, `.tzp-cache`, `.tzp-config`
   - `language.txt` parsed for charset + display name
   - `language.txt` and `credits.txt` excluded from translatable list
+  - `language.txt` is read-only (never modified by the app)
   - Malformed `language.txt` triggers a warning and the locale is skipped
 
 ### Step 3 — Parser + model + spans [✓]
@@ -323,33 +325,43 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 
 Priority A — **Core workflow completeness** (ordered, status)
 A1 [ ] **Search/Replace scopes**
-   - Implement File | Locale | Pool behavior for search + replace (not just stored in prefs).
-   - Status bar clearly reflects active scope (search + replace independently).
+   - **Problem**: scopes are persisted but not enforced; users expect Locale/Pool yet only File is reliable.
+   - **Impact**: false confidence, missed matches, and inconsistent replace behavior.
+   - **Target**: apply File | Locale | Pool to both search and replace; keep search/replace scopes independent.
+   - **UX**: status bar must always show active scope(s) and update immediately on change.
 A2 [ ] **Multi‑file search navigation**
-   - Results list anchored to search UI; selecting a hit highlights the file in the tree.
-   - Prev/Next wraps across files and keeps selection + row focus consistent.
+   - **Problem**: hit navigation is opaque; no results list and cross‑file movement is hard to track.
+   - **Impact**: users lose context when jumping across files; repeated searches to locate hits.
+   - **Target**: add a results list anchored to search UI, with file+row context.
+   - **Navigation**: Prev/Next wraps across files; selection and row focus remain stable.
 A3 [ ] **Replace‑all safety**
-   - Replace‑all in Locale/Pool shows a file list confirmation; only applies to opened locales.
+   - **Problem**: replace‑all across multiple files is high‑risk and currently lacks a clear safety gate.
+   - **Impact**: accidental mass edits; undo is noisy and can span many files.
+   - **Target**: confirmation dialog listing affected files + counts; applies only to opened locales.
 A4 [→] **Large‑file performance** (more urgent now)
-   - [✓] Windowed row sizing (visible rows + viewport margin) + debounce.
-   - [ ] Streaming parser / on‑demand row materialization to avoid full file in RAM.
-   - [ ] Precompute/store per‑entry hash to avoid repeated xxhash on open.
-   - [✓] Lazy EN source map (row‑aligned list; lazy dict only if needed).
-   - [✓] Search rows are lazy + bounded (no full per‑scope index; LRU cache only for small files).
-   - [→] Dirty dot index O(1): path→item map done; cache‑header draft flag pending.
-   - [✓] Progressive multi‑file search with status‑bar progress (non‑blocking).
-   - [→] Fast initial open: defer row sizing for large files; tighten budget targets next.
-   - [✓] Upgrade cache key hash to u64 (reduce collisions); add cache migration.
+   - [✓] **Windowed row sizing**: only visible rows + viewport margin, debounced.
+   - [ ] **Streaming parser / on‑demand rows**
+     - **Problem**: parser materializes full token lists + entries; large files spike RAM and stall UI.
+     - **Target**: stream tokens and materialize entries on demand or in chunks; keep raw bytes once.
+   - [ ] **Precompute/store per‑entry hash**
+     - **Problem**: xxhash64 computed for every entry on every open; O(n) hot path.
+     - **Target**: compute once per file load and reuse across cache lookups and conflicts.
+   - [✓] **Lazy EN source map**: row‑aligned list with lazy dict fallback to avoid duplicating payloads.
+   - [✓] **Lazy + bounded search rows**: no per‑scope index; cache only small files.
+   - [→] **Dirty dot index O(1)**
+     - **Problem**: dot detection still walks cache files on startup.
+     - **Target**: cache‑header draft flag so “dirty” can be read without parsing rows.
+   - [✓] **Progressive multi‑file search** with status‑bar progress.
+   - [→] **Fast initial open**
+     - **Problem**: first render still pays parse + layout costs before user can act.
+     - **Target**: first paint within a tight budget; defer non‑critical work (row sizing, full search cache).
+   - [✓] **u64 cache key hash** + migration to reduce collisions.
 A5 [ ] **Automated regression coverage**
-   - Expand golden/round‑trip tests to cover **structure preservation** (comments, spacing,
-     concat chains, stray quotes, block/line comments, raw tables) using real samples.
-   - Add **encoding‑specific** fixtures per locale (cp1251, UTF‑16, UTF‑8 variants) and
-     assert byte‑exact round‑trip output preserves the original encoding.
-   - Use the `ProjectZomboidTranslations` repo as a reference source for edge‑case inputs.
-   - Add **performance regression** checks (profiling or timing budgets) for:
-     - open‑file latency (large files),
-     - search‑across‑files latency,
-     - cache write latency on status/value edits.
+   - **Problem**: current tests cover typical cases, not “worst‑case” structures and sizes.
+   - **Target**: golden/round‑trip tests for edge‑case syntax (comments, spacing, concat, stray quotes).
+   - **Encoding**: per‑locale fixtures for cp1251/UTF‑16/UTF‑8 with byte‑exact preservation.
+   - **Reference corpus**: use real PZ repo samples for regressions.
+   - **Perf budgets**: automated timing checks for large‑file open, multi‑file search, and cache writes.
 A6 [✓] **Cache/original conflict handling**
    - On file open, compare cached draft values vs **original file translations**.
    - If conflicts exist, show **modal notification** with choices:
@@ -368,11 +380,17 @@ A6 [✓] **Cache/original conflict handling**
 
 Priority B — **Productivity/clarity**
 B1 [ ] **Validation highlights** (Step 28).
+   - **Problem**: errors are only visible on inspection; no per‑cell visual guidance.
+   - **Target**: visible cues for malformed or missing values without obscuring status colors.
 B2 [✓] **File tree toggle** (Step 21).
 B3 [ ] **Text visualization** (Step 19).
+   - **Problem**: translators cannot see hidden whitespace/escapes; mistakes slip through.
+   - **Target**: optional glyph overlays for spaces/newlines and tag/escape highlighting.
 
 Priority C — **Assistive tooling**
 C1 [ ] **Translation memory** + **LanguageTool** (Step 29).
+   - **Problem**: repetitive phrases require manual recall; no suggestions.
+   - **Target**: local TM + optional LanguageTool API, async and non‑blocking.
 
 ---
 
@@ -383,6 +401,7 @@ C1 [ ] **Translation memory** + **LanguageTool** (Step 29).
 - **Pool scope**: Pool = currently opened locales only (not entire root).
 - **Cache hash width**: **u64** key hashes (implemented).
 - **UTF‑16 without BOM**: heuristic decode is allowed **only when** `language.txt` declares UTF‑16.
+- **Metadata immutability**: `language.txt` is read‑only and never modified by the app.
 
 ---
 
