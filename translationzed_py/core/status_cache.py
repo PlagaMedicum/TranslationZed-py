@@ -11,14 +11,15 @@ from translationzed_py.core.app_config import load as _load_app_config
 from translationzed_py.core.atomic_io import write_bytes_atomic
 from translationzed_py.core.model import Entry, Status
 
-_MAGIC = b"TZC1"
-_MAGIC_V3 = b"TZC2"
-_MAGIC_V4 = b"TZC3"
+_MAGIC_V1 = b"TZC1"
+_MAGIC_V2 = b"TZC2"
+_MAGIC_V3 = b"TZC3"
+_MAGIC_V4 = b"TZC4"
 _HEADER_V1 = struct.Struct("<4sI")
 _HEADER_V2 = struct.Struct("<4sQI")
-_HEADER_V3 = struct.Struct("<4sQI")
 _RECORD_V2 = struct.Struct("<HBBI")
 _RECORD_V3 = struct.Struct("<HBBII")
+_RECORD_V4 = struct.Struct("<QBBII")
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,12 +29,40 @@ class CacheEntry:
     original: str | None = None
 
 
+class CacheMap(dict[int, CacheEntry]):
+    __slots__ = ("hash_bits", "legacy_status", "last_opened", "magic")
+
+    def __init__(
+        self,
+        *args: object,
+        hash_bits: int = 64,
+        legacy_status: bool = False,
+        last_opened: int = 0,
+        magic: bytes = b"",
+        **kwargs: object,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.hash_bits = hash_bits
+        self.legacy_status = legacy_status
+        self.last_opened = last_opened
+        self.magic = magic
+
+
 _LEGACY_STATUS_MAP = {
     0: Status.UNTOUCHED,
     1: Status.TRANSLATED,
     2: Status.PROOFREAD,
     3: Status.FOR_REVIEW,
 }
+
+
+@dataclass(frozen=True, slots=True)
+class _CacheRows:
+    last_opened: int
+    rows: list[tuple[int, Status, str | None, str | None]]
+    legacy_status: bool
+    hash_bits: int
+    magic: bytes
 
 
 def _status_from_byte(status_byte: int, *, legacy: bool) -> Status | None:
@@ -45,9 +74,11 @@ def _status_from_byte(status_byte: int, *, legacy: bool) -> Status | None:
         return None
 
 
-def _hash_key(key: str) -> int:
-    # xxhash64 truncated to 16 bits
-    return int(xxhash.xxh64(key.encode("utf-8")).intdigest()) & 0xFFFF
+def _hash_key(key: str, *, bits: int = 64) -> int:
+    digest = int(xxhash.xxh64(key.encode("utf-8")).intdigest())
+    if bits == 16:
+        return digest & 0xFFFF
+    return digest & 0xFFFFFFFFFFFFFFFF
 
 
 def _cache_path(root: Path, file_path: Path) -> Path:
@@ -119,50 +150,92 @@ def _parse_rows_v3(
     return rows
 
 
-def _read_rows_any(
-    data: bytes,
-) -> tuple[int, list[tuple[int, Status, str | None, str | None]], bool] | None:
+def _parse_rows_v4(
+    data: bytes, *, offset: int, count: int, legacy: bool
+) -> list[tuple[int, Status, str | None, str | None]] | None:
+    rows: list[tuple[int, Status, str | None, str | None]] = []
+    for _ in range(count):
+        if offset + _RECORD_V4.size > len(data):
+            return None
+        key_hash, status_byte, flags, value_len, original_len = _RECORD_V4.unpack_from(
+            data, offset
+        )
+        offset += _RECORD_V4.size
+        value: str | None = None
+        original: str | None = None
+        if flags & 0x1:
+            end = offset + value_len
+            if end > len(data):
+                return None
+            raw = data[offset:end]
+            offset = end
+            value = raw.decode("utf-8", errors="replace")
+        if flags & 0x2:
+            end = offset + original_len
+            if end > len(data):
+                return None
+            raw = data[offset:end]
+            offset = end
+            original = raw.decode("utf-8", errors="replace")
+        status = _status_from_byte(status_byte, legacy=legacy)
+        if status is None:
+            continue
+        rows.append((key_hash, status, value, original))
+    return rows
+
+
+def _read_rows_any(data: bytes) -> _CacheRows | None:
     if not data:
         return None
     if data.startswith(_MAGIC_V4):
-        if len(data) >= _HEADER_V3.size:
-            magic, last_opened, count = _HEADER_V3.unpack_from(data, 0)
+        if len(data) >= _HEADER_V2.size:
+            magic, last_opened, count = _HEADER_V2.unpack_from(data, 0)
             if magic == _MAGIC_V4:
-                parsed_rows = _parse_rows_v3(
-                    data, offset=_HEADER_V3.size, count=count, legacy=False
+                parsed_rows = _parse_rows_v4(
+                    data, offset=_HEADER_V2.size, count=count, legacy=False
                 )
                 if parsed_rows is not None:
-                    return last_opened, parsed_rows, False
+                    return _CacheRows(last_opened, parsed_rows, False, 64, magic)
         return None
     if data.startswith(_MAGIC_V3):
-        if len(data) >= _HEADER_V3.size:
-            magic, last_opened, count = _HEADER_V3.unpack_from(data, 0)
+        if len(data) >= _HEADER_V2.size:
+            magic, last_opened, count = _HEADER_V2.unpack_from(data, 0)
             if magic == _MAGIC_V3:
                 parsed_rows = _parse_rows_v3(
-                    data, offset=_HEADER_V3.size, count=count, legacy=True
+                    data, offset=_HEADER_V2.size, count=count, legacy=False
                 )
                 if parsed_rows is not None:
-                    return last_opened, parsed_rows, True
+                    return _CacheRows(last_opened, parsed_rows, False, 16, magic)
         return None
-    if data.startswith(_MAGIC):
+    if data.startswith(_MAGIC_V2):
+        if len(data) >= _HEADER_V2.size:
+            magic, last_opened, count = _HEADER_V2.unpack_from(data, 0)
+            if magic == _MAGIC_V2:
+                parsed_rows = _parse_rows_v3(
+                    data, offset=_HEADER_V2.size, count=count, legacy=True
+                )
+                if parsed_rows is not None:
+                    return _CacheRows(last_opened, parsed_rows, True, 16, magic)
+        return None
+    if data.startswith(_MAGIC_V1):
         # v2 header: magic + u64 last_opened + u32 count
         if len(data) >= _HEADER_V2.size:
             magic, last_opened, count = _HEADER_V2.unpack_from(data, 0)
-            if magic == _MAGIC:
+            if magic == _MAGIC_V1:
                 parsed_rows = _parse_rows_v2(
                     data, offset=_HEADER_V2.size, count=count, legacy=True
                 )
                 if parsed_rows is not None:
-                    return last_opened, parsed_rows, True
+                    return _CacheRows(last_opened, parsed_rows, True, 16, magic)
         # v1 header: magic + u32 count
         if len(data) >= _HEADER_V1.size:
             magic, count = _HEADER_V1.unpack_from(data, 0)
-            if magic == _MAGIC:
+            if magic == _MAGIC_V1:
                 parsed_rows = _parse_rows_v2(
                     data, offset=_HEADER_V1.size, count=count, legacy=True
                 )
                 if parsed_rows is not None:
-                    return 0, parsed_rows, True
+                    return _CacheRows(0, parsed_rows, True, 16, magic)
         return None
 
     # --- legacy (status-only) format ---
@@ -181,10 +254,10 @@ def _read_rows_any(
         if status is None:
             continue
         legacy_rows.append((key_hash, status, None, None))
-    return 0, legacy_rows, True
+    return _CacheRows(0, legacy_rows, True, 16, _MAGIC_V1)
 
 
-def read(root: Path, file_path: Path) -> dict[int, CacheEntry]:
+def read(root: Path, file_path: Path) -> CacheMap:
     """
     Read per-file cache, returning a mapping { key_hash: CacheEntry }.
     Missing or corrupt files are ignored.
@@ -194,17 +267,31 @@ def read(root: Path, file_path: Path) -> dict[int, CacheEntry]:
         data = status_file.read_bytes()
         parsed = _read_rows_any(data)
         if not parsed:
-            return {}
-        last_opened, rows, legacy = parsed
-        out: dict[int, CacheEntry] = {}
-        for key_hash, status, value, original in rows:
+            return CacheMap()
+        out = CacheMap(
+            hash_bits=parsed.hash_bits,
+            legacy_status=parsed.legacy_status,
+            last_opened=int(parsed.last_opened or 0),
+            magic=parsed.magic,
+        )
+        for key_hash, status, value, original in parsed.rows:
             out[key_hash] = CacheEntry(status, value, original)
-        if legacy:
+        if (
+            parsed.legacy_status
+            and parsed.hash_bits == 16
+            and parsed.magic != _MAGIC_V3
+        ):
             with contextlib.suppress(OSError):
-                _write_rows(status_file, rows, last_opened)
+                _write_rows(
+                    status_file,
+                    parsed.rows,
+                    parsed.last_opened,
+                    hash_bits=16,
+                    magic=_MAGIC_V3,
+                )
         return out
     except (OSError, struct.error):
-        return {}
+        return CacheMap()
 
 
 def write(
@@ -226,9 +313,11 @@ def write(
     rows: list[tuple[int, Status, str | None, str | None]] = []
     original_values = original_values or {}
     force_original = force_original or set()
-    existing = {}
+    existing: CacheMap | dict[int, CacheEntry] = {}
+    existing_hash_bits = 64
     if changed_keys and status_file.exists():
         existing = read(root, file_path)
+        existing_hash_bits = getattr(existing, "hash_bits", 64)
     for e in entries:
         include = e.status != Status.UNTOUCHED or e.key in changed_keys
         if not include:
@@ -236,12 +325,12 @@ def write(
         value = e.value if e.key in changed_keys else None
         original: str | None = None
         if e.key in changed_keys:
-            prev = existing.get(_hash_key(e.key))
+            prev = existing.get(_hash_key(e.key, bits=existing_hash_bits))
             if prev and prev.original is not None and e.key not in force_original:
                 original = prev.original
             else:
                 original = original_values.get(e.key)
-        rows.append((_hash_key(e.key), e.status, value, original))
+        rows.append((_hash_key(e.key, bits=64), e.status, value, original))
     if not rows:
         if status_file.exists():
             status_file.unlink()
@@ -250,7 +339,7 @@ def write(
         last_opened = read_last_opened_from_path(status_file)
     if last_opened is None:
         last_opened = 0
-    _write_rows(status_file, rows, last_opened)
+    _write_rows(status_file, rows, last_opened, hash_bits=64)
 
 
 def read_last_opened_from_path(path: Path) -> int:
@@ -262,25 +351,31 @@ def read_last_opened_from_path(path: Path) -> int:
     if len(data) < _HEADER_V1.size:
         return 0
     if data.startswith(_MAGIC_V4):
-        if len(data) >= _HEADER_V3.size:
-            magic, last_opened, _count = _HEADER_V3.unpack_from(data, 0)
+        if len(data) >= _HEADER_V2.size:
+            magic, last_opened, _count = _HEADER_V2.unpack_from(data, 0)
             if magic == _MAGIC_V4:
                 return int(last_opened or 0)
         return 0
     if data.startswith(_MAGIC_V3):
-        if len(data) >= _HEADER_V3.size:
-            magic, last_opened, _count = _HEADER_V3.unpack_from(data, 0)
+        if len(data) >= _HEADER_V2.size:
+            magic, last_opened, _count = _HEADER_V2.unpack_from(data, 0)
             if magic == _MAGIC_V3:
                 return int(last_opened or 0)
         return 0
-    if not data.startswith(_MAGIC):
+    if data.startswith(_MAGIC_V2):
+        if len(data) >= _HEADER_V2.size:
+            magic, last_opened, _count = _HEADER_V2.unpack_from(data, 0)
+            if magic == _MAGIC_V2:
+                return int(last_opened or 0)
+        return 0
+    if not data.startswith(_MAGIC_V1):
         return 0
     if len(data) >= _HEADER_V2.size:
         magic, last_opened, _count = _HEADER_V2.unpack_from(data, 0)
-        if magic == _MAGIC:
+        if magic == _MAGIC_V1:
             return int(last_opened or 0)
     magic, _count = _HEADER_V1.unpack_from(data, 0)
-    if magic != _MAGIC:
+    if magic != _MAGIC_V1:
         return 0
     return 0
 
@@ -294,8 +389,13 @@ def touch_last_opened(root: Path, file_path: Path, last_opened: int) -> bool:
     parsed = _read_rows_any(data)
     if not parsed:
         return False
-    _, rows, _legacy = parsed
-    _write_rows(status_file, rows, last_opened)
+    _write_rows(
+        status_file,
+        parsed.rows,
+        last_opened,
+        hash_bits=parsed.hash_bits,
+        magic=parsed.magic,
+    )
     return True
 
 
@@ -303,9 +403,14 @@ def _write_rows(
     status_file: Path,
     rows: list[tuple[int, Status, str | None, str | None]],
     last_opened: int,
+    *,
+    hash_bits: int,
+    magic: bytes | None = None,
 ) -> None:
     buf = bytearray()
-    buf += _HEADER_V3.pack(_MAGIC_V4, int(last_opened), len(rows))
+    if magic is None:
+        magic = _MAGIC_V4 if hash_bits == 64 else _MAGIC_V3
+    buf += _HEADER_V2.pack(magic, int(last_opened), len(rows))
     for key_hash, status, value, original in rows:
         flags = 0
         raw_value = b""
@@ -322,7 +427,22 @@ def _write_rows(
             flags |= 0x2
             raw_original = original.encode("utf-8")
             original_len = len(raw_original)
-        buf += _RECORD_V3.pack(key_hash, status.value, flags, value_len, original_len)
+        if hash_bits == 16:
+            buf += _RECORD_V3.pack(
+                int(key_hash) & 0xFFFF,
+                status.value,
+                flags,
+                value_len,
+                original_len,
+            )
+        else:
+            buf += _RECORD_V4.pack(
+                int(key_hash) & 0xFFFFFFFFFFFFFFFF,
+                status.value,
+                flags,
+                value_len,
+                original_len,
+            )
         if raw_value:
             buf += raw_value
         if raw_original:

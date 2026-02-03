@@ -1027,9 +1027,10 @@ class MainWindow(QMainWindow):
         changed_keys: set[str] = set()
         baseline_by_row: dict[int, str] = {}
         conflict_originals: dict[str, str] = {}
+        original_values: dict[str, str] = {}
         if self._cache_map:
             for idx, e in enumerate(pf.entries):
-                h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
+                h = self._hash_for_cache(e.key, self._cache_map)
                 if h not in self._cache_map:
                     continue
                 rec = self._cache_map[h]
@@ -1043,6 +1044,10 @@ class MainWindow(QMainWindow):
                 if rec.value is not None and rec.value != e.value:
                     changed_keys.add(e.key)
                     baseline_by_row[idx] = e.value
+                    if rec.original is not None:
+                        original_values[e.key] = rec.original
+                    else:
+                        original_values[e.key] = e.value
                 if new_value != e.value or rec.status != e.status:
                     pf.entries[idx] = type(e)(
                         e.key,
@@ -1099,6 +1104,19 @@ class MainWindow(QMainWindow):
                 self._clear_conflicts(path)
         else:
             self._skip_conflict_check = False
+
+        if self._cache_map and getattr(self._cache_map, "hash_bits", 64) == 16:
+            try:
+                _write_status_cache(
+                    self._root,
+                    path,
+                    pf.entries,
+                    changed_keys=changed_keys,
+                    original_values=original_values,
+                    last_opened=int(time.time()),
+                )
+            except Exception as exc:
+                QMessageBox.warning(self, "Cache migration failed", str(exc))
 
         # (re)create undo/redo actions bound to this file’s stack
         for action in list(self.menu_edit.actions()):
@@ -1309,6 +1327,13 @@ class MainWindow(QMainWindow):
         for path in self._all_draft_files():
             self.fs_model.set_dirty(path, True)
 
+    def _hash_for_cache(self, key: str, cache_map: dict[int, CacheEntry]) -> int:
+        digest = int(xxhash.xxh64(key.encode("utf-8")).intdigest())
+        bits = getattr(cache_map, "hash_bits", 64)
+        if bits == 16:
+            return digest & 0xFFFF
+        return digest & 0xFFFFFFFFFFFFFFFF
+
     def _auto_open_last_file(self) -> None:
         cache_root = self._root / self._app_config.cache_dir
         if not cache_root.exists():
@@ -1378,7 +1403,7 @@ class MainWindow(QMainWindow):
         changed: dict[str, str] = {}
         new_entries = []
         for e in pf.entries:
-            h = xxhash.xxh64(e.key.encode("utf-8")).intdigest() & 0xFFFF
+            h = self._hash_for_cache(e.key, cached)
             rec = cached.get(h)
             if rec is None:
                 new_entries.append(e)
@@ -1686,7 +1711,7 @@ class MainWindow(QMainWindow):
         original_values: dict[str, str] = {}
         new_entries = []
         for entry in pf.entries:
-            key_hash = xxhash.xxh64(entry.key.encode("utf-8")).intdigest() & 0xFFFF
+            key_hash = self._hash_for_cache(entry.key, cache_map)
             cache = cache_map.get(key_hash)
             value = cache.value if cache and cache.value is not None else entry.value
             status = cache.status if cache else entry.status
@@ -2091,7 +2116,7 @@ class MainWindow(QMainWindow):
             value = ""
             if include_value:
                 if use_cache:
-                    key_hash = xxhash.xxh64(key.encode("utf-8")).intdigest() & 0xFFFF
+                    key_hash = self._hash_for_cache(key, cache_map)
                     rec = cache_map.get(key_hash)
                     value = rec.value if rec and rec.value is not None else entry.value
                 else:

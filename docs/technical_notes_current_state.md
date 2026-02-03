@@ -104,7 +104,7 @@ From latest clarification:
   - **Translated**: green background.
   - **Proofread**: light‑blue background (higher priority than Translated).
 - **Status order (desired)**: Untouched → For review → Translated → Proofread.
-- **Cache key width**: move to **u64** hash to avoid collisions (u16 is unsafe).
+- **Cache key width**: **u64** hash to avoid collisions (u16 retired).
 - **UTF‑16 without BOM**: allow heuristic decoding **only** when `language.txt` declares UTF‑16.
 - **Plain-text files**: if a file has no `=` tokens, it is treated as a single raw entry
   (key = filename) and saved back verbatim without quoting. Mixed/unsupported formats remain errors.
@@ -218,7 +218,7 @@ Observed hotspots and their current shape (code references are indicative):
 - **Offset map**: `_build_offset_map` encodes every character to compute byte offsets,
   which is O(n) with non‑trivial constant factors for UTF‑16 and long strings.
 - **Cache application**: `gui/main_window.py::_file_chosen` walks every entry and
-  computes xxhash per key (16‑bit truncation) to reconcile cache rows; O(n) per open.
+  computes xxhash64 per key to reconcile cache rows; O(n) per open.
 - **Source map duplication**: `_load_en_source` builds a dict `{key: value}` for EN;
   this duplicates string payloads for large files (Source and Translation both held).
 
@@ -356,7 +356,7 @@ GUI: MainWindow
           |
           v
 Core: parse -> ParsedFile(entries, raw_bytes)
-Core: status_cache.read/write (xxhash16)
+Core: status_cache.read/write (xxhash64)
 ```
 
 Module responsibility matrix (actual):
@@ -457,8 +457,8 @@ Current status sources:
 2) Binary cache `.bin` for in-memory status + draft overrides.
 
 Notes:
-- Status cache uses 16-bit hash of UTF-8 key text (xxhash64 -> u16).
-- Collisions are possible by design; no collision mitigation exists.
+- Status cache uses 64-bit hash of UTF-8 key text (xxhash64 -> u64).
+- Collisions are extremely unlikely in practice.
 - Saver does not update inline status comments; status changes are persisted
   only via the cache. If files contain legacy comment tags, they can diverge.
 - Multi-file search caches per-file row data (LRU) and skips loading Source/Translation
@@ -481,11 +481,11 @@ Clarified direction:
 
 Cache file layout (actual):
 ```
-4s  magic ("TZC3")
+4s  magic ("TZC4")
 u64 last_opened_unix
 u32 count
 repeat count:
-  u16 key_hash
+  u64 key_hash
   u8  status (UNTOUCHED=0, FOR_REVIEW=1, TRANSLATED=2, PROOFREAD=3)
   u8  flags (bit0 = has_value, bit1 = has_original)
   u32 value_len
@@ -494,6 +494,7 @@ repeat count:
   bytes[original_len] (UTF-8)
 ```
 Legacy caches:
+- `TZC3` uses u16 key hashes (new status order); upgraded when the file is opened.
 - `TZC2` uses the old status order (Untouched=0, Translated=1, Proofread=2, For review=3).
 - Legacy bytes are mapped to the new enum order on read and rewritten as `TZC3`.
 
@@ -585,7 +586,7 @@ Missing coverage:
    - Divergence is possible if comment tags exist in source files.
 
 2) Cache collisions
-   - Status/draft cache uses 16-bit hash keys; collisions are possible.
+   - Status/draft cache uses 64-bit hash keys; collisions are extremely unlikely.
    - No collision mitigation exists (by design).
 
 3) Crash recovery

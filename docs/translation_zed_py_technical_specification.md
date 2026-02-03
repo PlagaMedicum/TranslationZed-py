@@ -355,7 +355,7 @@ hidden `.tzp-cache/` subfolder under the repo root, preserving relative paths.
 
 | Offset | Type | Description |
 |--------|------|-------------|
-| 0      | 4s   | magic `TZC3` |
+| 0      | 4s   | magic `TZC4` |
 | 4      | u64  | `last_opened_unix` |
 | 12     | u32  | entry-count |
 | 16     | …   | repeated: `u64 key-hash` • `u8 status` • `u8 flags` • `u32 draft_len` • `u32 orig_len` • `draft bytes` • `orig bytes` |
@@ -366,6 +366,7 @@ hidden `.tzp-cache/` subfolder under the repo root, preserving relative paths.
   When set, the corresponding UTF‑8 byte payload follows (`draft_len` / `orig_len`).
 
 Legacy caches:
+- `TZC3` uses **u16** key hashes (new status order) and is upgraded when the file is opened.
 - `TZC2` uses the **old** status order (Untouched=0, Translated=1, Proofread=2, For review=3).
 - On read, legacy bytes are mapped into the new enum order and rewritten as `TZC3`.
 

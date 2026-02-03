@@ -27,6 +27,8 @@ def test_roundtrip():
         object.__setattr__(pf.entries[0], "status", Status.TRANSLATED)
 
         write(root, path, pf.entries)
+        cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
+        assert cache_path.read_bytes().startswith(b"TZC4")
         assert list(read(root, path).values()) == [
             CacheEntry(Status.TRANSLATED, None, None)
         ]

@@ -14,7 +14,7 @@ from translationzed_py.gui import main_window as mw
 
 
 def _hash_key(key: str) -> int:
-    return int(xxhash.xxh64(key.encode("utf-8")).intdigest()) & 0xFFFF
+    return int(xxhash.xxh64(key.encode("utf-8")).intdigest()) & 0xFFFFFFFFFFFFFFFF
 
 
 def _make_conflict_project(tmp_path: Path) -> tuple[Path, Path]:
