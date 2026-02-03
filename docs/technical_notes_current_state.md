@@ -230,6 +230,8 @@ Observed hotspots and their current shape (code references are indicative):
 **B) Search & replace**
 - **Multi‑file search**: Locale/Pool search runs in batches with status‑bar progress;
   rows are produced lazily per file rather than materializing a full index up front.
+- **Results list**: multi‑file searches surface a file+row list for direct navigation;
+  selection syncs with Prev/Next and table focus.
 - **Search cache**: `_search_rows_cache` is still LRU‑bounded, but now only caches
   rows for smaller files; large files stream rows without extra list allocation.
 - **Regex compilation**: `core/search.py::search` compiles every run; ok for small files,

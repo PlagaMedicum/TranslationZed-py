@@ -324,23 +324,25 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ## 4) v0.2 Focus Plan (draft, ordered)
 
 Priority A — **Core workflow completeness** (ordered, status)
-A1 [ ] **Search/Replace scopes**
+A1 [✓] **Search/Replace scopes**
    - **Problem**: scopes are persisted but not enforced; users expect Locale/Pool yet only File is reliable.
    - **Impact**: false confidence, missed matches, and inconsistent replace behavior.
    - **Target**: apply File | Locale | Pool to both search and replace; keep search/replace scopes independent.
    - **UX**: status bar must always show active scope(s) and update immediately on change.
-A2 [ ] **Multi‑file search navigation**
+   - **Implemented**: independent search/replace scopes are enforced for FILE/LOCALE/POOL; status bar indicators reflect active scopes.
+A2 [✓] **Multi‑file search navigation**
    - **Problem**: hit navigation is opaque; no results list and cross‑file movement is hard to track.
    - **Impact**: users lose context when jumping across files; repeated searches to locate hits.
    - **Target**: add a results list anchored to search UI, with file+row context.
    - **Navigation**: Prev/Next wraps across files; selection and row focus remain stable.
+   - **Implemented**: multi‑file results list (file + row) with click‑to‑jump and sync to selection.
 A3 [ ] **Replace‑all safety**
    - **Problem**: replace‑all across multiple files is high‑risk and currently lacks a clear safety gate.
    - **Impact**: accidental mass edits; undo is noisy and can span many files.
    - **Target**: confirmation dialog listing affected files + counts; applies only to opened locales.
-A4 [→] **Large‑file performance** (more urgent now)
+A4 [✓] **Large‑file performance** (more urgent now)
    - [✓] **Windowed row sizing**: only visible rows + viewport margin, debounced.
-   - [→] **Streaming parser / on‑demand rows**
+   - [✓] **Streaming parser / on‑demand rows**
      - **Problem**: parser materializes full token lists + entry values; large files spike RAM and stall UI.
      - **Target**: stream tokens; keep entry metadata but materialize values on demand with a row‑window prefetch.
    - [✓] **Precompute/store per‑entry hash**
@@ -352,7 +354,7 @@ A4 [→] **Large‑file performance** (more urgent now)
      - **Problem**: dot detection still walks cache files on startup.
      - **Target**: cache‑header draft flag so “dirty” can be read without parsing rows.
    - [✓] **Progressive multi‑file search** with status‑bar progress.
-   - [→] **Fast initial open**
+   - [✓] **Fast initial open**
      - **Problem**: first render still pays parse + layout costs before user can act.
      - **Target**: first paint within a tight budget; defer non‑critical work (row sizing, full search cache).
      - **Implemented**: cache overlay uses hash index + lazy value decode (no full value materialization on open).
