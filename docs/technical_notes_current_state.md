@@ -183,6 +183,8 @@ From latest clarification:
 - **Comparison basis**: compare **translation values only** (no whitespace normalization).
 - **Cache requirements**: cache must store **original translation snapshot** (per key) to detect
   file‑changes vs cache drafts.
+- **Orphan cache warning**: if a selected locale has cache files without source files, show a
+  warning with options to purge or dismiss.
 
 ---
 
@@ -317,8 +319,8 @@ Implications:
 - Scanner must accept arbitrary locale folder names (except ignore list).
 - Encoding must be applied per locale for **all** files in that locale.
 - UI locale list should use `text = ...` as the display label.
-- UTF-16 locales (e.g., KO) will break the current byte-level tokenizer unless
-  tokenization becomes encoding-aware (byte offset mapping required).
+- UTF-16 locales are supported; tokenization is encoding-aware and handles
+  BOM-less UTF-16 with a heuristic fallback.
 
 ---
 
@@ -495,7 +497,7 @@ repeat count:
   bytes[original_len] (UTF-8)
 ```
 Legacy caches:
-- `TZC3` uses u16 key hashes (new status order); upgraded when the file is opened.
+- `TZC3` uses u16 key hashes (new status order); proactively migrated to `TZC4` on startup.
 - `TZC2` uses the old status order (Untouched=0, Translated=1, Proofread=2, For review=3).
 - Legacy bytes are mapped to the new enum order on read and rewritten as `TZC3`.
 

@@ -366,9 +366,10 @@ hidden `.tzp-cache/` subfolder under the repo root, preserving relative paths.
   When set, the corresponding UTF‑8 byte payload follows (`draft_len` / `orig_len`).
 
 Legacy caches:
-- `TZC3` uses **u16** key hashes (new status order) and is upgraded when the file is opened.
+- `TZC3` uses **u16** key hashes (new status order) and is proactively migrated on startup.
 - `TZC2` uses the **old** status order (Untouched=0, Translated=1, Proofread=2, For review=3).
 - On read, legacy bytes are mapped into the new enum order and rewritten as `TZC3`.
+- On startup, any `TZC3` files are proactively migrated to `TZC4` (u64 hashes).
 
 ```python
 def read(root: Path, file_path: Path) -> dict[int, CacheEntry]: ...

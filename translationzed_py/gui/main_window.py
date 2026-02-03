@@ -80,7 +80,13 @@ from translationzed_py.core.status_cache import (
     CacheEntry,
 )
 from translationzed_py.core.status_cache import (
+    legacy_cache_paths as _legacy_cache_paths,
+)
+from translationzed_py.core.status_cache import (
     migrate_all as _migrate_status_caches,
+)
+from translationzed_py.core.status_cache import (
+    migrate_paths as _migrate_status_cache_paths,
 )
 from translationzed_py.core.status_cache import (
     read as _read_status_cache,
@@ -222,6 +228,11 @@ class MainWindow(QMainWindow):
         self._merge_result: dict[str, tuple[str, str]] | None = None
         self._merge_loop: QEventLoop | None = None
         self._merge_apply_btn: QPushButton | None = None
+        self._orphan_cache_warned_locales: set[str] = set()
+        self._pending_cache_migrations: list[Path] = []
+        self._migration_timer: QTimer | None = None
+        self._migration_batch_size = 25
+        self._migration_count = 0
 
         self._main_splitter = QSplitter(Qt.Vertical, self)
         self._content_splitter = QSplitter(Qt.Horizontal, self)
@@ -788,10 +799,7 @@ class MainWindow(QMainWindow):
             self._locales = {}
             self._selected_locales = []
             return
-        try:
-            _migrate_status_caches(self._root, self._locales)
-        except Exception as exc:
-            QMessageBox.warning(self, "Cache migration failed", str(exc))
+        self._schedule_cache_migration()
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
         self._files_by_locale.clear()
 
@@ -812,6 +820,7 @@ class MainWindow(QMainWindow):
             selected_locales = dialog.selected_codes()
 
         self._selected_locales = [c for c in selected_locales if c in selectable]
+        self._warn_orphan_caches()
 
     def _locale_for_path(self, path: Path) -> str | None:
         try:
@@ -1375,6 +1384,93 @@ class MainWindow(QMainWindow):
         index = self.fs_model.index_for_path(best_path)
         if index.isValid():
             self._file_chosen(index)
+
+    def _schedule_cache_migration(self) -> None:
+        legacy_paths = _legacy_cache_paths(self._root)
+        if not legacy_paths:
+            return
+        if len(legacy_paths) <= self._migration_batch_size:
+            try:
+                migrated = _migrate_status_caches(self._root, self._locales)
+            except Exception as exc:
+                QMessageBox.warning(self, "Cache migration failed", str(exc))
+                return
+            if migrated:
+                self._migration_count += migrated
+            return
+        self._pending_cache_migrations = list(legacy_paths)
+        self._migration_count = 0
+        if self._migration_timer is None:
+            self._migration_timer = QTimer(self)
+            self._migration_timer.timeout.connect(self._run_cache_migration_batch)
+        if not self._migration_timer.isActive():
+            self._migration_timer.start(0)
+
+    def _run_cache_migration_batch(self) -> None:
+        if not self._pending_cache_migrations:
+            if self._migration_timer is not None:
+                self._migration_timer.stop()
+            if self._migration_count:
+                self.statusBar().showMessage(
+                    f"Migrated {self._migration_count} cache file(s).", 5000
+                )
+            return
+        batch = self._pending_cache_migrations[: self._migration_batch_size]
+        del self._pending_cache_migrations[: self._migration_batch_size]
+        try:
+            migrated = _migrate_status_cache_paths(self._root, self._locales, batch)
+        except Exception as exc:
+            if self._migration_timer is not None:
+                self._migration_timer.stop()
+            QMessageBox.warning(self, "Cache migration failed", str(exc))
+            return
+        self._migration_count += migrated
+
+    def _warn_orphan_caches(self) -> None:
+        cache_root = self._root / self._app_config.cache_dir
+        if not cache_root.exists():
+            return
+        for locale in self._selected_locales:
+            if locale in self._orphan_cache_warned_locales:
+                continue
+            locale_cache = cache_root / locale
+            if not locale_cache.exists():
+                continue
+            missing: list[Path] = []
+            for cache_path in locale_cache.rglob(f"*{self._app_config.cache_ext}"):
+                try:
+                    rel = cache_path.relative_to(cache_root)
+                except ValueError:
+                    continue
+                original = (self._root / rel).with_suffix(
+                    self._app_config.translation_ext
+                )
+                if not original.exists():
+                    missing.append(cache_path)
+            if not missing:
+                continue
+            self._orphan_cache_warned_locales.add(locale)
+            rels = [str(p.relative_to(cache_root)) for p in missing]
+            preview = "\n".join(rels[:20])
+            if len(rels) > 20:
+                preview = f"{preview}\n... ({len(rels) - 20} more)"
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle("Orphan cache files")
+            msg.setText(f"Locale {locale} has cache files without source files.")
+            msg.setInformativeText(
+                "Purge deletes those cache files. Dismiss keeps them."
+            )
+            msg.setDetailedText(preview)
+            purge = msg.addButton("Purge", QMessageBox.AcceptRole)
+            msg.addButton("Dismiss", QMessageBox.RejectRole)
+            msg.exec()
+            if msg.clickedButton() is purge:
+                for path in missing:
+                    try:
+                        path.unlink()
+                    except OSError:
+                        continue
 
     def _save_all_files(self, files: list[Path]) -> None:
         if not files:

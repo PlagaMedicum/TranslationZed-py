@@ -250,7 +250,7 @@ UNTOUCHED ──────────────────────▶ 
 
 ---
 ## 7  Assumptions & Open Issues
-1. **File Encoding**: Each locale *may* use a different charset.  SYS MUST read `<locale>/language.txt` for the `charset = …` setting (e.g. `Cp1251`) and decode all files accordingly.  When saving, files SHOULD be written back in the same charset; if no charset is specified, default to UTF‑8.
+1. **File Encoding**: Each locale *may* use a different charset.  SYS MUST read `<locale>/language.txt` for the `charset = …` setting (e.g. `Cp1251`) and decode all files accordingly.  When saving, files SHOULD be written back in the same charset; missing `charset` is a hard error.
 2. **Multiline Strings**: handled via parser token concatenation; no GUI wrap concerns beyond row height.
 3. **Locale Names**: mapping code → English name shipped in static JSON (ISO‑639‑1).
 4. **Accessibility**: basic; no screen‑reader optimisation in MVP.\

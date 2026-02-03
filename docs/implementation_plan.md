@@ -339,7 +339,7 @@ Priority A — **Core workflow completeness**
    - Row sizing should be **visible‑rows only**; debounce resizes after edits.
    - **Progressive multi‑file search** with status‑bar progress (non‑blocking).
    - **Fast initial open**: prioritize “first table render” under a tight budget.
-   - Upgrade cache key hash to **u64** (reduce collisions); add cache migration.
+   - Upgrade cache key hash to **u64** (reduce collisions); add cache migration. **[✓]**
 5) **Automated regression coverage**
    - Expand golden/round‑trip tests to cover **structure preservation** (comments, spacing,
      concat chains, stray quotes, block/line comments, raw tables) using real samples.
@@ -381,7 +381,7 @@ Priority C — **Assistive tooling**
 - **v0.2 priority order**: confirmed (Priority A/B/C as listed).
 - **Replace‑all confirmation**: modal dialog now; future sidebar is acceptable (VSCode‑style).
 - **Pool scope**: Pool = currently opened locales only (not entire root).
-- **Cache hash width**: use **u64** key hashes (current u16 is collision‑prone).
+- **Cache hash width**: **u64** key hashes (implemented).
 - **UTF‑16 without BOM**: heuristic decode is allowed **only when** `language.txt` declares UTF‑16.
 
 ---

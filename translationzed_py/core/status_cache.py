@@ -107,63 +107,96 @@ def _original_path_from_cache(root: Path, cache_path: Path) -> Path | None:
     return (root / rel).with_suffix(cfg.translation_ext)
 
 
-def migrate_all(root: Path, locales: dict[str, LocaleMeta] | None = None) -> int:
+def legacy_cache_paths(root: Path) -> list[Path]:
     cfg = _load_app_config(root)
     cache_root = root / cfg.cache_dir
     if not cache_root.exists():
-        return 0
-    if locales is None:
-        from translationzed_py.core.project_scanner import scan_root
-
-        locales = scan_root(root)
-    migrated = 0
+        return []
+    out: list[Path] = []
     for cache_path in cache_root.rglob(f"*{cfg.cache_ext}"):
         if cache_path.name == cfg.en_hash_filename:
             continue
         try:
-            data = cache_path.read_bytes()
+            with cache_path.open("rb") as handle:
+                head = handle.read(4)
         except OSError:
             continue
-        parsed = _read_rows_any(data)
-        if not parsed or parsed.hash_bits == 64:
+        if not head:
             continue
-        original = _original_path_from_cache(root, cache_path)
-        if not original or not original.exists():
+        if head == _MAGIC_V4:
             continue
-        try:
-            rel = original.relative_to(root)
-        except ValueError:
-            continue
-        if not rel.parts:
-            continue
-        locale = rel.parts[0]
-        meta = locales.get(locale)
-        if not meta:
-            continue
-        try:
-            from translationzed_py.core import parse
+        out.append(cache_path)
+    return out
 
-            pf = parse(original, encoding=meta.charset)
-        except Exception:
+
+def _migrate_cache_path(
+    root: Path, cache_path: Path, locales: dict[str, LocaleMeta]
+) -> bool:
+    try:
+        data = cache_path.read_bytes()
+    except OSError:
+        return False
+    parsed = _read_rows_any(data)
+    if not parsed or parsed.hash_bits == 64:
+        return False
+    original = _original_path_from_cache(root, cache_path)
+    if not original or not original.exists():
+        return False
+    try:
+        rel = original.relative_to(root)
+    except ValueError:
+        return False
+    if not rel.parts:
+        return False
+    locale = rel.parts[0]
+    meta = locales.get(locale)
+    if not meta:
+        return False
+    try:
+        from translationzed_py.core import parse
+
+        pf = parse(original, encoding=meta.charset)
+    except Exception:
+        return False
+    legacy_map = {
+        key_hash: CacheEntry(status, value, original_value)
+        for key_hash, status, value, original_value in parsed.rows
+    }
+    rows: list[tuple[int, Status, str | None, str | None]] = []
+    for entry in pf.entries:
+        key16 = _hash_key(entry.key, bits=16)
+        rec = legacy_map.get(key16)
+        if rec is None:
             continue
-        legacy_map = {
-            key_hash: CacheEntry(status, value, original_value)
-            for key_hash, status, value, original_value in parsed.rows
-        }
-        rows: list[tuple[int, Status, str | None, str | None]] = []
-        for entry in pf.entries:
-            key16 = _hash_key(entry.key, bits=16)
-            rec = legacy_map.get(key16)
-            if rec is None:
-                continue
-            rows.append(
-                (_hash_key(entry.key, bits=64), rec.status, rec.value, rec.original)
-            )
-        if not rows:
+        rows.append(
+            (_hash_key(entry.key, bits=64), rec.status, rec.value, rec.original)
+        )
+    if not rows:
+        return False
+    _write_rows(cache_path, rows, parsed.last_opened, hash_bits=64)
+    return True
+
+
+def migrate_paths(root: Path, locales: dict[str, LocaleMeta], paths: list[Path]) -> int:
+    cfg = _load_app_config(root)
+    migrated = 0
+    for cache_path in paths:
+        if cache_path.name == cfg.en_hash_filename:
             continue
-        _write_rows(cache_path, rows, parsed.last_opened, hash_bits=64)
-        migrated += 1
+        if _migrate_cache_path(root, cache_path, locales):
+            migrated += 1
     return migrated
+
+
+def migrate_all(root: Path, locales: dict[str, LocaleMeta] | None = None) -> int:
+    if locales is None:
+        from translationzed_py.core.project_scanner import scan_root
+
+        locales = scan_root(root)
+    paths = legacy_cache_paths(root)
+    if not paths:
+        return 0
+    return migrate_paths(root, locales, paths)
 
 
 def _parse_rows_v2(
