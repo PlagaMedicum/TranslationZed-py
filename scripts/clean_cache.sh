@@ -2,5 +2,13 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+FIXTURE_ROOT="$ROOT_DIR/tests/fixtures"
 
-find "$ROOT_DIR" -type d -name ".tzp-cache" -prune -exec rm -rf {} +
+while IFS= read -r cache_dir; do
+  case "$cache_dir" in
+    "$FIXTURE_ROOT"/*)
+      continue
+      ;;
+  esac
+  rm -rf "$cache_dir"
+done < <(find "$ROOT_DIR" -type d -name ".tzp-cache" -prune)
