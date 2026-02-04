@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+from contextlib import suppress
 from dataclasses import dataclass
 
 _TRACE_ENV = "TZP_PERF_TRACE"
@@ -42,7 +43,7 @@ class PerfTrace:
         self._last_flush = time.monotonic()
 
     @classmethod
-    def from_env(cls) -> "PerfTrace":
+    def from_env(cls) -> PerfTrace:
         return cls(_parse_categories(os.getenv(_TRACE_ENV, "")))
 
     def start(self, name: str) -> float | None:
@@ -97,10 +98,8 @@ class PerfTrace:
                 f"max {bucket.max_ms:.1f}ms"
             )
         self._out.write("\n".join(lines) + "\n")
-        try:
+        with suppress(Exception):
             self._out.flush()
-        except Exception:
-            pass
         self._buckets.clear()
         self._last_flush = now
 

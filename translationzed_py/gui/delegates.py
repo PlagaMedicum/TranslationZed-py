@@ -26,6 +26,7 @@ from translationzed_py.core.model import STATUS_ORDER, Status
 
 from .perf_trace import PERF_TRACE
 
+
 class StatusDelegate(QStyledItemDelegate):
     """Combo-box editor for the Status column."""
 
