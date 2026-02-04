@@ -7,43 +7,117 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 
 from translationzed_py.core.project_scanner import LocaleMeta, list_translatable_files
 
+_ABS_PATH_ROLE = int(Qt.ItemDataRole.UserRole)
+_REL_PATH_ROLE = _ABS_PATH_ROLE + 1
+_LOCALE_CODE_ROLE = _ABS_PATH_ROLE + 2
+
 
 class FsModel(QStandardItemModel):
     """Tiny tree showing translatable files under <root>/<LOCALE>/."""
 
-    def __init__(self, root: Path, locales: list[LocaleMeta]) -> None:
+    def __init__(self, root: Path, locales: list[LocaleMeta], *, lazy: bool = True) -> None:
         super().__init__()
         self._root = root  # keep for helpers
+        self._lazy = lazy
         self._path_items: dict[str, QStandardItem] = {}
+        self._pending_dirty: set[str] = set()
+        self._locale_meta: dict[str, LocaleMeta] = {meta.code: meta for meta in locales}
+        self._locale_items: dict[str, QStandardItem] = {}
+        self._loaded_locales: set[str] = set()
         self.setHorizontalHeaderLabels(["Project files"])
 
         for meta in locales:
             loc_item = QStandardItem(f"{meta.code} — {meta.display_name}")
             loc_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            for txt in list_translatable_files(meta.path):
-                rel = str(txt.relative_to(meta.path))
-                file_item = QStandardItem(rel)
-                file_item.setFlags(
-                    Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
-                )
-                # store absolute path string in UserRole
-                abs_path = str(txt)
-                file_item.setData(abs_path, int(Qt.ItemDataRole.UserRole))
-                file_item.setData(rel, int(Qt.ItemDataRole.UserRole) + 1)
-                loc_item.appendRow(file_item)
-                self._path_items[abs_path] = file_item
+            loc_item.setData(meta.code, _LOCALE_CODE_ROLE)
+            if self._lazy:
+                placeholder = QStandardItem("...")
+                placeholder.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                loc_item.appendRow(placeholder)
+            else:
+                self._populate_locale(loc_item, meta)
+                self._loaded_locales.add(meta.code)
             self.appendRow(loc_item)
+            self._locale_items[meta.code] = loc_item
 
-    def set_dirty(self, path: Path, dirty: bool) -> None:
-        item = self._path_items.get(str(path))
+    def is_lazy(self) -> bool:
+        return self._lazy
+
+    def ensure_loaded_for_index(self, index: QModelIndex) -> None:
+        if not index.isValid():
+            return
+        item = self.itemFromIndex(index)
         if item is None:
             return
-        base = item.data(int(Qt.ItemDataRole.UserRole) + 1) or item.text()
+        code = item.data(_LOCALE_CODE_ROLE)
+        if isinstance(code, str):
+            self._ensure_locale_loaded(code)
+
+    def _ensure_locale_loaded(self, code: str) -> None:
+        if code in self._loaded_locales:
+            return
+        meta = self._locale_meta.get(code)
+        item = self._locale_items.get(code)
+        if not meta or item is None:
+            return
+        self._populate_locale(item, meta)
+        self._loaded_locales.add(code)
+
+    def _populate_locale(self, loc_item: QStandardItem, meta: LocaleMeta) -> None:
+        loc_item.removeRows(0, loc_item.rowCount())
+        for txt in list_translatable_files(meta.path):
+            rel = str(txt.relative_to(meta.path))
+            file_item = QStandardItem(rel)
+            file_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            abs_path = str(txt)
+            file_item.setData(abs_path, _ABS_PATH_ROLE)
+            file_item.setData(rel, _REL_PATH_ROLE)
+            loc_item.appendRow(file_item)
+            self._path_items[abs_path] = file_item
+            if abs_path in self._pending_dirty:
+                self._apply_dirty_label(file_item, True)
+                self._pending_dirty.discard(abs_path)
+
+    def set_dirty(self, path: Path, dirty: bool) -> None:
+        abs_path = str(path)
+        item = self._path_items.get(abs_path)
+        if item is None:
+            if dirty:
+                self._pending_dirty.add(abs_path)
+            else:
+                self._pending_dirty.discard(abs_path)
+            return
+        self._apply_dirty_label(item, dirty)
+        if dirty:
+            self._pending_dirty.discard(abs_path)
+
+    def _apply_dirty_label(self, item: QStandardItem, dirty: bool) -> None:
+        base = item.data(_REL_PATH_ROLE) or item.text()
         label = f"● {base}" if dirty else str(base)
         item.setText(label)
 
     # ------------------------------------------------------------------ helper
     def index_for_path(self, path: Path) -> QModelIndex:
         """Return QModelIndex of *path* inside the tree."""
-        item = self._path_items.get(str(path))
-        return item.index() if item is not None else QModelIndex()
+        abs_path = str(path)
+        item = self._path_items.get(abs_path)
+        if item is not None:
+            return item.index()
+        if not self._lazy:
+            return QModelIndex()
+        code = self._locale_code_for_path(path)
+        if code:
+            self._ensure_locale_loaded(code)
+            item = self._path_items.get(abs_path)
+            if item is not None:
+                return item.index()
+        return QModelIndex()
+
+    def _locale_code_for_path(self, path: Path) -> str | None:
+        try:
+            rel = path.relative_to(self._root)
+        except ValueError:
+            return None
+        if not rel.parts:
+            return None
+        return rel.parts[0]

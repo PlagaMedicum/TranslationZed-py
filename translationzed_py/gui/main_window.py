@@ -116,7 +116,6 @@ from .delegates import (
     TextVisualHighlighter,
     VisualTextDelegate,
 )
-from .perf_trace import PERF_TRACE
 from .dialogs import (
     AboutDialog,
     ConflictChoiceDialog,
@@ -126,6 +125,7 @@ from .dialogs import (
 )
 from .entry_model import TranslationModel
 from .fs_model import FsModel
+from .perf_trace import PERF_TRACE
 from .preferences_dialog import PreferencesDialog
 
 
@@ -546,13 +546,24 @@ class MainWindow(QMainWindow):
         if not self._selected_locales:
             self._startup_aborted = True
             return
+        lazy_tree = len(self._selected_locales) > 1
         self.fs_model = FsModel(
-            self._root, [self._locales[c] for c in self._selected_locales]
+            self._root,
+            [self._locales[c] for c in self._selected_locales],
+            lazy=lazy_tree,
         )
         self.tree.setModel(self.fs_model)
+        self.tree.expanded.connect(self._on_tree_expanded)
         # prevent in-place renaming on double-click; we use double-click to open
         self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tree.expandAll()
+        if self.fs_model.is_lazy():
+            if len(self._selected_locales) == 1:
+                idx = self.fs_model.index(0, 0)
+                if idx.isValid():
+                    self.fs_model.ensure_loaded_for_index(idx)
+                    self.tree.expand(idx)
+        else:
+            self.tree.expandAll()
         self._mark_cached_dirty()
         self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
         self.tree.doubleClicked.connect(self._file_chosen)
@@ -1011,7 +1022,7 @@ class MainWindow(QMainWindow):
             selected_locales = dialog.selected_codes()
 
         self._selected_locales = [c for c in selected_locales if c in selectable]
-        self._warn_orphan_caches()
+        QTimer.singleShot(0, self._warn_orphan_caches)
 
     def _locale_for_path(self, path: Path) -> str | None:
         try:
@@ -1262,11 +1273,21 @@ class MainWindow(QMainWindow):
         self._current_model = None
         self.table.setModel(None)
         self._set_status_combo(None)
+        lazy_tree = len(self._selected_locales) > 1
         self.fs_model = FsModel(
-            self._root, [self._locales[c] for c in self._selected_locales]
+            self._root,
+            [self._locales[c] for c in self._selected_locales],
+            lazy=lazy_tree,
         )
         self.tree.setModel(self.fs_model)
-        self.tree.expandAll()
+        if self.fs_model.is_lazy():
+            if len(self._selected_locales) == 1:
+                idx = self.fs_model.index(0, 0)
+                if idx.isValid():
+                    self.fs_model.ensure_loaded_for_index(idx)
+                    self.tree.expand(idx)
+        else:
+            self.tree.expandAll()
         self._mark_cached_dirty()
         self._auto_open_last_file()
         self._mark_cached_dirty()
@@ -1653,6 +1674,10 @@ class MainWindow(QMainWindow):
         if self._wrap_text:
             self._schedule_row_resize()
 
+    def _on_tree_expanded(self, index: QModelIndex) -> None:
+        if self.fs_model:
+            self.fs_model.ensure_loaded_for_index(index)
+
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         if obj is self.table.viewport():
             if event.type() == QEvent.MouseMove:
@@ -1818,25 +1843,34 @@ class MainWindow(QMainWindow):
                 files.append(original)
         return sorted(set(files))
 
-    def _all_draft_files(self) -> list[Path]:
+    def _all_draft_files(self, locales: Iterable[str] | None = None) -> list[Path]:
         cache_root = self._root / self._app_config.cache_dir
         if not cache_root.exists():
             return []
+        locale_list = [loc for loc in locales or [] if loc]
+        cache_dirs = (
+            [cache_root / loc for loc in locale_list] if locale_list else [cache_root]
+        )
         files: list[Path] = []
-        for cache_path in cache_root.rglob(f"*{self._app_config.cache_ext}"):
-            try:
-                rel = cache_path.relative_to(cache_root)
-            except ValueError:
+        for cache_dir in cache_dirs:
+            if not cache_dir.exists():
                 continue
-            original = (self._root / rel).with_suffix(self._app_config.translation_ext)
-            if not original.exists():
-                continue
-            if _read_has_drafts_from_path(cache_path):
-                files.append(original)
+            for cache_path in cache_dir.rglob(f"*{self._app_config.cache_ext}"):
+                try:
+                    rel = cache_path.relative_to(cache_root)
+                except ValueError:
+                    continue
+                original = (self._root / rel).with_suffix(
+                    self._app_config.translation_ext
+                )
+                if not original.exists():
+                    continue
+                if _read_has_drafts_from_path(cache_path):
+                    files.append(original)
         return sorted(set(files))
 
     def _mark_cached_dirty(self) -> None:
-        for path in self._all_draft_files():
+        for path in self._all_draft_files(self._selected_locales):
             self.fs_model.set_dirty(path, True)
 
     def _hash_for_cache(
@@ -1859,25 +1893,33 @@ class MainWindow(QMainWindow):
         cache_root = self._root / self._app_config.cache_dir
         if not cache_root.exists():
             return
+        locale_dirs = [cache_root / loc for loc in self._selected_locales if loc]
+        if not locale_dirs:
+            return
         best_ts = 0
         best_path: Path | None = None
-        for cache_path in cache_root.rglob(f"*{self._app_config.cache_ext}"):
-            ts = _read_last_opened_from_path(cache_path)
-            if ts <= 0:
+        for cache_dir in locale_dirs:
+            if not cache_dir.exists():
                 continue
-            try:
-                rel = cache_path.relative_to(cache_root)
-            except ValueError:
-                continue
-            original = (self._root / rel).with_suffix(self._app_config.translation_ext)
-            if not original.exists():
-                continue
-            locale = self._locale_for_path(original)
-            if locale not in self._selected_locales:
-                continue
-            if ts > best_ts:
-                best_ts = ts
-                best_path = original
+            for cache_path in cache_dir.rglob(f"*{self._app_config.cache_ext}"):
+                ts = _read_last_opened_from_path(cache_path)
+                if ts <= 0:
+                    continue
+                try:
+                    rel = cache_path.relative_to(cache_root)
+                except ValueError:
+                    continue
+                original = (self._root / rel).with_suffix(
+                    self._app_config.translation_ext
+                )
+                if not original.exists():
+                    continue
+                locale = self._locale_for_path(original)
+                if locale not in self._selected_locales:
+                    continue
+                if ts > best_ts:
+                    best_ts = ts
+                    best_path = original
         if not best_path:
             return
         index = self.fs_model.index_for_path(best_path)
