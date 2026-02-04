@@ -25,10 +25,12 @@ def test_search_selects_first_match(qtbot, tmp_path: Path):
     win._file_chosen(ix)
     win.search_edit.setText("beto")
     win._trigger_search()
-    qtbot.waitUntil(lambda: len(win._search_matches) == 1, timeout=1000)
-    current = win.table.currentIndex()
-    assert current.isValid()
-    assert current.row() == 1
+    qtbot.waitUntil(
+        lambda: (
+            win.table.currentIndex().isValid() and win.table.currentIndex().row() == 1
+        ),
+        timeout=1000,
+    )
 
 
 def test_search_moves_to_other_file(qtbot, tmp_path: Path):
@@ -47,8 +49,6 @@ def test_search_moves_to_other_file(qtbot, tmp_path: Path):
     win._file_chosen(ix)
     win._search_scope = "POOL"
     win.search_edit.setText("Two")
-    win._trigger_search()
-    qtbot.waitUntil(lambda: bool(win._search_matches), timeout=1000)
     win._search_next()
     qtbot.waitUntil(
         lambda: win._current_pf and win._current_pf.path == dst / "BE" / "second.txt",

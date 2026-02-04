@@ -28,24 +28,23 @@ class Match:
     row: int
 
 
-def search(
+def iter_matches(
     rows: Iterable[SearchRow],
     query: str,
     field: SearchField,
     is_regex: bool,
-) -> list[Match]:
+) -> Iterable[Match]:
     if not query:
-        return []
+        return
     if is_regex:
         try:
             matcher = re.compile(query, re.IGNORECASE | re.MULTILINE)
         except re.error:
-            return []
+            return
     else:
         matcher = None
         query = query.lower()
 
-    matches: list[Match] = []
     for row in rows:
         if field is SearchField.KEY:
             text = row.key
@@ -56,8 +55,16 @@ def search(
         text = text or ""
         if matcher:
             if matcher.search(text):
-                matches.append(Match(row.file, row.row))
+                yield Match(row.file, row.row)
         else:
             if query in text.lower():
-                matches.append(Match(row.file, row.row))
-    return matches
+                yield Match(row.file, row.row)
+
+
+def search(
+    rows: Iterable[SearchRow],
+    query: str,
+    field: SearchField,
+    is_regex: bool,
+) -> list[Match]:
+    return list(iter_matches(rows, query, field, is_regex))

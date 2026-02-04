@@ -52,6 +52,8 @@ class PreferencesDialog(QDialog):
             "default_root": self._default_root_edit.text().strip(),
             "prompt_write_on_exit": self._prompt_exit_check.isChecked(),
             "wrap_text": self._wrap_text_check.isChecked(),
+            "visual_highlight": self._visual_highlight_check.isChecked(),
+            "visual_whitespace": self._visual_whitespace_check.isChecked(),
             "search_scope": self._search_scope_combo.currentData(),
             "replace_scope": self._replace_scope_combo.currentData(),
         }
@@ -104,8 +106,22 @@ class PreferencesDialog(QDialog):
 
         self._wrap_text_check = QCheckBox("Wrap long strings in table", self)
         self._wrap_text_check.setChecked(bool(self._prefs.get("wrap_text", False)))
+        self._visual_highlight_check = QCheckBox(
+            "Highlight tags and escape sequences", self
+        )
+        self._visual_highlight_check.setChecked(
+            bool(self._prefs.get("visual_highlight", False))
+        )
+        self._visual_whitespace_check = QCheckBox(
+            "Show whitespace glyphs (spaces/newlines)", self
+        )
+        self._visual_whitespace_check.setChecked(
+            bool(self._prefs.get("visual_whitespace", False))
+        )
 
         layout.addRow(self._wrap_text_check)
+        layout.addRow(self._visual_highlight_check)
+        layout.addRow(self._visual_whitespace_check)
         return widget
 
     def _browse_root(self) -> None:

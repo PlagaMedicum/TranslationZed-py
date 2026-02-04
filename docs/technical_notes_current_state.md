@@ -1,4 +1,4 @@
-# TranslationZed-Py: Technical Notes (2026-01-31)
+# TranslationZed-Py: Technical Notes (2026-02-04)
 
 Goal: capture *observed behavior*, *as-built architecture*, and *spec deltas* with
 minimal prose and maximal precision. These are diagnostic notes, not a roadmap.
@@ -120,13 +120,13 @@ From latest clarification:
   - Quote-heavy lines (e.g., `"intensity"` / `"egghead"` / `""zippees"`) are parsed as literal text.
   - Ellipsis near quotes (`..."`) is treated as text, not concat.
 - **Text visualization**: highlights escape sequences/tags and can show whitespace glyphs
-  for spaces/newlines in Source/Translation (preview + edit).
+  for spaces/newlines in Source/Translation (preview + edit); toggles live in Preferences → View.
 - **Future quality tooling**: LanguageTool server API integration for grammar/spell suggestions.
 - **Future translation memory**: allow importing user TMs and generating a project TM from edits;
   local TM suggestions take priority over LanguageTool API results; **project‑TM** outranks imported TM.
 - **Future detail editors**: optional Poedit-style dual editor panes below the table (Source read-only,
   Translation editable), keeping the table visible above; toggle is placed at the **bottom**.
-- **Future layout toggle**: add a left-side toggle to hide/show the file tree panel.
+- **File tree toggle (current)**: left-side toggle hides/shows the tree; last width persists.
 - **Future theming**: support dark system theme (OS-driven; avoid custom themes).
 - **String editor panel (current)**: dual Source/Translation editors below the table are now present,
   toggled from the status bar icon (tooltip: “String editor”). Default is **open**; minimum height is
@@ -223,14 +223,12 @@ Observed hotspots and their current shape (code references are indicative):
   EN keys match target keys; key→value dicts are built lazily only if required.
 
 **B) Search & replace**
-- **Multi‑file search**: Locale/Pool search runs in batches with status‑bar progress;
-  rows are produced lazily per file rather than materializing a full index up front.
-- **Results list**: multi‑file searches surface a file+row list for direct navigation;
-  selection syncs with Prev/Next and table focus.
-- **Search cache**: `_search_rows_cache` is still LRU‑bounded, but now only caches
-  rows for smaller files; large files stream rows without extra list allocation.
-- **Regex compilation**: `core/search.py::search` compiles every run; ok for small files,
-  but multi‑file searches repeatedly re‑compile for the same query.
+- **Multi‑file search**: Locale/Pool search is on‑demand (Next/Prev only); no
+  precomputed results list and no background batching.
+- **Search cache**: `_search_rows_cache` is still LRU‑bounded, caching only smaller
+  files; large files stream rows without extra list allocation.
+- **Regex compilation**: `core/search.py` compiles per run; ok for small files, but
+  cross‑file navigation still recompiles for each file scan.
 
 **C) File tree + dirty indicator**
 - **Tree build**: `gui/fs_model.py` builds all file items at startup with `rglob`.
@@ -275,9 +273,9 @@ Pending performance questions (need product guidance):
 - Is background indexing acceptable, or must all search remain synchronous?
 - Do we accept “initial open is slower, scrolling is fast,” or must first open be fast too?
 
-Answers (2026‑01‑31):
+Answers (2026‑02‑04):
 - **Largest prod file** must load smoothly; lazy‑load is expected to mitigate most issues.
-- **Search** may be progressive; surface progress in the **status bar**.
+ - **Search** is on‑demand (Next/Prev only); no results list or background indexing for now.
 - **Initial open must be fast** (first table render is a priority).
 - **Performance is the top priority** for v0.2 work.
 
@@ -465,12 +463,12 @@ Notes:
   only via the cache. If files contain legacy comment tags, they can diverge.
 - Multi-file search caches per-file row data (LRU) and skips loading Source/Translation
   data when the active search column does not require it. Locale/Pool searches run
-  only on Enter or prev/next actions (no live scanning).
+  on debounced input and on Prev/Next actions (no results list).
 - Active-file search rows are generated directly from the model (no QModelIndex data()
   lookups). Cache hashing is skipped when no cache entries exist for a file.
 - Baselines are stored lazily for edited rows only (row->original value). Source text
   stays key-based to avoid duplicating full per-row lists.
-- Search only runs on explicit actions (Enter / prev / next), so no live scans.
+- Search runs on debounced input; Prev/Next advances to the next match in scope.
 
 Limits:
 - Parsed files are still held fully in memory (Entry list). True streaming/windowed
@@ -524,7 +522,8 @@ Search dock                  live search + F3             Implemented (core.sear
 Core search separation       core.search module           Implemented (no snippets in v0.1)
 Unsaved guard                on locale switch/exit        Exit prompt only (no switch guard)
 Wrap text toggle             View menu toggle             Implemented (wrap + preference)
-Preferences UI               prompt_write_on_exit toggle  Implemented (View menu)
+Text visualization toggles   Whitespace/tag highlight     Implemented (Preferences → View)
+Preferences UI               prompt_write_on_exit toggle  Implemented (Preferences window)
 ```
 
 ---

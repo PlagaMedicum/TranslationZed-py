@@ -104,10 +104,9 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 | **Trigger** | Typing in search box (`Ctrl+F`). |
 | **Parameter** | Mode (Key / Source / Translation) and Regex toggle. |
 | **Flow** |
-|  1 | After 300 ms debounce, SYS executes search across selected locales; matches collected. |
-|  2 | If the **current file** has matches, the first match row is auto‑selected and scrolled into view. |
-|  3 | Switching files does **not** auto‑jump to matches in other files. |
-|  4 | `F3` / `Shift+F3` cycles through matches across files (opening files as needed). |
+|  1 | After 300 ms debounce, SYS searches within the active scope and selects the first match (no results list). |
+|  2 | If the current file has no matches and the scope includes other files, SYS opens the next file with a match. |
+|  3 | `F3` / `Shift+F3` moves to next/prev match across files (opening files as needed), wrapping within scope. |
 
 ### UC‑05 ter  Search & Replace
 | **Trigger** | Toggle **Replace** control to expand the replace row. |
@@ -148,6 +147,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  4 | User sets **Search scope** (File / Locale / Locale Pool). |
 |  5 | User sets **Replace scope** (File / Locale / Locale Pool). |
 |  6 | User toggles general options (Prompt on Exit, Wrap Text, etc.). |
+|  7 | User toggles View options (whitespace glyphs, tag/escape highlighting). |
 |  7 | On Apply/OK, SYS persists settings to `.tzp-config/settings.env`. |
 | **Post‑condition** | Next app launch uses the selected defaults; toolbar remains minimal. |
 
@@ -274,12 +274,12 @@ UNTOUCHED ──────────────────────▶ 
      table remains visible above. Toggle is placed in the **bottom bar** and defaults to **open**.
    - Status palette: **For review** = orange, **Translated** = green, **Proofread** = light‑blue (higher priority than Translated).
    - Validation priority: **empty cell = red** (overrides any status color).
-7. **Future visualization**: highlight escape sequences, tags, and repeated whitespace; optional
+7. **Visualization**: highlight escape sequences, tags, and repeated whitespace; optional
    glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation in both
-   preview and edit.
+   preview and edit (toggled in Preferences → View).
 8. **Layout toggles**: file tree panel can be hidden/shown via a **left‑side toggle**; the
    detail editor pane is toggled from the **bottom bar**.
 9. **System theme**: future support for OS light/dark theme via native Qt styles (no custom theme).
 
 ---
-_Last updated: 2026‑01‑31 (v0.3.14)_
+_Last updated: 2026‑02‑04 (v0.3.14)_

@@ -12,7 +12,6 @@ from pathlib import Path
 
 import xxhash
 from PySide6.QtCore import (
-    QAbstractTableModel,
     QByteArray,
     QEventLoop,
     QItemSelectionModel,
@@ -79,7 +78,7 @@ from translationzed_py.core.saver import save
 from translationzed_py.core.search import Match as _SearchMatch
 from translationzed_py.core.search import SearchField as _SearchField
 from translationzed_py.core.search import SearchRow as _SearchRow
-from translationzed_py.core.search import search as _search_rows
+from translationzed_py.core.search import iter_matches as _iter_search_matches
 from translationzed_py.core.status_cache import (
     CacheEntry,
 )
@@ -195,71 +194,6 @@ class _LazySourceRows:
         return self._entries[idx].value
 
 
-class _SearchResultsModel(QAbstractTableModel):
-    __slots__ = ("_root", "_matches", "_paths")
-
-    def __init__(self, root: Path, parent=None) -> None:
-        super().__init__(parent)
-        self._root = root
-        self._matches: list[_SearchMatch] = []
-        self._paths: list[str] = []
-
-    def set_matches(self, matches: list[_SearchMatch]) -> None:
-        self.beginResetModel()
-        self._matches = list(matches)
-        self._paths = []
-        for match in self._matches:
-            try:
-                rel = match.file.relative_to(self._root)
-                self._paths.append(str(rel))
-            except ValueError:
-                self._paths.append(str(match.file))
-        self.endResetModel()
-
-    def match_at(self, row: int) -> _SearchMatch | None:
-        if 0 <= row < len(self._matches):
-            return self._matches[row]
-        return None
-
-    def rowCount(self, parent=None) -> int:  # noqa: N802
-        if parent and parent.isValid():
-            return 0
-        return len(self._matches)
-
-    def columnCount(self, parent=None) -> int:  # noqa: N802
-        if parent and parent.isValid():
-            return 0
-        return 2
-
-    def data(self, index, role=Qt.DisplayRole):  # noqa: N802
-        if not index.isValid():
-            return None
-        row = index.row()
-        col = index.column()
-        if row < 0 or row >= len(self._matches):
-            return None
-        match = self._matches[row]
-        if role == Qt.DisplayRole:
-            if col == 0:
-                return self._paths[row]
-            if col == 1:
-                return match.row + 1
-        if role == Qt.ToolTipRole and col == 0:
-            return str(match.file)
-        if role == Qt.TextAlignmentRole and col == 1:
-            return Qt.AlignRight | Qt.AlignVCenter
-        return None
-
-    def headerData(self, section, orientation, role=Qt.DisplayRole):  # noqa: N802
-        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
-            return None
-        if section == 0:
-            return "File"
-        if section == 1:
-            return "Row"
-        return None
-
-
 class MainWindow(QMainWindow):
     """Main window: left file-tree, right translation table."""
 
@@ -341,7 +275,12 @@ class MainWindow(QMainWindow):
         layout_reset_rev = str(self._prefs_extras.get("LAYOUT_RESET_REV", "")).strip()
         if layout_reset_rev != "3":
             prefs["window_geometry"] = ""
-            for key in ("TABLE_KEY_WIDTH", "TABLE_STATUS_WIDTH", "TABLE_SRC_RATIO"):
+            for key in (
+                "TABLE_KEY_WIDTH",
+                "TABLE_STATUS_WIDTH",
+                "TABLE_SRC_RATIO",
+                "TREE_PANEL_WIDTH",
+            ):
                 self._prefs_extras.pop(key, None)
             self._prefs_extras["LAYOUT_RESET_REV"] = "3"
             prefs["__extras__"] = dict(self._prefs_extras)
@@ -375,6 +314,7 @@ class MainWindow(QMainWindow):
         self._main_splitter.addWidget(self._content_splitter)
         self.setCentralWidget(self._main_splitter)
         self._main_splitter.splitterMoved.connect(self._on_main_splitter_moved)
+        self._content_splitter.splitterMoved.connect(self._on_content_splitter_moved)
 
         # ── toolbar ────────────────────────────────────────────────────────
         self.toolbar = QToolBar("Toolbar", self)
@@ -502,9 +442,6 @@ class MainWindow(QMainWindow):
         self._search_timer.setSingleShot(True)
         self._search_timer.setInterval(300)
         self._search_timer.timeout.connect(self._run_search)
-        self._search_matches: list[_SearchMatch] = []
-        self._search_index = -1
-        self._search_match_ranges: dict[Path, tuple[int, int]] = {}
         self._search_column = 0
         self._last_saved_text = ""
         self._search_rows_cache: OrderedDict[
@@ -512,29 +449,16 @@ class MainWindow(QMainWindow):
         ] = OrderedDict()
         self._search_cache_max = 64
         self._search_cache_row_limit = 5000
-        self._suppress_search_update = False
         self._replace_visible = False
-        self._skip_search_autoselect = False
-        self._search_needs_run = False
-        self._search_job_timer = QTimer(self)
-        self._search_job_timer.setSingleShot(False)
-        self._search_job_timer.setInterval(0)
-        self._search_job_timer.timeout.connect(self._run_search_batch)
-        self._search_job_query = ""
-        self._search_job_field = _SearchField.TRANSLATION
-        self._search_job_use_regex = False
-        self._search_job_include_source = False
-        self._search_job_include_value = False
-        self._search_job_files: list[Path] = []
-        self._search_job_index = 0
         self._search_progress_text = ""
-        self._search_batch_budget_ms = 20
-        self._search_batch_size = 2
-        self._suppress_results_selection = False
         self._row_resize_timer = QTimer(self)
         self._row_resize_timer.setSingleShot(True)
         self._row_resize_timer.setInterval(80)
         self._row_resize_timer.timeout.connect(self._resize_visible_rows)
+        self._tree_width_timer = QTimer(self)
+        self._tree_width_timer.setSingleShot(True)
+        self._tree_width_timer.setInterval(250)
+        self._tree_width_timer.timeout.connect(self._persist_tree_width)
         self._row_cache_margin_pct = 0.5
         self._large_file_row_threshold = 5000
         self._pending_row_span: tuple[int, int] | None = None
@@ -574,6 +498,7 @@ class MainWindow(QMainWindow):
         self._source_translation_ratio = _pref_float("TABLE_SRC_RATIO") or 0.5
         self._table_layout_guard = False
         self._user_resized_columns = bool(_pref_float("TABLE_SRC_RATIO"))
+        self._tree_last_width = _pref_int("TREE_PANEL_WIDTH") or self._tree_last_width
         self._visual_whitespace = _pref_bool("TEXT_SHOW_WHITESPACE", False)
         self._visual_highlight = _pref_bool("TEXT_HIGHLIGHT", False)
 
@@ -638,40 +563,6 @@ class MainWindow(QMainWindow):
         self._table_container = QWidget(self)
         table_layout = QVBoxLayout(self._table_container)
         table_layout.setContentsMargins(0, 0, 0, 0)
-        self._search_results_panel = QWidget(self._table_container)
-        results_layout = QVBoxLayout(self._search_results_panel)
-        results_layout.setContentsMargins(0, 0, 0, 0)
-        results_layout.setSpacing(2)
-        results_header = QWidget(self._search_results_panel)
-        header_layout = QHBoxLayout(results_header)
-        header_layout.setContentsMargins(4, 2, 4, 0)
-        header_layout.setSpacing(6)
-        self._search_results_label = QLabel("Results", results_header)
-        self._search_results_count = QLabel("", results_header)
-        header_layout.addWidget(self._search_results_label)
-        header_layout.addStretch(1)
-        header_layout.addWidget(self._search_results_count)
-        results_layout.addWidget(results_header)
-        self._search_results_model = _SearchResultsModel(self._root, self)
-        self._search_results = QTableView(self._search_results_panel)
-        self._search_results.setModel(self._search_results_model)
-        self._search_results.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self._search_results.setSelectionMode(QAbstractItemView.SingleSelection)
-        self._search_results.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self._search_results.setShowGrid(False)
-        self._search_results.setAlternatingRowColors(True)
-        self._search_results.verticalHeader().setVisible(False)
-        header = self._search_results.horizontalHeader()
-        header.setStretchLastSection(False)
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self._search_results.setMaximumHeight(200)
-        self._search_results.selectionModel().currentChanged.connect(
-            self._on_search_result_selected
-        )
-        results_layout.addWidget(self._search_results)
-        self._search_results_panel.setVisible(False)
-        table_layout.addWidget(self._search_results_panel)
         table_layout.addWidget(self.table)
         self._right_stack.addWidget(self._table_container)
         self._merge_container: QWidget | None = None
@@ -734,7 +625,8 @@ class MainWindow(QMainWindow):
         self._main_splitter.setStretchFactor(0, 1)
         self._main_splitter.setStretchFactor(1, 0)
 
-        self._content_splitter.setSizes([220, 980])
+        tree_width = max(80, self._tree_last_width)
+        self._content_splitter.setSizes([tree_width, 980])
         self._main_splitter.setSizes([1, 0])
         self.resize(1200, 800)
         self.act_undo: QAction | None = None
@@ -803,24 +695,12 @@ class MainWindow(QMainWindow):
         act_wrap.setChecked(self._wrap_text)
         act_wrap.triggered.connect(self._toggle_wrap_text)
         self.addAction(act_wrap)
-        act_visual_highlight = QAction("&Highlight Tags/Escapes", self)
-        act_visual_highlight.setCheckable(True)
-        act_visual_highlight.setChecked(self._visual_highlight)
-        act_visual_highlight.triggered.connect(self._toggle_visual_highlight)
-        self.addAction(act_visual_highlight)
-        act_visual_whitespace = QAction("Show &Whitespace Glyphs", self)
-        act_visual_whitespace.setCheckable(True)
-        act_visual_whitespace.setChecked(self._visual_whitespace)
-        act_visual_whitespace.triggered.connect(self._toggle_visual_whitespace)
-        self.addAction(act_visual_whitespace)
         act_prompt = QAction("Prompt on E&xit", self)
         act_prompt.setCheckable(True)
         act_prompt.setChecked(self._prompt_write_on_exit)
         act_prompt.triggered.connect(self._toggle_prompt_on_exit)
         self.addAction(act_prompt)
         self.menu_view.addAction(act_wrap)
-        self.menu_view.addAction(act_visual_highlight)
-        self.menu_view.addAction(act_visual_whitespace)
         self.menu_view.addAction(act_prompt)
         act_about = QAction("&About", self)
         act_about.triggered.connect(self._show_about)
@@ -919,11 +799,29 @@ class MainWindow(QMainWindow):
             min_height = max(70, self._detail_min_height)
             self._detail_last_height = max(min_height, sizes[1])
 
+    def _on_content_splitter_moved(self, _pos: int, _index: int) -> None:
+        if not self.tree.isVisible():
+            return
+        sizes = self._content_splitter.sizes()
+        if len(sizes) >= 2 and sizes[0] > 0:
+            self._tree_last_width = max(60, sizes[0])
+            self._schedule_tree_width_persist()
+
+    def _schedule_tree_width_persist(self) -> None:
+        if self._tree_width_timer.isActive():
+            self._tree_width_timer.stop()
+        self._tree_width_timer.start()
+
+    def _persist_tree_width(self) -> None:
+        self._prefs_extras["TREE_PANEL_WIDTH"] = str(max(60, self._tree_last_width))
+        self._persist_preferences()
+
     def _toggle_tree_panel(self, checked: bool) -> None:
         if checked:
             sizes = self._content_splitter.sizes()
             if sizes:
                 self._tree_last_width = max(60, sizes[0])
+                self._schedule_tree_width_persist()
             self.tree.setVisible(False)
             self.tree_toggle.setIcon(
                 self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowRight)
@@ -1236,6 +1134,8 @@ class MainWindow(QMainWindow):
             "default_root": self._default_root,
             "prompt_write_on_exit": self._prompt_write_on_exit,
             "wrap_text": self._wrap_text,
+            "visual_highlight": self._visual_highlight,
+            "visual_whitespace": self._visual_whitespace,
             "search_scope": self._search_scope,
             "replace_scope": self._replace_scope,
         }
@@ -1254,6 +1154,23 @@ class MainWindow(QMainWindow):
         self.table.setWordWrap(self._wrap_text)
         if self._wrap_text:
             self._schedule_row_resize()
+        visual_highlight = bool(values.get("visual_highlight", self._visual_highlight))
+        visual_whitespace = bool(
+            values.get("visual_whitespace", self._visual_whitespace)
+        )
+        if (
+            visual_highlight != self._visual_highlight
+            or visual_whitespace != self._visual_whitespace
+        ):
+            self._visual_highlight = visual_highlight
+            self._visual_whitespace = visual_whitespace
+            self._prefs_extras["TEXT_HIGHLIGHT"] = (
+                "true" if self._visual_highlight else "false"
+            )
+            self._prefs_extras["TEXT_SHOW_WHITESPACE"] = (
+                "true" if self._visual_whitespace else "false"
+            )
+            self._apply_text_visual_options()
         self._default_root = str(values.get("default_root", "")).strip()
         search_scope = str(values.get("search_scope", "FILE")).upper()
         if search_scope not in {"FILE", "LOCALE", "POOL"}:
@@ -1290,9 +1207,6 @@ class MainWindow(QMainWindow):
         self._conflict_notified.clear()
         self._current_pf = None
         self._current_model = None
-        self._search_matches = []
-        self._search_index = -1
-        self._cancel_search_job()
         self.table.setModel(None)
         self._set_status_combo(None)
         self.fs_model = FsModel(
@@ -1447,9 +1361,6 @@ class MainWindow(QMainWindow):
             self._prefetch_visible_rows()
             if self._wrap_text:
                 self._schedule_row_resize()
-            if self.search_edit.text() and not self._suppress_search_update:
-                self._skip_search_autoselect = True
-                self._schedule_search()
         if changed_keys:
             self.fs_model.set_dirty(self._current_pf.path, True)
         if not self._skip_conflict_check:
@@ -1606,9 +1517,6 @@ class MainWindow(QMainWindow):
             self._prefetch_visible_rows()
             if self._wrap_text:
                 self._schedule_row_resize()
-            if self.search_edit.text() and not self._suppress_search_update:
-                self._skip_search_autoselect = True
-                self._schedule_search()
 
         QTimer.singleShot(0, _run)
 
@@ -2010,7 +1918,7 @@ class MainWindow(QMainWindow):
     def _trigger_search(self) -> None:
         if self._search_timer.isActive():
             self._search_timer.stop()
-        self._run_search()
+        self._search_next()
 
     def _open_regex_help(self) -> None:
         QDesktopServices.openUrl(QUrl("https://docs.python.org/3/library/re.html"))
@@ -2018,13 +1926,13 @@ class MainWindow(QMainWindow):
     def _schedule_search(self, *_args) -> None:
         self._update_replace_enabled()
         self._update_status_bar()
-        self._search_needs_run = bool(self.search_edit.text().strip())
-        self._search_matches = []
-        self._search_index = -1
-        self._search_match_ranges.clear()
-        self._cancel_search_job()
         if self._search_timer.isActive():
             self._search_timer.stop()
+        if self.search_edit.text().strip():
+            self._search_timer.start()
+        else:
+            self._search_progress_text = ""
+            self._update_status_bar()
 
     def _on_search_mode_changed(self, *_args) -> None:
         self._schedule_search()
@@ -2846,194 +2754,106 @@ class MainWindow(QMainWindow):
             files = [current, *[p for p in files if p != current]]
         return files
 
-    def _process_search_file(self, path: Path) -> None:
-        locale = self._locale_for_path(path)
-        if not locale:
-            return
-        if self._current_pf and self._current_model and path == self._current_pf.path:
-            rows = self._rows_from_model(
-                include_source=self._search_job_include_source,
-                include_value=self._search_job_include_value,
-            )
-        else:
-            rows = self._cached_rows_from_file(
-                path,
-                locale,
-                include_source=self._search_job_include_source,
-                include_value=self._search_job_include_value,
-            )
-        matches = _search_rows(
-            rows,
-            self._search_job_query,
-            self._search_job_field,
-            self._search_job_use_regex,
-        )
-        if not matches:
-            return
-        start = len(self._search_matches)
-        self._search_matches.extend(matches)
-        self._search_match_ranges[path] = (start, start + len(matches) - 1)
+    def _search_anchor_row(self, direction: int) -> int:
+        current = self.table.currentIndex()
+        if current.isValid():
+            return current.row()
+        return -1 if direction > 0 else sys.maxsize
 
-    def _finalize_search_results(self) -> None:
-        self._update_search_results_panel()
-        if not self._search_matches:
-            self._search_index = -1
-            self._skip_search_autoselect = False
-            return
-        if self._skip_search_autoselect:
-            self._search_index = -1
-            self._skip_search_autoselect = False
-            self._sync_search_index_to_selection()
-            self._sync_results_selection()
-            return
-        current_path = self._current_pf.path if self._current_pf else None
-        initial_index = -1
-        if current_path:
-            for idx, match in enumerate(self._search_matches):
-                if match.file == current_path:
-                    initial_index = idx
-                    break
-        self._search_index = initial_index
-        if initial_index != -1:
-            self._select_match(initial_index)
-        self._sync_results_selection()
-
-    def _update_search_results_panel(self) -> None:
-        query = self.search_edit.text().strip()
-        if (
-            not query
-            or not self._search_matches
-            or self._search_scope == "FILE"
-            or not self._search_results_panel
-        ):
-            self._search_results_panel.setVisible(False)
-            self._search_results_model.set_matches([])
-            self._search_results_count.setText("")
-            return
-        self._search_results_model.set_matches(self._search_matches)
-        count = len(self._search_matches)
-        self._search_results_count.setText(f"{count} match{'es' if count != 1 else ''}")
-        self._search_results_panel.setVisible(True)
-        self._sync_results_selection()
-
-    def _on_search_result_selected(self, current, _previous) -> None:
-        if self._suppress_results_selection:
-            return
-        if not current.isValid():
-            return
-        row = current.row()
-        if row < 0 or row >= len(self._search_matches):
-            return
-        self._search_index = row
-        self._select_match(row)
-
-    def _sync_results_selection(self) -> None:
-        if not self._search_results_panel or not self._search_results_panel.isVisible():
-            return
-        selection = self._search_results.selectionModel()
-        if selection is None:
-            return
-        if self._search_index < 0 or self._search_index >= len(self._search_matches):
-            selection.clearSelection()
-            return
-        self._suppress_results_selection = True
-        try:
-            idx = self._search_results_model.index(self._search_index, 0)
-            selection.setCurrentIndex(
-                idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows
-            )
-            self._search_results.scrollTo(idx, QAbstractItemView.PositionAtCenter)
-        finally:
-            self._suppress_results_selection = False
-
-    def _cancel_search_job(self) -> None:
-        if self._search_job_timer.isActive():
-            self._search_job_timer.stop()
-        self._search_job_files = []
-        self._search_job_index = 0
-        self._search_progress_text = ""
-
-    def _update_search_progress(self) -> None:
-        total = len(self._search_job_files)
-        if total:
-            self._search_progress_text = f"Searching {self._search_job_index}/{total}"
-        else:
-            self._search_progress_text = ""
-        self._update_status_bar()
-
-    def _finish_search_job(self) -> None:
-        if self._search_job_timer.isActive():
-            self._search_job_timer.stop()
-        self._search_progress_text = ""
-        self._search_job_files = []
-        self._search_job_index = 0
-        self._update_status_bar()
-        self._finalize_search_results()
-
-    def _finish_search_job_immediately(self) -> None:
-        if self._search_job_timer.isActive():
-            self._search_job_timer.stop()
-        while self._search_job_index < len(self._search_job_files):
-            path = self._search_job_files[self._search_job_index]
-            self._search_job_index += 1
-            self._process_search_file(path)
-        self._finish_search_job()
-
-    def _start_search_job(
+    def _find_match_in_rows(
         self,
-        files: list[Path],
+        rows: Iterable[_SearchRow],
+        query: str,
+        field: _SearchField,
+        use_regex: bool,
+        *,
+        start_row: int,
+        direction: int,
+    ) -> _SearchMatch | None:
+        if direction >= 0:
+            for match in _iter_search_matches(rows, query, field, use_regex):
+                if match.row > start_row:
+                    return match
+            return None
+        last_match: _SearchMatch | None = None
+        for match in _iter_search_matches(rows, query, field, use_regex):
+            if match.row >= start_row:
+                break
+            last_match = match
+        return last_match
+
+    def _find_match_in_file(
+        self,
+        path: Path,
         *,
         query: str,
         field: _SearchField,
         use_regex: bool,
         include_source: bool,
         include_value: bool,
-    ) -> None:
-        self._search_job_query = query
-        self._search_job_field = field
-        self._search_job_use_regex = use_regex
-        self._search_job_include_source = include_source
-        self._search_job_include_value = include_value
-        self._search_job_files = files
-        self._search_job_index = 0
-        self._search_matches = []
-        self._search_match_ranges.clear()
-        self._update_search_results_panel()
-        self._update_search_progress()
-        self._search_job_timer.start()
+        start_row: int,
+        direction: int,
+    ) -> _SearchMatch | None:
+        locale = self._locale_for_path(path)
+        if not locale:
+            return None
+        if self._current_pf and self._current_model and path == self._current_pf.path:
+            rows = self._rows_from_model(
+                include_source=include_source, include_value=include_value
+            )
+        else:
+            rows = self._cached_rows_from_file(
+                path,
+                locale,
+                include_source=include_source,
+                include_value=include_value,
+            )
+        return self._find_match_in_rows(
+            rows, query, field, use_regex, start_row=start_row, direction=direction
+        )
 
-    def _run_search_batch(self) -> None:
-        if not self._search_job_files:
-            self._finish_search_job()
-            return
-        start = time.monotonic()
-        processed = 0
-        total = len(self._search_job_files)
-        while self._search_job_index < total:
-            path = self._search_job_files[self._search_job_index]
-            self._search_job_index += 1
-            self._process_search_file(path)
-            processed += 1
-            elapsed = (time.monotonic() - start) * 1000
-            if (
-                processed >= self._search_batch_size
-                or elapsed >= self._search_batch_budget_ms
-            ):
-                break
-        self._update_search_progress()
-        if self._search_job_index >= total:
-            self._finish_search_job()
+    def _select_match(self, match: _SearchMatch) -> bool:
+        if not match:
+            return False
+        if not self._current_pf or match.file != self._current_pf.path:
+            index = self.fs_model.index_for_path(match.file)
+            if not index.isValid():
+                return False
+            self._file_chosen(index)
+            if self._current_pf and self._current_pf.path == match.file:
+                self.tree.selectionModel().setCurrentIndex(
+                    index,
+                    QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+                )
+                self.tree.scrollTo(index, QAbstractItemView.PositionAtCenter)
+        if not self._current_model or not self._current_pf:
+            return False
+        if match.file != self._current_pf.path:
+            return False
+        if match.row < 0 or match.row >= self._current_model.rowCount():
+            return False
+        column = self._search_column
+        model_index = self._current_model.index(match.row, column)
+        self.table.selectionModel().setCurrentIndex(
+            model_index,
+            QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+        )
+        self.table.scrollTo(model_index, QAbstractItemView.PositionAtCenter)
+        return True
 
-    def _run_search(self) -> None:
+    def _search_from_anchor(
+        self,
+        *,
+        direction: int,
+        anchor_row: int | None = None,
+        anchor_path: Path | None = None,
+        wrap: bool = True,
+    ) -> bool:
         query = self.search_edit.text().strip()
-        self._search_needs_run = False
-        self._cancel_search_job()
+        self._search_progress_text = ""
+        self._update_status_bar()
         if not query:
-            self._search_matches = []
-            self._search_index = -1
-            self._search_match_ranges.clear()
-            self._update_search_results_panel()
-            return
+            return False
         column = int(self.search_mode.currentData())
         self._search_column = column
         use_regex = self.regex_check.isChecked()
@@ -3047,134 +2867,71 @@ class MainWindow(QMainWindow):
         include_value = field is _SearchField.TRANSLATION
         files = self._search_files_for_scope()
         if not files:
-            self._search_matches = []
-            self._search_index = -1
-            self._search_match_ranges.clear()
-            self._update_search_results_panel()
-            return
-        self._search_job_query = query
-        self._search_job_field = field
-        self._search_job_use_regex = use_regex
-        self._search_job_include_source = include_source
-        self._search_job_include_value = include_value
-        if self._search_scope == "FILE" or len(files) <= 1:
-            self._search_matches = []
-            self._search_match_ranges.clear()
-            for path in files:
-                self._process_search_file(path)
-            self._finalize_search_results()
-            return
-        self._start_search_job(
-            files,
+            return False
+        if anchor_path is None:
+            anchor_path = self._current_pf.path if self._current_pf else files[0]
+        if anchor_row is None:
+            anchor_row = self._search_anchor_row(direction)
+        others = [p for p in files if p != anchor_path]
+        if direction < 0:
+            others = list(reversed(others))
+        if anchor_path:
+            match = self._find_match_in_file(
+                anchor_path,
+                query=query,
+                field=field,
+                use_regex=use_regex,
+                include_source=include_source,
+                include_value=include_value,
+                start_row=anchor_row,
+                direction=direction,
+            )
+            if match and self._select_match(match):
+                return True
+        fallback_row = -1 if direction > 0 else sys.maxsize
+        for path in others:
+            match = self._find_match_in_file(
+                path,
+                query=query,
+                field=field,
+                use_regex=use_regex,
+                include_source=include_source,
+                include_value=include_value,
+                start_row=fallback_row,
+                direction=direction,
+            )
+            if match and self._select_match(match):
+                return True
+        if not wrap or not anchor_path:
+            return False
+        if direction > 0 and anchor_row < 0:
+            return False
+        if direction < 0 and anchor_row >= sys.maxsize:
+            return False
+        match = self._find_match_in_file(
+            anchor_path,
             query=query,
             field=field,
             use_regex=use_regex,
             include_source=include_source,
             include_value=include_value,
+            start_row=fallback_row,
+            direction=direction,
         )
+        return bool(match and self._select_match(match))
 
-    def _sync_search_index_to_selection(self) -> None:
-        if self._suppress_search_update:
-            return
-        if self._search_timer.isActive():
-            return
-        if not self.search_edit.text().strip():
-            return
-        if not self._search_matches or not self._current_pf:
-            return
-        current = self.table.currentIndex()
-        if not current.isValid():
-            return
-        current_row = current.row()
-        current_path = self._current_pf.path
-        match_range = self._search_match_ranges.get(current_path)
-        if not match_range:
-            self._search_index = -1
-            return
-        start, end = match_range
-        prev_idx: int | None = None
-        next_idx: int | None = None
-        for idx in range(start, end + 1):
-            match = self._search_matches[idx]
-            if match.row == current_row:
-                self._search_index = idx
-                return
-            if match.row < current_row:
-                prev_idx = idx
-            elif match.row > current_row:
-                next_idx = idx
-                break
-        if next_idx is not None:
-            self._search_index = next_idx - 1
-        elif prev_idx is not None:
-            self._search_index = prev_idx
-        else:
-            self._search_index = -1
-        self._sync_results_selection()
-
-    def _ensure_search_ready(self) -> None:
-        if self._search_timer.isActive():
-            self._search_timer.stop()
-            self._run_search()
-        if self._search_job_timer.isActive():
-            self._finish_search_job_immediately()
-        if self._search_needs_run:
-            self._run_search()
-
-    def _select_match(self, idx: int) -> None:
-        if not self._search_matches:
-            return
-        self._search_index = idx
-        match = self._search_matches[idx]
-        if not self._current_pf or match.file != self._current_pf.path:
-            index = self.fs_model.index_for_path(match.file)
-            if not index.isValid():
-                return
-            self._suppress_search_update = True
-            try:
-                self._file_chosen(index)
-            finally:
-                self._suppress_search_update = False
-            if self._current_pf and self._current_pf.path == match.file:
-                self.tree.selectionModel().setCurrentIndex(
-                    index,
-                    QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
-                )
-                self.tree.scrollTo(index, QAbstractItemView.PositionAtCenter)
-        if not self._current_model or not self._current_pf:
-            return
-        if match.file != self._current_pf.path:
-            return
-        if match.row < 0 or match.row >= self._current_model.rowCount():
-            return
-        column = self._search_column
-        model_index = self._current_model.index(match.row, column)
-        self.table.selectionModel().setCurrentIndex(
-            model_index,
-            QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
-        )
-        self.table.scrollTo(model_index, QAbstractItemView.PositionAtCenter)
-        self._sync_results_selection()
+    def _run_search(self) -> None:
+        self._search_from_anchor(direction=1, anchor_row=-1)
 
     def _search_next(self) -> None:
-        self._ensure_search_ready()
-        if not self._search_matches:
-            return
-        if self._search_index == -1:
-            self._search_index = 0
-        else:
-            self._search_index = (self._search_index + 1) % len(self._search_matches)
-        self._select_match(self._search_index)
+        if self._search_timer.isActive():
+            self._search_timer.stop()
+        self._search_from_anchor(direction=1)
 
     def _search_prev(self) -> None:
-        self._ensure_search_ready()
-        if not self._search_matches:
-            return
-        if self._search_index == -1:
-            self._search_index = len(self._search_matches) - 1
-        else:
-            self._search_index = (self._search_index - 1) % len(self._search_matches)
-        self._select_match(self._search_index)
+        if self._search_timer.isActive():
+            self._search_timer.stop()
+        self._search_from_anchor(direction=-1)
 
     def _copy_selection(self) -> None:
         sel = self.table.selectionModel()
@@ -3272,18 +3029,6 @@ class MainWindow(QMainWindow):
         if self.table.viewport():
             self.table.viewport().update()
 
-    def _toggle_visual_highlight(self, checked: bool) -> None:
-        self._visual_highlight = bool(checked)
-        self._prefs_extras["TEXT_HIGHLIGHT"] = "true" if checked else "false"
-        self._apply_text_visual_options()
-        self._persist_preferences()
-
-    def _toggle_visual_whitespace(self, checked: bool) -> None:
-        self._visual_whitespace = bool(checked)
-        self._prefs_extras["TEXT_SHOW_WHITESPACE"] = "true" if checked else "false"
-        self._apply_text_visual_options()
-        self._persist_preferences()
-
     def _toggle_prompt_on_exit(self, checked: bool) -> None:
         self._prompt_write_on_exit = bool(checked)
         self._persist_preferences()
@@ -3344,7 +3089,6 @@ class MainWindow(QMainWindow):
         self._update_status_combo_from_selection()
         if self._detail_panel.isVisible():
             self._sync_detail_editors()
-        self._sync_search_index_to_selection()
         self._update_status_bar()
 
     def showEvent(self, event) -> None:  # noqa: N802
@@ -3525,5 +3269,8 @@ class MainWindow(QMainWindow):
         if not self._write_cache_current():
             event.ignore()
             return
+        if self._tree_width_timer.isActive():
+            self._tree_width_timer.stop()
+            self._prefs_extras["TREE_PANEL_WIDTH"] = str(max(60, self._tree_last_width))
         self._persist_preferences()
         event.accept()

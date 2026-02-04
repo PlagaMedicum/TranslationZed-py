@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-03_
+_Last updated: 2026-02-04_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.1 is shipped; this plan now
@@ -140,13 +140,14 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Acceptance:
   - Regex toggle
   - F3 / Shift+F3 navigation
-  - Replace row toggle + Replace / Replace All (current file, Translation only)
+  - Replace row toggle + Replace / Replace All (Translation only)
+  - Replace All respects File | Locale | Pool scopes with confirmation showing per-file counts
   - Multi-file search caches per-file rows (LRU) and skips unused columns for speed
   - Active-file search rows are generated from model data (no QModelIndex lookups)
-  - All scopes search only on Enter or prev/next actions (no live scanning)
-  - Enter triggers search for file-scope (manual, not live)
+  - Search runs on debounced input; Enter forces an immediate run
+  - Multi-file search is **on-demand** (Next/Prev only) and does not build a results list
+  - Navigation wraps across files within the selected scope
   - Baseline values stored only for edited rows (lazy baseline capture)
-  - Future: locale‑scope Replace All (current locale only, scope explicitly labeled)
 
 ### Step 10 — Save flows + prompts [✓]
 - Touchpoints: `gui/main_window.py`, `gui/dialogs.py`
@@ -161,9 +162,10 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Acceptance:
   - `PROMPT_WRITE_ON_EXIT` and `WRAP_TEXT` persisted
   - Wrap text toggle changes view
+  - View tab includes toggles for whitespace glyphs and tag/escape highlighting
   - Last locale selection remembered
   - Last opened file per locale stored **inside cache headers** (no settings entry)
-  - Preferences include **Search scope** and **Replace scope** (future UI)
+  - Preferences include **Search scope** and **Replace scope**
   - Pool scope means **currently opened locales only** (not entire root)
 
 ### Step 12 — Dirty indicators from cache [✓]
@@ -206,7 +208,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Acceptance:
   - Source can switch from EN to another locale
 
-### Step 18 — Preferences window (planned) [✓]
+### Step 18 — Preferences window [✓]
 - Touchpoints: `gui/preferences_dialog.py` (new), `core/preferences.py`
 - Acceptance:
   - Preferences window groups settings: General, Search & Replace, View
@@ -216,7 +218,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Values persisted to `.tzp-config/settings.env`
 
 ### Step 19 — String editor under table (Poedit-style) [✓]
-- Touchpoints: `gui/main_window.py`, new `gui/detail_editors.py`
+- Touchpoints: `gui/main_window.py`
 - Acceptance:
   - Optional lower pane with two large text boxes (Source read‑only, Translation editable)
   - Pane toggle placed in the **bottom bar**, default **open**
@@ -233,10 +235,10 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Status bar “mixed” indicator is deferred (future).
 
 ### Step 21 — File tree visibility toggle [✓]
-- Touchpoints: `gui/main_window.py`, `gui/file_tree_panel.py`
+- Touchpoints: `gui/main_window.py`
 - Acceptance:
   - Left‑side toggle collapses/expands the file tree panel
-  - Toggle state persists per user preferences
+  - Last tree width is persisted across restarts
 
 ### Step 22 — Dark system theme support [≈ future]
 - Touchpoints: `gui/app.py` (style init), preferences
@@ -245,7 +247,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - No custom theming; use palette only when required
 
 ### Step 23 — License compliance UI [✓]
-- Touchpoints: `gui/main_window.py`, new `gui/about_dialog.py`
+- Touchpoints: `gui/main_window.py`, `gui/dialogs.py`
 - Acceptance:
   - Help/About dialog shows GPLv3 notice and “no warranty” text
   - LICENSE text is hidden by default and expandable in the About dialog
@@ -330,12 +332,12 @@ A1 [✓] **Search/Replace scopes**
    - **Target**: apply File | Locale | Pool to both search and replace; keep search/replace scopes independent.
    - **UX**: status bar must always show active scope(s) and update immediately on change.
    - **Implemented**: independent search/replace scopes are enforced for FILE/LOCALE/POOL; status bar indicators reflect active scopes.
-A2 [✓] **Multi‑file search navigation**
-   - **Problem**: hit navigation is opaque; no results list and cross‑file movement is hard to track.
-   - **Impact**: users lose context when jumping across files; repeated searches to locate hits.
-   - **Target**: add a results list anchored to search UI, with file+row context.
+A2 [✓] **Multi‑file search navigation (Next/Prev only)**
+   - **Problem**: cross‑file navigation must stay lightweight; a results list adds overhead and UI noise.
+   - **Impact**: precomputed lists slow large projects and clutter the workflow.
+   - **Target**: on‑demand Next/Prev traversal across File/Locale/Pool; no results list.
    - **Navigation**: Prev/Next wraps across files; selection and row focus remain stable.
-   - **Implemented**: multi‑file results list (file + row) with click‑to‑jump and sync to selection.
+   - **Implemented**: scope‑aware Next/Prev navigation without a results list (on‑demand scans).
 A3 [✓] **Replace‑all safety**
    - **Problem**: replace‑all across multiple files is high‑risk and currently lacks a clear safety gate.
    - **Impact**: accidental mass edits; undo is noisy and can span many files.
@@ -354,13 +356,13 @@ A4 [✓] **Large‑file performance** (more urgent now)
    - [✓] **Dirty dot index O(1)**
      - **Problem**: dot detection still walks cache files on startup.
      - **Target**: cache‑header draft flag so “dirty” can be read without parsing rows.
-   - [✓] **Progressive multi‑file search** with status‑bar progress.
+   - [✓] **On‑demand multi‑file search** (Next/Prev only; no precomputed results list).
    - [✓] **Fast initial open**
      - **Problem**: first render still pays parse + layout costs before user can act.
      - **Target**: first paint within a tight budget; defer non‑critical work (row sizing, full search cache).
      - **Implemented**: cache overlay uses hash index + lazy value decode (no full value materialization on open).
      - **Implemented**: EN source rows are lazy for large files; values resolve on demand.
-     - **Implemented**: post‑open deferral for large files (prefetch, row resize, search refresh).
+     - **Implemented**: post‑open deferral for large files (prefetch, row resize).
    - [✓] **u64 cache key hash** + migration to reduce collisions.
 A5 [✓] **Automated regression coverage**
    - **Problem**: current tests cover typical cases, not “worst‑case” structures and sizes.
@@ -393,7 +395,7 @@ B2 [✓] **File tree toggle** (Step 21).
 B3 [✓] **Text visualization** (Step 19).
    - **Problem**: translators cannot see hidden whitespace/escapes; mistakes slip through.
    - **Target**: optional glyph overlays for spaces/newlines and tag/escape highlighting.
-   - **Implemented**: view toggles for whitespace glyphs and tag/escape highlighting across Source/Translation.
+   - **Implemented**: Preferences → View toggles for whitespace glyphs and tag/escape highlighting across Source/Translation.
 
 Priority C — **Assistive tooling**
 C1 [ ] **Translation memory** + **LanguageTool** (Step 29).
