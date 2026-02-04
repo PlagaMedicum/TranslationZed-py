@@ -15,7 +15,9 @@ _LOCALE_CODE_ROLE = _ABS_PATH_ROLE + 2
 class FsModel(QStandardItemModel):
     """Tiny tree showing translatable files under <root>/<LOCALE>/."""
 
-    def __init__(self, root: Path, locales: list[LocaleMeta], *, lazy: bool = True) -> None:
+    def __init__(
+        self, root: Path, locales: list[LocaleMeta], *, lazy: bool = True
+    ) -> None:
         super().__init__()
         self._root = root  # keep for helpers
         self._lazy = lazy

@@ -492,6 +492,7 @@ class MainWindow(QMainWindow):
         self._row_cache_margin_pct = 0.5
         self._large_file_row_threshold = 5000
         self._large_file_bytes_threshold = 1_000_000
+        self._prefetch_pending = False
         self._pending_row_span: tuple[int, int] | None = None
         self._lazy_parse_min_bytes = 1_000_000
         self._lazy_row_prefetch_margin = 200
@@ -680,7 +681,7 @@ class MainWindow(QMainWindow):
         self._main_splitter.setStretchFactor(0, 1)
         self._main_splitter.setStretchFactor(1, 0)
 
-        tree_width = max(80, self._tree_last_width)
+        tree_width = self._initial_tree_width(lazy_tree)
         self._content_splitter.setSizes([tree_width, 980])
         self._main_splitter.setSizes([1, 0])
         self.resize(1200, 800)
@@ -1288,6 +1289,13 @@ class MainWindow(QMainWindow):
                     self.tree.expand(idx)
         else:
             self.tree.expandAll()
+        tree_width = self._initial_tree_width(lazy_tree)
+        sizes = self._content_splitter.sizes()
+        total = max(0, self._content_splitter.width())
+        if total <= 0 and sizes:
+            total = sum(sizes)
+        if total > 0:
+            self._content_splitter.setSizes([tree_width, max(100, total - tree_width)])
         self._mark_cached_dirty()
         self._auto_open_last_file()
         self._mark_cached_dirty()
@@ -1584,9 +1592,12 @@ class MainWindow(QMainWindow):
         if not span:
             return
         start, end = span
-        start = max(0, start - self._lazy_row_prefetch_margin)
+        margin = self._lazy_row_prefetch_margin
+        if self._is_large_file():
+            margin = min(margin, 50)
+        start = max(0, start - margin)
         end = min(
-            self._current_model.rowCount() - 1, end + self._lazy_row_prefetch_margin
+            self._current_model.rowCount() - 1, end + margin
         )
         self._current_model.prefetch_rows(start, end)
 
@@ -1661,7 +1672,7 @@ class MainWindow(QMainWindow):
         perf_trace.stop("row_resize", perf_start, items=rows_processed, unit="rows")
 
     def _on_table_scrolled(self, *_args) -> None:
-        self._prefetch_visible_rows()
+        self._prefetch_pending = True
         if not self._wrap_text:
             return
         self._scrolling = True
@@ -1671,12 +1682,25 @@ class MainWindow(QMainWindow):
 
     def _on_scroll_idle(self) -> None:
         self._scrolling = False
+        if self._prefetch_pending:
+            self._prefetch_pending = False
+            self._prefetch_visible_rows()
         if self._wrap_text:
             self._schedule_row_resize()
 
     def _on_tree_expanded(self, index: QModelIndex) -> None:
         if self.fs_model:
             self.fs_model.ensure_loaded_for_index(index)
+
+    def _initial_tree_width(self, lazy_tree: bool) -> int:
+        width = max(80, self._tree_last_width)
+        if not lazy_tree:
+            return width
+        hint = self.tree.sizeHintForColumn(0)
+        width = (
+            min(width, max(140, hint + 24)) if hint > 0 else min(width, 200)
+        )
+        return width
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         if obj is self.table.viewport():
