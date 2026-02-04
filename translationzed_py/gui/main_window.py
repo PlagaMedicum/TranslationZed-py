@@ -13,11 +13,11 @@ from pathlib import Path
 import xxhash
 from PySide6.QtCore import (
     QByteArray,
+    QEvent,
     QEventLoop,
     QItemSelectionModel,
     QModelIndex,
     QPoint,
-    QEvent,
     Qt,
     QTimer,
     QUrl,
@@ -109,7 +109,6 @@ from translationzed_py.core.status_cache import (
 )
 from translationzed_py.core.status_cache import write as _write_status_cache
 
-from .commands import ChangeStatusCommand
 from .delegates import (
     MAX_VISUAL_CHARS,
     KeyDelegate,
@@ -3166,10 +3165,9 @@ class MainWindow(QMainWindow):
                 self.act_wrap.setToolTip("Wrap long strings in table")
 
     def _update_large_file_mode(self) -> None:
-        if not self._large_text_optimizations:
-            active = False
-        else:
-            active = self._is_large_file()
+        active = (
+            False if not self._large_text_optimizations else self._is_large_file()
+        )
         if active != self._large_file_mode:
             self._large_file_mode = active
             self._apply_wrap_mode()

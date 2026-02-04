@@ -140,7 +140,10 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     lines = [
         f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
         f"WRAP_TEXT={'true' if prefs.get('wrap_text', False) else 'false'}",
-        f"LARGE_TEXT_OPTIMIZATIONS={'true' if prefs.get('large_text_optimizations', True) else 'false'}",
+        (
+            "LARGE_TEXT_OPTIMIZATIONS="
+            f"{'true' if prefs.get('large_text_optimizations', True) else 'false'}"
+        ),
     ]
     last_root = str(prefs.get("last_root", "")).strip()
     if last_root:
