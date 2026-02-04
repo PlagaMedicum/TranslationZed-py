@@ -336,10 +336,11 @@ A2 [✓] **Multi‑file search navigation**
    - **Target**: add a results list anchored to search UI, with file+row context.
    - **Navigation**: Prev/Next wraps across files; selection and row focus remain stable.
    - **Implemented**: multi‑file results list (file + row) with click‑to‑jump and sync to selection.
-A3 [ ] **Replace‑all safety**
+A3 [✓] **Replace‑all safety**
    - **Problem**: replace‑all across multiple files is high‑risk and currently lacks a clear safety gate.
    - **Impact**: accidental mass edits; undo is noisy and can span many files.
    - **Target**: confirmation dialog listing affected files + counts; applies only to opened locales.
+   - **Implemented**: scope confirm dialog shows affected files with per‑file replacement counts.
 A4 [✓] **Large‑file performance** (more urgent now)
    - [✓] **Windowed row sizing**: only visible rows + viewport margin, debounced.
    - [✓] **Streaming parser / on‑demand rows**

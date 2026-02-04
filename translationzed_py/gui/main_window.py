@@ -2109,6 +2109,98 @@ class MainWindow(QMainWindow):
             self._current_model.setData(idx, new_text, Qt.EditRole)
             self._schedule_search()
 
+    def _replace_all_text(
+        self,
+        text: str,
+        pattern: re.Pattern[str],
+        replacement: str,
+        use_regex: bool,
+        matches_empty: bool,
+        has_group_ref: bool,
+    ) -> tuple[bool, str] | None:
+        if not text:
+            return False, text
+        if matches_empty and not has_group_ref:
+            new_text = replacement
+        else:
+            if not pattern.search(text):
+                return False, text
+            try:
+                if use_regex:
+                    template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
+                    count = 1 if matches_empty else 0
+                    new_text = pattern.sub(
+                        lambda m, template=template: m.expand(template),
+                        text,
+                        count=count,
+                    )
+                else:
+                    new_text = pattern.sub(lambda _m: replacement, text)
+            except re.error as exc:
+                QMessageBox.warning(self, "Replace failed", str(exc))
+                return None
+        return new_text != text, new_text
+
+    def _replace_all_count_in_model(
+        self,
+        pattern: re.Pattern[str],
+        replacement: str,
+        use_regex: bool,
+        matches_empty: bool,
+        has_group_ref: bool,
+    ) -> int | None:
+        if not self._current_model:
+            return 0
+        count = 0
+        for row in range(self._current_model.rowCount()):
+            idx = self._current_model.index(row, 2)
+            text = idx.data(Qt.DisplayRole)
+            text = "" if text is None else str(text)
+            result = self._replace_all_text(
+                text, pattern, replacement, use_regex, matches_empty, has_group_ref
+            )
+            if result is None:
+                return None
+            changed, _new_text = result
+            if changed:
+                count += 1
+        return count
+
+    def _replace_all_count_in_file(
+        self,
+        path: Path,
+        pattern: re.Pattern[str],
+        replacement: str,
+        use_regex: bool,
+        matches_empty: bool,
+        has_group_ref: bool,
+    ) -> int | None:
+        locale = self._locale_for_path(path)
+        encoding = self._locales.get(
+            locale, LocaleMeta("", Path(), "", "utf-8")
+        ).charset
+        try:
+            pf = parse(path, encoding=encoding)
+        except Exception as exc:
+            self._report_parse_error(path, exc)
+            return None
+        cache_map = _read_status_cache(self._root, path)
+        count = 0
+        for entry in pf.entries:
+            key_hash = self._hash_for_cache(entry, cache_map)
+            cache = cache_map.get(key_hash)
+            value = cache.value if cache and cache.value is not None else entry.value
+            text = "" if value is None else str(value)
+            result = self._replace_all_text(
+                text, pattern, replacement, use_regex, matches_empty, has_group_ref
+            )
+            if result is None:
+                return None
+            changed, _new_text = result
+            if changed:
+                count += 1
+        return count
+
     def _replace_all(self) -> None:
         if not self._current_model:
             return
@@ -2131,8 +2223,35 @@ class MainWindow(QMainWindow):
                 scope_label = f"Locale {locale}" if locale else "Locale"
             else:
                 scope_label = f"Pool ({len(self._selected_locales)})"
-            rel_files = [str(p.relative_to(self._root)) for p in files]
-            dialog = ReplaceFilesDialog(rel_files, scope_label, self)
+            counts: list[tuple[str, int]] = []
+            total = 0
+            current_path = self._current_pf.path if self._current_pf else None
+            for path in files:
+                if current_path and path == current_path:
+                    file_count = self._replace_all_count_in_model(
+                        pattern, replacement, use_regex, matches_empty, has_group_ref
+                    )
+                else:
+                    file_count = self._replace_all_count_in_file(
+                        path,
+                        pattern,
+                        replacement,
+                        use_regex,
+                        matches_empty,
+                        has_group_ref,
+                    )
+                if file_count is None:
+                    return
+                total += file_count
+                if file_count:
+                    try:
+                        rel = str(path.relative_to(self._root))
+                    except ValueError:
+                        rel = str(path)
+                    counts.append((rel, file_count))
+            if total == 0:
+                return
+            dialog = ReplaceFilesDialog(counts, scope_label, self)
             dialog.exec()
             if not dialog.confirmed():
                 return
@@ -2167,28 +2286,13 @@ class MainWindow(QMainWindow):
             idx = self._current_model.index(row, 2)
             text = idx.data(Qt.DisplayRole)
             text = "" if text is None else str(text)
-            if not text:
-                continue
-            if matches_empty and not has_group_ref:
-                new_text = replacement
-            else:
-                if not pattern.search(text):
-                    continue
-                try:
-                    if use_regex:
-                        template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
-                        count = 1 if matches_empty else 0
-                        new_text = pattern.sub(
-                            lambda m, template=template: m.expand(template),
-                            text,
-                            count=count,
-                        )
-                    else:
-                        new_text = pattern.sub(lambda _m: replacement, text)
-                except re.error as exc:
-                    QMessageBox.warning(self, "Replace failed", str(exc))
-                    return False
-            if new_text != text:
+            result = self._replace_all_text(
+                text, pattern, replacement, use_regex, matches_empty, has_group_ref
+            )
+            if result is None:
+                return False
+            changed, new_text = result
+            if changed:
                 self._current_model.setData(idx, new_text, Qt.EditRole)
         return True
 
@@ -2220,26 +2324,12 @@ class MainWindow(QMainWindow):
             value = cache.value if cache and cache.value is not None else entry.value
             status = cache.status if cache else entry.status
             text = "" if value is None else str(value)
-            new_value = text
-            if text:
-                if matches_empty and not has_group_ref:
-                    new_value = replacement
-                else:
-                    if pattern.search(text):
-                        try:
-                            if use_regex:
-                                template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
-                                count = 1 if matches_empty else 0
-                                new_value = pattern.sub(
-                                    lambda m, template=template: m.expand(template),
-                                    text,
-                                    count=count,
-                                )
-                            else:
-                                new_value = pattern.sub(lambda _m: replacement, text)
-                        except re.error as exc:
-                            QMessageBox.warning(self, "Replace failed", str(exc))
-                            return False
+            result = self._replace_all_text(
+                text, pattern, replacement, use_regex, matches_empty, has_group_ref
+            )
+            if result is None:
+                return False
+            _changed, new_value = result
             if new_value != text:
                 status = Status.TRANSLATED
                 changed_keys.add(entry.key)

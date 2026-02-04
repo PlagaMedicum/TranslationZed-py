@@ -128,7 +128,12 @@ class SaveFilesDialog(QDialog):
 class ReplaceFilesDialog(QDialog):
     """Confirm replace-all across multiple files."""
 
-    def __init__(self, files: Iterable[str], scope_label: str, parent=None) -> None:
+    def __init__(
+        self,
+        files: Iterable[str] | Iterable[tuple[str, int]],
+        scope_label: str,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Replace in multiple files")
         self.setModal(True)
@@ -140,7 +145,11 @@ class ReplaceFilesDialog(QDialog):
         list_widget = QListWidget(self)
         list_widget.setSelectionMode(QAbstractItemView.NoSelection)
         for item in files:
-            list_widget.addItem(item)
+            if isinstance(item, tuple) and len(item) == 2:
+                path, count = item
+                list_widget.addItem(f"{path} ({count})")
+            else:
+                list_widget.addItem(str(item))
         list_widget.setMaximumHeight(240)
         main_layout.addWidget(list_widget)
 

@@ -251,6 +251,7 @@ Observed hotspots and their current shape (code references are indicative):
   selections or rapid edits this can add UI overhead.
 
 **E) Replace‑all (scope > FILE)**
+- Replace‑all confirmation lists **affected files + per‑file counts** before applying.
 - `_replace_all_in_file` parses each target file and walks all entries, performing
   regex checks row‑by‑row. This is correct but expensive for large scopes.
 
