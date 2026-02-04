@@ -52,7 +52,7 @@ def _assert_budget(label: str, elapsed_ms: float, budget_ms: float) -> None:
     ), f"{label} exceeded budget: {elapsed_ms:.1f}ms > {budget_ms:.1f}ms"
 
 
-def test_perf_large_file_open(tmp_path: Path) -> None:
+def test_perf_large_file_open(tmp_path: Path, perf_recorder) -> None:
     count = int(os.getenv("TZP_PERF_OPEN_ENTRIES", "8000"))
     budget_ms = _budget_ms("TZP_PERF_OPEN_MS", 2000.0)
     path = tmp_path / "Large.txt"
@@ -66,10 +66,11 @@ def test_perf_large_file_open(tmp_path: Path) -> None:
     pf = parse_lazy(path, encoding="utf-8")
     elapsed_ms = (time.perf_counter() - start) * 1000.0
     assert len(pf.entries) == count
+    perf_recorder("large-file open", elapsed_ms, budget_ms, f"entries={count}")
     _assert_budget("large-file open", elapsed_ms, budget_ms)
 
 
-def test_perf_multi_file_search(tmp_path: Path) -> None:
+def test_perf_multi_file_search(tmp_path: Path, perf_recorder) -> None:
     files = int(os.getenv("TZP_PERF_SEARCH_FILES", "4"))
     count = int(os.getenv("TZP_PERF_SEARCH_ENTRIES", "3000"))
     budget_ms = _budget_ms("TZP_PERF_SEARCH_MS", 2000.0)
@@ -91,10 +92,16 @@ def test_perf_multi_file_search(tmp_path: Path) -> None:
         total += len(search(rows, "Value", SearchField.TRANSLATION, False))
     elapsed_ms = (time.perf_counter() - start) * 1000.0
     assert total == files * count
+    perf_recorder(
+        "multi-file search",
+        elapsed_ms,
+        budget_ms,
+        f"files={files} entries={count} matches={total}",
+    )
     _assert_budget("multi-file search", elapsed_ms, budget_ms)
 
 
-def test_perf_cache_write(tmp_path: Path) -> None:
+def test_perf_cache_write(tmp_path: Path, perf_recorder) -> None:
     count = int(os.getenv("TZP_PERF_CACHE_ENTRIES", "8000"))
     budget_ms = _budget_ms("TZP_PERF_CACHE_MS", 1500.0)
     root = tmp_path / "root"
@@ -109,4 +116,5 @@ def test_perf_cache_write(tmp_path: Path) -> None:
     elapsed_ms = (time.perf_counter() - start) * 1000.0
     cache_path = root / ".tzp-cache" / "EN" / "ui.bin"
     assert cache_path.exists()
+    perf_recorder("cache write", elapsed_ms, budget_ms, f"entries={count}")
     _assert_budget("cache write", elapsed_ms, budget_ms)
