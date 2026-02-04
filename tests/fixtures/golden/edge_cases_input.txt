@@ -1,0 +1,10 @@
+// Auto-generated file
+A = "Hello"  -- comment
+B   =   "Spaced" // inline
+C = "Hel"  ..  "lo"   /* block */
+D = "He said \"hi\"" -- escaped
+E = " <CENTRE> "<SIZE:large> hello",
+F = "Use /startrain "intensity", optional intensity is from 1 to 100",
+G = "...called "baldie", "egghead", "skinskull"..."
+BAD = "Missing quote
+OK = "Fine"

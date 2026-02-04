@@ -361,12 +361,12 @@ A4 [✓] **Large‑file performance** (more urgent now)
      - **Implemented**: EN source rows are lazy for large files; values resolve on demand.
      - **Implemented**: post‑open deferral for large files (prefetch, row resize, search refresh).
    - [✓] **u64 cache key hash** + migration to reduce collisions.
-A5 [ ] **Automated regression coverage**
+A5 [→] **Automated regression coverage**
    - **Problem**: current tests cover typical cases, not “worst‑case” structures and sizes.
-   - **Target**: golden/round‑trip tests for edge‑case syntax (comments, spacing, concat, stray quotes).
-   - **Encoding**: per‑locale fixtures for cp1251/UTF‑16/UTF‑8 with byte‑exact preservation.
-   - **Reference corpus**: use real PZ repo samples for regressions.
-   - **Perf budgets**: automated timing checks for large‑file open, multi‑file search, and cache writes.
+   - [✓] **Target**: golden/round‑trip tests for edge‑case syntax (comments, spacing, concat, stray quotes).
+   - [✓] **Encoding**: per‑locale fixtures for cp1251/UTF‑16/UTF‑8 with byte‑exact preservation.
+   - [✓] **Reference corpus**: prod‑like sample fixtures round‑trip for regression coverage.
+   - [ ] **Perf budgets**: automated timing checks for large‑file open, multi‑file search, and cache writes.
 A6 [✓] **Cache/original conflict handling**
    - On file open, compare cached draft values vs **original file translations**.
    - If conflicts exist, show **modal notification** with choices:

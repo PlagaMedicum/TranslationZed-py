@@ -75,3 +75,13 @@ def test_structure_mixed_multi(tmp_path: Path) -> None:
         },
         expected="mixed_expected_multi.txt",
     )
+
+
+def test_structure_edge_cases(tmp_path: Path) -> None:
+    _run_case(
+        tmp_path,
+        fixture="edge_cases",
+        filename="EdgeCases_BE.txt",
+        updates={"B": "Spaced out"},
+        expected="edge_cases_expected.txt",
+    )
