@@ -241,7 +241,8 @@ Observed hotspots and their current shape (code references are indicative):
   cross‑file navigation still recompiles for each file scan.
 
 **C) File tree + dirty indicator**
-- **Tree build**: `gui/fs_model.py` builds all file items at startup with `rglob`.
+- **Tree build**: file tree is **lazy** for multi‑locale pools (children loaded on expand or
+  on‑demand for auto‑open); single‑locale keeps eager load for convenience.
 - **Dirty dot updates**: `FsModel.set_dirty` now uses a path→item map (O(1) per file).
   `_mark_cached_dirty()` reads cache headers for a draft flag (O(1) per cache file);
   legacy cache versions fall back to full read until rewritten.
