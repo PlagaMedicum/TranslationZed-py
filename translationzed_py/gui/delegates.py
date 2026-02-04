@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from translationzed_py.core.model import STATUS_ORDER, Status
 
+from .perf_trace import PERF_TRACE
 
 class StatusDelegate(QStyledItemDelegate):
     """Combo-box editor for the Status column."""
@@ -286,79 +287,88 @@ class VisualTextDelegate(MultiLineEditDelegate):
         return super().sizeHint(option, index)
 
     def paint(self, painter, option, index):  # noqa: N802
-        opt = QStyleOptionViewItem(option)
-        self.initStyleOption(opt, index)
-        text = opt.text
-        opt.text = ""
-        style = opt.widget.style() if opt.widget else QApplication.style()
-        style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)
+        perf_trace = PERF_TRACE
+        start = perf_trace.start("paint")
+        try:
+            opt = QStyleOptionViewItem(option)
+            self.initStyleOption(opt, index)
+            text = opt.text
+            opt.text = ""
+            style = opt.widget.style() if opt.widget else QApplication.style()
+            style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)
 
-        if len(text) > _MAX_RENDER_CHARS:
+            if len(text) > _MAX_RENDER_CHARS:
+                text_rect = opt.rect.adjusted(4, 0, -4, 0)
+                painter.save()
+                painter.setClipRect(text_rect)
+                if opt.state & QStyle.State_Selected:
+                    painter.setPen(opt.palette.highlightedText().color())
+                else:
+                    painter.setPen(opt.palette.text().color())
+                elided = opt.fontMetrics.elidedText(
+                    text, Qt.ElideRight, text_rect.width()
+                )
+                painter.drawText(
+                    text_rect,
+                    Qt.AlignLeft | Qt.AlignVCenter | Qt.TextSingleLine,
+                    elided,
+                )
+                painter.restore()
+                return
+
+            show_ws, highlight, _optimize = self._options_provider()
+            if not highlight and not show_ws:
+                text_rect = opt.rect.adjusted(4, 0, -4, 0)
+                painter.save()
+                painter.setClipRect(text_rect)
+                painter.setFont(opt.font)
+                if opt.state & QStyle.State_Selected:
+                    painter.setPen(opt.palette.highlightedText().color())
+                else:
+                    painter.setPen(opt.palette.text().color())
+                static_text = QStaticText(text)
+                wrap = False
+                if opt.widget is not None and hasattr(opt.widget, "wordWrap"):
+                    try:
+                        wrap = bool(opt.widget.wordWrap())
+                    except Exception:
+                        wrap = False
+                option = QTextOption()
+                option.setWrapMode(
+                    QTextOption.WrapMode.WordWrap
+                    if wrap
+                    else QTextOption.WrapMode.NoWrap
+                )
+                static_text.setTextOption(option)
+                static_text.setTextWidth(max(0, text_rect.width()))
+                painter.drawStaticText(text_rect.topLeft(), static_text)
+                painter.restore()
+                return
+
+            doc = self._doc
+            doc.setDefaultFont(opt.font)
+            doc.setPlainText(text)
+            show_ws, highlight, optimize = self._options_provider()
+            if optimize and len(text) >= MAX_VISUAL_CHARS:
+                show_ws = False
+                highlight = False
+            _apply_whitespace_option(doc, show_ws)
             text_rect = opt.rect.adjusted(4, 0, -4, 0)
+            doc.setTextWidth(max(0, text_rect.width()))
+            cursor = QTextCursor(doc)
+            cursor.select(QTextCursor.Document)
+            base_format = QTextCharFormat()
+            if opt.state & QStyle.State_Selected:
+                base_format.setForeground(opt.palette.highlightedText())
+            else:
+                base_format.setForeground(opt.palette.text())
+            cursor.mergeCharFormat(base_format)
+            _apply_visual_formats(doc, text, highlight=highlight, show_ws=show_ws)
+
             painter.save()
             painter.setClipRect(text_rect)
-            if opt.state & QStyle.State_Selected:
-                painter.setPen(opt.palette.highlightedText().color())
-            else:
-                painter.setPen(opt.palette.text().color())
-            elided = opt.fontMetrics.elidedText(text, Qt.ElideRight, text_rect.width())
-            painter.drawText(
-                text_rect,
-                Qt.AlignLeft | Qt.AlignVCenter | Qt.TextSingleLine,
-                elided,
-            )
+            painter.translate(text_rect.topLeft())
+            doc.drawContents(painter)
             painter.restore()
-            return
-
-        show_ws, highlight, _optimize = self._options_provider()
-        if not highlight and not show_ws:
-            text_rect = opt.rect.adjusted(4, 0, -4, 0)
-            painter.save()
-            painter.setClipRect(text_rect)
-            painter.setFont(opt.font)
-            if opt.state & QStyle.State_Selected:
-                painter.setPen(opt.palette.highlightedText().color())
-            else:
-                painter.setPen(opt.palette.text().color())
-            static_text = QStaticText(text)
-            wrap = False
-            if opt.widget is not None and hasattr(opt.widget, "wordWrap"):
-                try:
-                    wrap = bool(opt.widget.wordWrap())
-                except Exception:
-                    wrap = False
-            option = QTextOption()
-            option.setWrapMode(
-                QTextOption.WrapMode.WordWrap if wrap else QTextOption.WrapMode.NoWrap
-            )
-            static_text.setTextOption(option)
-            static_text.setTextWidth(max(0, text_rect.width()))
-            painter.drawStaticText(text_rect.topLeft(), static_text)
-            painter.restore()
-            return
-
-        doc = self._doc
-        doc.setDefaultFont(opt.font)
-        doc.setPlainText(text)
-        show_ws, highlight, optimize = self._options_provider()
-        if optimize and len(text) >= MAX_VISUAL_CHARS:
-            show_ws = False
-            highlight = False
-        _apply_whitespace_option(doc, show_ws)
-        text_rect = opt.rect.adjusted(4, 0, -4, 0)
-        doc.setTextWidth(max(0, text_rect.width()))
-        cursor = QTextCursor(doc)
-        cursor.select(QTextCursor.Document)
-        base_format = QTextCharFormat()
-        if opt.state & QStyle.State_Selected:
-            base_format.setForeground(opt.palette.highlightedText())
-        else:
-            base_format.setForeground(opt.palette.text())
-        cursor.mergeCharFormat(base_format)
-        _apply_visual_formats(doc, text, highlight=highlight, show_ws=show_ws)
-
-        painter.save()
-        painter.setClipRect(text_rect)
-        painter.translate(text_rect.topLeft())
-        doc.drawContents(painter)
-        painter.restore()
+        finally:
+            perf_trace.stop("paint", start, items=1, unit="cells")

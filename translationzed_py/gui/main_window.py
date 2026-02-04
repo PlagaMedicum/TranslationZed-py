@@ -116,6 +116,7 @@ from .delegates import (
     TextVisualHighlighter,
     VisualTextDelegate,
 )
+from .perf_trace import PERF_TRACE
 from .dialogs import (
     AboutDialog,
     ConflictChoiceDialog,
@@ -1620,7 +1621,11 @@ class MainWindow(QMainWindow):
             self._row_height_cache_key = signature
             self._row_height_cache.clear()
         start, end = span
+        perf_trace = PERF_TRACE
+        perf_start = perf_trace.start("row_resize")
+        rows_processed = 0
         for row in range(start, end + 1):
+            rows_processed += 1
             cached = self._row_height_cache.get(row)
             if cached is not None:
                 if self.table.rowHeight(row) != cached:
@@ -1632,6 +1637,7 @@ class MainWindow(QMainWindow):
             self._row_height_cache[row] = height
             self.table.setRowHeight(row, height)
         self._pending_row_span = None
+        perf_trace.stop("row_resize", perf_start, items=rows_processed, unit="rows")
 
     def _on_table_scrolled(self, *_args) -> None:
         self._prefetch_visible_rows()
