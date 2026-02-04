@@ -3166,7 +3166,7 @@ class MainWindow(QMainWindow):
 
     def _update_large_file_mode(self) -> None:
         active = (
-            False if not self._large_text_optimizations else self._is_large_file()
+            self._is_large_file() if self._large_text_optimizations else False
         )
         if active != self._large_file_mode:
             self._large_file_mode = active
