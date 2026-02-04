@@ -212,8 +212,16 @@ class TranslationModel(QAbstractTableModel):
         if role == Qt.BackgroundRole:
             if index.column() == 0 and not (e.key or ""):
                 return _BG_MISSING
-            if index.column() == 1 and not (self._source_values.get(e.key, "") or ""):
-                return _BG_MISSING
+            if index.column() == 1:
+                source_text = None
+                if self._source_by_row is not None and index.row() < len(
+                    self._source_by_row
+                ):
+                    source_text = self._source_by_row[index.row()]
+                else:
+                    source_text = self._source_values.get(e.key, "")
+                if not (source_text or ""):
+                    return _BG_MISSING
             if index.column() == 2 and not (e.value or ""):
                 return _BG_MISSING
             return _BG_STATUS.get(e.status)

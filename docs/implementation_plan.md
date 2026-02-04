@@ -385,9 +385,10 @@ A6 [✓] **Cache/original conflict handling**
    - Cache schema must store **original translation snapshot** per key for comparisons.
 
 Priority B — **Productivity/clarity**
-B1 [ ] **Validation highlights** (Step 28).
+B1 [✓] **Validation highlights** (Step 28).
    - **Problem**: errors are only visible on inspection; no per‑cell visual guidance.
    - **Target**: visible cues for malformed or missing values without obscuring status colors.
+   - **Implemented**: empty Key/Source/Translation cells render red; source checks respect row‑aligned source data.
 B2 [✓] **File tree toggle** (Step 21).
 B3 [ ] **Text visualization** (Step 19).
    - **Problem**: translators cannot see hidden whitespace/escapes; mistakes slip through.

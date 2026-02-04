@@ -203,7 +203,6 @@ From latest clarification:
 **Known gaps (candidate v0.2 focus)**
 - **Scopes**: search/replace scopes exist in preferences, but behavior is file‑only; multi‑file
   search navigation + replace across locale/pool not yet implemented.
-- **Validation cues**: empty Key/Source/Translation highlighting is still pending.
 - **Visualization**: escape/tag/whitespace highlighting + glyph mode not implemented.
 - **TM/LanguageTool**: suggestion engine and TM import/project‑TM generation are future work.
 - **Layout toggles**: file tree hide/show toggle is planned but not implemented.
