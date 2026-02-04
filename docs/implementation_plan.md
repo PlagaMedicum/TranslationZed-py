@@ -305,6 +305,17 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - LanguageTool uses configurable server URL and is optional/disabled by default
   - No blocking UI; suggestions fetched asynchronously
 
+### Step 30 — Translation QA checks (post‑TM) [≈ future]
+- Dependency: **complete TM import/export** before starting this step.
+- Touchpoints: new QA rules module, preferences UI, status/summary panel
+- Acceptance:
+  - QA panel with per‑check **checkbox toggles** (MemoQ/Polyglot‑style):
+    - Missing trailing characters
+    - Missing/extra newlines
+    - Missing escape sequences / code blocks
+    - Translation equals Source
+  - Checks are opt‑in per locale or project; results are non‑blocking warnings by default.
+
 ---
 
 ## 3) MVP Acceptance Checklist (v0.1)
@@ -345,6 +356,8 @@ A3 [✓] **Replace‑all safety**
    - **Implemented**: scope confirm dialog shows affected files with per‑file replacement counts.
 A4 [✓] **Large‑file performance** (more urgent now)
    - [✓] **Windowed row sizing**: only visible rows + viewport margin, debounced.
+   - [✓] **Giant‑string guards**: cap per‑cell render cost; table previews elide, but
+     editors always load **full text** (no truncation when editing).
    - [✓] **Streaming parser / on‑demand rows**
      - **Problem**: parser materializes full token lists + entry values; large files spike RAM and stall UI.
      - **Target**: stream tokens; keep entry metadata but materialize values on demand with a row‑window prefetch.
@@ -386,6 +399,22 @@ A6 [✓] **Cache/original conflict handling**
    - Scope: **only opened file**; detection runs in background, notification shown when ready.
    - Cache schema must store **original translation snapshot** per key for comparisons.
 
+A7 [→] **UI latency stabilization (scroll + paint)**
+   - **Problem**: table scrolling/selection still laggy on large files; paint + row sizing
+     costs stack with regex highlighting, tooltips, and wrap sizing.
+   - **Target**: smooth scroll/selection on large files; zero hangs on huge strings.
+   - **Tasks**:
+     - [✓] Cache row heights and recompute only on data change or column resize.
+     - [✓] Throttle/merge row‑resize passes during scroll (run after scroll idle).
+     - [✓] Skip highlight/whitespace glyphs for values ≥100k chars.
+     - [✓] Disable/cap tooltips for huge values; delay tooltip display (~900ms, 800/200 caps).
+     - [✓] Preference toggle for large‑text optimizations (default ON).
+     - [✓] Fast paint path for non‑highlight rows (QStaticText/QTextLayout).
+     - [✓] Large‑file mode auto‑disables wrap + table highlighting (≥5,000 rows or ≥1,000,000 bytes).
+     - [ ] Add lightweight perf tracing for paint/resize to spot regressions.
+   - **Acceptance**: large single‑string files (News/Recorded_Media) open and scroll without jank;
+     no tooltip‑related freezes.
+
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
    - **Problem**: errors are only visible on inspection; no per‑cell visual guidance.
@@ -401,6 +430,10 @@ Priority C — **Assistive tooling**
 C1 [ ] **Translation memory** + **LanguageTool** (Step 29).
    - **Problem**: repetitive phrases require manual recall; no suggestions.
    - **Target**: local TM + optional LanguageTool API, async and non‑blocking.
+C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
+   - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.
+   - **Target**: opt‑in QA panel with per‑check toggles; non‑blocking warnings by default.
+   - **Dependency**: start only after TM import/export is complete.
 
 ---
 
