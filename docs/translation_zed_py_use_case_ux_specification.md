@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.14 · 2026‑01‑31_
+_version 0.3.17 · 2026‑02‑04_
 
 ---
 ## 1  Actors
@@ -94,7 +94,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  3 | Toolbar **Status ▼** label reflects the selected row status. |
 
 ### UC‑04b  Mark as For Review
-| **Trigger** | Status ▼ → **For review** on selected rows (shortcut TBD). |
+| **Trigger** | `Ctrl+U` or Status ▼ → **For review** on selected rows. |
 | **Flow** |
 |  1 | SYS sets `Entry.status = FOR_REVIEW`. |
 |  2 | Table delegate re‑paints cell background **orange**. |
@@ -147,7 +147,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  4 | User sets **Search scope** (File / Locale / Locale Pool). |
 |  5 | User sets **Replace scope** (File / Locale / Locale Pool). |
 |  6 | User toggles general options (Prompt on Exit, Wrap Text, etc.). |
-|  7 | User toggles View options (whitespace glyphs, tag/escape highlighting). |
+|  7 | User toggles View options (whitespace glyphs, tag/escape highlighting, large‑text optimizations). |
 |  7 | On Apply/OK, SYS persists settings to `.tzp-config/settings.env`. |
 | **Post‑condition** | Next app launch uses the selected defaults; toolbar remains minimal. |
 
@@ -269,17 +269,35 @@ UNTOUCHED ──────────────────────▶ 
    - Wrap OFF: Source opens in read‑only multi‑line editor; Translation uses expanded
      multi‑line editor. Editor expands to remaining table width and height adapts to
      content (min ~2 lines, max to table bottom); mouse‑wheel scroll stays
-     inside editor.
+     inside editor. Editors always load **full text** (no truncation); truncation is
+     allowed only in table preview and tooltips.
      **String editor** below the table (Poedit‑style). Source is read‑only and Translation is editable;
      table remains visible above. Toggle is placed in the **bottom bar** and defaults to **open**.
    - Status palette: **For review** = orange, **Translated** = green, **Proofread** = light‑blue (higher priority than Translated).
    - Validation priority: **empty cell = red** (overrides any status color).
-7. **Visualization**: highlight escape sequences, tags, and repeated whitespace; optional
-   glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation in both
-   preview and edit (toggled in Preferences → View).
-8. **Layout toggles**: file tree panel can be hidden/shown via a **left‑side toggle**; the
+7. **Visualization**: highlight escape sequences and **code markers** (uppercase `<TAG...>` tokens,
+   bracket tags like `[IMG=...]`, and placeholders like `%1`, `%s`, `%1$s`), plus repeated whitespace;
+   optional glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation
+   in both preview and edit (toggled in Preferences → View). When large‑text optimizations are on,
+   highlight/whitespace glyphs are suppressed for extremely large values (≥100k chars).
+8. **Large‑file mode (current)**: when large‑text optimizations are enabled and a file exceeds
+   row‑count or size thresholds, table **wrap** and **highlight/glyphs** are auto‑disabled to keep
+   scrolling responsive. Editing still shows full text. Current thresholds: ≥5,000 rows or
+   ≥1,000,000 bytes (subject to tuning). User can disable in Preferences.
+9. **Tooltips**: plain text only (no highlighting/selection), delayed ~900ms, truncated for large
+   values (800 chars normally, 200 chars when length ≥5,000); used for preview only.
+10. **Layout toggles**: file tree panel can be hidden/shown via a **left‑side toggle**; the
    detail editor pane is toggled from the **bottom bar**.
-9. **System theme**: future support for OS light/dark theme via native Qt styles (no custom theme).
+11. **System theme**: future support for OS light/dark theme via native Qt styles (no custom theme).
+12. **Translation QA checks (future)**: add an opt‑in QA panel with per‑check toggles
+   (missing trailing characters, missing/extra newlines, missing escapes/code blocks,
+   translation equals Source). Implement **only after** TM import/export is complete.
 
 ---
-_Last updated: 2026‑02‑04 (v0.3.14)_
+_Last updated: 2026‑02‑04 (v0.3.17)_
+### UC‑04c  Mark as Translated
+| **Trigger** | `Ctrl+T` or Status ▼ → **Translated** on selected rows. |
+| **Flow** |
+|  1 | SYS sets `Entry.status = TRANSLATED`. |
+|  2 | Table delegate re‑paints cell background **green**. |
+|  3 | Toolbar **Status ▼** label reflects the selected row status. |

@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.3.9 · 2026‑01‑31**\
+**Version 0.3.12 · 2026‑02‑04**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -234,6 +234,7 @@ Algorithm:
 - Keys:
   - `PROMPT_WRITE_ON_EXIT=true|false`
   - `WRAP_TEXT=true|false`
+  - `LARGE_TEXT_OPTIMIZATIONS=true|false`
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
   - `DEFAULT_ROOT=<path>` (default project root in Preferences)
@@ -267,6 +268,18 @@ Algorithm:
 - On first run, if no CLI `--project` arg is provided and `DEFAULT_ROOT` is unset,
   the app **blocks** with a project‑root chooser and saves it as `DEFAULT_ROOT`.
 - If CLI `--project` is provided, it **overrides** `DEFAULT_ROOT` for that run
+
+#### 5.6.3  Large‑text optimizations
+
+- Default: `LARGE_TEXT_OPTIMIZATIONS=true`.
+- When enabled:
+  - **Large‑file mode** triggers at ≥5,000 rows or ≥1,000,000 bytes.
+  - Table **wrap** and **highlight/whitespace glyphs** are forced off in large‑file mode
+    (user wrap preference is preserved but not applied to the table).
+  - Highlight/whitespace glyphs are suppressed for any value ≥100k chars (table + editors).
+  - Tooltips are plain text, delayed ~900ms, and truncated (800/200 chars); preview‑only.
+  - Editors always load **full text** (no truncation).
+- When disabled: none of the above guardrails apply.
   but does not modify it.
 - Users can change or clear `DEFAULT_ROOT` only via Preferences.
 
@@ -512,14 +525,12 @@ v0.1 uses **cache‑only** recovery:
 3. GitHub PR integration (REST v4 API).
 4. Automatic update check (GitHub Releases).
 5. Simple editor for location `description.txt` files.
-6. Whitespace visualization (spaces/newlines glyphs) + highlighting of escape sequences,
-   tags, and repeated whitespace in Source/Translation preview + edit.
-7. LanguageTool server API integration for grammar/spell suggestions.
-8. Translation memory (TM): import user TMs, generate a project TM from edits; local TM
+6. LanguageTool server API integration for grammar/spell suggestions.
+7. Translation memory (TM): import user TMs, generate a project TM from edits; local TM
    suggestions outrank LanguageTool API results; **project‑TM** outranks imported TM.
-9. Optional Poedit-style dual editor panes under the table (Source read-only, Translation editable),
-   toggled from the bottom bar. Add a left-side toggle to hide/show the file tree panel.
-10. Dark system theme support (follow OS theme; no custom theming).
+8. Translation QA checks (post‑TM import/export): per‑check toggles for missing trailing
+   characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
+9. Dark system theme support (follow OS theme; no custom theming).
 
 ## 13  Undo / Redo
 
@@ -547,4 +558,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-01-31 (v0.3.9)*
+*Last updated: 2026-02-04 (v0.3.11)*

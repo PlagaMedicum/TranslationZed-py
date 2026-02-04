@@ -70,8 +70,8 @@ From latest clarification:
 - **Parser/saver placement**: treated as infrastructure (behind interfaces),
   not core domain.
 - **Testing**: core-first coverage; golden‑file tests are required for UTF‑8,
-  cp1251, and UTF‑16. Perf budgets validate large-file open, multi-file search,
-  and cache write timing (env-tunable).
+  cp1251, and UTF‑16. Perf budgets validate large‑file open, multi‑file search,
+  and cache write timing (env‑tunable) and are always summarized in pytest output.
 - **Tree layout**: when multiple locales are selected, show **multiple roots**
   (one root per locale).
 - **EN hash cache**: single index file for all EN hashes (for now).
@@ -119,9 +119,19 @@ From latest clarification:
   - Bare values after `=` (missing opening quote) are accepted to avoid hard parse failures.
   - Quote-heavy lines (e.g., `"intensity"` / `"egghead"` / `""zippees"`) are parsed as literal text.
   - Ellipsis near quotes (`..."`) is treated as text, not concat.
-- **Text visualization**: highlights escape sequences/tags and can show whitespace glyphs
+- **Text visualization**: highlights escape sequences and **code markers** (uppercase `<TAG...>`,
+  bracket tags like `[IMG=...]`, placeholders like `%1`, `%s`, `%1$s`) and can show whitespace glyphs
   for spaces/newlines in Source/Translation (preview + edit); toggles live in Preferences → View.
+  **Large‑text optimizations** (default ON) suppress highlight/whitespace glyphs for extremely
+  large values (≥100k chars) to avoid stalls while preserving full‑text editing.
+- **Large‑file mode**: active only when large‑text optimizations are ON; if a file is large
+  (≥5,000 rows or ≥1,000,000 bytes), table wrap and table highlight/whitespace glyphs auto‑disable
+  to keep scrolling responsive. User wrap preference is preserved but forced off in the table.
+- **Tooltips**: plain text only (no highlighting/selection), delayed (~900ms). Truncation caps:
+  800 chars normally, 200 chars when value length ≥5,000; suffix “...(truncated)”.
 - **Future quality tooling**: LanguageTool server API integration for grammar/spell suggestions.
+- **Future translation QA** (post‑TM import/export): per‑check toggles for missing trailing
+  characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
 - **Future translation memory**: allow importing user TMs and generating a project TM from edits;
   local TM suggestions take priority over LanguageTool API results; **project‑TM** outranks imported TM.
 - **Future detail editors**: optional Poedit-style dual editor panes below the table (Source read-only,
@@ -237,10 +247,17 @@ Observed hotspots and their current shape (code references are indicative):
   legacy cache versions fall back to full read until rewritten.
 
 **D) Table rendering / row sizing**
-- **Word‑wrap**: `resizeRowsToContents()` is called on wrap toggle and row edit;
-  for large files this is expensive, especially if invoked frequently.
-- **Detail editors**: `_sync_detail_editors` runs on selection + data changes; for large
-  selections or rapid edits this can add UI overhead.
+- **Word‑wrap**: row sizing is **windowed** (visible rows + viewport margin) and
+  debounced; full‑table `resizeRowsToContents()` is avoided.
+- **Row‑height cache**: per‑row heights cached and reused; invalidated on column resize,
+  row data changes, wrap toggle, and file switch.
+- **Scroll‑idle sizing**: resize pass runs only after scroll idle (no sizing during wheel).
+- **Fast paint path**: when highlights/glyphs are off, cells render via `QStaticText`
+  instead of `QTextDocument`.
+- **Giant strings**: delegate caps per‑cell render cost; huge values render as a
+  single elided line and painting is clipped to the cell rect.
+- **Detail editors**: when visible, they always load **full text** on selection
+  (no truncation); performance relies on table preview caps + paint throttling.
 
 **E) Replace‑all (scope > FILE)**
 - Replace‑all confirmation lists **affected files + per‑file counts** before applying.
@@ -252,21 +269,19 @@ Current mitigations already present:
 - Search row cache is LRU‑bounded (default 64 files).
 - Cache stores **draft values only for changed keys**, limiting cache size.
 - `TranslationModel` tracks a **baseline map** only for edited rows.
+- Windowed row sizing + scroll‑idle resize (visible rows only).
+- Row‑height cache per visible row; recompute only on data/column change.
+- Fast paint path for non‑highlight rows (`QStaticText`).
+- Large‑file mode auto‑disables wrap + table highlighting/glyphs at ≥5,000 rows or ≥1,000,000 bytes
+  (only when large‑text optimizations are ON).
+- Per‑cell render cap for huge strings; editors always load full text.
+- Tooltips are plain text, delayed ~900ms, truncated to 800/200 chars with “...(truncated)”.
 
 Performance opportunities (candidate v0.2 work):
-- **Windowed model**: load only visible rows + a viewport‑percent margin; avoid materializing
-  every `Entry` for large files and keep a row cache window.
-- **Streaming parse**: avoid `list(_tokenise)`; parse line‑by‑line or generator‑driven
-  to build only the requested row window.
-- **Key‑hash precompute**: store an entry hash alongside `Entry` to avoid per‑open xxhash.
-- **EN source lazy map**: compute source values on demand; avoid building full `{key: value}`
-  when a row window is active.
-- **Dirty index**: maintain a per‑session dirty file set and/or cache header bit
-  “has draft values” to avoid reading full cache files at startup.
-- **Tree index map**: store a `path -> QStandardItem` dict in `FsModel` for O(1) dirty updates.
 - **Search index**: build per‑file search indices lazily and reuse across queries when safe;
   scan in chunks for large files to keep memory bounded.
-- **Row sizing**: only resize visible rows; debounce resize operations after edits.
+- **Regex reuse**: cache compiled regex per query to reduce compile churn on multi‑file scans.
+- **Replace‑all streaming**: add progress/cancel + chunked processing for large scopes.
 
 Pending performance questions (need product guidance):
 - Are there target limits (max file size, max locale count) that must remain responsive?
@@ -325,22 +340,20 @@ Implications:
 
 Behavior (from screenshot):
 - Tree renders `BE/`, `EN/`, and `ui.txt` entries correctly.
-- Double-click enters in-place edit on the file label.
-- Right pane remains empty (no table header/rows).
+- In‑place edit is **disabled** for file items; double‑click activates the file.
+- Right pane populates with the translation table when a file is activated.
 
 Event-path schematic (current behavior):
 ```
 User double-click
-  -> QTreeView edit triggers (default)
-     -> QStandardItem in-place edit
-        -> QTreeView::activated NOT emitted
-           -> _file_chosen() not called
-              -> QTableView model stays unset
+  -> QTreeView::activated
+     -> _file_chosen()
+        -> QTableView model set and table populated
 ```
 
-Root causes (code):
-- `FsModel` uses editable `QStandardItem` defaults.
-- `MainWindow` listens to `tree.activated` only; double-click is intercepted by edit.
+Root causes (code) — resolved:
+- `FsModel` marks file items as non‑editable (`ItemIsSelectable | ItemIsEnabled`).
+- `MainWindow` uses `tree.activated` for file open (double‑click/Enter).
 
 ---
 
