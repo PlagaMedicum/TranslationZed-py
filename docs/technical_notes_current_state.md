@@ -243,6 +243,8 @@ Observed hotspots and their current shape (code references are indicative):
 **C) File tree + dirty indicator**
 - **Tree build**: file tree is **lazy** for multi‑locale pools (children loaded on expand or
   on‑demand for auto‑open); single‑locale keeps eager load for convenience.
+- **Startup perf**: cache dirty scan + last‑opened lookup are scoped to selected locales;
+  prefetch runs after scroll idle with reduced margins for large files.
 - **Dirty dot updates**: `FsModel.set_dirty` now uses a path→item map (O(1) per file).
   `_mark_cached_dirty()` reads cache headers for a draft flag (O(1) per cache file);
   legacy cache versions fall back to full read until rewritten.
