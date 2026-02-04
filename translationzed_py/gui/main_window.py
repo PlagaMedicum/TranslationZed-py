@@ -980,7 +980,8 @@ class MainWindow(QMainWindow):
             self._content_splitter.setSizes([0, max(100, total)])
         else:
             self._left_panel.setVisible(True)
-            width = max(80, self._tree_last_width)
+            lazy_tree = bool(self.fs_model and self.fs_model.is_lazy())
+            width = self._initial_tree_width(lazy_tree)
             sizes = self._content_splitter.sizes()
             total = max(0, self._content_splitter.width())
             if total <= 0 and sizes:
