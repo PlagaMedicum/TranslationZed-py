@@ -15,13 +15,16 @@ from PySide6.QtCore import (
     QByteArray,
     QEventLoop,
     QItemSelectionModel,
+    QModelIndex,
     QPoint,
+    QEvent,
     Qt,
     QTimer,
     QUrl,
 )
 from PySide6.QtGui import (
     QAction,
+    QCursor,
     QDesktopServices,
     QGuiApplication,
     QIcon,
@@ -52,6 +55,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QToolBar,
     QToolButton,
+    QToolTip,
     QTreeView,
     QVBoxLayout,
     QWidget,
@@ -107,6 +111,7 @@ from translationzed_py.core.status_cache import write as _write_status_cache
 
 from .commands import ChangeStatusCommand
 from .delegates import (
+    MAX_VISUAL_CHARS,
     KeyDelegate,
     StatusDelegate,
     TextVisualHighlighter,
@@ -125,14 +130,20 @@ from .preferences_dialog import PreferencesDialog
 
 
 class _CommitPlainTextEdit(QPlainTextEdit):
-    def __init__(self, commit_cb, parent=None) -> None:
+    def __init__(self, commit_cb, parent=None, *, focus_cb=None) -> None:
         super().__init__(parent)
         self._commit_cb = commit_cb
+        self._focus_cb = focus_cb
 
     def focusOutEvent(self, event) -> None:  # noqa: N802
         super().focusOutEvent(event)
         if self._commit_cb:
             self._commit_cb()
+
+    def focusInEvent(self, event) -> None:  # noqa: N802
+        super().focusInEvent(event)
+        if self._focus_cb:
+            self._focus_cb()
 
 
 class _SourceLookup(Mapping[str, str]):
@@ -255,7 +266,11 @@ class MainWindow(QMainWindow):
             return
         prefs = _load_preferences(self._root)
         self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
-        self._wrap_text = bool(prefs.get("wrap_text", False))
+        self._wrap_text_user = bool(prefs.get("wrap_text", False))
+        self._wrap_text = self._wrap_text_user
+        self._large_text_optimizations = bool(
+            prefs.get("large_text_optimizations", True)
+        )
         self._default_root = str(prefs.get("default_root", "") or self._default_root)
         self._search_scope = str(prefs.get("search_scope", "FILE")).upper()
         if self._search_scope not in {"FILE", "LOCALE", "POOL"}:
@@ -296,6 +311,8 @@ class MainWindow(QMainWindow):
         self._detail_min_height = 0
         self._detail_syncing = False
         self._detail_dirty = False
+        self._large_file_mode = False
+        self._current_file_size = 0
         self._merge_active = False
         self._merge_rows: list[
             tuple[str, QTableWidgetItem, QTableWidgetItem, QRadioButton, QRadioButton]
@@ -455,12 +472,26 @@ class MainWindow(QMainWindow):
         self._row_resize_timer.setSingleShot(True)
         self._row_resize_timer.setInterval(80)
         self._row_resize_timer.timeout.connect(self._resize_visible_rows)
+        self._scroll_idle_timer = QTimer(self)
+        self._scroll_idle_timer.setSingleShot(True)
+        self._scroll_idle_timer.setInterval(200)
+        self._scroll_idle_timer.timeout.connect(self._on_scroll_idle)
+        self._scrolling = False
+        self._row_height_cache: dict[int, int] = {}
+        self._row_height_cache_key: tuple[int, ...] | None = None
+        self._tooltip_timer = QTimer(self)
+        self._tooltip_timer.setSingleShot(True)
+        self._tooltip_timer.setInterval(900)
+        self._tooltip_timer.timeout.connect(self._show_delayed_tooltip)
+        self._tooltip_index = QModelIndex()
+        self._tooltip_pos = QPoint()
         self._tree_width_timer = QTimer(self)
         self._tree_width_timer.setSingleShot(True)
         self._tree_width_timer.setInterval(250)
         self._tree_width_timer.timeout.connect(self._persist_tree_width)
         self._row_cache_margin_pct = 0.5
         self._large_file_row_threshold = 5000
+        self._large_file_bytes_threshold = 1_000_000
         self._pending_row_span: tuple[int, int] | None = None
         self._lazy_parse_min_bytes = 1_000_000
         self._lazy_row_prefetch_margin = 200
@@ -527,12 +558,22 @@ class MainWindow(QMainWindow):
         self.tree.doubleClicked.connect(self._file_chosen)
         self._content_splitter.addWidget(self.tree)
 
-        # ── proofread toggle ────────────────────────────────────────────────
+        # ── status shortcuts ────────────────────────────────────────────────
         act_proof = QAction("&Mark Proofread", self)
         act_proof.setShortcut("Ctrl+P")
         act_proof.triggered.connect(self._mark_proofread)
         self.addAction(act_proof)
         self.act_proof = act_proof
+        act_translated = QAction("Mark &Translated", self)
+        act_translated.setShortcut("Ctrl+T")
+        act_translated.triggered.connect(self._mark_translated)
+        self.addAction(act_translated)
+        self.act_translated = act_translated
+        act_review = QAction("Mark &For Review", self)
+        act_review.setShortcut("Ctrl+U")
+        act_review.triggered.connect(self._mark_for_review)
+        self.addAction(act_review)
+        self.act_review = act_review
 
         # ── right pane: entry table ─────────────────────────────────────────
         self.table = QTableView()
@@ -542,18 +583,20 @@ class MainWindow(QMainWindow):
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.table.verticalScrollBar().valueChanged.connect(self._on_table_scrolled)
+        self.table.viewport().setMouseTracking(True)
+        self.table.viewport().installEventFilter(self)
         self._key_delegate = KeyDelegate(self.table)
         self.table.setItemDelegateForColumn(0, self._key_delegate)
         self._source_delegate = VisualTextDelegate(
             self.table,
             read_only=True,
-            options_provider=self._text_visual_options,
+            options_provider=self._text_visual_options_table,
         )
         self.table.setItemDelegateForColumn(1, self._source_delegate)
         self._value_delegate = VisualTextDelegate(
             self.table,
             read_only=False,
-            options_provider=self._text_visual_options,
+            options_provider=self._text_visual_options_table,
         )
         self.table.setItemDelegateForColumn(2, self._value_delegate)
         self._status_delegate = StatusDelegate(self.table)
@@ -576,14 +619,14 @@ class MainWindow(QMainWindow):
         detail_layout.setSpacing(2)
         self._detail_source_label = QLabel("Source", self._detail_panel)
         detail_layout.addWidget(self._detail_source_label)
-        self._detail_source = QPlainTextEdit(self._detail_panel)
+        self._detail_source = _CommitPlainTextEdit(None, self._detail_panel)
         self._detail_source.setReadOnly(True)
         self._detail_source.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self._detail_source.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self._detail_source.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._detail_source.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
         self._detail_source_highlighter = TextVisualHighlighter(
-            self._detail_source.document(), self._text_visual_options
+            self._detail_source.document(), self._text_visual_options_detail
         )
         line_height = self._detail_source.fontMetrics().lineSpacing()
         min_line_height = max(22, line_height + 6)
@@ -592,7 +635,8 @@ class MainWindow(QMainWindow):
         self._detail_translation_label = QLabel("Translation", self._detail_panel)
         detail_layout.addWidget(self._detail_translation_label)
         self._detail_translation = _CommitPlainTextEdit(
-            self._commit_detail_translation, self._detail_panel
+            self._commit_detail_translation,
+            self._detail_panel,
         )
         self._detail_translation.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self._detail_translation.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -601,7 +645,7 @@ class MainWindow(QMainWindow):
             QSizePolicy.Preferred, QSizePolicy.Minimum
         )
         self._detail_translation_highlighter = TextVisualHighlighter(
-            self._detail_translation.document(), self._text_visual_options
+            self._detail_translation.document(), self._text_visual_options_detail
         )
         self._detail_translation.setMinimumHeight(min_line_height)
         self._detail_translation.textChanged.connect(
@@ -695,6 +739,7 @@ class MainWindow(QMainWindow):
         act_wrap.setChecked(self._wrap_text)
         act_wrap.triggered.connect(self._toggle_wrap_text)
         self.addAction(act_wrap)
+        self.act_wrap = act_wrap
         act_prompt = QAction("Prompt on E&xit", self)
         act_prompt.setCheckable(True)
         act_prompt.setChecked(self._prompt_write_on_exit)
@@ -899,11 +944,14 @@ class MainWindow(QMainWindow):
         value_text = str(value_index.data(Qt.EditRole) or "")
         self._detail_syncing = True
         try:
+            self._detail_translation.setReadOnly(False)
+            self._detail_translation.setPlaceholderText("")
             self._detail_source.setPlainText(source_text)
             self._detail_translation.setPlainText(value_text)
         finally:
             self._detail_syncing = False
         self._detail_dirty = False
+        self._apply_detail_whitespace_options()
 
     def _scope_icon(self, scope: str) -> QIcon:
         if scope == "FILE":
@@ -1133,7 +1181,8 @@ class MainWindow(QMainWindow):
         prefs = {
             "default_root": self._default_root,
             "prompt_write_on_exit": self._prompt_write_on_exit,
-            "wrap_text": self._wrap_text,
+            "wrap_text": self._wrap_text_user,
+            "large_text_optimizations": self._large_text_optimizations,
             "visual_highlight": self._visual_highlight,
             "visual_whitespace": self._visual_whitespace,
             "search_scope": self._search_scope,
@@ -1150,10 +1199,14 @@ class MainWindow(QMainWindow):
 
     def _apply_preferences(self, values: dict) -> None:
         self._prompt_write_on_exit = bool(values.get("prompt_write_on_exit", True))
-        self._wrap_text = bool(values.get("wrap_text", False))
-        self.table.setWordWrap(self._wrap_text)
-        if self._wrap_text:
-            self._schedule_row_resize()
+        self._wrap_text_user = bool(values.get("wrap_text", False))
+        large_text_opt = bool(
+            values.get("large_text_optimizations", self._large_text_optimizations)
+        )
+        if large_text_opt != self._large_text_optimizations:
+            self._large_text_optimizations = large_text_opt
+            self._update_large_file_mode()
+        self._apply_wrap_mode()
         visual_highlight = bool(values.get("visual_highlight", self._visual_highlight))
         visual_whitespace = bool(
             values.get("visual_whitespace", self._visual_whitespace)
@@ -1250,6 +1303,10 @@ class MainWindow(QMainWindow):
             return
 
         self._current_encoding = encoding
+        try:
+            self._current_file_size = path.stat().st_size
+        except OSError:
+            self._current_file_size = 0
 
         source_lookup = self._load_en_source(path, locale, target_entries=pf.entries)
         self._cache_map = _read_status_cache(self._root, path)
@@ -1345,8 +1402,10 @@ class MainWindow(QMainWindow):
             self._source_translation_ratio = 0.5
         self._table_layout_guard = True
         self.table.setModel(self._current_model)
+        self._clear_row_height_cache()
         self._apply_table_layout()
         self._table_layout_guard = False
+        self._update_large_file_mode()
         self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
         self._update_status_combo_from_selection()
         self._update_replace_enabled()
@@ -1464,7 +1523,10 @@ class MainWindow(QMainWindow):
     def _is_large_file(self) -> bool:
         return bool(
             self._current_model
-            and self._current_model.rowCount() >= self._large_file_row_threshold
+            and (
+                self._current_model.rowCount() >= self._large_file_row_threshold
+                or self._current_file_size >= self._large_file_bytes_threshold
+            )
         )
 
     def _should_parse_lazy(self, path: Path) -> bool:
@@ -1523,16 +1585,30 @@ class MainWindow(QMainWindow):
     def _schedule_row_resize(self, *, full: bool = False) -> None:
         if not self._wrap_text or not self._current_model:
             return
-        if full or not self._is_large_file():
-            self.table.resizeRowsToContents()
-            return
         span = self._visible_row_span()
         if not span:
             return
         self._pending_row_span = span
+        if self._scrolling:
+            return
         if self._row_resize_timer.isActive():
             self._row_resize_timer.stop()
         self._row_resize_timer.start()
+
+    def _row_height_cache_signature(self) -> tuple[int, ...]:
+        model = self.table.model()
+        if model is None:
+            return ()
+        header = self.table.horizontalHeader()
+        return tuple(header.sectionSize(i) for i in range(model.columnCount()))
+
+    def _clear_row_height_cache(self, rows: Iterable[int] | None = None) -> None:
+        if rows is None:
+            self._row_height_cache.clear()
+            self._row_height_cache_key = None
+            return
+        for row in rows:
+            self._row_height_cache.pop(row, None)
 
     def _resize_visible_rows(self) -> None:
         if not self._wrap_text or not self._current_model:
@@ -1540,16 +1616,81 @@ class MainWindow(QMainWindow):
         span = self._pending_row_span or self._visible_row_span()
         if not span:
             return
+        signature = self._row_height_cache_signature()
+        if signature != self._row_height_cache_key:
+            self._row_height_cache_key = signature
+            self._row_height_cache.clear()
         start, end = span
         for row in range(start, end + 1):
-            self.table.resizeRowToContents(row)
+            cached = self._row_height_cache.get(row)
+            if cached is not None:
+                if self.table.rowHeight(row) != cached:
+                    self.table.setRowHeight(row, cached)
+                continue
+            height = self.table.sizeHintForRow(row)
+            if height <= 0:
+                continue
+            self._row_height_cache[row] = height
+            self.table.setRowHeight(row, height)
         self._pending_row_span = None
 
     def _on_table_scrolled(self, *_args) -> None:
         self._prefetch_visible_rows()
-        if not self._wrap_text or not self._is_large_file():
+        if not self._wrap_text:
             return
-        self._schedule_row_resize()
+        self._scrolling = True
+        if self._scroll_idle_timer.isActive():
+            self._scroll_idle_timer.stop()
+        self._scroll_idle_timer.start()
+
+    def _on_scroll_idle(self) -> None:
+        self._scrolling = False
+        if self._wrap_text:
+            self._schedule_row_resize()
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        if obj is self.table.viewport():
+            if event.type() == QEvent.MouseMove:
+                idx = self.table.indexAt(event.pos())
+                if not idx.isValid():
+                    self._tooltip_timer.stop()
+                    self._tooltip_index = QModelIndex()
+                    QToolTip.hideText()
+                    return False
+                if idx != self._tooltip_index:
+                    self._tooltip_index = idx
+                    self._tooltip_pos = event.globalPos()
+                    self._tooltip_timer.start()
+                    QToolTip.hideText()
+                else:
+                    self._tooltip_pos = event.globalPos()
+                return False
+            if event.type() == QEvent.Leave:
+                self._tooltip_timer.stop()
+                self._tooltip_index = QModelIndex()
+                QToolTip.hideText()
+                return False
+            if event.type() == QEvent.ToolTip:
+                return True
+        return super().eventFilter(obj, event)
+
+    def _show_delayed_tooltip(self) -> None:
+        idx = self._tooltip_index
+        if not idx.isValid() or not self.table.model():
+            return
+        pos = self.table.viewport().mapFromGlobal(QCursor.pos())
+        current = self.table.indexAt(pos)
+        if not current.isValid() or current != idx:
+            return
+        text = self.table.model().data(idx, Qt.ToolTipRole)
+        if not text:
+            return
+        QToolTip.showText(
+            self._tooltip_pos,
+            str(text),
+            self.table,
+            self.table.visualRect(idx),
+        )
 
     def _on_header_resized(self, logical_index: int, _old: int, _new: int) -> None:
         if self._table_layout_guard or not self.table.model():
@@ -1558,11 +1699,17 @@ class MainWindow(QMainWindow):
             self._key_column_width = max(60, _new)
             self._prefs_extras["TABLE_KEY_WIDTH"] = str(self._key_column_width)
             self._apply_table_layout()
+            self._clear_row_height_cache()
+            if self._wrap_text:
+                self._schedule_row_resize()
             return
         if logical_index == 3:
             self._status_column_width = max(60, _new)
             self._prefs_extras["TABLE_STATUS_WIDTH"] = str(self._status_column_width)
             self._apply_table_layout()
+            self._clear_row_height_cache()
+            if self._wrap_text:
+                self._schedule_row_resize()
             return
         if logical_index not in (1, 2):
             return
@@ -1593,6 +1740,9 @@ class MainWindow(QMainWindow):
             self._prefs_extras["TABLE_SRC_RATIO"] = (
                 f"{self._source_translation_ratio:.6f}"
             )
+        self._clear_row_height_cache()
+        if self._wrap_text:
+            self._schedule_row_resize()
 
     def _save_current(self) -> bool:
         """Patch file on disk if there are unsaved value edits."""
@@ -2992,23 +3142,77 @@ class MainWindow(QMainWindow):
             stack.endMacro()
 
     def _toggle_wrap_text(self, checked: bool) -> None:
-        self._wrap_text = bool(checked)
-        self.table.setWordWrap(self._wrap_text)
-        if self._wrap_text:
-            self._schedule_row_resize()
+        self._wrap_text_user = bool(checked)
+        self._apply_wrap_mode()
         self._persist_preferences()
 
-    def _text_visual_options(self) -> tuple[bool, bool]:
-        return self._visual_whitespace, self._visual_highlight
+    def _apply_wrap_mode(self) -> None:
+        effective = self._wrap_text_user and not self._large_file_mode
+        if self._wrap_text != effective:
+            self._wrap_text = effective
+            self.table.setWordWrap(self._wrap_text)
+            self._clear_row_height_cache()
+            if self._wrap_text:
+                self._schedule_row_resize()
+        if getattr(self, "act_wrap", None):
+            self.act_wrap.blockSignals(True)
+            try:
+                self.act_wrap.setChecked(self._wrap_text)
+            finally:
+                self.act_wrap.blockSignals(False)
+            if self._large_file_mode:
+                self.act_wrap.setToolTip("Wrap disabled by large-file mode")
+            else:
+                self.act_wrap.setToolTip("Wrap long strings in table")
+
+    def _update_large_file_mode(self) -> None:
+        if not self._large_text_optimizations:
+            active = False
+        else:
+            active = self._is_large_file()
+        if active != self._large_file_mode:
+            self._large_file_mode = active
+            self._apply_wrap_mode()
+            self._apply_text_visual_options()
+
+    def _text_visual_options_table(self) -> tuple[bool, bool, bool]:
+        show_ws = self._visual_whitespace
+        highlight = self._visual_highlight
+        if self._large_file_mode and self._large_text_optimizations:
+            show_ws = False
+            highlight = False
+        return show_ws, highlight, self._large_text_optimizations
+
+    def _text_visual_options_detail(self) -> tuple[bool, bool, bool]:
+        return (
+            self._visual_whitespace,
+            self._visual_highlight,
+            self._large_text_optimizations,
+        )
 
     def _apply_text_visual_options(self) -> None:
-        show_ws, _highlight = self._text_visual_options()
+        self._apply_detail_whitespace_options()
+        for highlighter in (
+            self._detail_source_highlighter,
+            self._detail_translation_highlighter,
+        ):
+            if highlighter:
+                highlighter.rehighlight()
+        if self.table.viewport():
+            self.table.viewport().update()
+
+    def _apply_detail_whitespace_options(self) -> None:
+        show_ws, _highlight, optimize = self._text_visual_options_detail()
         for editor in (self._detail_source, self._detail_translation):
             if not editor:
                 continue
+            if optimize and editor.document().characterCount() >= MAX_VISUAL_CHARS:
+                apply_ws = False
+            else:
+                apply_ws = show_ws
             option = editor.document().defaultTextOption()
             flags = option.flags()
-            if show_ws:
+            if apply_ws:
                 flags |= (
                     QTextOption.ShowTabsAndSpaces
                     | QTextOption.ShowLineAndParagraphSeparators
@@ -3020,14 +3224,6 @@ class MainWindow(QMainWindow):
                 )
             option.setFlags(flags)
             editor.document().setDefaultTextOption(option)
-        for highlighter in (
-            self._detail_source_highlighter,
-            self._detail_translation_highlighter,
-        ):
-            if highlighter:
-                highlighter.rehighlight()
-        if self.table.viewport():
-            self.table.viewport().update()
 
     def _toggle_prompt_on_exit(self, checked: bool) -> None:
         self._prompt_write_on_exit = bool(checked)
@@ -3041,7 +3237,8 @@ class MainWindow(QMainWindow):
             geometry = ""
         prefs = {
             "prompt_write_on_exit": self._prompt_write_on_exit,
-            "wrap_text": self._wrap_text,
+            "wrap_text": self._wrap_text_user,
+            "large_text_optimizations": self._large_text_optimizations,
             "last_root": str(self._root),
             "last_locales": list(self._selected_locales),
             "window_geometry": geometry,
@@ -3073,10 +3270,10 @@ class MainWindow(QMainWindow):
         ):
             self._update_status_combo_from_selection()
             if self._wrap_text:
-                if self._is_large_file():
-                    self._schedule_row_resize()
-                else:
-                    self.table.resizeRowToContents(row)
+                self._clear_row_height_cache(
+                    range(top_left.row(), bottom_right.row() + 1)
+                )
+                self._schedule_row_resize()
             if (
                 self._detail_panel.isVisible()
                 and not self._detail_translation.hasFocus()
@@ -3235,19 +3432,37 @@ class MainWindow(QMainWindow):
         widget.setToolTip(f"{title}: {scope.title()}")
         widget.setVisible(True)
 
-    def _mark_proofread(self) -> None:
+    def _apply_status_to_selection(self, status: Status, label: str) -> None:
         if not (self._current_pf and self._current_model):
             return
-        idx = self.table.currentIndex()
-        if not idx.isValid():
+        rows = self._selected_rows()
+        if not rows:
             return
-        row = idx.row()
-        cmd = ChangeStatusCommand(
-            self._current_pf, row, Status.PROOFREAD, self._current_model
-        )
-        self._current_model.undo_stack.push(cmd)
-        self._write_cache_current()
+        if len(rows) == 1:
+            model_index = self._current_model.index(rows[0], 3)
+            self._current_model.setData(model_index, status, Qt.EditRole)
+            self._update_status_combo_from_selection()
+            return
+        if not any(self._current_model.status_for_row(row) != status for row in rows):
+            return
+        stack = self._current_model.undo_stack
+        stack.beginMacro(label)
+        try:
+            for row in rows:
+                model_index = self._current_model.index(row, 3)
+                self._current_model.setData(model_index, status, Qt.EditRole)
+        finally:
+            stack.endMacro()
         self._update_status_combo_from_selection()
+
+    def _mark_proofread(self) -> None:
+        self._apply_status_to_selection(Status.PROOFREAD, "Mark proofread")
+
+    def _mark_translated(self) -> None:
+        self._apply_status_to_selection(Status.TRANSLATED, "Mark translated")
+
+    def _mark_for_review(self) -> None:
+        self._apply_status_to_selection(Status.FOR_REVIEW, "Mark for review")
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self._merge_active:

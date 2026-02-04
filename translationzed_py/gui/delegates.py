@@ -3,9 +3,10 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import (
     QColor,
+    QStaticText,
     QSyntaxHighlighter,
     QTextCharFormat,
     QTextCursor,
@@ -140,17 +141,32 @@ class MultiLineEditDelegate(QStyledItemDelegate):
         editor.setGeometry(rect)
 
 
-_TAG_RE = re.compile(r"<[^>\r\n]+>")
+_TAG_RE = re.compile(r"<[A-Z][A-Z0-9_]*(?::[^>\r\n]+)?>")
+_BRACKET_TAG_RE = re.compile(r"\[[Ii][Mm][Gg]=[^\]\r\n]+\]")
+_PLACEHOLDER_RE = re.compile(r"%(?:\d+\$[A-Za-z]|\d+|[A-Za-z])")
 _ESCAPE_RE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|[nrt\"\\\\])")
 _WS_RE = re.compile(r"[ \t]{2,}")
+_WS_GLYPH_RE = re.compile(r"[ \t]")
+
+_MAX_RENDER_CHARS = 4000
+_MAX_RENDER_LINES = 12
+MAX_VISUAL_CHARS = 100_000
 
 _TAG_FORMAT = QTextCharFormat()
 _TAG_FORMAT.setForeground(QColor("#2a6f97"))
 _ESCAPE_FORMAT = QTextCharFormat()
 _ESCAPE_FORMAT.setForeground(QColor("#6a4c93"))
+_WS_GLYPH_FORMAT = QTextCharFormat()
+_ws_glyph_color = QColor("#2f2f2f")
+_ws_glyph_color.setAlpha(220)
+_WS_GLYPH_FORMAT.setForeground(_ws_glyph_color)
 _WS_FORMAT = QTextCharFormat()
-_WS_FORMAT.setForeground(QColor("#888888"))
-_WS_FORMAT.setBackground(QColor("#f0f0f0"))
+_ws_repeat_color = QColor("#4a4a4a")
+_ws_repeat_color.setAlpha(220)
+_WS_FORMAT.setForeground(_ws_repeat_color)
+_ws_repeat_bg = QColor("#f0f0f0")
+_ws_repeat_bg.setAlpha(140)
+_WS_FORMAT.setBackground(_ws_repeat_bg)
 
 
 def _apply_whitespace_option(doc: QTextDocument, enabled: bool) -> None:
@@ -168,14 +184,25 @@ def _apply_whitespace_option(doc: QTextDocument, enabled: bool) -> None:
     doc.setDefaultTextOption(option)
 
 
-def _apply_visual_formats(doc: QTextDocument, text: str, *, highlight: bool) -> None:
-    if not highlight or not text:
+def _apply_visual_formats(
+    doc: QTextDocument, text: str, *, highlight: bool, show_ws: bool
+) -> None:
+    if not text:
+        return
+    if show_ws:
+        cursor = QTextCursor(doc)
+        for match in _WS_GLYPH_RE.finditer(text):
+            cursor.setPosition(match.start())
+            cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
+            cursor.mergeCharFormat(_WS_GLYPH_FORMAT)
+    if not highlight:
         return
     cursor = QTextCursor(doc)
-    for match in _TAG_RE.finditer(text):
-        cursor.setPosition(match.start())
-        cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
-        cursor.mergeCharFormat(_TAG_FORMAT)
+    for regex in (_TAG_RE, _BRACKET_TAG_RE, _PLACEHOLDER_RE):
+        for match in regex.finditer(text):
+            cursor.setPosition(match.start())
+            cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
+            cursor.mergeCharFormat(_TAG_FORMAT)
     for match in _ESCAPE_RE.finditer(text):
         cursor.setPosition(match.start())
         cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
@@ -188,17 +215,28 @@ def _apply_visual_formats(doc: QTextDocument, text: str, *, highlight: bool) -> 
 
 class TextVisualHighlighter(QSyntaxHighlighter):
     def __init__(
-        self, doc: QTextDocument, options_provider: Callable[[], tuple[bool, bool]]
+        self,
+        doc: QTextDocument,
+        options_provider: Callable[[], tuple[bool, bool, bool]],
     ):
         super().__init__(doc)
         self._options_provider = options_provider
 
     def highlightBlock(self, text: str) -> None:  # noqa: N802
-        _show_ws, highlight = self._options_provider()
+        show_ws, highlight, optimize = self._options_provider()
+        if optimize and self.document().characterCount() >= MAX_VISUAL_CHARS:
+            show_ws = False
+            highlight = False
+        if show_ws:
+            for match in _WS_GLYPH_RE.finditer(text):
+                self.setFormat(
+                    match.start(), match.end() - match.start(), _WS_GLYPH_FORMAT
+                )
         if not highlight:
             return
-        for match in _TAG_RE.finditer(text):
-            self.setFormat(match.start(), match.end() - match.start(), _TAG_FORMAT)
+        for regex in (_TAG_RE, _BRACKET_TAG_RE, _PLACEHOLDER_RE):
+            for match in regex.finditer(text):
+                self.setFormat(match.start(), match.end() - match.start(), _TAG_FORMAT)
         for match in _ESCAPE_RE.finditer(text):
             self.setFormat(match.start(), match.end() - match.start(), _ESCAPE_FORMAT)
         for match in _WS_RE.finditer(text):
@@ -213,21 +251,39 @@ class VisualTextDelegate(MultiLineEditDelegate):
         parent=None,
         *,
         read_only: bool = False,
-        options_provider: Callable[[], tuple[bool, bool]] | None = None,
+        options_provider: Callable[[], tuple[bool, bool, bool]] | None = None,
     ) -> None:
         super().__init__(parent, read_only=read_only)
-        self._options_provider = options_provider or (lambda: (False, False))
+        self._options_provider = options_provider or (lambda: (False, False, False))
         self._doc = QTextDocument()
 
     def createEditor(self, parent, _option, _index):  # noqa: N802
         editor = super().createEditor(parent, _option, _index)
         if isinstance(editor, QPlainTextEdit):
-            show_ws, _highlight = self._options_provider()
+            show_ws, _highlight, _optimize = self._options_provider()
             _apply_whitespace_option(editor.document(), show_ws)
             editor._text_visual_highlighter = TextVisualHighlighter(  # type: ignore[attr-defined]
                 editor.document(), self._options_provider
             )
         return editor
+
+    def setEditorData(self, editor, index):  # noqa: N802
+        super().setEditorData(editor, index)
+        if not isinstance(editor, QPlainTextEdit):
+            return
+        show_ws, _highlight, optimize = self._options_provider()
+        text = str(index.data(Qt.EditRole) or "")
+        if optimize and len(text) >= MAX_VISUAL_CHARS:
+            show_ws = False
+        _apply_whitespace_option(editor.document(), show_ws)
+
+    def sizeHint(self, option, index):  # noqa: N802
+        text = index.data(Qt.DisplayRole)
+        if isinstance(text, str) and len(text) > _MAX_RENDER_CHARS:
+            line_height = option.fontMetrics.lineSpacing()
+            height = line_height * _MAX_RENDER_LINES + 8
+            return QSize(0, height)
+        return super().sizeHint(option, index)
 
     def paint(self, painter, option, index):  # noqa: N802
         opt = QStyleOptionViewItem(option)
@@ -237,10 +293,57 @@ class VisualTextDelegate(MultiLineEditDelegate):
         style = opt.widget.style() if opt.widget else QApplication.style()
         style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)
 
+        if len(text) > _MAX_RENDER_CHARS:
+            text_rect = opt.rect.adjusted(4, 0, -4, 0)
+            painter.save()
+            painter.setClipRect(text_rect)
+            if opt.state & QStyle.State_Selected:
+                painter.setPen(opt.palette.highlightedText().color())
+            else:
+                painter.setPen(opt.palette.text().color())
+            elided = opt.fontMetrics.elidedText(text, Qt.ElideRight, text_rect.width())
+            painter.drawText(
+                text_rect,
+                Qt.AlignLeft | Qt.AlignVCenter | Qt.TextSingleLine,
+                elided,
+            )
+            painter.restore()
+            return
+
+        show_ws, highlight, _optimize = self._options_provider()
+        if not highlight and not show_ws:
+            text_rect = opt.rect.adjusted(4, 0, -4, 0)
+            painter.save()
+            painter.setClipRect(text_rect)
+            painter.setFont(opt.font)
+            if opt.state & QStyle.State_Selected:
+                painter.setPen(opt.palette.highlightedText().color())
+            else:
+                painter.setPen(opt.palette.text().color())
+            static_text = QStaticText(text)
+            wrap = False
+            if opt.widget is not None and hasattr(opt.widget, "wordWrap"):
+                try:
+                    wrap = bool(opt.widget.wordWrap())
+                except Exception:
+                    wrap = False
+            option = QTextOption()
+            option.setWrapMode(
+                QTextOption.WrapMode.WordWrap if wrap else QTextOption.WrapMode.NoWrap
+            )
+            static_text.setTextOption(option)
+            static_text.setTextWidth(max(0, text_rect.width()))
+            painter.drawStaticText(text_rect.topLeft(), static_text)
+            painter.restore()
+            return
+
         doc = self._doc
         doc.setDefaultFont(opt.font)
         doc.setPlainText(text)
-        show_ws, highlight = self._options_provider()
+        show_ws, highlight, optimize = self._options_provider()
+        if optimize and len(text) >= MAX_VISUAL_CHARS:
+            show_ws = False
+            highlight = False
         _apply_whitespace_option(doc, show_ws)
         text_rect = opt.rect.adjusted(4, 0, -4, 0)
         doc.setTextWidth(max(0, text_rect.width()))
@@ -252,9 +355,10 @@ class VisualTextDelegate(MultiLineEditDelegate):
         else:
             base_format.setForeground(opt.palette.text())
         cursor.mergeCharFormat(base_format)
-        _apply_visual_formats(doc, text, highlight=highlight)
+        _apply_visual_formats(doc, text, highlight=highlight, show_ws=show_ws)
 
         painter.save()
+        painter.setClipRect(text_rect)
         painter.translate(text_rect.topLeft())
         doc.drawContents(painter)
         painter.restore()
