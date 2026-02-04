@@ -22,6 +22,9 @@ _BG_STATUS = {
     Status.FOR_REVIEW: QColor("#ffd8a8"),
 }
 _BG_MISSING = QColor("#ffcccc")
+_TOOLTIP_LIMIT = 800
+_TOOLTIP_LIMIT_LARGE = 200
+_TOOLTIP_LARGE_THRESHOLD = 5000
 
 
 class TranslationModel(QAbstractTableModel):
@@ -160,20 +163,30 @@ class TranslationModel(QAbstractTableModel):
 
         e = self._entries[index.row()]
 
+        def _tooltip_text(value: str | None) -> str:
+            text = "" if value is None else str(value)
+            if not text:
+                return ""
+            if len(text) > _TOOLTIP_LARGE_THRESHOLD:
+                text = text[:_TOOLTIP_LIMIT_LARGE] + "\n...(truncated)"
+            elif len(text) > _TOOLTIP_LIMIT:
+                text = text[:_TOOLTIP_LIMIT] + "\n...(truncated)"
+            return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
         if role == Qt.TextAlignmentRole and index.column() == 0:
             return Qt.AlignRight | Qt.AlignVCenter
         if role == Qt.ToolTipRole:
             match index.column():
                 case 0:
-                    return e.key
+                    return _tooltip_text(e.key)
                 case 1:
                     if self._source_by_row is not None and index.row() < len(
                         self._source_by_row
                     ):
-                        return self._source_by_row[index.row()]
-                    return self._source_values.get(e.key, "")
+                        return _tooltip_text(self._source_by_row[index.row()])
+                    return _tooltip_text(self._source_values.get(e.key, ""))
                 case 2:
-                    return e.value
+                    return _tooltip_text(e.value)
                 case 3:
                     return e.status.label()
 
