@@ -13,6 +13,7 @@ _EXTRAS_KEY = "__extras__"
 _DEFAULTS: dict[str, Any] = {
     "prompt_write_on_exit": True,
     "wrap_text": False,
+    "large_text_optimizations": True,
     "last_root": "",
     "last_locales": [],
     "window_geometry": "",
@@ -57,6 +58,12 @@ def _parse_env(path: Path) -> dict[str, Any]:
                     out["wrap_text"] = True
                 elif val in _BOOL_FALSE:
                     out["wrap_text"] = False
+            elif key == "LARGE_TEXT_OPTIMIZATIONS":
+                val = value.lower()
+                if val in _BOOL_TRUE:
+                    out["large_text_optimizations"] = True
+                elif val in _BOOL_FALSE:
+                    out["large_text_optimizations"] = False
             elif key == "LAST_ROOT":
                 out["last_root"] = value
             elif key == "LAST_LOCALES":
@@ -122,6 +129,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     known_keys = {
         "PROMPT_WRITE_ON_EXIT",
         "WRAP_TEXT",
+        "LARGE_TEXT_OPTIMIZATIONS",
         "LAST_ROOT",
         "LAST_LOCALES",
         "WINDOW_GEOMETRY",
@@ -132,6 +140,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     lines = [
         f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
         f"WRAP_TEXT={'true' if prefs.get('wrap_text', False) else 'false'}",
+        f"LARGE_TEXT_OPTIMIZATIONS={'true' if prefs.get('large_text_optimizations', True) else 'false'}",
     ]
     last_root = str(prefs.get("last_root", "")).strip()
     if last_root:

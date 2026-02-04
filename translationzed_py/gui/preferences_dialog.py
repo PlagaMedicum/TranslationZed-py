@@ -52,6 +52,7 @@ class PreferencesDialog(QDialog):
             "default_root": self._default_root_edit.text().strip(),
             "prompt_write_on_exit": self._prompt_exit_check.isChecked(),
             "wrap_text": self._wrap_text_check.isChecked(),
+            "large_text_optimizations": self._large_text_opt_check.isChecked(),
             "visual_highlight": self._visual_highlight_check.isChecked(),
             "visual_whitespace": self._visual_whitespace_check.isChecked(),
             "search_scope": self._search_scope_combo.currentData(),
@@ -106,6 +107,12 @@ class PreferencesDialog(QDialog):
 
         self._wrap_text_check = QCheckBox("Wrap long strings in table", self)
         self._wrap_text_check.setChecked(bool(self._prefs.get("wrap_text", False)))
+        self._large_text_opt_check = QCheckBox(
+            "Enable large-text performance optimizations", self
+        )
+        self._large_text_opt_check.setChecked(
+            bool(self._prefs.get("large_text_optimizations", True))
+        )
         self._visual_highlight_check = QCheckBox(
             "Highlight tags and escape sequences", self
         )
@@ -120,6 +127,7 @@ class PreferencesDialog(QDialog):
         )
 
         layout.addRow(self._wrap_text_check)
+        layout.addRow(self._large_text_opt_check)
         layout.addRow(self._visual_highlight_check)
         layout.addRow(self._visual_whitespace_check)
         return widget
