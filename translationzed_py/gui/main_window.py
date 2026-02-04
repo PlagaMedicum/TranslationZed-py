@@ -3165,9 +3165,7 @@ class MainWindow(QMainWindow):
                 self.act_wrap.setToolTip("Wrap long strings in table")
 
     def _update_large_file_mode(self) -> None:
-        active = (
-            self._is_large_file() if self._large_text_optimizations else False
-        )
+        active = self._is_large_file() if self._large_text_optimizations else False
         if active != self._large_file_mode:
             self._large_file_mode = active
             self._apply_wrap_mode()
