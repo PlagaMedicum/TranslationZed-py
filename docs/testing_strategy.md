@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-01-31_
+_Last updated: 2026-02-04_
 
 ---
 
@@ -51,6 +51,12 @@ _Last updated: 2026-01-31_
   - `KO/Recorded_Media_KO.txt` (`// Auto-generated file` header + missing opening quotes)
 - Measure time from app launch to first table render (target < 2s on cached project).
 - Run a regex search and confirm UI stays responsive (<100ms typical).
+
+### 2.6 Automated performance budgets (always reported)
+- `tests/test_perf_budgets.py` enforces timing budgets for large‑file open,
+  multi‑file search, and cache writes (env‑tunable).
+- pytest always prints a **Performance** summary in terminal output,
+  including `make verify`, to keep regressions visible.
 
 ---
 
@@ -104,32 +110,51 @@ They include:
 - Parser edge cases: escaped quotes, concat chains, block comments, `//` lines,
   stray quotes/markup, dotted keys, keys with symbols, raw/plain‑text files.
 - Encodings: parse CP1251 + UTF‑16 from prod‑like fixtures; golden round‑trip tests
-  for UTF‑8/CP1251/UTF‑16 with byte‑exact output.
-- Add a UTF‑16 **no‑BOM** fixture to validate heuristic decoding based on `language.txt`.
+  for UTF‑8/CP1251/UTF‑16 with byte‑exact output; UTF‑16 **no‑BOM** decoding covered.
 - Saver basics: span updates, concat preservation, escape encoding.
 - Saver structure preservation on edge cases (stray quotes/markup, `//` headers,
   trivia spacing, raw file replacement, and large‑file slices (Recorded_Media/News/Stash).
-- Cache: status cache read/write + last_opened header.
+- Cache: status cache read/write + last_opened header; u16→u64 migration; original snapshot fields.
 - Core search: plain + regex paths.
 - GUI smoke: open, table fill, search navigation, edit/save, undo/redo.
 - GUI save prompts: cache‑only vs write‑to‑original.
 - GUI save encoding: cp1251 + UTF‑16 write‑back via locale `language.txt`.
+- GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
 
-**Not covered yet (automation gaps):**
-- Full‑file diff invariants on large prod files (Recorded_Media/News/Stash cases).
-- Multi‑file replace‑all across scope with confirmation list (future).
-- Cache/original conflict detection + merge decisions (new requirement).
+**Not covered yet (automation gaps, by layer):**
+
+**Unit (core) gaps**
+- `LazyEntries`: value decoding, caching/prefetch window, hash index (16/64), raw‑file path.
+- `parse_lazy` / streaming path: entry values match eager parse; window prefetch boundaries.
+- `status_cache`: v5 `has_drafts` header flag, `read_has_drafts_from_path()`, and `touch_last_opened()`;
+  ensure status‑only caches set `has_drafts = false`.
+- `preferences`: load/save round‑trip incl. extras, `SEARCH_SCOPE`, `REPLACE_SCOPE`, and unknown keys.
+- `search`: invalid regex returns no matches; empty query returns no matches.
+- `atomic_io`: atomic replace semantics + directory fsync attempt; temp file cleanup on failure.
+
+**Integration gaps**
+- GUI warning flow for **malformed/missing `language.txt`**: locale is skipped and other locales open.
+- Orphan cache warning: dialog appears for selected locales; **purge** removes caches, **dismiss** keeps them.
+- Save is **blocked** while conflicts exist; conflict resolution unblocks save.
+- Replace‑all across File/Locale/Pool: confirmation list, cancel path, and per‑file counts.
+- Cache‑dirty dots driven by cache header `has_drafts` (startup + after edits).
+- Preferences persistence for UI state: tree width, column widths, view toggles, search/replace scopes.
+- Detail panel large‑string guard: truncated preview + focus‑load full text; no truncated commit.
+
+**System / functional / regression / smoke gaps**
+- End‑to‑end cache lifecycle: edit → cache write → reopen → conflict detect → resolve → save → cache cleared.
+- Large‑string UI regression: open News/Recorded_Media single‑string files; scroll + selection remain responsive.
+- Cross‑encoding regression: GUI edits + saves for cp1251/UTF‑16 + BOM‑less UTF‑16 with `language.txt`.
+- Makefile `verify` non‑destructive fixture cache rule (clean_cache whitelist) as a script‑level regression.
 
 **Planned test expansions:**
 - Golden save fixtures derived from real PZ files (small slices) that include
   tricky comments/spacing/concat chains and raw tables.
 - Locale‑driven encoding save tests (write via GUI/controller and compare bytes).
 - Regression test suite for previously reported parse/saver failures (screenshots).
-- Conflict tests:
-  - Detect cache vs original divergence for a file with cached drafts.
-  - Ensure write‑original is blocked until conflicts resolved.
-  - Merge dialog decisions persist chosen values back into cache.
+- GUI tests for large‑string guards (delegate elide + detail panel lazy load).
+- Orphan cache warning + purge flow integration tests.
 
 ---
 
