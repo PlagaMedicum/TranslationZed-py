@@ -70,7 +70,8 @@ From latest clarification:
 - **Parser/saver placement**: treated as infrastructure (behind interfaces),
   not core domain.
 - **Testing**: core-first coverage; golden‑file tests are required for UTF‑8,
-  cp1251, and UTF‑16.
+  cp1251, and UTF‑16. Perf budgets validate large-file open, multi-file search,
+  and cache write timing (env-tunable).
 - **Tree layout**: when multiple locales are selected, show **multiple roots**
   (one root per locale).
 - **EN hash cache**: single index file for all EN hashes (for now).
