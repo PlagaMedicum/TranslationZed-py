@@ -390,9 +390,10 @@ B1 [✓] **Validation highlights** (Step 28).
    - **Target**: visible cues for malformed or missing values without obscuring status colors.
    - **Implemented**: empty Key/Source/Translation cells render red; source checks respect row‑aligned source data.
 B2 [✓] **File tree toggle** (Step 21).
-B3 [ ] **Text visualization** (Step 19).
+B3 [✓] **Text visualization** (Step 19).
    - **Problem**: translators cannot see hidden whitespace/escapes; mistakes slip through.
    - **Target**: optional glyph overlays for spaces/newlines and tag/escape highlighting.
+   - **Implemented**: view toggles for whitespace glyphs and tag/escape highlighting across Source/Translation.
 
 Priority C — **Assistive tooling**
 C1 [ ] **Translation memory** + **LanguageTool** (Step 29).

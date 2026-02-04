@@ -119,9 +119,8 @@ From latest clarification:
   - Bare values after `=` (missing opening quote) are accepted to avoid hard parse failures.
   - Quote-heavy lines (e.g., `"intensity"` / `"egghead"` / `""zippees"`) are parsed as literal text.
   - Ellipsis near quotes (`..."`) is treated as text, not concat.
-- **Future text visualization**: add highlighting for escape sequences, tags, and repeated whitespace,
-  plus optional glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation
-  in both preview and edit.
+- **Text visualization**: highlights escape sequences/tags and can show whitespace glyphs
+  for spaces/newlines in Source/Translation (preview + edit).
 - **Future quality tooling**: LanguageTool server API integration for grammar/spell suggestions.
 - **Future translation memory**: allow importing user TMs and generating a project TM from edits;
   local TM suggestions take priority over LanguageTool API results; **project‑TM** outranks imported TM.
@@ -195,17 +194,13 @@ From latest clarification:
 - **Core parse/save/cache**: tolerant parser + lossless saver + per‑file cache; EN hash alerts;
   search logic separated in core.
 - **GUI baseline**: locale chooser, file tree, table editing with undo/redo, status updates,
-  search/replace (file‑scope), status bar, preferences, and string editor panel.
+  search/replace with scopes, status bar, preferences, and string editor panel.
 - **Tests & CI**: pytest + mypy + ruff run on Linux/Windows/macOS; golden files for UTF‑8/cp1251/UTF‑16.
 - **Packaging**: per‑OS PyInstaller builds, pruning scripts, draft release artifacts, about dialog +
   license disclosure; fallback version for bundled builds.
 
 **Known gaps (candidate v0.2 focus)**
-- **Scopes**: search/replace scopes exist in preferences, but behavior is file‑only; multi‑file
-  search navigation + replace across locale/pool not yet implemented.
-- **Visualization**: escape/tag/whitespace highlighting + glyph mode not implemented.
 - **TM/LanguageTool**: suggestion engine and TM import/project‑TM generation are future work.
-- **Layout toggles**: file tree hide/show toggle is planned but not implemented.
 - **Packaging size**: Linux/macOS bundles are still larger due to full Qt runtime.
 
 ---

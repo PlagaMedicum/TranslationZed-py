@@ -27,6 +27,7 @@ from PySide6.QtGui import (
     QGuiApplication,
     QIcon,
     QKeySequence,
+    QTextOption,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -106,7 +107,12 @@ from translationzed_py.core.status_cache import (
 from translationzed_py.core.status_cache import write as _write_status_cache
 
 from .commands import ChangeStatusCommand
-from .delegates import KeyDelegate, MultiLineEditDelegate, StatusDelegate
+from .delegates import (
+    KeyDelegate,
+    StatusDelegate,
+    TextVisualHighlighter,
+    VisualTextDelegate,
+)
 from .dialogs import (
     AboutDialog,
     ConflictChoiceDialog,
@@ -535,6 +541,14 @@ class MainWindow(QMainWindow):
         self._lazy_parse_min_bytes = 1_000_000
         self._lazy_row_prefetch_margin = 200
 
+        def _pref_bool(name: str, default: bool) -> bool:
+            raw = str(self._prefs_extras.get(name, "")).strip().lower()
+            if raw in {"1", "true", "yes", "on"}:
+                return True
+            if raw in {"0", "false", "no", "off"}:
+                return False
+            return default
+
         def _pref_int(name: str) -> int | None:
             raw = str(self._prefs_extras.get(name, "")).strip()
             if not raw:
@@ -560,6 +574,8 @@ class MainWindow(QMainWindow):
         self._source_translation_ratio = _pref_float("TABLE_SRC_RATIO") or 0.5
         self._table_layout_guard = False
         self._user_resized_columns = bool(_pref_float("TABLE_SRC_RATIO"))
+        self._visual_whitespace = _pref_bool("TEXT_SHOW_WHITESPACE", False)
+        self._visual_highlight = _pref_bool("TEXT_HIGHLIGHT", False)
 
         # ── menu bar ───────────────────────────────────────────────────────
         menubar = self.menuBar()
@@ -603,9 +619,17 @@ class MainWindow(QMainWindow):
         self.table.verticalScrollBar().valueChanged.connect(self._on_table_scrolled)
         self._key_delegate = KeyDelegate(self.table)
         self.table.setItemDelegateForColumn(0, self._key_delegate)
-        self._source_delegate = MultiLineEditDelegate(self.table, read_only=True)
+        self._source_delegate = VisualTextDelegate(
+            self.table,
+            read_only=True,
+            options_provider=self._text_visual_options,
+        )
         self.table.setItemDelegateForColumn(1, self._source_delegate)
-        self._value_delegate = MultiLineEditDelegate(self.table, read_only=False)
+        self._value_delegate = VisualTextDelegate(
+            self.table,
+            read_only=False,
+            options_provider=self._text_visual_options,
+        )
         self.table.setItemDelegateForColumn(2, self._value_delegate)
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
@@ -667,6 +691,9 @@ class MainWindow(QMainWindow):
         self._detail_source.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self._detail_source.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._detail_source.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self._detail_source_highlighter = TextVisualHighlighter(
+            self._detail_source.document(), self._text_visual_options
+        )
         line_height = self._detail_source.fontMetrics().lineSpacing()
         min_line_height = max(22, line_height + 6)
         self._detail_source.setMinimumHeight(min_line_height)
@@ -681,6 +708,9 @@ class MainWindow(QMainWindow):
         self._detail_translation.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._detail_translation.setSizePolicy(
             QSizePolicy.Preferred, QSizePolicy.Minimum
+        )
+        self._detail_translation_highlighter = TextVisualHighlighter(
+            self._detail_translation.document(), self._text_visual_options
         )
         self._detail_translation.setMinimumHeight(min_line_height)
         self._detail_translation.textChanged.connect(
@@ -773,12 +803,24 @@ class MainWindow(QMainWindow):
         act_wrap.setChecked(self._wrap_text)
         act_wrap.triggered.connect(self._toggle_wrap_text)
         self.addAction(act_wrap)
+        act_visual_highlight = QAction("&Highlight Tags/Escapes", self)
+        act_visual_highlight.setCheckable(True)
+        act_visual_highlight.setChecked(self._visual_highlight)
+        act_visual_highlight.triggered.connect(self._toggle_visual_highlight)
+        self.addAction(act_visual_highlight)
+        act_visual_whitespace = QAction("Show &Whitespace Glyphs", self)
+        act_visual_whitespace.setCheckable(True)
+        act_visual_whitespace.setChecked(self._visual_whitespace)
+        act_visual_whitespace.triggered.connect(self._toggle_visual_whitespace)
+        self.addAction(act_visual_whitespace)
         act_prompt = QAction("Prompt on E&xit", self)
         act_prompt.setCheckable(True)
         act_prompt.setChecked(self._prompt_write_on_exit)
         act_prompt.triggered.connect(self._toggle_prompt_on_exit)
         self.addAction(act_prompt)
         self.menu_view.addAction(act_wrap)
+        self.menu_view.addAction(act_visual_highlight)
+        self.menu_view.addAction(act_visual_whitespace)
         self.menu_view.addAction(act_prompt)
         act_about = QAction("&About", self)
         act_about.triggered.connect(self._show_about)
@@ -808,6 +850,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._search_scope_widget)
         self.statusBar().addPermanentWidget(self._replace_scope_widget)
         self._update_status_bar()
+        self._apply_text_visual_options()
         self._auto_open_last_file()
 
     def _build_scope_indicator(self, icon_name: str, tooltip: str):
@@ -3196,6 +3239,49 @@ class MainWindow(QMainWindow):
         self.table.setWordWrap(self._wrap_text)
         if self._wrap_text:
             self._schedule_row_resize()
+        self._persist_preferences()
+
+    def _text_visual_options(self) -> tuple[bool, bool]:
+        return self._visual_whitespace, self._visual_highlight
+
+    def _apply_text_visual_options(self) -> None:
+        show_ws, _highlight = self._text_visual_options()
+        for editor in (self._detail_source, self._detail_translation):
+            if not editor:
+                continue
+            option = editor.document().defaultTextOption()
+            flags = option.flags()
+            if show_ws:
+                flags |= (
+                    QTextOption.ShowTabsAndSpaces
+                    | QTextOption.ShowLineAndParagraphSeparators
+                )
+            else:
+                flags &= ~(
+                    QTextOption.ShowTabsAndSpaces
+                    | QTextOption.ShowLineAndParagraphSeparators
+                )
+            option.setFlags(flags)
+            editor.document().setDefaultTextOption(option)
+        for highlighter in (
+            self._detail_source_highlighter,
+            self._detail_translation_highlighter,
+        ):
+            if highlighter:
+                highlighter.rehighlight()
+        if self.table.viewport():
+            self.table.viewport().update()
+
+    def _toggle_visual_highlight(self, checked: bool) -> None:
+        self._visual_highlight = bool(checked)
+        self._prefs_extras["TEXT_HIGHLIGHT"] = "true" if checked else "false"
+        self._apply_text_visual_options()
+        self._persist_preferences()
+
+    def _toggle_visual_whitespace(self, checked: bool) -> None:
+        self._visual_whitespace = bool(checked)
+        self._prefs_extras["TEXT_SHOW_WHITESPACE"] = "true" if checked else "false"
+        self._apply_text_visual_options()
         self._persist_preferences()
 
     def _toggle_prompt_on_exit(self, checked: bool) -> None:

@@ -1,8 +1,25 @@
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
+
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QTextCursor, QTextDocument
-from PySide6.QtWidgets import QComboBox, QPlainTextEdit, QStyledItemDelegate
+from PySide6.QtGui import (
+    QColor,
+    QSyntaxHighlighter,
+    QTextCharFormat,
+    QTextCursor,
+    QTextDocument,
+    QTextOption,
+)
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QPlainTextEdit,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+)
 
 from translationzed_py.core.model import STATUS_ORDER, Status
 
@@ -121,3 +138,123 @@ class MultiLineEditDelegate(QStyledItemDelegate):
             height = min(max(desired, min_height), max_height)
             rect.setHeight(height)
         editor.setGeometry(rect)
+
+
+_TAG_RE = re.compile(r"<[^>\r\n]+>")
+_ESCAPE_RE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|[nrt\"\\\\])")
+_WS_RE = re.compile(r"[ \t]{2,}")
+
+_TAG_FORMAT = QTextCharFormat()
+_TAG_FORMAT.setForeground(QColor("#2a6f97"))
+_ESCAPE_FORMAT = QTextCharFormat()
+_ESCAPE_FORMAT.setForeground(QColor("#6a4c93"))
+_WS_FORMAT = QTextCharFormat()
+_WS_FORMAT.setForeground(QColor("#888888"))
+_WS_FORMAT.setBackground(QColor("#f0f0f0"))
+
+
+def _apply_whitespace_option(doc: QTextDocument, enabled: bool) -> None:
+    option = doc.defaultTextOption()
+    flags = option.flags()
+    if enabled:
+        flags |= (
+            QTextOption.ShowTabsAndSpaces | QTextOption.ShowLineAndParagraphSeparators
+        )
+    else:
+        flags &= ~(
+            QTextOption.ShowTabsAndSpaces | QTextOption.ShowLineAndParagraphSeparators
+        )
+    option.setFlags(flags)
+    doc.setDefaultTextOption(option)
+
+
+def _apply_visual_formats(doc: QTextDocument, text: str, *, highlight: bool) -> None:
+    if not highlight or not text:
+        return
+    cursor = QTextCursor(doc)
+    for match in _TAG_RE.finditer(text):
+        cursor.setPosition(match.start())
+        cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
+        cursor.mergeCharFormat(_TAG_FORMAT)
+    for match in _ESCAPE_RE.finditer(text):
+        cursor.setPosition(match.start())
+        cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
+        cursor.mergeCharFormat(_ESCAPE_FORMAT)
+    for match in _WS_RE.finditer(text):
+        cursor.setPosition(match.start())
+        cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
+        cursor.mergeCharFormat(_WS_FORMAT)
+
+
+class TextVisualHighlighter(QSyntaxHighlighter):
+    def __init__(
+        self, doc: QTextDocument, options_provider: Callable[[], tuple[bool, bool]]
+    ):
+        super().__init__(doc)
+        self._options_provider = options_provider
+
+    def highlightBlock(self, text: str) -> None:  # noqa: N802
+        _show_ws, highlight = self._options_provider()
+        if not highlight:
+            return
+        for match in _TAG_RE.finditer(text):
+            self.setFormat(match.start(), match.end() - match.start(), _TAG_FORMAT)
+        for match in _ESCAPE_RE.finditer(text):
+            self.setFormat(match.start(), match.end() - match.start(), _ESCAPE_FORMAT)
+        for match in _WS_RE.finditer(text):
+            self.setFormat(match.start(), match.end() - match.start(), _WS_FORMAT)
+
+
+class VisualTextDelegate(MultiLineEditDelegate):
+    """Delegate with optional glyphs and tag/escape highlighting."""
+
+    def __init__(
+        self,
+        parent=None,
+        *,
+        read_only: bool = False,
+        options_provider: Callable[[], tuple[bool, bool]] | None = None,
+    ) -> None:
+        super().__init__(parent, read_only=read_only)
+        self._options_provider = options_provider or (lambda: (False, False))
+        self._doc = QTextDocument()
+
+    def createEditor(self, parent, _option, _index):  # noqa: N802
+        editor = super().createEditor(parent, _option, _index)
+        if isinstance(editor, QPlainTextEdit):
+            show_ws, _highlight = self._options_provider()
+            _apply_whitespace_option(editor.document(), show_ws)
+            editor._text_visual_highlighter = TextVisualHighlighter(  # type: ignore[attr-defined]
+                editor.document(), self._options_provider
+            )
+        return editor
+
+    def paint(self, painter, option, index):  # noqa: N802
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        text = opt.text
+        opt.text = ""
+        style = opt.widget.style() if opt.widget else QApplication.style()
+        style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)
+
+        doc = self._doc
+        doc.setDefaultFont(opt.font)
+        doc.setPlainText(text)
+        show_ws, highlight = self._options_provider()
+        _apply_whitespace_option(doc, show_ws)
+        text_rect = opt.rect.adjusted(4, 0, -4, 0)
+        doc.setTextWidth(max(0, text_rect.width()))
+        cursor = QTextCursor(doc)
+        cursor.select(QTextCursor.Document)
+        base_format = QTextCharFormat()
+        if opt.state & QStyle.State_Selected:
+            base_format.setForeground(opt.palette.highlightedText())
+        else:
+            base_format.setForeground(opt.palette.text())
+        cursor.mergeCharFormat(base_format)
+        _apply_visual_formats(doc, text, highlight=highlight)
+
+        painter.save()
+        painter.translate(text_rect.topLeft())
+        doc.drawContents(painter)
+        painter.restore()
