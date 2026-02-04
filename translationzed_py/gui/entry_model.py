@@ -85,6 +85,21 @@ class TranslationModel(QAbstractTableModel):
                 out[e.key] = e.value
         return out
 
+    def changed_rows_with_source(self) -> list[tuple[str, str, str]]:
+        """Return (key, source, value) for edited rows."""
+        out: list[tuple[str, str, str]] = []
+        for row in self._baseline_by_row:
+            if 0 <= row < len(self._entries):
+                e = self._entries[row]
+                source_text = ""
+                if self._source_by_row is not None and row < len(self._source_by_row):
+                    source_text = self._source_by_row[row]
+                else:
+                    source_text = self._source_values.get(e.key, "")
+                value_text = "" if e.value is None else str(e.value)
+                out.append((e.key, source_text, value_text))
+        return out
+
     def changed_keys(self) -> set[str]:
         keys: set[str] = set()
         for row in self._baseline_by_row:

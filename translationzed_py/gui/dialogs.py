@@ -7,8 +7,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
     QLabel,
     QListWidget,
     QPlainTextEdit,
@@ -123,6 +125,65 @@ class SaveFilesDialog(QDialog):
 
     def choice(self) -> str:
         return self._choice
+
+
+class TmLanguageDialog(QDialog):
+    """Pick source/target locale pair for TM import/export."""
+
+    def __init__(
+        self,
+        languages: Iterable[str],
+        parent=None,
+        *,
+        default_source: str | None = None,
+        default_target: str | None = None,
+        title: str = "TM language pair",
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        langs = sorted({lang for lang in languages if lang})
+        if not langs:
+            langs = []
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Select source/target languages:"))
+
+        source_row = QHBoxLayout()
+        source_row.addWidget(QLabel("Source:"))
+        self._source_combo = QComboBox(self)
+        self._source_combo.setEditable(True)
+        self._source_combo.addItems(langs)
+        source_row.addWidget(self._source_combo)
+        layout.addLayout(source_row)
+
+        target_row = QHBoxLayout()
+        target_row.addWidget(QLabel("Target:"))
+        self._target_combo = QComboBox(self)
+        self._target_combo.setEditable(True)
+        self._target_combo.addItems(langs)
+        target_row.addWidget(self._target_combo)
+        layout.addLayout(target_row)
+
+        if default_source:
+            self._source_combo.setCurrentText(default_source)
+        if default_target:
+            self._target_combo.setCurrentText(default_target)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            Qt.Orientation.Horizontal,
+            self,
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def source_locale(self) -> str:
+        return self._source_combo.currentText().strip()
+
+    def target_locale(self) -> str:
+        return self._target_combo.currentText().strip()
 
 
 class ReplaceFilesDialog(QDialog):

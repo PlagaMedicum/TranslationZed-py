@@ -41,6 +41,8 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
@@ -108,6 +110,7 @@ from translationzed_py.core.status_cache import (
     touch_last_opened as _touch_last_opened,
 )
 from translationzed_py.core.status_cache import write as _write_status_cache
+from translationzed_py.core.tm_store import TMMatch, TMStore
 
 from .delegates import (
     MAX_VISUAL_CHARS,
@@ -122,6 +125,7 @@ from .dialogs import (
     LocaleChooserDialog,
     ReplaceFilesDialog,
     SaveFilesDialog,
+    TmLanguageDialog,
 )
 from .entry_model import TranslationModel
 from .fs_model import FsModel
@@ -260,6 +264,11 @@ class MainWindow(QMainWindow):
         self._files_by_locale: dict[str, list[Path]] = {}
         self._en_cache: dict[Path, ParsedFile] = {}
         self._child_windows: list[MainWindow] = []
+        self._tm_store: TMStore | None = None
+        self._tm_cache: OrderedDict[tuple[str, str, str], list[TMMatch]] = OrderedDict()
+        self._tm_cache_limit = 128
+        self._tm_pending: dict[str, dict[str, tuple[str, str, str]]] = {}
+        self._tm_source_locale = "EN"
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -325,6 +334,15 @@ class MainWindow(QMainWindow):
         self._migration_timer: QTimer | None = None
         self._migration_batch_size = 25
         self._migration_count = 0
+        self._init_tm_store()
+        self._tm_update_timer = QTimer(self)
+        self._tm_update_timer.setSingleShot(True)
+        self._tm_update_timer.setInterval(120)
+        self._tm_update_timer.timeout.connect(self._update_tm_suggestions)
+        self._tm_flush_timer = QTimer(self)
+        self._tm_flush_timer.setSingleShot(True)
+        self._tm_flush_timer.setInterval(750)
+        self._tm_flush_timer.timeout.connect(self._flush_tm_updates)
 
         self._main_splitter = QSplitter(Qt.Vertical, self)
         self._content_splitter = QSplitter(Qt.Horizontal, self)
@@ -344,7 +362,7 @@ class MainWindow(QMainWindow):
         self.tree_toggle.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowLeft)
         )
-        self.tree_toggle.setToolTip("Hide file tree")
+        self.tree_toggle.setToolTip("Hide side panel")
         self.tree_toggle.toggled.connect(self._toggle_tree_panel)
         self.toolbar.addWidget(self.tree_toggle)
         self.toolbar.addSeparator()
@@ -539,9 +557,43 @@ class MainWindow(QMainWindow):
         self.menu_general = menubar.addMenu("General")
         self.menu_edit = menubar.addMenu("Edit")
         self.menu_view = menubar.addMenu("View")
+        self.menu_tm = menubar.addMenu("TM")
         self.menu_help = menubar.addMenu("Help")
 
-        # ── left pane: project tree ──────────────────────────────────────────
+        # ── left pane: side panel (Files / TM / Search) ─────────────────────
+        self._left_panel = QWidget()
+        left_layout = QVBoxLayout(self._left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(4)
+
+        toggle_bar = QWidget(self._left_panel)
+        toggle_layout = QHBoxLayout(toggle_bar)
+        toggle_layout.setContentsMargins(6, 4, 6, 4)
+        toggle_layout.setSpacing(6)
+        self._left_group = QButtonGroup(self)
+        self._left_group.setExclusive(True)
+        self._left_files_btn = QToolButton(self)
+        self._left_files_btn.setText("Files")
+        self._left_files_btn.setCheckable(True)
+        self._left_tm_btn = QToolButton(self)
+        self._left_tm_btn.setText("TM")
+        self._left_tm_btn.setCheckable(True)
+        self._left_search_btn = QToolButton(self)
+        self._left_search_btn.setText("Search")
+        self._left_search_btn.setCheckable(True)
+        for btn, idx in (
+            (self._left_files_btn, 0),
+            (self._left_tm_btn, 1),
+            (self._left_search_btn, 2),
+        ):
+            btn.setAutoRaise(True)
+            self._left_group.addButton(btn, idx)
+            toggle_layout.addWidget(btn)
+        toggle_layout.addStretch(1)
+        self._left_group.buttonClicked.connect(self._on_left_panel_changed)
+
+        self._left_stack = QStackedWidget(self._left_panel)
+
         self.tree = QTreeView()
         self._init_locales(selected_locales)
         if not self._selected_locales:
@@ -568,7 +620,38 @@ class MainWindow(QMainWindow):
         self._mark_cached_dirty()
         self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
         self.tree.doubleClicked.connect(self._file_chosen)
-        self._content_splitter.addWidget(self.tree)
+        self._left_stack.addWidget(self.tree)
+
+        self._tm_panel = QWidget(self._left_panel)
+        tm_layout = QVBoxLayout(self._tm_panel)
+        tm_layout.setContentsMargins(6, 0, 6, 6)
+        tm_layout.setSpacing(6)
+        self._tm_status_label = QLabel("Select a row to see TM suggestions.")
+        self._tm_list = QListWidget(self._tm_panel)
+        self._tm_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._tm_list.itemSelectionChanged.connect(self._update_tm_apply_state)
+        self._tm_list.itemDoubleClicked.connect(self._apply_tm_selection)
+        self._tm_apply_btn = QPushButton("Apply", self._tm_panel)
+        self._tm_apply_btn.setEnabled(False)
+        self._tm_apply_btn.clicked.connect(self._apply_tm_selection)
+        tm_layout.addWidget(self._tm_status_label)
+        tm_layout.addWidget(self._tm_list)
+        tm_layout.addWidget(self._tm_apply_btn)
+        self._left_stack.addWidget(self._tm_panel)
+
+        self._search_panel = QWidget(self._left_panel)
+        search_layout = QVBoxLayout(self._search_panel)
+        search_layout.setContentsMargins(6, 0, 6, 6)
+        search_layout.setSpacing(6)
+        search_layout.addWidget(QLabel("Search results list not implemented yet."))
+        self._left_stack.addWidget(self._search_panel)
+
+        self._left_files_btn.setChecked(True)
+        self._left_stack.setCurrentIndex(0)
+
+        left_layout.addWidget(toggle_bar)
+        left_layout.addWidget(self._left_stack)
+        self._content_splitter.addWidget(self._left_panel)
 
         # ── status shortcuts ────────────────────────────────────────────────
         act_proof = QAction("&Mark Proofread", self)
@@ -717,6 +800,13 @@ class MainWindow(QMainWindow):
         self.menu_general.addAction(act_prefs)
         self.menu_general.addSeparator()
         self.menu_general.addAction(act_exit)
+
+        act_import_tmx = QAction("Import TMX…", self)
+        act_import_tmx.triggered.connect(self._import_tmx)
+        self.menu_tm.addAction(act_import_tmx)
+        act_export_tmx = QAction("Export TMX…", self)
+        act_export_tmx.triggered.connect(self._export_tmx)
+        self.menu_tm.addAction(act_export_tmx)
 
         act_copy = QAction("&Copy", self)
         act_copy.setShortcut(QKeySequence.StandardKey.Copy)
@@ -879,17 +969,17 @@ class MainWindow(QMainWindow):
             if sizes:
                 self._tree_last_width = max(60, sizes[0])
                 self._schedule_tree_width_persist()
-            self.tree.setVisible(False)
+            self._left_panel.setVisible(False)
             self.tree_toggle.setIcon(
                 self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowRight)
             )
-            self.tree_toggle.setToolTip("Show file tree")
+            self.tree_toggle.setToolTip("Show side panel")
             total = max(0, self._content_splitter.width())
             if total <= 0 and sizes:
                 total = sum(sizes)
             self._content_splitter.setSizes([0, max(100, total)])
         else:
-            self.tree.setVisible(True)
+            self._left_panel.setVisible(True)
             width = max(80, self._tree_last_width)
             sizes = self._content_splitter.sizes()
             total = max(0, self._content_splitter.width())
@@ -899,7 +989,7 @@ class MainWindow(QMainWindow):
             self.tree_toggle.setIcon(
                 self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowLeft)
             )
-            self.tree_toggle.setToolTip("Hide file tree")
+            self.tree_toggle.setToolTip("Hide side panel")
         if self.table.model():
             self._apply_table_layout()
 
@@ -1024,6 +1114,13 @@ class MainWindow(QMainWindow):
 
         self._selected_locales = [c for c in selected_locales if c in selectable]
         QTimer.singleShot(0, self._warn_orphan_caches)
+
+    def _init_tm_store(self) -> None:
+        try:
+            self._tm_store = TMStore(self._root)
+        except Exception as exc:
+            self._tm_store = None
+            QMessageBox.warning(self, "TM init failed", str(exc))
 
     def _locale_for_path(self, path: Path) -> str | None:
         try:
@@ -1188,6 +1285,95 @@ class MainWindow(QMainWindow):
             return
         win.show()
         self._child_windows.append(win)
+
+    def _import_tmx(self) -> None:
+        if not self._tm_store:
+            QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import TMX",
+            str(self._root),
+            "TMX files (*.tmx);;All files (*)",
+        )
+        if not path:
+            return
+        from translationzed_py.core.tmx_io import detect_tmx_languages
+
+        langs = detect_tmx_languages(Path(path))
+        default_target = None
+        if self._current_pf:
+            default_target = self._locale_for_path(self._current_pf.path)
+        dialog = TmLanguageDialog(
+            langs,
+            parent=self,
+            default_source=self._tm_source_locale,
+            default_target=default_target,
+            title="Import TMX",
+        )
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        source_locale = dialog.source_locale()
+        target_locale = dialog.target_locale()
+        if not source_locale or not target_locale:
+            QMessageBox.warning(self, "Invalid locales", "Source/target locales required.")
+            return
+        try:
+            count = self._tm_store.import_tmx(
+                Path(path), source_locale=source_locale, target_locale=target_locale
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "TMX import failed", str(exc))
+            return
+        self._tm_cache.clear()
+        QMessageBox.information(
+            self,
+            "TMX import complete",
+            f"Imported {count} translation unit(s).",
+        )
+
+    def _export_tmx(self) -> None:
+        if not self._tm_store:
+            QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export TMX",
+            str(self._root / "translation_memory.tmx"),
+            "TMX files (*.tmx);;All files (*)",
+        )
+        if not path:
+            return
+        languages = sorted(self._locales.keys())
+        default_target = None
+        if self._current_pf:
+            default_target = self._locale_for_path(self._current_pf.path)
+        dialog = TmLanguageDialog(
+            languages,
+            parent=self,
+            default_source=self._tm_source_locale,
+            default_target=default_target,
+            title="Export TMX",
+        )
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        source_locale = dialog.source_locale()
+        target_locale = dialog.target_locale()
+        if not source_locale or not target_locale:
+            QMessageBox.warning(self, "Invalid locales", "Source/target locales required.")
+            return
+        try:
+            count = self._tm_store.export_tmx(
+                Path(path), source_locale=source_locale, target_locale=target_locale
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "TMX export failed", str(exc))
+            return
+        QMessageBox.information(
+            self,
+            "TMX export complete",
+            f"Exported {count} translation unit(s).",
+        )
 
     def _open_preferences(self) -> None:
         prefs = {
@@ -1702,6 +1888,13 @@ class MainWindow(QMainWindow):
         )
         return width
 
+    def _on_left_panel_changed(self, button) -> None:
+        idx = self._left_group.id(button)
+        if idx >= 0:
+            self._left_stack.setCurrentIndex(idx)
+        if idx == 1:
+            self._schedule_tm_update()
+
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         if obj is self.table.viewport():
             if event.type() == QEvent.MouseMove:
@@ -2108,6 +2301,7 @@ class MainWindow(QMainWindow):
             return True
         if self._detail_panel.isVisible():
             self._commit_detail_translation()
+        changed_rows = self._current_model.changed_rows_with_source()
         try:
             original_values = self._current_model.baseline_values()
             _write_status_cache(
@@ -2125,7 +2319,53 @@ class MainWindow(QMainWindow):
             self.fs_model.set_dirty(self._current_pf.path, True)
         else:
             self.fs_model.set_dirty(self._current_pf.path, False)
+        if changed_rows:
+            self._queue_tm_updates(self._current_pf.path, changed_rows)
         return True
+
+    def _queue_tm_updates(
+        self, path: Path, rows: Iterable[tuple[str, str, str]]
+    ) -> None:
+        if not self._tm_store:
+            return
+        self._tm_cache.clear()
+        file_key = str(path)
+        bucket = self._tm_pending.setdefault(file_key, {})
+        for key, source_text, value_text in rows:
+            bucket[key] = (key, source_text, value_text)
+        if self._tm_flush_timer.isActive():
+            self._tm_flush_timer.stop()
+        self._tm_flush_timer.start()
+
+    def _flush_tm_updates(self, *, paths: Iterable[Path] | None = None) -> None:
+        if not self._tm_store or not self._tm_pending:
+            return
+        if paths is None:
+            pending_items = list(self._tm_pending.items())
+        else:
+            wanted = {str(path) for path in paths}
+            pending_items = [
+                (path_key, rows)
+                for path_key, rows in self._tm_pending.items()
+                if path_key in wanted
+            ]
+        for path_key, rows in pending_items:
+            if not rows:
+                continue
+            locale = self._locale_for_path(Path(path_key))
+            if not locale:
+                continue
+            try:
+                self._tm_store.upsert_project_entries(
+                    rows.values(),
+                    source_locale=self._tm_source_locale,
+                    target_locale=locale,
+                    file_path=path_key,
+                )
+            except Exception as exc:
+                QMessageBox.warning(self, "TM update failed", str(exc))
+                continue
+            self._tm_pending.pop(path_key, None)
 
     def _on_model_changed(self, *_args) -> None:
         if not (self._current_pf and self._current_model):
@@ -3355,6 +3595,99 @@ class MainWindow(QMainWindow):
         if self._detail_panel.isVisible():
             self._sync_detail_editors()
         self._update_status_bar()
+        self._schedule_tm_update()
+
+    def _schedule_tm_update(self) -> None:
+        if not self._tm_store:
+            return
+        if self._left_stack.currentIndex() != 1:
+            return
+        if self._tm_update_timer.isActive():
+            self._tm_update_timer.stop()
+        self._tm_update_timer.start()
+
+    def _update_tm_apply_state(self) -> None:
+        self._tm_apply_btn.setEnabled(bool(self._tm_list.selectedItems()))
+
+    def _apply_tm_selection(self) -> None:
+        if not (self._current_model and self._current_pf):
+            return
+        items = self._tm_list.selectedItems()
+        if not items:
+            return
+        match = items[0].data(Qt.UserRole)
+        if not isinstance(match, TMMatch):
+            return
+        current = self.table.currentIndex()
+        if not current.isValid():
+            return
+        value_index = self._current_model.index(current.row(), 2)
+        self._current_model.setData(value_index, match.target_text, Qt.EditRole)
+        status_index = self._current_model.index(current.row(), 3)
+        self._current_model.setData(status_index, Status.FOR_REVIEW, Qt.EditRole)
+        self._update_status_combo_from_selection()
+
+    def _update_tm_suggestions(self) -> None:
+        if not self._tm_store:
+            return
+        if not (self._current_model and self._current_pf):
+            self._tm_list.clear()
+            self._tm_status_label.setText("Select a row to see TM suggestions.")
+            self._tm_apply_btn.setEnabled(False)
+            return
+        if self._left_stack.currentIndex() != 1:
+            return
+        current = self.table.currentIndex()
+        if not current.isValid():
+            self._tm_list.clear()
+            self._tm_status_label.setText("Select a row to see TM suggestions.")
+            self._tm_apply_btn.setEnabled(False)
+            return
+        source_index = self._current_model.index(current.row(), 1)
+        source_text = str(source_index.data(Qt.EditRole) or "")
+        if not source_text.strip():
+            self._tm_list.clear()
+            self._tm_status_label.setText("No source text for TM lookup.")
+            self._tm_apply_btn.setEnabled(False)
+            return
+        locale = self._locale_for_path(self._current_pf.path)
+        if not locale:
+            return
+        self._flush_tm_updates(paths=[self._current_pf.path])
+        cache_key = (source_text, self._tm_source_locale, locale)
+        matches = self._tm_cache.get(cache_key)
+        if matches is None:
+            matches = self._tm_store.query(
+                source_text,
+                source_locale=self._tm_source_locale,
+                target_locale=locale,
+                limit=12,
+            )
+            self._tm_cache[cache_key] = matches
+            if len(self._tm_cache) > self._tm_cache_limit:
+                self._tm_cache.popitem(last=False)
+        self._tm_list.clear()
+        if not matches:
+            self._tm_status_label.setText("No TM matches found.")
+            self._tm_apply_btn.setEnabled(False)
+            return
+        self._tm_status_label.setText("TM suggestions")
+        for match in matches:
+            item = QListWidgetItem(self._format_tm_item(match))
+            item.setData(Qt.UserRole, match)
+            item.setToolTip(match.target_text)
+            self._tm_list.addItem(item)
+        self._tm_apply_btn.setEnabled(bool(self._tm_list.selectedItems()))
+
+    def _format_tm_item(self, match: TMMatch) -> str:
+        origin = "project" if match.origin == "project" else "import"
+        target_preview = self._truncate_text(match.target_text, 80)
+        return f"{match.score:>3}% · {origin}: {target_preview}"
+
+    def _truncate_text(self, text: str, limit: int) -> str:
+        if len(text) <= limit:
+            return text
+        return text[: max(0, limit - 1)] + "…"
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
@@ -3552,6 +3885,11 @@ class MainWindow(QMainWindow):
         if not self._write_cache_current():
             event.ignore()
             return
+        with contextlib.suppress(Exception):
+            self._flush_tm_updates()
+        if self._tm_store is not None:
+            with contextlib.suppress(Exception):
+                self._tm_store.close()
         if self._tree_width_timer.isActive():
             self._tree_width_timer.stop()
             self._prefs_extras["TREE_PANEL_WIDTH"] = str(max(60, self._tree_last_width))
