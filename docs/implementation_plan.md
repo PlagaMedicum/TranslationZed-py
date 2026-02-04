@@ -427,9 +427,15 @@ B3 [✓] **Text visualization** (Step 19).
    - **Implemented**: Preferences → View toggles for whitespace glyphs and tag/escape highlighting across Source/Translation.
 
 Priority C — **Assistive tooling**
-C1 [ ] **Translation memory** + **LanguageTool** (Step 29).
+C1 [→] **Translation memory** (Step 29).
    - **Problem**: repetitive phrases require manual recall; no suggestions.
-   - **Target**: local TM + optional LanguageTool API, async and non‑blocking.
+   - **Target**: local SQLite TM + TMX import/export, non‑blocking suggestions.
+   - **Scope now**:
+     - SQLite store under `.tzp-config/tm.sqlite` (project‑scoped).
+     - TMX import/export (external TMs) for a **source+target locale pair** only.
+     - TM suggestions panel (side‑panel switcher: Files / TM / Search).
+     - Ranking: exact match 100%, fuzzy down to ~30% (project TM outranks imported).
+   - **Deferred**: LanguageTool API (post‑v0.2).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.
    - **Target**: opt‑in QA panel with per‑check toggles; non‑blocking warnings by default.

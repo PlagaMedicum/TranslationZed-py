@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.3.12 · 2026‑02‑04**\
+**Version 0.3.13 · 2026‑02‑04**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -428,6 +428,27 @@ UNTOUCHED).
 
 ---
 
+### 5.9.2  `core.tm_store` + TMX I/O
+
+- Project‑scoped SQLite DB at `<root>/.tzp-config/tm.sqlite`.
+- Table `tm_entries` stores:
+  - `source_text`, `target_text`, `source_norm`, `source_prefix`, `source_len`
+  - `source_locale`, `target_locale`, `origin` (`project` or `import`)
+  - optional `file_path`, `key`, `updated_at`
+- Indices:
+  - `tm_project_key` unique on `(origin, source_locale, target_locale, file_path, key)` for project TM.
+  - `tm_import_unique` unique on `(origin, source_locale, target_locale, source_norm, target_text)` for imports.
+  - `tm_exact_lookup` + `tm_prefix_lookup` for matching.
+- Matching:
+  - Exact match returns score **100**.
+  - Fuzzy match uses `SequenceMatcher` on a bounded candidate set; keeps scores ≥30.
+  - Project TM outranks imported TM.
+- TMX import/export:
+  - `core.tmx_io.iter_tmx_pairs` streams `<tu>`/`<tuv>` pairs for a **source+target locale**.
+  - `core.tmx_io.write_tmx` exports current TM to TMX for a source+target locale pair.
+
+---
+
 ### 5.10 Conflict resolution (cache vs original)
 
 - Conflicts compare cached **original snapshots** to current file values (value-only compare).
@@ -526,11 +547,9 @@ v0.1 uses **cache‑only** recovery:
 4. Automatic update check (GitHub Releases).
 5. Simple editor for location `description.txt` files.
 6. LanguageTool server API integration for grammar/spell suggestions.
-7. Translation memory (TM): import user TMs, generate a project TM from edits; local TM
-   suggestions outrank LanguageTool API results; **project‑TM** outranks imported TM.
-8. Translation QA checks (post‑TM import/export): per‑check toggles for missing trailing
+7. Translation QA checks (post‑TM import/export): per‑check toggles for missing trailing
    characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
-9. Dark system theme support (follow OS theme; no custom theming).
+8. Dark system theme support (follow OS theme; no custom theming).
 
 ## 13  Undo / Redo
 

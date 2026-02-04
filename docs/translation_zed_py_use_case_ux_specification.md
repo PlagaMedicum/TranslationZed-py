@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.17 · 2026‑02‑04_
+_version 0.3.18 · 2026‑02‑04_
 
 ---
 ## 1  Actors
@@ -286,15 +286,16 @@ UNTOUCHED ──────────────────────▶ 
    ≥1,000,000 bytes (subject to tuning). User can disable in Preferences.
 9. **Tooltips**: plain text only (no highlighting/selection), delayed ~900ms, truncated for large
    values (800 chars normally, 200 chars when length ≥5,000); used for preview only.
-10. **Layout toggles**: file tree panel can be hidden/shown via a **left‑side toggle**; the
-   detail editor pane is toggled from the **bottom bar**.
+10. **Side panel (current)**: left‑side panel switches between **Files / TM / Search**
+   and can be hidden/shown via a **left‑side toggle**; the detail editor pane is
+   toggled from the **bottom bar**.
 11. **System theme**: future support for OS light/dark theme via native Qt styles (no custom theme).
 12. **Translation QA checks (future)**: add an opt‑in QA panel with per‑check toggles
    (missing trailing characters, missing/extra newlines, missing escapes/code blocks,
    translation equals Source). Implement **only after** TM import/export is complete.
 
 ---
-_Last updated: 2026‑02‑04 (v0.3.17)_
+_Last updated: 2026‑02‑04 (v0.3.18)_
 ### UC‑04c  Mark as Translated
 | **Trigger** | `Ctrl+T` or Status ▼ → **Translated** on selected rows. |
 | **Flow** |

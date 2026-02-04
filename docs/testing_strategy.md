@@ -121,6 +121,7 @@ They include:
 - GUI save encoding: cp1251 + UTF‑16 write‑back via locale `language.txt`.
 - GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
+- TM: SQLite store round‑trip, exact/fuzzy query, TMX import/export.
 
 **Not covered yet (automation gaps, by layer):**
 
@@ -132,6 +133,7 @@ They include:
 - `preferences`: load/save round‑trip incl. extras, `SEARCH_SCOPE`, `REPLACE_SCOPE`, and unknown keys.
 - `search`: invalid regex returns no matches; empty query returns no matches.
 - `atomic_io`: atomic replace semantics + directory fsync attempt; temp file cleanup on failure.
+- `tm_store`: SQLite schema, exact + fuzzy query ranking, TMX import/export paths.
 
 **Integration gaps**
 - GUI warning flow for **malformed/missing `language.txt`**: locale is skipped and other locales open.

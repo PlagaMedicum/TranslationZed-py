@@ -130,13 +130,15 @@ From latest clarification:
 - **Tooltips**: plain text only (no highlighting/selection), delayed (~900ms). Truncation caps:
   800 chars normally, 200 chars when value length ≥5,000; suffix “...(truncated)”.
 - **Future quality tooling**: LanguageTool server API integration for grammar/spell suggestions.
+- **Translation memory (current)**: project‑scoped SQLite TM (`.tzp-config/tm.sqlite`) populated
+  from edits; TMX import/export supported for a source+target locale pair. Ranking: exact 100%,
+  fuzzy down to ~30%; **project‑TM** outranks imported TM.
 - **Future translation QA** (post‑TM import/export): per‑check toggles for missing trailing
   characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
-- **Future translation memory**: allow importing user TMs and generating a project TM from edits;
-  local TM suggestions take priority over LanguageTool API results; **project‑TM** outranks imported TM.
 - **Future detail editors**: optional Poedit-style dual editor panes below the table (Source read-only,
   Translation editable), keeping the table visible above; toggle is placed at the **bottom**.
-- **File tree toggle (current)**: left-side toggle hides/shows the tree; last width persists.
+- **Side panel toggle (current)**: left-side toggle hides/shows the side panel (Files / TM / Search);
+  last width persists.
 - **Future theming**: support dark system theme (OS-driven; avoid custom themes).
 - **String editor panel (current)**: dual Source/Translation editors below the table are now present,
   toggled from the status bar icon (tooltip: “String editor”). Default is **open**; minimum height is
@@ -210,7 +212,7 @@ From latest clarification:
   license disclosure; fallback version for bundled builds.
 
 **Known gaps (candidate v0.2 focus)**
-- **TM/LanguageTool**: suggestion engine and TM import/project‑TM generation are future work.
+- **LanguageTool**: deferred; TM suggestion engine is now present, LanguageTool remains future work.
 - **Packaging size**: Linux/macOS bundles are still larger due to full Qt runtime.
 
 ---
