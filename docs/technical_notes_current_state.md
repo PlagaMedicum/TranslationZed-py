@@ -276,6 +276,7 @@ Current mitigations already present:
   (only when large‑text optimizations are ON).
 - Per‑cell render cap for huge strings; editors always load full text.
 - Tooltips are plain text, delayed ~900ms, truncated to 800/200 chars with “...(truncated)”.
+- Optional perf tracing for paint/resize (`TZP_PERF_TRACE=paint,row_resize`) to spot regressions.
 
 Performance opportunities (candidate v0.2 work):
 - **Search index**: build per‑file search indices lazily and reuse across queries when safe;

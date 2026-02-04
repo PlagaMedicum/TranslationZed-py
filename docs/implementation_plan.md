@@ -411,7 +411,7 @@ A7 [→] **UI latency stabilization (scroll + paint)**
      - [✓] Preference toggle for large‑text optimizations (default ON).
      - [✓] Fast paint path for non‑highlight rows (QStaticText/QTextLayout).
      - [✓] Large‑file mode auto‑disables wrap + table highlighting (≥5,000 rows or ≥1,000,000 bytes).
-     - [ ] Add lightweight perf tracing for paint/resize to spot regressions.
+     - [✓] Add lightweight perf tracing for paint/resize (`TZP_PERF_TRACE=paint,row_resize`).
    - **Acceptance**: large single‑string files (News/Recorded_Media) open and scroll without jank;
      no tooltip‑related freezes.
 
