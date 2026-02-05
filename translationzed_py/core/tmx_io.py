@@ -61,7 +61,7 @@ def write_tmx(
     *,
     source_locale: str,
     target_locale: str,
-    ) -> None:
+) -> None:
     source_locale = source_locale.strip()
     target_locale = target_locale.strip()
     with path.open("w", encoding="utf-8") as handle:

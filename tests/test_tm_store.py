@@ -15,9 +15,7 @@ def test_tm_store_exact_and_fuzzy(tmp_path: Path) -> None:
         target_locale="BE",
         file_path=str(file_path),
     )
-    exact = store.query(
-        "Hello world", source_locale="EN", target_locale="BE", limit=5
-    )
+    exact = store.query("Hello world", source_locale="EN", target_locale="BE", limit=5)
     assert exact
     assert exact[0].score == 100
     assert exact[0].target_text == "Privet mir"
@@ -27,6 +25,8 @@ def test_tm_store_exact_and_fuzzy(tmp_path: Path) -> None:
         source_locale="EN",
         target_locale="BE",
     )
-    fuzzy = store.query("Hello world!!", source_locale="EN", target_locale="BE", limit=5)
+    fuzzy = store.query(
+        "Hello world!!", source_locale="EN", target_locale="BE", limit=5
+    )
     assert any(match.score < 100 for match in fuzzy)
     store.close()

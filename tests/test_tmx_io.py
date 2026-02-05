@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from translationzed_py.core.tmx_io import detect_tmx_languages, iter_tmx_pairs, write_tmx
+from translationzed_py.core.tmx_io import (
+    detect_tmx_languages,
+    iter_tmx_pairs,
+    write_tmx,
+)
 
 
 def test_tmx_roundtrip(tmp_path: Path) -> None:

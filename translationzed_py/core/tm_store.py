@@ -76,11 +76,11 @@ class TMStore:
             )
             """
         )
+        self._conn.execute("DROP INDEX IF EXISTS tm_project_key")
         self._conn.execute(
             """
             CREATE UNIQUE INDEX IF NOT EXISTS tm_project_key
             ON tm_entries(origin, source_locale, target_locale, file_path, key)
-            WHERE origin = 'project'
             """
         )
         self._conn.execute(
@@ -228,9 +228,7 @@ class TMStore:
         self._conn.commit()
         return count
 
-    def import_tmx(
-        self, path: Path, *, source_locale: str, target_locale: str
-    ) -> int:
+    def import_tmx(self, path: Path, *, source_locale: str, target_locale: str) -> int:
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
         pairs = iter_tmx_pairs(path, source_locale, target_locale)
@@ -248,7 +246,11 @@ class TMStore:
     ) -> int:
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
-        origins = (_PROJECT_ORIGIN, _IMPORT_ORIGIN) if include_imported else (_PROJECT_ORIGIN,)
+        origins = (
+            (_PROJECT_ORIGIN, _IMPORT_ORIGIN)
+            if include_imported
+            else (_PROJECT_ORIGIN,)
+        )
         rows = self._conn.execute(
             """
             SELECT source_text, target_text
@@ -347,7 +349,14 @@ class TMStore:
             ORDER BY updated_at DESC
             LIMIT ?
             """,
-            (source_locale, target_locale, prefix, min_len, max_len, _MAX_FUZZY_CANDIDATES),
+            (
+                source_locale,
+                target_locale,
+                prefix,
+                min_len,
+                max_len,
+                _MAX_FUZZY_CANDIDATES,
+            ),
         ).fetchall()
         if not rows:
             rows = self._conn.execute(
