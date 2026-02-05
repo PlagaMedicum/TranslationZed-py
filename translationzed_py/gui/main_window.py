@@ -915,9 +915,7 @@ class MainWindow(QMainWindow):
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setWordWrap(self._wrap_text)
         self._default_row_height = max(20, self.table.fontMetrics().lineSpacing() + 8)
-        self.table.verticalHeader().setDefaultSectionSize(self._default_row_height)
-        # Uniform row heights avoid expensive sizeHint lookups when wrap is off.
-        self.table.setUniformRowHeights(not self._wrap_text)
+        self._apply_row_height_mode()
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.table.verticalScrollBar().valueChanged.connect(self._on_table_scrolled)
@@ -3904,11 +3902,7 @@ class MainWindow(QMainWindow):
         if self._wrap_text != effective:
             self._wrap_text = effective
             self.table.setWordWrap(self._wrap_text)
-            self.table.setUniformRowHeights(not self._wrap_text)
-            if not self._wrap_text:
-                self.table.verticalHeader().setDefaultSectionSize(
-                    self._default_row_height
-                )
+            self._apply_row_height_mode()
             self._clear_row_height_cache()
             if self._wrap_text:
                 self._schedule_row_resize()
@@ -3929,6 +3923,18 @@ class MainWindow(QMainWindow):
             self._large_file_mode = active
             self._apply_wrap_mode()
             self._apply_text_visual_options()
+
+    def _apply_row_height_mode(self) -> None:
+        header = self.table.verticalHeader()
+        header.setDefaultSectionSize(self._default_row_height)
+        if hasattr(self.table, "setUniformRowHeights"):
+            # Available on some Qt/PySide builds; avoid AttributeError on others.
+            self.table.setUniformRowHeights(not self._wrap_text)
+        if self._wrap_text:
+            header.setSectionResizeMode(QHeaderView.Interactive)
+        else:
+            # No-wrap uses fixed row height to avoid sizeHint churn.
+            header.setSectionResizeMode(QHeaderView.Fixed)
 
     def _text_visual_options_table(self) -> tuple[bool, bool, bool]:
         show_ws = self._visual_whitespace
