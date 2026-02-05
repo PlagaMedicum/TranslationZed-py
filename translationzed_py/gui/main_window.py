@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import html
 import os
 import re
 import sys
@@ -2373,8 +2374,7 @@ class MainWindow(QMainWindow):
         text = self.table.model().data(idx, Qt.ToolTipRole)
         if not text:
             return
-        # Force plain-text tooltip to avoid Qt interpreting game tags as HTML.
-        tooltip = Qt.convertFromPlainText(str(text))
+        tooltip = self._tooltip_html(str(text))
         QToolTip.showText(
             self._tooltip_pos,
             tooltip,
@@ -4246,7 +4246,7 @@ class MainWindow(QMainWindow):
         for match in filtered:
             item = QListWidgetItem(self._format_tm_item(match))
             item.setData(Qt.UserRole, match)
-            item.setToolTip(Qt.convertFromPlainText(match.target_text))
+            item.setToolTip(self._tooltip_html(match.target_text))
             self._tm_list.addItem(item)
         self._tm_apply_btn.setEnabled(bool(self._tm_list.selectedItems()))
 
@@ -4259,6 +4259,10 @@ class MainWindow(QMainWindow):
         if len(text) <= limit:
             return text
         return text[: max(0, limit - 1)] + "…"
+
+    def _tooltip_html(self, text: str) -> str:
+        escaped = html.escape(text)
+        return f"<span style=\"white-space: pre-wrap;\">{escaped}</span>"
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
