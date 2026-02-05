@@ -437,6 +437,8 @@ C1 [→] **Translation memory** (Step 29).
      - Ranking: exact match 100%, fuzzy down to ~30% (project TM outranks imported).
      - [✓] Non‑blocking TM suggestion lookup (background worker + stale result guard).
      - [✓] Test-safe TM UI teardown (no modal dialog deadlocks in pytest).
+     - [✓] Project‑TM rebuild/bootstrap for selected locales (menu action + auto‑bootstrap if empty, background worker).
+     - [✓] TM filters: minimum score and origin toggles (project/import), persisted in preferences.
    - **Deferred**: LanguageTool API (post‑v0.2).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.

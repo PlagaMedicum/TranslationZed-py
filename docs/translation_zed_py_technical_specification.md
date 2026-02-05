@@ -443,9 +443,14 @@ UNTOUCHED).
   - Exact match returns score **100**.
   - Fuzzy match uses `SequenceMatcher` on a bounded candidate set; keeps scores ≥30.
   - Project TM outranks imported TM.
+  - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.
 - TMX import/export:
   - `core.tmx_io.iter_tmx_pairs` streams `<tu>`/`<tuv>` pairs for a **source+target locale**.
   - `core.tmx_io.write_tmx` exports current TM to TMX for a source+target locale pair.
+ - Project TM rebuild:
+   - UI can rebuild project TM by scanning selected locales and pairing target entries with EN source.
+   - Auto‑bootstrap runs when a selected locale pair has no TM entries.
+   - Rebuild/bootstrapping runs asynchronously (background worker).
 
 ---
 

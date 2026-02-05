@@ -288,7 +288,8 @@ UNTOUCHED ──────────────────────▶ 
    values (800 chars normally, 200 chars when length ≥5,000); used for preview only.
 10. **Side panel (current)**: left‑side panel switches between **Files / TM / Search**
    and can be hidden/shown via a **left‑side toggle**; the detail editor pane is
-   toggled from the **bottom bar**.
+   toggled from the **bottom bar**. TM panel includes filters (min score + origin
+   toggles for project/import) and supports project‑TM rebuild from selected locales.
 11. **System theme**: future support for OS light/dark theme via native Qt styles (no custom theme).
 12. **Translation QA checks (future)**: add an opt‑in QA panel with per‑check toggles
    (missing trailing characters, missing/extra newlines, missing escapes/code blocks,

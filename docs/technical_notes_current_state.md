@@ -133,7 +133,10 @@ From latest clarification:
 - **Translation memory (current)**: project‑scoped SQLite TM (`.tzp-config/tm.sqlite`) populated
   from edits; TMX import/export supported for a source+target locale pair. Ranking: exact 100%,
   fuzzy down to ~30%; **project‑TM** outranks imported TM. Suggestions are fetched asynchronously
-  (background query + stale-request guard) to avoid UI stalls on row changes.
+  (background query + stale-request guard) to avoid UI stalls on row changes. TM panel includes
+  minimum‑score and origin filters (project/import), persisted in preferences. Project TM can be
+  rebuilt from selected locales (menu action) and auto‑bootstraps when a locale pair has no TM data;
+  rebuild runs on a background worker to keep the UI responsive.
 - **Future translation QA** (post‑TM import/export): per‑check toggles for missing trailing
   characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
 - **Future detail editors**: optional Poedit-style dual editor panes below the table (Source read-only,
