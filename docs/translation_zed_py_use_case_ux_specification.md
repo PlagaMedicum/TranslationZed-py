@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.18 · 2026‑02‑04_
+_version 0.3.19 · 2026‑02‑05_
 
 ---
 ## 1  Actors
@@ -101,10 +101,10 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  3 | Toolbar **Status ▼** label reflects the selected row status. |
 
 ### UC‑05  Search & Navigate
-| **Trigger** | Typing in search box (`Ctrl+F`). |
+| **Trigger** | Press **Enter** in search box (`Ctrl+F`) or use `F3` / `Shift+F3`. |
 | **Parameter** | Mode (Key / Source / Translation) and Regex toggle. |
 | **Flow** |
-|  1 | After 300 ms debounce, SYS searches within the active scope and selects the first match (no results list). |
+|  1 | SYS searches within the active scope and selects the first match (no results list). |
 |  2 | If the current file has no matches and the scope includes other files, SYS opens the next file with a match. |
 |  3 | `F3` / `Shift+F3` moves to next/prev match across files (opening files as needed), wrapping within scope. |
 
@@ -269,8 +269,10 @@ UNTOUCHED ──────────────────────▶ 
    - Wrap OFF: Source opens in read‑only multi‑line editor; Translation uses expanded
      multi‑line editor. Editor expands to remaining table width and height adapts to
      content (min ~2 lines, max to table bottom); mouse‑wheel scroll stays
-     inside editor. Editors always load **full text** (no truncation); truncation is
-     allowed only in table preview and tooltips.
+     inside editor. Editors load **full text** when editing; for extremely large values
+     (≥100k chars) the detail panel defers loading until the editor is focused to keep
+     the UI responsive (length checks avoid forcing lazy decode on selection). Truncation
+     is allowed only in table preview and tooltips.
      **String editor** below the table (Poedit‑style). Source is read‑only and Translation is editable;
      table remains visible above. Toggle is placed in the **bottom bar** and defaults to **open**.
    - Status palette: **For review** = orange, **Translated** = green, **Proofread** = light‑blue (higher priority than Translated).

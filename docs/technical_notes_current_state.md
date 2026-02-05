@@ -1,4 +1,4 @@
-# TranslationZed-Py: Technical Notes (2026-02-04)
+# TranslationZed-Py: Technical Notes (2026-02-05)
 
 Goal: capture *observed behavior*, *as-built architecture*, and *spec deltas* with
 minimal prose and maximal precision. These are diagnostic notes, not a roadmap.
@@ -124,9 +124,14 @@ From latest clarification:
   for spaces/newlines in Source/Translation (preview + edit); toggles live in Preferences → View.
   **Large‑text optimizations** (default ON) suppress highlight/whitespace glyphs for extremely
   large values (≥100k chars) to avoid stalls while preserving full‑text editing.
+- **Detail editor lazy load**: for **huge** values (≥100k chars), the detail editors show
+  placeholders on selection and load full text **only when focused**; length checks use
+  entry metadata to avoid forcing lazy decode during selection changes.
 - **Large‑file mode**: active only when large‑text optimizations are ON; if a file is large
   (≥5,000 rows or ≥1,000,000 bytes), table wrap and table highlight/whitespace glyphs auto‑disable
   to keep scrolling responsive. User wrap preference is preserved but forced off in the table.
+- **No‑wrap render path**: when wrapping is OFF, the table uses uniform row heights and a fast
+  elided‑text paint path to avoid expensive per‑row layout work.
 - **Tooltips**: plain text only (no highlighting/selection), delayed (~900ms). Truncation caps:
   800 chars normally, 200 chars when value length ≥5,000; suffix “...(truncated)”.
 - **Future quality tooling**: LanguageTool server API integration for grammar/spell suggestions.
@@ -265,8 +270,9 @@ Observed hotspots and their current shape (code references are indicative):
   instead of `QTextDocument`.
 - **Giant strings**: delegate caps per‑cell render cost; huge values render as a
   single elided line and painting is clipped to the cell rect.
-- **Detail editors**: when visible, they always load **full text** on selection
-  (no truncation); performance relies on table preview caps + paint throttling.
+- **Detail editors**: when visible, they load **full text** on selection **unless the
+  value is huge** (≥100k chars) and large‑text optimizations are ON; in that case
+  they defer loading until the editor is focused.
 
 **E) Replace‑all (scope > FILE)**
 - Replace‑all confirmation lists **affected files + per‑file counts** before applying.
@@ -274,7 +280,7 @@ Observed hotspots and their current shape (code references are indicative):
   regex checks row‑by‑row. This is correct but expensive for large scopes.
 
 Current mitigations already present:
-- Search is **manual** (Enter / prev / next only); keystrokes only schedule, not run.
+- Search is **manual** (Enter / prev / next only); typing does not trigger a run.
 - Search row cache is LRU‑bounded (default 64 files).
 - Cache stores **draft values only for changed keys**, limiting cache size.
 - `TranslationModel` tracks a **baseline map** only for edited rows.
@@ -284,7 +290,8 @@ Current mitigations already present:
 - Large‑file mode auto‑disables wrap + table highlighting/glyphs at ≥5,000 rows or ≥1,000,000 bytes
   (only when large‑text optimizations are ON).
 - Per‑cell render cap for huge strings; editors always load full text.
-- Tooltips are plain text, delayed ~900ms, truncated to 800/200 chars with “...(truncated)”.
+- Tooltips are plain text, delayed ~900ms, truncated to 800/200 chars with “...(truncated)”;
+  HTML-like tags are escaped to avoid Qt rich-text rendering.
 - Optional perf tracing for paint/resize (`TZP_PERF_TRACE=paint,row_resize`) to spot regressions.
 
 Performance opportunities (candidate v0.2 work):
@@ -486,12 +493,12 @@ Notes:
   only via the cache. If files contain legacy comment tags, they can diverge.
 - Multi-file search caches per-file row data (LRU) and skips loading Source/Translation
   data when the active search column does not require it. Locale/Pool searches run
-  on debounced input and on Prev/Next actions (no results list).
+  only on explicit Enter/Prev/Next actions (no results list).
 - Active-file search rows are generated directly from the model (no QModelIndex data()
   lookups). Cache hashing is skipped when no cache entries exist for a file.
 - Baselines are stored lazily for edited rows only (row->original value). Source text
   stays key-based to avoid duplicating full per-row lists.
-- Search runs on debounced input; Prev/Next advances to the next match in scope.
+- Search runs only on Enter/Prev/Next; Prev/Next advances to the next match in scope.
 
 Limits:
 - Parsed files are still held fully in memory (Entry list). True streaming/windowed

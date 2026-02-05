@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-04_
+_Last updated: 2026-02-05_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.1 is shipped; this plan now
@@ -144,7 +144,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Replace All respects File | Locale | Pool scopes with confirmation showing per-file counts
   - Multi-file search caches per-file rows (LRU) and skips unused columns for speed
   - Active-file search rows are generated from model data (no QModelIndex lookups)
-  - Search runs on debounced input; Enter forces an immediate run
+  - Search runs only on **Enter** / **Prev** / **Next**; typing updates UI only
   - Multi-file search is **on-demand** (Next/Prev only) and does not build a results list
   - Navigation wraps across files within the selected scope
   - Baseline values stored only for edited rows (lazy baseline capture)
@@ -407,13 +407,21 @@ A7 [→] **UI latency stabilization (scroll + paint)**
      - [✓] Cache row heights and recompute only on data change or column resize.
      - [✓] Throttle/merge row‑resize passes during scroll (run after scroll idle).
      - [✓] Skip highlight/whitespace glyphs for values ≥100k chars.
+     - [✓] Defer detail editor loads for huge strings (≥100k chars) until focus, with
+       length checks that avoid lazy decode on selection.
      - [✓] Disable/cap tooltips for huge values; delay tooltip display (~900ms, 800/200 caps).
      - [✓] Preference toggle for large‑text optimizations (default ON).
-     - [✓] Fast paint path for non‑highlight rows (QStaticText/QTextLayout).
+     - [✓] Fast paint path for non‑highlight rows (elide‑only when wrap is OFF).
+     - [✓] Uniform row heights when wrap is OFF (avoid per‑row sizeHint churn).
      - [✓] Large‑file mode auto‑disables wrap + table highlighting (≥5,000 rows or ≥1,000,000 bytes).
      - [✓] Add lightweight perf tracing for paint/resize (`TZP_PERF_TRACE=paint,row_resize`).
+     - [→] Debounce column/splitter resize to avoid redundant row‑height work.
+     - [→] Add perf tracing for selection/detail sync/layout (identify remaining hotspots).
+     - [→] Evaluate render‑cost heuristic (e.g., total chars) to auto‑enter large‑file mode
+       when row/size thresholds are not exceeded.
+     - [→] Reduce lazy prefetch window for very long rows to cut decode spikes on scroll.
    - **Acceptance**: large single‑string files (News/Recorded_Media) open and scroll without jank;
-     no tooltip‑related freezes.
+     column resize/side‑panel toggles are smooth; no tooltip‑related freezes.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
