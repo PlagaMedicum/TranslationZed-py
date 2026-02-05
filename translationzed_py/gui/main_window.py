@@ -209,6 +209,8 @@ def _patch_message_boxes_for_tests() -> None:
 
 _TM_REBUILD_BATCH = 1000
 _TMRebuildLocale = tuple[str, Path, str]
+# Avoid blocking UI by deferring detail-panel loads for huge strings.
+_DETAIL_LAZY_THRESHOLD = 100_000
 
 
 def _tm_en_path_for(root: Path, locale: str, path: Path) -> Path | None:
@@ -378,6 +380,19 @@ class _LazySourceRows:
             return [self._entries[i].value for i in range(start, stop, step)]
         return self._entries[idx].value
 
+    def length_at(self, idx: int) -> int:
+        entries = self._entries
+        if hasattr(entries, "meta_at"):
+            try:
+                meta = entries.meta_at(idx)
+                if meta.segments:
+                    return sum(meta.segments)
+            except Exception:
+                return 0
+            return 0
+        value = entries[idx].value
+        return len(value) if value else 0
+
 
 class MainWindow(QMainWindow):
     """Main window: left file-tree, right translation table."""
@@ -512,6 +527,8 @@ class MainWindow(QMainWindow):
         self._detail_min_height = 0
         self._detail_syncing = False
         self._detail_dirty = False
+        self._detail_pending_row: int | None = None
+        self._detail_pending_active = False
         self._large_file_mode = False
         self._current_file_size = 0
         self._merge_active = False
@@ -581,7 +598,7 @@ class MainWindow(QMainWindow):
         self.toolbar.addWidget(self.status_combo)
         self.toolbar.addSeparator()
         self.regex_check = QCheckBox("Regex", self)
-        self.regex_check.stateChanged.connect(self._schedule_search)
+        self.regex_check.stateChanged.connect(self._on_search_controls_changed)
         self.regex_help = QLabel(
             '<a href="https://docs.python.org/3/library/re.html">'
             '<span style="vertical-align:super; font-size:smaller;">?</span>'
@@ -604,7 +621,7 @@ class MainWindow(QMainWindow):
         self.search_edit.setPlaceholderText("Search")
         self.search_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.search_edit.setMinimumWidth(320)
-        self.search_edit.textChanged.connect(self._schedule_search)
+        self.search_edit.textChanged.connect(self._on_search_controls_changed)
         self.search_edit.returnPressed.connect(self._trigger_search)
         self.toolbar.addWidget(self.search_edit)
         self.search_prev_btn = QToolButton(self)
@@ -642,7 +659,7 @@ class MainWindow(QMainWindow):
         self.search_mode.addItem("Source", 1)
         self.search_mode.addItem("Trans", 2)
         self.search_mode.setCurrentIndex(2)
-        self.search_mode.currentIndexChanged.connect(self._on_search_mode_changed)
+        self.search_mode.currentIndexChanged.connect(self._on_search_controls_changed)
         self.toolbar.addWidget(self.search_mode)
 
         self.addToolBarBreak()
@@ -897,6 +914,10 @@ class MainWindow(QMainWindow):
         self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setWordWrap(self._wrap_text)
+        self._default_row_height = max(20, self.table.fontMetrics().lineSpacing() + 8)
+        self.table.verticalHeader().setDefaultSectionSize(self._default_row_height)
+        # Uniform row heights avoid expensive sizeHint lookups when wrap is off.
+        self.table.setUniformRowHeights(not self._wrap_text)
         self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.table.verticalScrollBar().valueChanged.connect(self._on_table_scrolled)
@@ -919,6 +940,7 @@ class MainWindow(QMainWindow):
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
         self.table.horizontalHeader().sectionResized.connect(self._on_header_resized)
+        QToolTip.setFont(self.table.font())
         self._right_stack = QStackedWidget(self)
         self._table_container = QWidget(self)
         table_layout = QVBoxLayout(self._table_container)
@@ -936,7 +958,11 @@ class MainWindow(QMainWindow):
         detail_layout.setSpacing(2)
         self._detail_source_label = QLabel("Source", self._detail_panel)
         detail_layout.addWidget(self._detail_source_label)
-        self._detail_source = _CommitPlainTextEdit(None, self._detail_panel)
+        self._detail_source = _CommitPlainTextEdit(
+            None,
+            self._detail_panel,
+            focus_cb=self._load_pending_detail_text,
+        )
         self._detail_source.setReadOnly(True)
         self._detail_source.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self._detail_source.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -954,6 +980,7 @@ class MainWindow(QMainWindow):
         self._detail_translation = _CommitPlainTextEdit(
             self._commit_detail_translation,
             self._detail_panel,
+            focus_cb=self._load_pending_detail_text,
         )
         self._detail_translation.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self._detail_translation.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -1228,6 +1255,8 @@ class MainWindow(QMainWindow):
     def _commit_detail_translation(self, index=None) -> None:
         if not self._detail_dirty or not self._current_model:
             return
+        if self._detail_pending_row is not None:
+            return
         if not self._detail_panel.isVisible():
             self._detail_dirty = False
             return
@@ -1245,10 +1274,61 @@ class MainWindow(QMainWindow):
             self._current_model.setData(model_index, new_text, Qt.EditRole)
         self._detail_dirty = False
 
+    def _load_pending_detail_text(self) -> None:
+        if self._detail_pending_row is None or not self._detail_pending_active:
+            return
+        if not self._detail_panel.isVisible():
+            return
+        if not self._current_model:
+            return
+        idx = self.table.currentIndex()
+        if not idx.isValid():
+            return
+        source_index = self._current_model.index(idx.row(), 1)
+        value_index = self._current_model.index(idx.row(), 2)
+        source_text = str(source_index.data(Qt.EditRole) or "")
+        value_text = str(value_index.data(Qt.EditRole) or "")
+        self._detail_syncing = True
+        try:
+            self._detail_translation.setReadOnly(False)
+            self._detail_translation.setPlaceholderText("")
+            self._detail_source.setPlaceholderText("")
+            self._detail_source.setPlainText(source_text)
+            self._detail_translation.setPlainText(value_text)
+        finally:
+            self._detail_syncing = False
+        self._detail_dirty = False
+        self._detail_pending_row = None
+        self._detail_pending_active = False
+        self._apply_detail_whitespace_options()
+
+    def _set_detail_pending(self, row: int) -> None:
+        self._detail_pending_row = row
+        self._detail_pending_active = True
+        self._detail_syncing = True
+        try:
+            # Avoid loading huge strings on selection; only load when editor is focused.
+            self._detail_translation.setReadOnly(True)
+            self._detail_source.setPlaceholderText(
+                "Large text. Click to load full source."
+            )
+            self._detail_translation.setPlaceholderText(
+                "Large text. Click to load full translation."
+            )
+            self._detail_source.setPlainText("")
+            self._detail_translation.setPlainText("")
+        finally:
+            self._detail_syncing = False
+        self._detail_dirty = False
+        if self._detail_source.hasFocus() or self._detail_translation.hasFocus():
+            self._load_pending_detail_text()
+
     def _sync_detail_editors(self) -> None:
         if not self._detail_panel.isVisible():
             return
         if not self._current_model:
+            self._detail_pending_row = None
+            self._detail_pending_active = False
             self._detail_syncing = True
             try:
                 self._detail_source.setPlainText("")
@@ -1259,6 +1339,8 @@ class MainWindow(QMainWindow):
             return
         idx = self.table.currentIndex()
         if not idx.isValid():
+            self._detail_pending_row = None
+            self._detail_pending_active = False
             self._detail_syncing = True
             try:
                 self._detail_source.setPlainText("")
@@ -1267,10 +1349,20 @@ class MainWindow(QMainWindow):
                 self._detail_syncing = False
             self._detail_dirty = False
             return
+        # Length check avoids forcing lazy decode for huge strings on selection.
+        source_len, value_len = self._current_model.text_lengths(idx.row())
+        if (
+            self._large_text_optimizations
+            and max(source_len, value_len) >= _DETAIL_LAZY_THRESHOLD
+        ):
+            self._set_detail_pending(idx.row())
+            return
         source_index = self._current_model.index(idx.row(), 1)
         value_index = self._current_model.index(idx.row(), 2)
         source_text = str(source_index.data(Qt.EditRole) or "")
         value_text = str(value_index.data(Qt.EditRole) or "")
+        self._detail_pending_row = None
+        self._detail_pending_active = False
         self._detail_syncing = True
         try:
             self._detail_translation.setReadOnly(False)
@@ -2283,9 +2375,11 @@ class MainWindow(QMainWindow):
         text = self.table.model().data(idx, Qt.ToolTipRole)
         if not text:
             return
+        # Force plain-text tooltip to avoid Qt interpreting game tags as HTML.
+        tooltip = Qt.convertFromPlainText(str(text))
         QToolTip.showText(
             self._tooltip_pos,
-            str(text),
+            tooltip,
             self.table,
             self.table.visualRect(idx),
         )
@@ -2297,16 +2391,16 @@ class MainWindow(QMainWindow):
             self._key_column_width = max(60, _new)
             self._prefs_extras["TABLE_KEY_WIDTH"] = str(self._key_column_width)
             self._apply_table_layout()
-            self._clear_row_height_cache()
             if self._wrap_text:
+                self._clear_row_height_cache()
                 self._schedule_row_resize()
             return
         if logical_index == 3:
             self._status_column_width = max(60, _new)
             self._prefs_extras["TABLE_STATUS_WIDTH"] = str(self._status_column_width)
             self._apply_table_layout()
-            self._clear_row_height_cache()
             if self._wrap_text:
+                self._clear_row_height_cache()
                 self._schedule_row_resize()
             return
         if logical_index not in (1, 2):
@@ -2338,8 +2432,8 @@ class MainWindow(QMainWindow):
             self._prefs_extras["TABLE_SRC_RATIO"] = (
                 f"{self._source_translation_ratio:.6f}"
             )
-        self._clear_row_height_cache()
         if self._wrap_text:
+            self._clear_row_height_cache()
             self._schedule_row_resize()
 
     def _save_current(self) -> bool:
@@ -2736,18 +2830,15 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(QUrl("https://docs.python.org/3/library/re.html"))
 
     def _schedule_search(self, *_args) -> None:
+        self._on_search_controls_changed()
+
+    def _on_search_controls_changed(self, *_args) -> None:
+        # Search runs only on explicit Enter/Next/Prev, not on typing.
         self._update_replace_enabled()
+        self._search_progress_text = ""
         self._update_status_bar()
         if self._search_timer.isActive():
             self._search_timer.stop()
-        if self.search_edit.text().strip():
-            self._search_timer.start()
-        else:
-            self._search_progress_text = ""
-            self._update_status_bar()
-
-    def _on_search_mode_changed(self, *_args) -> None:
-        self._schedule_search()
 
     def _toggle_replace(self, checked: bool) -> None:
         self._replace_visible = bool(checked)
@@ -3813,6 +3904,11 @@ class MainWindow(QMainWindow):
         if self._wrap_text != effective:
             self._wrap_text = effective
             self.table.setWordWrap(self._wrap_text)
+            self.table.setUniformRowHeights(not self._wrap_text)
+            if not self._wrap_text:
+                self.table.verticalHeader().setDefaultSectionSize(
+                    self._default_row_height
+                )
             self._clear_row_height_cache()
             if self._wrap_text:
                 self._schedule_row_resize()
@@ -4144,7 +4240,7 @@ class MainWindow(QMainWindow):
         for match in filtered:
             item = QListWidgetItem(self._format_tm_item(match))
             item.setData(Qt.UserRole, match)
-            item.setToolTip(match.target_text)
+            item.setToolTip(Qt.convertFromPlainText(match.target_text))
             self._tm_list.addItem(item)
         self._tm_apply_btn.setEnabled(bool(self._tm_list.selectedItems()))
 

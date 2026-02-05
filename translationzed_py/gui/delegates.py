@@ -318,6 +318,12 @@ class VisualTextDelegate(MultiLineEditDelegate):
                 return
 
             show_ws, highlight, _optimize = self._options_provider()
+            wrap = False
+            if opt.widget is not None and hasattr(opt.widget, "wordWrap"):
+                try:
+                    wrap = bool(opt.widget.wordWrap())
+                except Exception:
+                    wrap = False
             if not highlight and not show_ws:
                 text_rect = opt.rect.adjusted(4, 0, -4, 0)
                 painter.save()
@@ -327,22 +333,23 @@ class VisualTextDelegate(MultiLineEditDelegate):
                     painter.setPen(opt.palette.highlightedText().color())
                 else:
                     painter.setPen(opt.palette.text().color())
-                static_text = QStaticText(text)
-                wrap = False
-                if opt.widget is not None and hasattr(opt.widget, "wordWrap"):
-                    try:
-                        wrap = bool(opt.widget.wordWrap())
-                    except Exception:
-                        wrap = False
-                option = QTextOption()
-                option.setWrapMode(
-                    QTextOption.WrapMode.WordWrap
-                    if wrap
-                    else QTextOption.WrapMode.NoWrap
-                )
-                static_text.setTextOption(option)
-                static_text.setTextWidth(max(0, text_rect.width()))
-                painter.drawStaticText(text_rect.topLeft(), static_text)
+                if not wrap:
+                    # No-wrap rows: avoid QTextDocument layout; draw a single elided line.
+                    elided = opt.fontMetrics.elidedText(
+                        text, Qt.ElideRight, text_rect.width()
+                    )
+                    painter.drawText(
+                        text_rect,
+                        Qt.AlignLeft | Qt.AlignVCenter | Qt.TextSingleLine,
+                        elided,
+                    )
+                else:
+                    static_text = QStaticText(text)
+                    text_option = QTextOption()
+                    text_option.setWrapMode(QTextOption.WrapMode.WordWrap)
+                    static_text.setTextOption(text_option)
+                    static_text.setTextWidth(max(0, text_rect.width()))
+                    painter.drawStaticText(text_rect.topLeft(), static_text)
                 painter.restore()
                 return
 

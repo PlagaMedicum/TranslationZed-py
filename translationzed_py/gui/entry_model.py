@@ -107,6 +107,39 @@ class TranslationModel(QAbstractTableModel):
                 keys.add(self._entries[row].key)
         return keys
 
+    def text_lengths(self, row: int) -> tuple[int, int]:
+        """Return (source_len, value_len) without forcing lazy decode when possible."""
+        if not (0 <= row < len(self._entries)):
+            return 0, 0
+        source_len = 0
+        if self._source_by_row is not None and row < len(self._source_by_row):
+            source_row = self._source_by_row
+            if hasattr(source_row, "length_at"):
+                try:
+                    source_len = int(source_row.length_at(row))
+                except Exception:
+                    source_len = 0
+            else:
+                source_text = source_row[row]
+                source_len = len(source_text) if source_text else 0
+        else:
+            source_text = self._source_values.get(self._entries[row].key, "")
+            source_len = len(source_text) if source_text else 0
+
+        value_len = 0
+        entries = self._entries
+        if hasattr(entries, "meta_at"):
+            try:
+                meta = entries.meta_at(row)
+                if meta.segments:
+                    value_len = sum(meta.segments)
+            except Exception:
+                value_len = 0
+        else:
+            value_text = self._entries[row].value
+            value_len = len(value_text) if value_text else 0
+        return source_len, value_len
+
     def baseline_values(self) -> dict[str, str]:
         """Return original values for rows that currently track edits."""
         out: dict[str, str] = {}
@@ -186,7 +219,7 @@ class TranslationModel(QAbstractTableModel):
                 text = text[:_TOOLTIP_LIMIT_LARGE] + "\n...(truncated)"
             elif len(text) > _TOOLTIP_LIMIT:
                 text = text[:_TOOLTIP_LIMIT] + "\n...(truncated)"
-            return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            return text
 
         if role == Qt.TextAlignmentRole and index.column() == 0:
             return Qt.AlignRight | Qt.AlignVCenter
