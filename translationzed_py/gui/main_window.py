@@ -8,6 +8,7 @@ import time
 import traceback
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 import xxhash
@@ -322,6 +323,9 @@ class MainWindow(QMainWindow):
         self._tm_cache_limit = 128
         self._tm_pending: dict[str, dict[str, tuple[str, str, str]]] = {}
         self._tm_source_locale = "EN"
+        self._tm_query_pool: ThreadPoolExecutor | None = None
+        self._tm_query_future: Future[list[TMMatch]] | None = None
+        self._tm_query_key: tuple[str, str, str] | None = None
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -390,6 +394,8 @@ class MainWindow(QMainWindow):
         self._migration_batch_size = 25
         self._migration_count = 0
         self._init_tm_store()
+        if self._tm_store is not None:
+            self._tm_query_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tzp-tm")
         self._tm_update_timer = QTimer(self)
         self._tm_update_timer.setSingleShot(True)
         self._tm_update_timer.setInterval(120)
@@ -398,6 +404,10 @@ class MainWindow(QMainWindow):
         self._tm_flush_timer.setSingleShot(True)
         self._tm_flush_timer.setInterval(750)
         self._tm_flush_timer.timeout.connect(self._flush_tm_updates)
+        self._tm_query_timer = QTimer(self)
+        self._tm_query_timer.setSingleShot(False)
+        self._tm_query_timer.setInterval(50)
+        self._tm_query_timer.timeout.connect(self._poll_tm_query)
 
         self._main_splitter = QSplitter(Qt.Vertical, self)
         self._content_splitter = QSplitter(Qt.Horizontal, self)
@@ -3665,6 +3675,21 @@ class MainWindow(QMainWindow):
     def _update_tm_apply_state(self) -> None:
         self._tm_apply_btn.setEnabled(bool(self._tm_list.selectedItems()))
 
+    def _current_tm_lookup(self) -> tuple[str, str] | None:
+        if not (self._current_model and self._current_pf):
+            return None
+        current = self.table.currentIndex()
+        if not current.isValid():
+            return None
+        source_index = self._current_model.index(current.row(), 1)
+        source_text = str(source_index.data(Qt.EditRole) or "")
+        if not source_text.strip():
+            return None
+        locale = self._locale_for_path(self._current_pf.path)
+        if not locale:
+            return None
+        return source_text, locale
+
     def _apply_tm_selection(self) -> None:
         if not (self._current_model and self._current_pf):
             return
@@ -3686,42 +3711,79 @@ class MainWindow(QMainWindow):
     def _update_tm_suggestions(self) -> None:
         if not self._tm_store:
             return
-        if not (self._current_model and self._current_pf):
-            self._tm_list.clear()
-            self._tm_status_label.setText("Select a row to see TM suggestions.")
-            self._tm_apply_btn.setEnabled(False)
-            return
         if self._left_stack.currentIndex() != 1:
             return
-        current = self.table.currentIndex()
-        if not current.isValid():
+        lookup = self._current_tm_lookup()
+        if lookup is None:
             self._tm_list.clear()
             self._tm_status_label.setText("Select a row to see TM suggestions.")
             self._tm_apply_btn.setEnabled(False)
             return
-        source_index = self._current_model.index(current.row(), 1)
-        source_text = str(source_index.data(Qt.EditRole) or "")
-        if not source_text.strip():
-            self._tm_list.clear()
-            self._tm_status_label.setText("No source text for TM lookup.")
-            self._tm_apply_btn.setEnabled(False)
-            return
-        locale = self._locale_for_path(self._current_pf.path)
-        if not locale:
-            return
+        source_text, locale = lookup
         self._flush_tm_updates(paths=[self._current_pf.path])
         cache_key = (source_text, self._tm_source_locale, locale)
         matches = self._tm_cache.get(cache_key)
-        if matches is None:
-            matches = self._tm_store.query(
-                source_text,
-                source_locale=self._tm_source_locale,
-                target_locale=locale,
-                limit=12,
-            )
-            self._tm_cache[cache_key] = matches
-            if len(self._tm_cache) > self._tm_cache_limit:
-                self._tm_cache.popitem(last=False)
+        if matches is not None:
+            self._show_tm_matches(matches)
+            return
+        self._tm_status_label.setText("Searching TM...")
+        self._tm_list.clear()
+        self._tm_apply_btn.setEnabled(False)
+        self._start_tm_query(cache_key)
+
+    def _start_tm_query(self, cache_key: tuple[str, str, str]) -> None:
+        if not self._tm_store or self._tm_query_pool is None:
+            return
+        if (
+            self._tm_query_key == cache_key
+            and self._tm_query_future is not None
+            and not self._tm_query_future.done()
+        ):
+            return
+        self._tm_query_key = cache_key
+        source_text, source_locale, target_locale = cache_key
+        self._tm_query_future = self._tm_query_pool.submit(
+            TMStore.query_path,
+            self._tm_store.db_path,
+            source_text,
+            source_locale=source_locale,
+            target_locale=target_locale,
+            limit=12,
+        )
+        if not self._tm_query_timer.isActive():
+            self._tm_query_timer.start()
+
+    def _poll_tm_query(self) -> None:
+        future = self._tm_query_future
+        cache_key = self._tm_query_key
+        if future is None:
+            self._tm_query_timer.stop()
+            return
+        if not future.done():
+            return
+        self._tm_query_timer.stop()
+        self._tm_query_future = None
+        self._tm_query_key = None
+        if cache_key is None:
+            return
+        try:
+            matches = future.result()
+        except Exception:
+            self._tm_status_label.setText("TM lookup failed.")
+            self._tm_apply_btn.setEnabled(False)
+            return
+        self._tm_cache[cache_key] = matches
+        if len(self._tm_cache) > self._tm_cache_limit:
+            self._tm_cache.popitem(last=False)
+        lookup = self._current_tm_lookup()
+        if lookup is None:
+            return
+        current_key = (lookup[0], self._tm_source_locale, lookup[1])
+        if current_key != cache_key:
+            return
+        self._show_tm_matches(matches)
+
+    def _show_tm_matches(self, matches: list[TMMatch]) -> None:
         self._tm_list.clear()
         if not matches:
             self._tm_status_label.setText("No TM matches found.")
@@ -3944,6 +4006,7 @@ class MainWindow(QMainWindow):
         self._stop_timers()
         with contextlib.suppress(Exception):
             self._flush_tm_updates()
+        self._shutdown_tm_query_pool()
         if self._tm_store is not None:
             with contextlib.suppress(Exception):
                 self._tm_store.close()
@@ -3952,6 +4015,18 @@ class MainWindow(QMainWindow):
             self._prefs_extras["TREE_PANEL_WIDTH"] = str(max(60, self._tree_last_width))
         self._persist_preferences()
         event.accept()
+
+    def _shutdown_tm_query_pool(self) -> None:
+        if self._tm_query_future is not None:
+            with contextlib.suppress(Exception):
+                self._tm_query_future.cancel()
+        self._tm_query_future = None
+        self._tm_query_key = None
+        if self._tm_query_pool is None:
+            return
+        with contextlib.suppress(Exception):
+            self._tm_query_pool.shutdown(wait=False, cancel_futures=True)
+        self._tm_query_pool = None
 
     def _stop_timers(self) -> None:
         timers = [
@@ -3962,6 +4037,7 @@ class MainWindow(QMainWindow):
             self._tree_width_timer,
             self._tm_update_timer,
             self._tm_flush_timer,
+            self._tm_query_timer,
         ]
         if self._migration_timer is not None:
             timers.append(self._migration_timer)

@@ -52,6 +52,10 @@ class TMStore:
     def close(self) -> None:
         self._conn.close()
 
+    @property
+    def db_path(self) -> Path:
+        return self._path
+
     def _configure(self) -> None:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
@@ -272,12 +276,53 @@ class TMStore:
         target_locale: str,
         limit: int = 10,
     ) -> list[TMMatch]:
+        return self._query_conn(
+            self._conn,
+            source_text,
+            source_locale=source_locale,
+            target_locale=target_locale,
+            limit=limit,
+        )
+
+    @classmethod
+    def query_path(
+        cls,
+        db_path: Path,
+        source_text: str,
+        *,
+        source_locale: str,
+        target_locale: str,
+        limit: int = 10,
+    ) -> list[TMMatch]:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            return cls._query_conn(
+                conn,
+                source_text,
+                source_locale=source_locale,
+                target_locale=target_locale,
+                limit=limit,
+            )
+        finally:
+            conn.close()
+
+    @classmethod
+    def _query_conn(
+        cls,
+        conn: sqlite3.Connection,
+        source_text: str,
+        *,
+        source_locale: str,
+        target_locale: str,
+        limit: int,
+    ) -> list[TMMatch]:
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
         norm = _normalize(source_text)
         if not norm:
             return []
-        exact_rows = self._conn.execute(
+        exact_rows = conn.execute(
             """
             SELECT source_text, target_text, origin, file_path, key, updated_at
             FROM tm_entries
@@ -308,7 +353,7 @@ class TMStore:
                 return matches
         if len(norm) > _MAX_FUZZY_SOURCE_LEN:
             return matches
-        candidates = self._fuzzy_candidates(norm, source_locale, target_locale)
+        candidates = cls._fuzzy_candidates(conn, norm, source_locale, target_locale)
         for cand, score in candidates:
             key = (cand["source_text"], cand["target_text"], cand["origin"])
             if key in seen:
@@ -331,8 +376,9 @@ class TMStore:
                 break
         return matches
 
+    @staticmethod
     def _fuzzy_candidates(
-        self, norm: str, source_locale: str, target_locale: str
+        conn: sqlite3.Connection, norm: str, source_locale: str, target_locale: str
     ) -> list[tuple[sqlite3.Row, int]]:
         from difflib import SequenceMatcher
 
@@ -340,7 +386,7 @@ class TMStore:
         length = len(norm)
         min_len = max(1, int(length * 0.6))
         max_len = int(length * 1.4) if length > 5 else length + 10
-        rows = self._conn.execute(
+        rows = conn.execute(
             """
             SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
             FROM tm_entries
@@ -359,7 +405,7 @@ class TMStore:
             ),
         ).fetchall()
         if not rows:
-            rows = self._conn.execute(
+            rows = conn.execute(
                 """
                 SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
                 FROM tm_entries

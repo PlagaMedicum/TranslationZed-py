@@ -29,4 +29,13 @@ def test_tm_store_exact_and_fuzzy(tmp_path: Path) -> None:
         "Hello world!!", source_locale="EN", target_locale="BE", limit=5
     )
     assert any(match.score < 100 for match in fuzzy)
+    offthread = TMStore.query_path(
+        store.db_path,
+        "Hello world",
+        source_locale="EN",
+        target_locale="BE",
+        limit=5,
+    )
+    assert offthread
+    assert offthread[0].score == 100
     store.close()
