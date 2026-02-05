@@ -50,6 +50,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QSizePolicy,
+    QSpinBox,
     QSplitter,
     QStackedWidget,
     QStyle,
@@ -144,6 +145,27 @@ def _in_test_mode() -> bool:
     return bool(os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("TZP_TESTING"))
 
 
+def _bool_from_pref(value: object, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    raw = str(value).strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def _int_from_pref(value: object, default: int, *, min_value: int, max_value: int) -> int:
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(min_value, min(max_value, parsed))
+
+
 def _patch_message_boxes_for_tests() -> None:
     global _TEST_DIALOGS_PATCHED
     global _ORIG_QMESSAGEBOX_EXEC
@@ -183,6 +205,102 @@ def _patch_message_boxes_for_tests() -> None:
     QMessageBox.critical = staticmethod(_critical)
     QMessageBox.information = staticmethod(_info)
     _TEST_DIALOGS_PATCHED = True
+
+
+_TM_REBUILD_BATCH = 1000
+_TMRebuildLocale = tuple[str, Path, str]
+
+
+def _tm_en_path_for(root: Path, locale: str, path: Path) -> Path | None:
+    locale_root = root / locale
+    try:
+        rel = path.relative_to(locale_root)
+    except ValueError:
+        try:
+            rel_full = path.relative_to(root)
+            if rel_full.parts and rel_full.parts[0] == locale:
+                rel = Path(*rel_full.parts[1:])
+            else:
+                return None
+        except ValueError:
+            return None
+    candidate = root / "EN" / rel
+    if candidate.exists():
+        return candidate
+    stem = rel.stem
+    for token in (locale, locale.replace(" ", "_")):
+        suffix = f"_{token}"
+        if stem.endswith(suffix):
+            new_stem = stem[: -len(suffix)] + "_EN"
+            alt = rel.with_name(new_stem + rel.suffix)
+            alt_path = root / "EN" / alt
+            if alt_path.exists():
+                return alt_path
+    return None
+
+
+def _tm_rebuild_worker(
+    root: Path,
+    locales: list[_TMRebuildLocale],
+    source_locale: str,
+    en_encoding: str,
+) -> dict[str, int]:
+    store = TMStore(root)
+    totals = {
+        "files": 0,
+        "entries": 0,
+        "skipped_missing_source": 0,
+        "skipped_parse": 0,
+        "skipped_empty": 0,
+    }
+    try:
+        for locale, locale_path, target_encoding in locales:
+            for target_path in list_translatable_files(locale_path):
+                en_path = _tm_en_path_for(root, locale, target_path)
+                if en_path is None:
+                    totals["skipped_missing_source"] += 1
+                    continue
+                try:
+                    target_pf = parse(target_path, encoding=target_encoding)
+                    en_pf = parse(en_path, encoding=en_encoding)
+                except Exception:
+                    totals["skipped_parse"] += 1
+                    continue
+                source_by_key = {entry.key: entry.value for entry in en_pf.entries}
+                batch: list[tuple[str, str, str]] = []
+                for entry in target_pf.entries:
+                    value = entry.value
+                    if value is None:
+                        totals["skipped_empty"] += 1
+                        continue
+                    value_text = str(value)
+                    if not value_text:
+                        totals["skipped_empty"] += 1
+                        continue
+                    source_text = source_by_key.get(entry.key)
+                    if not source_text:
+                        totals["skipped_missing_source"] += 1
+                        continue
+                    batch.append((entry.key, str(source_text), value_text))
+                    if len(batch) >= _TM_REBUILD_BATCH:
+                        totals["entries"] += store.upsert_project_entries(
+                            batch,
+                            source_locale=source_locale,
+                            target_locale=locale,
+                            file_path=str(target_path),
+                        )
+                        batch.clear()
+                if batch:
+                    totals["entries"] += store.upsert_project_entries(
+                        batch,
+                        source_locale=source_locale,
+                        target_locale=locale,
+                        file_path=str(target_path),
+                    )
+                totals["files"] += 1
+    finally:
+        store.close()
+    return totals
 
 
 class _CommitPlainTextEdit(QPlainTextEdit):
@@ -319,13 +437,19 @@ class MainWindow(QMainWindow):
         self._en_cache: dict[Path, ParsedFile] = {}
         self._child_windows: list[MainWindow] = []
         self._tm_store: TMStore | None = None
-        self._tm_cache: OrderedDict[tuple[str, str, str], list[TMMatch]] = OrderedDict()
+        self._tm_cache: OrderedDict[
+            tuple[str, str, str, int, bool, bool], list[TMMatch]
+        ] = OrderedDict()
         self._tm_cache_limit = 128
         self._tm_pending: dict[str, dict[str, tuple[str, str, str]]] = {}
         self._tm_source_locale = "EN"
         self._tm_query_pool: ThreadPoolExecutor | None = None
         self._tm_query_future: Future[list[TMMatch]] | None = None
-        self._tm_query_key: tuple[str, str, str] | None = None
+        self._tm_query_key: tuple[str, str, str, int, bool, bool] | None = None
+        self._tm_rebuild_pool: ThreadPoolExecutor | None = None
+        self._tm_rebuild_future: Future[dict[str, int]] | None = None
+        self._tm_rebuild_locales: list[str] = []
+        self._tm_rebuild_interactive = False
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -369,6 +493,15 @@ class MainWindow(QMainWindow):
             prefs["__extras__"] = dict(self._prefs_extras)
             with contextlib.suppress(Exception):
                 _save_preferences(prefs, self._root)
+        self._tm_min_score = _int_from_pref(
+            self._prefs_extras.get("TM_MIN_SCORE"), 30, min_value=30, max_value=100
+        )
+        self._tm_origin_project = _bool_from_pref(
+            self._prefs_extras.get("TM_ORIGIN_PROJECT"), True
+        )
+        self._tm_origin_import = _bool_from_pref(
+            self._prefs_extras.get("TM_ORIGIN_IMPORT"), True
+        )
         geom = str(prefs.get("window_geometry", "")).strip()
         if geom:
             with contextlib.suppress(Exception):
@@ -408,6 +541,10 @@ class MainWindow(QMainWindow):
         self._tm_query_timer.setSingleShot(False)
         self._tm_query_timer.setInterval(50)
         self._tm_query_timer.timeout.connect(self._poll_tm_query)
+        self._tm_rebuild_timer = QTimer(self)
+        self._tm_rebuild_timer.setSingleShot(False)
+        self._tm_rebuild_timer.setInterval(100)
+        self._tm_rebuild_timer.timeout.connect(self._poll_tm_rebuild)
 
         self._main_splitter = QSplitter(Qt.Vertical, self)
         self._content_splitter = QSplitter(Qt.Horizontal, self)
@@ -692,6 +829,25 @@ class MainWindow(QMainWindow):
         tm_layout.setContentsMargins(6, 0, 6, 6)
         tm_layout.setSpacing(6)
         self._tm_status_label = QLabel("Select a row to see TM suggestions.")
+        tm_filter_row = QHBoxLayout()
+        tm_filter_row.setContentsMargins(0, 0, 0, 0)
+        tm_filter_row.setSpacing(6)
+        tm_filter_row.addWidget(QLabel("Min score", self._tm_panel))
+        self._tm_score_spin = QSpinBox(self._tm_panel)
+        self._tm_score_spin.setRange(30, 100)
+        self._tm_score_spin.setValue(self._tm_min_score)
+        self._tm_score_spin.setSuffix("%")
+        self._tm_score_spin.valueChanged.connect(self._on_tm_filters_changed)
+        tm_filter_row.addWidget(self._tm_score_spin)
+        tm_filter_row.addStretch(1)
+        self._tm_origin_project_cb = QCheckBox("Project", self._tm_panel)
+        self._tm_origin_project_cb.setChecked(self._tm_origin_project)
+        self._tm_origin_project_cb.toggled.connect(self._on_tm_filters_changed)
+        tm_filter_row.addWidget(self._tm_origin_project_cb)
+        self._tm_origin_import_cb = QCheckBox("Imported", self._tm_panel)
+        self._tm_origin_import_cb.setChecked(self._tm_origin_import)
+        self._tm_origin_import_cb.toggled.connect(self._on_tm_filters_changed)
+        tm_filter_row.addWidget(self._tm_origin_import_cb)
         self._tm_list = QListWidget(self._tm_panel)
         self._tm_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._tm_list.itemSelectionChanged.connect(self._update_tm_apply_state)
@@ -700,6 +856,7 @@ class MainWindow(QMainWindow):
         self._tm_apply_btn.setEnabled(False)
         self._tm_apply_btn.clicked.connect(self._apply_tm_selection)
         tm_layout.addWidget(self._tm_status_label)
+        tm_layout.addLayout(tm_filter_row)
         tm_layout.addWidget(self._tm_list)
         tm_layout.addWidget(self._tm_apply_btn)
         self._left_stack.addWidget(self._tm_panel)
@@ -872,6 +1029,10 @@ class MainWindow(QMainWindow):
         act_export_tmx = QAction("Export TMX…", self)
         act_export_tmx.triggered.connect(self._export_tmx)
         self.menu_tm.addAction(act_export_tmx)
+        self.menu_tm.addSeparator()
+        act_rebuild_tm = QAction("Rebuild Project TM (Selected Locales)", self)
+        act_rebuild_tm.triggered.connect(self._rebuild_tm_selected)
+        self.menu_tm.addAction(act_rebuild_tm)
 
         act_copy = QAction("&Copy", self)
         act_copy.setShortcut(QKeySequence.StandardKey.Copy)
@@ -1180,6 +1341,7 @@ class MainWindow(QMainWindow):
 
         self._selected_locales = [c for c in selected_locales if c in selectable]
         QTimer.singleShot(0, self._warn_orphan_caches)
+        QTimer.singleShot(0, self._maybe_bootstrap_tm)
 
     def _init_tm_store(self) -> None:
         try:
@@ -1445,6 +1607,128 @@ class MainWindow(QMainWindow):
             f"Exported {count} translation unit(s).",
         )
 
+    def _rebuild_tm_selected(self) -> None:
+        if not self._tm_store:
+            QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
+            return
+        locales = [loc for loc in self._selected_locales if loc != "EN"]
+        if not locales:
+            QMessageBox.information(self, "TM rebuild", "No locales selected.")
+            return
+        self._start_tm_rebuild(locales, interactive=True, force=True)
+
+    def _maybe_bootstrap_tm(self) -> None:
+        if self._test_mode or not self._tm_store:
+            return
+        if not self._selected_locales:
+            return
+        locales: list[str] = []
+        for loc in self._selected_locales:
+            if loc == "EN":
+                continue
+            try:
+                has_entries = self._tm_store.has_entries(
+                    source_locale=self._tm_source_locale, target_locale=loc
+                )
+            except Exception:
+                continue
+            if not has_entries:
+                locales.append(loc)
+        if not locales:
+            return
+        self._start_tm_rebuild(locales, interactive=False, force=False)
+
+    def _collect_tm_rebuild_locales(
+        self, locales: Iterable[str]
+    ) -> tuple[list[_TMRebuildLocale], str]:
+        en_meta = self._locales.get("EN")
+        en_encoding = en_meta.charset if en_meta else "utf-8"
+        out: list[_TMRebuildLocale] = []
+        for locale in locales:
+            if locale == "EN":
+                continue
+            meta = self._locales.get(locale)
+            if not meta:
+                continue
+            out.append((locale, meta.path, meta.charset))
+        return out, en_encoding
+
+    def _start_tm_rebuild(
+        self, locales: Iterable[str], *, interactive: bool, force: bool
+    ) -> None:
+        if not self._tm_store:
+            return
+        if (
+            self._tm_rebuild_future is not None
+            and not self._tm_rebuild_future.done()
+        ):
+            self.statusBar().showMessage("TM rebuild already running.", 3000)
+            return
+        locale_specs, en_encoding = self._collect_tm_rebuild_locales(locales)
+        if not locale_specs:
+            if interactive:
+                QMessageBox.information(self, "TM rebuild", "No TM entries found.")
+            return
+        if self._tm_rebuild_pool is None:
+            self._tm_rebuild_pool = ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix="tzp-tm-rebuild"
+            )
+        self._tm_rebuild_locales = sorted({entry[0] for entry in locale_specs})
+        self._tm_rebuild_interactive = interactive
+        label = ", ".join(self._tm_rebuild_locales)
+        prefix = "Rebuilding TM" if force else "Bootstrapping TM"
+        self.statusBar().showMessage(f"{prefix} for {label}…", 0)
+        self._tm_rebuild_future = self._tm_rebuild_pool.submit(
+            _tm_rebuild_worker,
+            self._root,
+            locale_specs,
+            self._tm_source_locale,
+            en_encoding,
+        )
+        if not self._tm_rebuild_timer.isActive():
+            self._tm_rebuild_timer.start()
+
+    def _poll_tm_rebuild(self) -> None:
+        future = self._tm_rebuild_future
+        if future is None:
+            self._tm_rebuild_timer.stop()
+            return
+        if not future.done():
+            return
+        self._tm_rebuild_timer.stop()
+        self._tm_rebuild_future = None
+        try:
+            result = future.result()
+        except Exception as exc:
+            message = f"TM rebuild failed: {exc}"
+            if self._tm_rebuild_interactive:
+                QMessageBox.warning(self, "TM rebuild failed", message)
+            else:
+                self.statusBar().showMessage(message, 5000)
+            return
+        self._finish_tm_rebuild(result)
+
+    def _finish_tm_rebuild(self, result: dict[str, int]) -> None:
+        self._tm_cache.clear()
+        total_missing = result.get("skipped_missing_source", 0)
+        parts = [
+            f"TM rebuild complete: {result.get('entries', 0)} entries",
+            f"{result.get('files', 0)} files",
+        ]
+        skipped = []
+        if total_missing:
+            skipped.append(f"missing source {total_missing}")
+        if result.get("skipped_parse"):
+            skipped.append(f"parse errors {result['skipped_parse']}")
+        if result.get("skipped_empty"):
+            skipped.append(f"empty values {result['skipped_empty']}")
+        if skipped:
+            parts.append(f"skipped {', '.join(skipped)}")
+        message = " · ".join(parts)
+        self.statusBar().showMessage(message, 8000)
+        if self._left_stack.currentIndex() == 1:
+            self._update_tm_suggestions()
+
     def _open_preferences(self) -> None:
         prefs = {
             "default_root": self._default_root,
@@ -1555,6 +1839,7 @@ class MainWindow(QMainWindow):
         self._mark_cached_dirty()
         self._auto_open_last_file()
         self._mark_cached_dirty()
+        QTimer.singleShot(0, self._maybe_bootstrap_tm)
 
     def _file_chosen(self, index) -> None:
         """Populate table when user activates a translation file."""
@@ -3675,6 +3960,34 @@ class MainWindow(QMainWindow):
     def _update_tm_apply_state(self) -> None:
         self._tm_apply_btn.setEnabled(bool(self._tm_list.selectedItems()))
 
+    def _on_tm_filters_changed(self) -> None:
+        self._tm_min_score = int(self._tm_score_spin.value())
+        self._tm_origin_project = bool(self._tm_origin_project_cb.isChecked())
+        self._tm_origin_import = bool(self._tm_origin_import_cb.isChecked())
+        self._prefs_extras["TM_MIN_SCORE"] = str(self._tm_min_score)
+        self._prefs_extras["TM_ORIGIN_PROJECT"] = (
+            "true" if self._tm_origin_project else "false"
+        )
+        self._prefs_extras["TM_ORIGIN_IMPORT"] = (
+            "true" if self._tm_origin_import else "false"
+        )
+        self._persist_preferences()
+        self._update_tm_suggestions()
+
+    def _filter_tm_matches(self, matches: list[TMMatch]) -> list[TMMatch]:
+        filtered: list[TMMatch] = []
+        for match in matches:
+            if match.score < self._tm_min_score:
+                continue
+            if match.origin == "project":
+                if not self._tm_origin_project:
+                    continue
+            else:
+                if not self._tm_origin_import:
+                    continue
+            filtered.append(match)
+        return filtered
+
     def _current_tm_lookup(self) -> tuple[str, str] | None:
         if not (self._current_model and self._current_pf):
             return None
@@ -3713,6 +4026,11 @@ class MainWindow(QMainWindow):
             return
         if self._left_stack.currentIndex() != 1:
             return
+        if not self._tm_origin_project and not self._tm_origin_import:
+            self._tm_list.clear()
+            self._tm_status_label.setText("No TM origins enabled.")
+            self._tm_apply_btn.setEnabled(False)
+            return
         lookup = self._current_tm_lookup()
         if lookup is None:
             self._tm_list.clear()
@@ -3721,7 +4039,14 @@ class MainWindow(QMainWindow):
             return
         source_text, locale = lookup
         self._flush_tm_updates(paths=[self._current_pf.path])
-        cache_key = (source_text, self._tm_source_locale, locale)
+        cache_key = (
+            source_text,
+            self._tm_source_locale,
+            locale,
+            self._tm_min_score,
+            self._tm_origin_project,
+            self._tm_origin_import,
+        )
         matches = self._tm_cache.get(cache_key)
         if matches is not None:
             self._show_tm_matches(matches)
@@ -3731,7 +4056,7 @@ class MainWindow(QMainWindow):
         self._tm_apply_btn.setEnabled(False)
         self._start_tm_query(cache_key)
 
-    def _start_tm_query(self, cache_key: tuple[str, str, str]) -> None:
+    def _start_tm_query(self, cache_key: tuple[str, str, str, int, bool, bool]) -> None:
         if not self._tm_store or self._tm_query_pool is None:
             return
         if (
@@ -3741,7 +4066,19 @@ class MainWindow(QMainWindow):
         ):
             return
         self._tm_query_key = cache_key
-        source_text, source_locale, target_locale = cache_key
+        (
+            source_text,
+            source_locale,
+            target_locale,
+            min_score,
+            origin_project,
+            origin_import,
+        ) = cache_key
+        origins = []
+        if origin_project:
+            origins.append("project")
+        if origin_import:
+            origins.append("import")
         self._tm_query_future = self._tm_query_pool.submit(
             TMStore.query_path,
             self._tm_store.db_path,
@@ -3749,6 +4086,8 @@ class MainWindow(QMainWindow):
             source_locale=source_locale,
             target_locale=target_locale,
             limit=12,
+            min_score=min_score,
+            origins=origins,
         )
         if not self._tm_query_timer.isActive():
             self._tm_query_timer.start()
@@ -3778,7 +4117,14 @@ class MainWindow(QMainWindow):
         lookup = self._current_tm_lookup()
         if lookup is None:
             return
-        current_key = (lookup[0], self._tm_source_locale, lookup[1])
+        current_key = (
+            lookup[0],
+            self._tm_source_locale,
+            lookup[1],
+            self._tm_min_score,
+            self._tm_origin_project,
+            self._tm_origin_import,
+        )
         if current_key != cache_key:
             return
         self._show_tm_matches(matches)
@@ -3789,8 +4135,13 @@ class MainWindow(QMainWindow):
             self._tm_status_label.setText("No TM matches found.")
             self._tm_apply_btn.setEnabled(False)
             return
+        filtered = self._filter_tm_matches(matches)
+        if not filtered:
+            self._tm_status_label.setText("No TM matches (filtered).")
+            self._tm_apply_btn.setEnabled(False)
+            return
         self._tm_status_label.setText("TM suggestions")
-        for match in matches:
+        for match in filtered:
             item = QListWidgetItem(self._format_tm_item(match))
             item.setData(Qt.UserRole, match)
             item.setToolTip(match.target_text)
@@ -4006,7 +4357,7 @@ class MainWindow(QMainWindow):
         self._stop_timers()
         with contextlib.suppress(Exception):
             self._flush_tm_updates()
-        self._shutdown_tm_query_pool()
+        self._shutdown_tm_workers()
         if self._tm_store is not None:
             with contextlib.suppress(Exception):
                 self._tm_store.close()
@@ -4016,17 +4367,27 @@ class MainWindow(QMainWindow):
         self._persist_preferences()
         event.accept()
 
-    def _shutdown_tm_query_pool(self) -> None:
+    def _shutdown_tm_workers(self) -> None:
         if self._tm_query_future is not None:
             with contextlib.suppress(Exception):
                 self._tm_query_future.cancel()
         self._tm_query_future = None
         self._tm_query_key = None
         if self._tm_query_pool is None:
+            self._tm_query_pool = None
+        else:
+            with contextlib.suppress(Exception):
+                self._tm_query_pool.shutdown(wait=False, cancel_futures=True)
+            self._tm_query_pool = None
+        if self._tm_rebuild_future is not None:
+            with contextlib.suppress(Exception):
+                self._tm_rebuild_future.cancel()
+        self._tm_rebuild_future = None
+        if self._tm_rebuild_pool is None:
             return
         with contextlib.suppress(Exception):
-            self._tm_query_pool.shutdown(wait=False, cancel_futures=True)
-        self._tm_query_pool = None
+            self._tm_rebuild_pool.shutdown(wait=False, cancel_futures=True)
+        self._tm_rebuild_pool = None
 
     def _stop_timers(self) -> None:
         timers = [
@@ -4038,6 +4399,7 @@ class MainWindow(QMainWindow):
             self._tm_update_timer,
             self._tm_flush_timer,
             self._tm_query_timer,
+            self._tm_rebuild_timer,
         ]
         if self._migration_timer is not None:
             timers.append(self._migration_timer)
