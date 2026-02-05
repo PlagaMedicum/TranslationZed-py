@@ -134,6 +134,7 @@ From latest clarification:
   elided‑text paint path to avoid expensive per‑row layout work.
 - **Tooltips**: plain text only (no highlighting/selection), delayed (~900ms). Truncation caps:
   800 chars normally, 200 chars when value length ≥5,000; suffix “...(truncated)”.
+  Implementation uses HTML‑escaped text (PySide builds lack `Qt.convertFromPlainText`).
 - **Future quality tooling**: LanguageTool server API integration for grammar/spell suggestions.
 - **Translation memory (current)**: project‑scoped SQLite TM (`.tzp-config/tm.sqlite`) populated
   from edits; TMX import/export supported for a source+target locale pair. Ranking: exact 100%,
