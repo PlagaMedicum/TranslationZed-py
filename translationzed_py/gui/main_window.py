@@ -132,6 +132,57 @@ from .fs_model import FsModel
 from .perf_trace import PERF_TRACE
 from .preferences_dialog import PreferencesDialog
 
+_TEST_DIALOGS_PATCHED = False
+_ORIG_QMESSAGEBOX_EXEC = None
+_ORIG_QMESSAGEBOX_WARNING = None
+_ORIG_QMESSAGEBOX_CRITICAL = None
+_ORIG_QMESSAGEBOX_INFORMATION = None
+
+
+def _in_test_mode() -> bool:
+    return bool(os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("TZP_TESTING"))
+
+
+def _patch_message_boxes_for_tests() -> None:
+    global _TEST_DIALOGS_PATCHED
+    global _ORIG_QMESSAGEBOX_EXEC
+    global _ORIG_QMESSAGEBOX_WARNING
+    global _ORIG_QMESSAGEBOX_CRITICAL
+    global _ORIG_QMESSAGEBOX_INFORMATION
+    if _TEST_DIALOGS_PATCHED or not _in_test_mode():
+        return
+
+    _ORIG_QMESSAGEBOX_EXEC = QMessageBox.exec
+    _ORIG_QMESSAGEBOX_WARNING = QMessageBox.warning
+    _ORIG_QMESSAGEBOX_CRITICAL = QMessageBox.critical
+    _ORIG_QMESSAGEBOX_INFORMATION = QMessageBox.information
+
+    def _exec_noop(self) -> int:
+        if _in_test_mode():
+            return int(QMessageBox.StandardButton.Ok)
+        return _ORIG_QMESSAGEBOX_EXEC(self)
+
+    def _warn(*args, **kwargs) -> int:
+        if _in_test_mode():
+            return int(QMessageBox.StandardButton.Ok)
+        return _ORIG_QMESSAGEBOX_WARNING(*args, **kwargs)
+
+    def _critical(*args, **kwargs) -> int:
+        if _in_test_mode():
+            return int(QMessageBox.StandardButton.Ok)
+        return _ORIG_QMESSAGEBOX_CRITICAL(*args, **kwargs)
+
+    def _info(*args, **kwargs) -> int:
+        if _in_test_mode():
+            return int(QMessageBox.StandardButton.Ok)
+        return _ORIG_QMESSAGEBOX_INFORMATION(*args, **kwargs)
+
+    QMessageBox.exec = _exec_noop  # type: ignore[assignment]
+    QMessageBox.warning = staticmethod(_warn)
+    QMessageBox.critical = staticmethod(_critical)
+    QMessageBox.information = staticmethod(_info)
+    _TEST_DIALOGS_PATCHED = True
+
 
 class _CommitPlainTextEdit(QPlainTextEdit):
     def __init__(self, commit_cb, parent=None, *, focus_cb=None) -> None:
@@ -223,6 +274,8 @@ class MainWindow(QMainWindow):
         self._root = Path(".").resolve()
         self._default_root = ""
         self._smoke = os.environ.get("TZP_SMOKE", "") == "1"
+        self._test_mode = _in_test_mode()
+        _patch_message_boxes_for_tests()
         if project_root is None:
             prefs_global = _load_preferences(None)
             default_root = str(prefs_global.get("default_root", "")).strip()
@@ -280,6 +333,8 @@ class MainWindow(QMainWindow):
         self._large_text_optimizations = bool(
             prefs.get("large_text_optimizations", True)
         )
+        if self._test_mode:
+            self._prompt_write_on_exit = False
         self._default_root = str(prefs.get("default_root", "") or self._default_root)
         self._search_scope = str(prefs.get("search_scope", "FILE")).upper()
         if self._search_scope not in {"FILE", "LOCALE", "POOL"}:
@@ -1317,7 +1372,9 @@ class MainWindow(QMainWindow):
         source_locale = dialog.source_locale()
         target_locale = dialog.target_locale()
         if not source_locale or not target_locale:
-            QMessageBox.warning(self, "Invalid locales", "Source/target locales required.")
+            QMessageBox.warning(
+                self, "Invalid locales", "Source/target locales required."
+            )
             return
         try:
             count = self._tm_store.import_tmx(
@@ -1361,7 +1418,9 @@ class MainWindow(QMainWindow):
         source_locale = dialog.source_locale()
         target_locale = dialog.target_locale()
         if not source_locale or not target_locale:
-            QMessageBox.warning(self, "Invalid locales", "Source/target locales required.")
+            QMessageBox.warning(
+                self, "Invalid locales", "Source/target locales required."
+            )
             return
         try:
             count = self._tm_store.export_tmx(
@@ -1783,9 +1842,7 @@ class MainWindow(QMainWindow):
         if self._is_large_file():
             margin = min(margin, 50)
         start = max(0, start - margin)
-        end = min(
-            self._current_model.rowCount() - 1, end + margin
-        )
+        end = min(self._current_model.rowCount() - 1, end + margin)
         self._current_model.prefetch_rows(start, end)
 
     def _should_defer_post_open(self) -> bool:
@@ -1884,9 +1941,7 @@ class MainWindow(QMainWindow):
         if not lazy_tree:
             return width
         hint = self.tree.sizeHintForColumn(0)
-        width = (
-            min(width, max(140, hint + 24)) if hint > 0 else min(width, 200)
-        )
+        width = min(width, max(140, hint + 24)) if hint > 0 else min(width, 200)
         return width
 
     def _on_left_panel_changed(self, button) -> None:
@@ -3886,6 +3941,7 @@ class MainWindow(QMainWindow):
         if not self._write_cache_current():
             event.ignore()
             return
+        self._stop_timers()
         with contextlib.suppress(Exception):
             self._flush_tm_updates()
         if self._tm_store is not None:
@@ -3896,3 +3952,19 @@ class MainWindow(QMainWindow):
             self._prefs_extras["TREE_PANEL_WIDTH"] = str(max(60, self._tree_last_width))
         self._persist_preferences()
         event.accept()
+
+    def _stop_timers(self) -> None:
+        timers = [
+            self._search_timer,
+            self._row_resize_timer,
+            self._scroll_idle_timer,
+            self._tooltip_timer,
+            self._tree_width_timer,
+            self._tm_update_timer,
+            self._tm_flush_timer,
+        ]
+        if self._migration_timer is not None:
+            timers.append(self._migration_timer)
+        for timer in timers:
+            if timer.isActive():
+                timer.stop()
