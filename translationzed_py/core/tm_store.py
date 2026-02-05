@@ -39,6 +39,22 @@ def _normalize_locale(locale: str) -> str:
     return locale.strip().upper()
 
 
+def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
+    if origins is None:
+        return (_PROJECT_ORIGIN, _IMPORT_ORIGIN)
+    normalized: list[str] = []
+    allowed = {_PROJECT_ORIGIN, _IMPORT_ORIGIN}
+    for origin in origins:
+        if origin in allowed and origin not in normalized:
+            normalized.append(origin)
+    ordered: list[str] = []
+    if _PROJECT_ORIGIN in normalized:
+        ordered.append(_PROJECT_ORIGIN)
+    if _IMPORT_ORIGIN in normalized:
+        ordered.append(_IMPORT_ORIGIN)
+    return tuple(ordered)
+
+
 class TMStore:
     def __init__(self, root: Path) -> None:
         cfg = _load_app_config(root)
@@ -55,6 +71,20 @@ class TMStore:
     @property
     def db_path(self) -> Path:
         return self._path
+
+    def has_entries(self, *, source_locale: str, target_locale: str) -> bool:
+        source_locale = _normalize_locale(source_locale)
+        target_locale = _normalize_locale(target_locale)
+        row = self._conn.execute(
+            """
+            SELECT 1
+            FROM tm_entries
+            WHERE source_locale = ? AND target_locale = ?
+            LIMIT 1
+            """,
+            (source_locale, target_locale),
+        ).fetchone()
+        return row is not None
 
     def _configure(self) -> None:
         self._conn.execute("PRAGMA journal_mode=WAL")
@@ -275,6 +305,8 @@ class TMStore:
         source_locale: str,
         target_locale: str,
         limit: int = 10,
+        min_score: int | None = None,
+        origins: Iterable[str] | None = None,
     ) -> list[TMMatch]:
         return self._query_conn(
             self._conn,
@@ -282,6 +314,8 @@ class TMStore:
             source_locale=source_locale,
             target_locale=target_locale,
             limit=limit,
+            min_score=min_score,
+            origins=origins,
         )
 
     @classmethod
@@ -293,6 +327,8 @@ class TMStore:
         source_locale: str,
         target_locale: str,
         limit: int = 10,
+        min_score: int | None = None,
+        origins: Iterable[str] | None = None,
     ) -> list[TMMatch]:
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
@@ -303,6 +339,8 @@ class TMStore:
                 source_locale=source_locale,
                 target_locale=target_locale,
                 limit=limit,
+                min_score=min_score,
+                origins=origins,
             )
         finally:
             conn.close()
@@ -316,20 +354,36 @@ class TMStore:
         source_locale: str,
         target_locale: str,
         limit: int,
+        min_score: int | None,
+        origins: Iterable[str] | None,
     ) -> list[TMMatch]:
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
+        origin_list = _normalize_origins(origins)
+        if not origin_list:
+            return []
+        if min_score is None:
+            min_score = _MIN_FUZZY_SCORE
+        min_score = max(_MIN_FUZZY_SCORE, min(100, int(min_score)))
         norm = _normalize(source_text)
         if not norm:
             return []
+        origin_params: tuple[str, ...]
+        if len(origin_list) == 1:
+            origin_clause = "origin = ?"
+            origin_params = (origin_list[0],)
+        else:
+            origin_clause = "origin IN (?, ?)"
+            origin_params = (origin_list[0], origin_list[1])
         exact_rows = conn.execute(
-            """
+            f"""
             SELECT source_text, target_text, origin, file_path, key, updated_at
             FROM tm_entries
             WHERE source_locale = ? AND target_locale = ? AND source_norm = ?
+              AND {origin_clause}
             ORDER BY CASE origin WHEN 'project' THEN 0 ELSE 1 END, updated_at DESC
             """,
-            (source_locale, target_locale, norm),
+            (source_locale, target_locale, norm, *origin_params),
         ).fetchall()
         matches: list[TMMatch] = []
         seen: set[tuple[str, str, str]] = set()
@@ -353,12 +407,14 @@ class TMStore:
                 return matches
         if len(norm) > _MAX_FUZZY_SOURCE_LEN:
             return matches
-        candidates = cls._fuzzy_candidates(conn, norm, source_locale, target_locale)
+        candidates = cls._fuzzy_candidates(
+            conn, norm, source_locale, target_locale, origin_list
+        )
         for cand, score in candidates:
             key = (cand["source_text"], cand["target_text"], cand["origin"])
             if key in seen:
                 continue
-            if score < _MIN_FUZZY_SCORE:
+            if score < min_score:
                 continue
             seen.add(key)
             matches.append(
@@ -378,20 +434,35 @@ class TMStore:
 
     @staticmethod
     def _fuzzy_candidates(
-        conn: sqlite3.Connection, norm: str, source_locale: str, target_locale: str
+        conn: sqlite3.Connection,
+        norm: str,
+        source_locale: str,
+        target_locale: str,
+        origins: Iterable[str],
     ) -> list[tuple[sqlite3.Row, int]]:
         from difflib import SequenceMatcher
 
+        origin_list = _normalize_origins(origins)
+        if not origin_list:
+            return []
+        origin_params: tuple[str, ...]
+        if len(origin_list) == 1:
+            origin_clause = "origin = ?"
+            origin_params = (origin_list[0],)
+        else:
+            origin_clause = "origin IN (?, ?)"
+            origin_params = (origin_list[0], origin_list[1])
         prefix = _prefix(norm, 6)
         length = len(norm)
         min_len = max(1, int(length * 0.6))
         max_len = int(length * 1.4) if length > 5 else length + 10
         rows = conn.execute(
-            """
+            f"""
             SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
             FROM tm_entries
             WHERE source_locale = ? AND target_locale = ? AND source_prefix = ?
               AND source_len BETWEEN ? AND ?
+              AND {origin_clause}
             ORDER BY updated_at DESC
             LIMIT ?
             """,
@@ -401,20 +472,29 @@ class TMStore:
                 prefix,
                 min_len,
                 max_len,
+                *origin_params,
                 _MAX_FUZZY_CANDIDATES,
             ),
         ).fetchall()
         if not rows:
             rows = conn.execute(
-                """
+                f"""
                 SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
                 FROM tm_entries
                 WHERE source_locale = ? AND target_locale = ?
                   AND source_len BETWEEN ? AND ?
+                  AND {origin_clause}
                 ORDER BY updated_at DESC
                 LIMIT ?
                 """,
-                (source_locale, target_locale, min_len, max_len, _MAX_FUZZY_CANDIDATES),
+                (
+                    source_locale,
+                    target_locale,
+                    min_len,
+                    max_len,
+                    *origin_params,
+                    _MAX_FUZZY_CANDIDATES,
+                ),
             ).fetchall()
         scored: list[tuple[sqlite3.Row, int]] = []
         for row in rows:
