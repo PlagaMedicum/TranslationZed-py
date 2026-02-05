@@ -132,7 +132,8 @@ From latest clarification:
 - **Future quality tooling**: LanguageTool server API integration for grammar/spell suggestions.
 - **Translation memory (current)**: project‑scoped SQLite TM (`.tzp-config/tm.sqlite`) populated
   from edits; TMX import/export supported for a source+target locale pair. Ranking: exact 100%,
-  fuzzy down to ~30%; **project‑TM** outranks imported TM.
+  fuzzy down to ~30%; **project‑TM** outranks imported TM. Suggestions are fetched asynchronously
+  (background query + stale-request guard) to avoid UI stalls on row changes.
 - **Future translation QA** (post‑TM import/export): per‑check toggles for missing trailing
   characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
 - **Future detail editors**: optional Poedit-style dual editor panes below the table (Source read-only,

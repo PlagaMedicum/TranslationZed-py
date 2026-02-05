@@ -435,6 +435,8 @@ C1 [→] **Translation memory** (Step 29).
      - TMX import/export (external TMs) for a **source+target locale pair** only.
      - TM suggestions panel (side‑panel switcher: Files / TM / Search).
      - Ranking: exact match 100%, fuzzy down to ~30% (project TM outranks imported).
+     - [✓] Non‑blocking TM suggestion lookup (background worker + stale result guard).
+     - [✓] Test-safe TM UI teardown (no modal dialog deadlocks in pytest).
    - **Deferred**: LanguageTool API (post‑v0.2).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.
