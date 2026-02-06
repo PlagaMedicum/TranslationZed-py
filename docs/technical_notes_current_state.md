@@ -142,7 +142,8 @@ From latest clarification:
   (background query + stale-request guard) to avoid UI stalls on row changes. TM panel includes
   minimum‑score and origin filters (project/import), persisted in preferences. Project TM can be
   rebuilt from selected locales (menu action) and auto‑bootstraps when a locale pair has no TM data;
-  rebuild runs on a background worker to keep the UI responsive.
+  rebuild runs on a background worker to keep the UI responsive. TM store is initialized **on demand**
+  when the TM tab is opened to keep startup fast.
 - **Future translation QA** (post‑TM import/export): per‑check toggles for missing trailing
   characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
 - **Future detail editors**: optional Poedit-style dual editor panes below the table (Source read-only,

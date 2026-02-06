@@ -463,6 +463,8 @@ C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
 - **Cache hash width**: **u64** key hashes (implemented).
 - **UTF‑16 without BOM**: heuristic decode is allowed **only when** `language.txt` declares UTF‑16.
 - **Metadata immutability**: `language.txt` is read‑only and never modified by the app.
+- **Performance escape hatch**: hot paths may be moved to native extensions (Rust preferred,
+  C acceptable) with a stable Python API and clean integration.
 
 ---
 
