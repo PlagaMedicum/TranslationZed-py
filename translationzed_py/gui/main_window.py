@@ -1326,53 +1326,58 @@ class MainWindow(QMainWindow):
     def _sync_detail_editors(self) -> None:
         if not self._detail_panel.isVisible():
             return
-        if not self._current_model:
-            self._detail_pending_row = None
-            self._detail_pending_active = False
-            self._detail_syncing = True
-            try:
-                self._detail_source.setPlainText("")
-                self._detail_translation.setPlainText("")
-            finally:
-                self._detail_syncing = False
-            self._detail_dirty = False
-            return
-        idx = self.table.currentIndex()
-        if not idx.isValid():
-            self._detail_pending_row = None
-            self._detail_pending_active = False
-            self._detail_syncing = True
-            try:
-                self._detail_source.setPlainText("")
-                self._detail_translation.setPlainText("")
-            finally:
-                self._detail_syncing = False
-            self._detail_dirty = False
-            return
-        # Length check avoids forcing lazy decode for huge strings on selection.
-        source_len, value_len = self._current_model.text_lengths(idx.row())
-        if (
-            self._large_text_optimizations
-            and max(source_len, value_len) >= _DETAIL_LAZY_THRESHOLD
-        ):
-            self._set_detail_pending(idx.row())
-            return
-        source_index = self._current_model.index(idx.row(), 1)
-        value_index = self._current_model.index(idx.row(), 2)
-        source_text = str(source_index.data(Qt.EditRole) or "")
-        value_text = str(value_index.data(Qt.EditRole) or "")
-        self._detail_pending_row = None
-        self._detail_pending_active = False
-        self._detail_syncing = True
+        perf_trace = PERF_TRACE
+        perf_start = perf_trace.start("detail_sync")
         try:
-            self._detail_translation.setReadOnly(False)
-            self._detail_translation.setPlaceholderText("")
-            self._detail_source.setPlainText(source_text)
-            self._detail_translation.setPlainText(value_text)
+            if not self._current_model:
+                self._detail_pending_row = None
+                self._detail_pending_active = False
+                self._detail_syncing = True
+                try:
+                    self._detail_source.setPlainText("")
+                    self._detail_translation.setPlainText("")
+                finally:
+                    self._detail_syncing = False
+                self._detail_dirty = False
+                return
+            idx = self.table.currentIndex()
+            if not idx.isValid():
+                self._detail_pending_row = None
+                self._detail_pending_active = False
+                self._detail_syncing = True
+                try:
+                    self._detail_source.setPlainText("")
+                    self._detail_translation.setPlainText("")
+                finally:
+                    self._detail_syncing = False
+                self._detail_dirty = False
+                return
+            # Length check avoids forcing lazy decode for huge strings on selection.
+            source_len, value_len = self._current_model.text_lengths(idx.row())
+            if (
+                self._large_text_optimizations
+                and max(source_len, value_len) >= _DETAIL_LAZY_THRESHOLD
+            ):
+                self._set_detail_pending(idx.row())
+                return
+            source_index = self._current_model.index(idx.row(), 1)
+            value_index = self._current_model.index(idx.row(), 2)
+            source_text = str(source_index.data(Qt.EditRole) or "")
+            value_text = str(value_index.data(Qt.EditRole) or "")
+            self._detail_pending_row = None
+            self._detail_pending_active = False
+            self._detail_syncing = True
+            try:
+                self._detail_translation.setReadOnly(False)
+                self._detail_translation.setPlaceholderText("")
+                self._detail_source.setPlainText(source_text)
+                self._detail_translation.setPlainText(value_text)
+            finally:
+                self._detail_syncing = False
+            self._detail_dirty = False
+            self._apply_detail_whitespace_options()
         finally:
-            self._detail_syncing = False
-        self._detail_dirty = False
-        self._apply_detail_whitespace_options()
+            perf_trace.stop("detail_sync", perf_start, items=1, unit="events")
 
     def _scope_icon(self, scope: str) -> QIcon:
         if scope == "FILE":
@@ -2154,6 +2159,8 @@ class MainWindow(QMainWindow):
     def _apply_table_layout(self) -> None:
         if not self.table.model():
             return
+        perf_trace = PERF_TRACE
+        perf_start = perf_trace.start("layout")
         header = self.table.horizontalHeader()
         header.setStretchLastSection(False)
         if self._key_column_width is None:
@@ -2191,6 +2198,7 @@ class MainWindow(QMainWindow):
         self._prefs_extras["TABLE_KEY_WIDTH"] = str(key_width)
         self._prefs_extras["TABLE_STATUS_WIDTH"] = str(status_width)
         self._prefs_extras["TABLE_SRC_RATIO"] = f"{ratio:.6f}"
+        perf_trace.stop("layout", perf_start, items=1, unit="events")
 
     def _is_large_file(self) -> bool:
         return bool(
@@ -2544,8 +2552,12 @@ class MainWindow(QMainWindow):
         return sorted(set(files))
 
     def _mark_cached_dirty(self) -> None:
-        for path in self._all_draft_files(self._selected_locales):
+        perf_trace = PERF_TRACE
+        perf_start = perf_trace.start("cache_scan")
+        paths = self._all_draft_files(self._selected_locales)
+        for path in paths:
             self.fs_model.set_dirty(path, True)
+        perf_trace.stop("cache_scan", perf_start, items=len(paths), unit="files")
 
     def _schedule_post_locale_tasks(self) -> None:
         if self._post_locale_timer.isActive():
@@ -2553,8 +2565,13 @@ class MainWindow(QMainWindow):
         self._post_locale_timer.start()
 
     def _run_post_locale_tasks(self) -> None:
-        self._mark_cached_dirty()
-        self._auto_open_last_file()
+        perf_trace = PERF_TRACE
+        perf_start = perf_trace.start("startup")
+        try:
+            self._mark_cached_dirty()
+            self._auto_open_last_file()
+        finally:
+            perf_trace.stop("startup", perf_start, items=1, unit="tasks")
 
     def _hash_for_cache(
         self, key: str | Entry, cache_map: dict[int, CacheEntry]
@@ -2573,41 +2590,48 @@ class MainWindow(QMainWindow):
         return digest & 0xFFFFFFFFFFFFFFFF
 
     def _auto_open_last_file(self) -> None:
-        cache_root = self._root / self._app_config.cache_dir
-        if not cache_root.exists():
-            return
-        locale_dirs = [cache_root / loc for loc in self._selected_locales if loc]
-        if not locale_dirs:
-            return
-        best_ts = 0
-        best_path: Path | None = None
-        for cache_dir in locale_dirs:
-            if not cache_dir.exists():
-                continue
-            for cache_path in cache_dir.rglob(f"*{self._app_config.cache_ext}"):
-                ts = _read_last_opened_from_path(cache_path)
-                if ts <= 0:
+        perf_trace = PERF_TRACE
+        perf_start = perf_trace.start("auto_open")
+        scanned = 0
+        try:
+            cache_root = self._root / self._app_config.cache_dir
+            if not cache_root.exists():
+                return
+            locale_dirs = [cache_root / loc for loc in self._selected_locales if loc]
+            if not locale_dirs:
+                return
+            best_ts = 0
+            best_path: Path | None = None
+            for cache_dir in locale_dirs:
+                if not cache_dir.exists():
                     continue
-                try:
-                    rel = cache_path.relative_to(cache_root)
-                except ValueError:
-                    continue
-                original = (self._root / rel).with_suffix(
-                    self._app_config.translation_ext
-                )
-                if not original.exists():
-                    continue
-                locale = self._locale_for_path(original)
-                if locale not in self._selected_locales:
-                    continue
-                if ts > best_ts:
-                    best_ts = ts
-                    best_path = original
-        if not best_path:
-            return
-        index = self.fs_model.index_for_path(best_path)
-        if index.isValid():
-            self._file_chosen(index)
+                for cache_path in cache_dir.rglob(f"*{self._app_config.cache_ext}"):
+                    scanned += 1
+                    ts = _read_last_opened_from_path(cache_path)
+                    if ts <= 0:
+                        continue
+                    try:
+                        rel = cache_path.relative_to(cache_root)
+                    except ValueError:
+                        continue
+                    original = (self._root / rel).with_suffix(
+                        self._app_config.translation_ext
+                    )
+                    if not original.exists():
+                        continue
+                    locale = self._locale_for_path(original)
+                    if locale not in self._selected_locales:
+                        continue
+                    if ts > best_ts:
+                        best_ts = ts
+                        best_path = original
+            if not best_path:
+                return
+            index = self.fs_model.index_for_path(best_path)
+            if index.isValid():
+                self._file_chosen(index)
+        finally:
+            perf_trace.stop("auto_open", perf_start, items=scanned, unit="files")
 
     def _schedule_cache_migration(self) -> None:
         legacy_paths = _legacy_cache_paths(self._root)
@@ -4065,13 +4089,18 @@ class MainWindow(QMainWindow):
                 self._sync_detail_editors()
 
     def _on_selection_changed(self, current, previous) -> None:
-        if previous is not None and previous.isValid():
-            self._commit_detail_translation(previous)
-        self._update_status_combo_from_selection()
-        if self._detail_panel.isVisible():
-            self._sync_detail_editors()
-        self._update_status_bar()
-        self._schedule_tm_update()
+        perf_trace = PERF_TRACE
+        perf_start = perf_trace.start("selection")
+        try:
+            if previous is not None and previous.isValid():
+                self._commit_detail_translation(previous)
+            self._update_status_combo_from_selection()
+            if self._detail_panel.isVisible():
+                self._sync_detail_editors()
+            self._update_status_bar()
+            self._schedule_tm_update()
+        finally:
+            perf_trace.stop("selection", perf_start, items=1, unit="events")
 
     def _schedule_tm_update(self) -> None:
         if not self._tm_store:

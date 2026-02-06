@@ -7,7 +7,16 @@ from contextlib import suppress
 from dataclasses import dataclass
 
 _TRACE_ENV = "TZP_PERF_TRACE"
-_DEFAULT_CATEGORIES = {"paint", "row_resize"}
+_DEFAULT_CATEGORIES = {
+    "paint",
+    "row_resize",
+    "startup",
+    "cache_scan",
+    "auto_open",
+    "selection",
+    "detail_sync",
+    "layout",
+}
 
 
 def _parse_categories(value: str) -> set[str]:
