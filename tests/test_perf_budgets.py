@@ -6,7 +6,15 @@ from pathlib import Path
 from translationzed_py.core import SearchField, SearchRow, parse, parse_lazy, search
 from translationzed_py.core.model import Entry, Status
 from translationzed_py.core.parse_utils import _hash_key_u64
-from translationzed_py.core.status_cache import write as write_cache
+from translationzed_py.core.status_cache import (
+    read as read_cache,
+)
+from translationzed_py.core.status_cache import (
+    read_has_drafts_from_path as read_has_drafts,
+)
+from translationzed_py.core.status_cache import (
+    write as write_cache,
+)
 
 
 def _budget_ms(env_name: str, default_ms: float) -> float:
@@ -118,3 +126,85 @@ def test_perf_cache_write(tmp_path: Path, perf_recorder) -> None:
     assert cache_path.exists()
     perf_recorder("cache write", elapsed_ms, budget_ms, f"entries={count}")
     _assert_budget("cache write", elapsed_ms, budget_ms)
+
+
+def test_perf_cache_read(tmp_path: Path, perf_recorder) -> None:
+    count = int(os.getenv("TZP_PERF_CACHE_READ_ENTRIES", "8000"))
+    budget_ms = _budget_ms("TZP_PERF_CACHE_READ_MS", 1500.0)
+    root = tmp_path / "root"
+    file_path = root / "EN" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    entries = _make_entries(count)
+    changed_keys = {entry.key for entry in entries}
+    write_cache(root, file_path, entries, changed_keys=changed_keys)
+
+    gc.collect()
+    start = time.perf_counter()
+    cache_map = read_cache(root, file_path)
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    assert len(cache_map) == count
+    perf_recorder("cache read", elapsed_ms, budget_ms, f"entries={count}")
+    _assert_budget("cache read", elapsed_ms, budget_ms)
+
+
+def test_perf_cache_header_scan(tmp_path: Path, perf_recorder) -> None:
+    files = int(os.getenv("TZP_PERF_CACHE_HEADER_FILES", "300"))
+    budget_ms = _budget_ms("TZP_PERF_CACHE_HEADER_MS", 800.0)
+    root = tmp_path / "root"
+    entry = _make_entries(1)
+    changed_keys = {entry[0].key}
+    for idx in range(files):
+        file_path = root / "EN" / f"file_{idx}.txt"
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        write_cache(root, file_path, entry, changed_keys=changed_keys)
+    cache_root = root / ".tzp-cache" / "EN"
+    paths = list(cache_root.rglob("*.bin"))
+    assert len(paths) == files
+
+    gc.collect()
+    start = time.perf_counter()
+    hits = 0
+    for path in paths:
+        if read_has_drafts(path):
+            hits += 1
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    assert hits == files
+    perf_recorder("cache header scan", elapsed_ms, budget_ms, f"files={files}")
+    _assert_budget("cache header scan", elapsed_ms, budget_ms)
+
+
+def test_perf_lazy_prefetch(tmp_path: Path, perf_recorder) -> None:
+    count = int(os.getenv("TZP_PERF_PREFETCH_ENTRIES", "8000"))
+    window = int(os.getenv("TZP_PERF_PREFETCH_WINDOW", "400"))
+    budget_ms = _budget_ms("TZP_PERF_PREFETCH_MS", 800.0)
+    path = tmp_path / "Large.txt"
+    _write_entries(path, count)
+    pf = parse_lazy(path, encoding="utf-8")
+    assert hasattr(pf.entries, "prefetch")
+    window = max(1, min(window, count))
+
+    gc.collect()
+    start = time.perf_counter()
+    pf.entries.prefetch(0, window - 1)
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    perf_recorder(
+        "lazy prefetch", elapsed_ms, budget_ms, f"entries={count} window={window}"
+    )
+    _assert_budget("lazy prefetch", elapsed_ms, budget_ms)
+
+
+def test_perf_hash_index(tmp_path: Path, perf_recorder) -> None:
+    count = int(os.getenv("TZP_PERF_HASH_INDEX_ENTRIES", "20000"))
+    budget_ms = _budget_ms("TZP_PERF_HASH_INDEX_MS", 800.0)
+    path = tmp_path / "Large.txt"
+    _write_entries(path, count)
+    pf = parse_lazy(path, encoding="utf-8")
+    assert hasattr(pf.entries, "index_by_hash")
+
+    gc.collect()
+    start = time.perf_counter()
+    index = pf.entries.index_by_hash(bits=64)
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    assert index
+    perf_recorder("hash index", elapsed_ms, budget_ms, f"entries={count}")
+    _assert_budget("hash index", elapsed_ms, budget_ms)
