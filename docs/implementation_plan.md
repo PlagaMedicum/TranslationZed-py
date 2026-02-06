@@ -382,7 +382,8 @@ A5 [✓] **Automated regression coverage**
    - [✓] **Target**: golden/round‑trip tests for edge‑case syntax (comments, spacing, concat, stray quotes).
    - [✓] **Encoding**: per‑locale fixtures for cp1251/UTF‑16/UTF‑8 with byte‑exact preservation.
    - [✓] **Reference corpus**: prod‑like sample fixtures round‑trip for regression coverage.
-   - [✓] **Perf budgets**: automated timing checks for large‑file open, multi‑file search, and cache writes.
+   - [✓] **Perf budgets**: automated timing checks for large‑file open, multi‑file search,
+     cache write/read, cache‑header scan, lazy prefetch, and hash‑index build.
 A6 [✓] **Cache/original conflict handling**
    - On file open, compare cached draft values vs **original file translations**.
    - If conflicts exist, show **modal notification** with choices:
@@ -416,7 +417,8 @@ A7 [→] **UI latency stabilization (scroll + paint)**
      - [✓] Large‑file mode auto‑disables wrap + table highlighting (≥5,000 rows or ≥1,000,000 bytes).
      - [✓] Add lightweight perf tracing for paint/resize (`TZP_PERF_TRACE=paint,row_resize`).
      - [→] Debounce column/splitter resize to avoid redundant row‑height work.
-     - [→] Add perf tracing for selection/detail sync/layout (identify remaining hotspots).
+     - [✓] Add perf tracing for selection/detail sync/layout/startup/cache scan/auto‑open
+       (identify remaining hotspots).
      - [→] Evaluate render‑cost heuristic (e.g., total chars) to auto‑enter large‑file mode
        when row/size thresholds are not exceeded.
      - [→] Reduce lazy prefetch window for very long rows to cut decode spikes on scroll.

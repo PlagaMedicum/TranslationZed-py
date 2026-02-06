@@ -53,8 +53,14 @@ _Last updated: 2026-02-04_
 - Run a regex search and confirm UI stays responsive (<100ms typical).
 
 ### 2.6 Automated performance budgets (always reported)
-- `tests/test_perf_budgets.py` enforces timing budgets for large‑file open,
-  multi‑file search, and cache writes (env‑tunable).
+- `tests/test_perf_budgets.py` enforces timing budgets for:
+  - large‑file open (lazy parse),
+  - multi‑file search,
+  - cache write and cache read,
+  - cache header scans (draft‑flag reads),
+  - lazy prefetch window decode,
+  - lazy hash‑index build.
+  (All env‑tunable.)
 - pytest always prints a **Performance** summary in terminal output,
   including `make verify`, to keep regressions visible.
 

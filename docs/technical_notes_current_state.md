@@ -143,7 +143,8 @@ From latest clarification:
   minimum‑score and origin filters (project/import), persisted in preferences. Project TM can be
   rebuilt from selected locales (menu action) and auto‑bootstraps when a locale pair has no TM data;
   rebuild runs on a background worker to keep the UI responsive. TM store is initialized **on demand**
-  when the TM tab is opened to keep startup fast.
+  when the TM tab is opened to keep startup fast. Query worker reuses a per‑thread connection
+  to avoid per‑query connect overhead.
 - **Future translation QA** (post‑TM import/export): per‑check toggles for missing trailing
   characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
 - **Future detail editors**: optional Poedit-style dual editor panes below the table (Source read-only,
@@ -256,8 +257,9 @@ Observed hotspots and their current shape (code references are indicative):
 **C) File tree + dirty indicator**
 - **Tree build**: file tree is **lazy** for multi‑locale pools (children loaded on expand or
   on‑demand for auto‑open); single‑locale keeps eager load for convenience.
-- **Startup perf**: cache dirty scan + last‑opened lookup are scoped to selected locales;
-  prefetch runs after scroll idle with reduced margins for large files.
+- **Startup perf**: cache dirty scan + last‑opened lookup are scoped to selected locales
+  and **deferred** via a post‑locale timer so the UI can paint; prefetch runs after
+  scroll idle with reduced margins for large files.
 - **Dirty dot updates**: `FsModel.set_dirty` now uses a path→item map (O(1) per file).
   `_mark_cached_dirty()` reads cache headers for a draft flag (O(1) per cache file);
   legacy cache versions fall back to full read until rewritten.
@@ -294,7 +296,8 @@ Current mitigations already present:
 - Per‑cell render cap for huge strings; editors always load full text.
 - Tooltips are plain text, delayed ~900ms, truncated to 800/200 chars with “...(truncated)”;
   HTML-like tags are escaped to avoid Qt rich-text rendering.
-- Optional perf tracing for paint/resize (`TZP_PERF_TRACE=paint,row_resize`) to spot regressions.
+- Optional perf tracing for paint/resize and interaction hotspots
+  (`TZP_PERF_TRACE=paint,row_resize,selection,detail_sync,layout,cache_scan,auto_open,startup`).
 
 Performance opportunities (candidate v0.2 work):
 - **Search index**: build per‑file search indices lazily and reuse across queries when safe;
