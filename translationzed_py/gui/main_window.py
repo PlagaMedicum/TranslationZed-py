@@ -466,6 +466,7 @@ class MainWindow(QMainWindow):
         self._tm_rebuild_future: Future[dict[str, int]] | None = None
         self._tm_rebuild_locales: list[str] = []
         self._tm_rebuild_interactive = False
+        self._tm_bootstrap_pending = False
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -544,9 +545,10 @@ class MainWindow(QMainWindow):
         self._migration_timer: QTimer | None = None
         self._migration_batch_size = 25
         self._migration_count = 0
-        self._init_tm_store()
-        if self._tm_store is not None:
-            self._tm_query_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="tzp-tm")
+        self._post_locale_timer = QTimer(self)
+        self._post_locale_timer.setSingleShot(True)
+        self._post_locale_timer.setInterval(0)
+        self._post_locale_timer.timeout.connect(self._run_post_locale_tasks)
         self._tm_update_timer = QTimer(self)
         self._tm_update_timer.setSingleShot(True)
         self._tm_update_timer.setInterval(120)
@@ -837,7 +839,7 @@ class MainWindow(QMainWindow):
                     self.tree.expand(idx)
         else:
             self.tree.expandAll()
-        self._mark_cached_dirty()
+        self._schedule_post_locale_tasks()
         self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
         self.tree.doubleClicked.connect(self._file_chosen)
         self._left_stack.addWidget(self.tree)
@@ -1130,7 +1132,6 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self._replace_scope_widget)
         self._update_status_bar()
         self._apply_text_visual_options()
-        self._auto_open_last_file()
 
     def _build_scope_indicator(self, icon_name: str, tooltip: str):
         widget = QWidget(self)
@@ -1431,8 +1432,9 @@ class MainWindow(QMainWindow):
             selected_locales = dialog.selected_codes()
 
         self._selected_locales = [c for c in selected_locales if c in selectable]
+        self._tm_bootstrap_pending = bool(self._selected_locales)
         QTimer.singleShot(0, self._warn_orphan_caches)
-        QTimer.singleShot(0, self._maybe_bootstrap_tm)
+        self._schedule_post_locale_tasks()
 
     def _init_tm_store(self) -> None:
         try:
@@ -1440,6 +1442,17 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self._tm_store = None
             QMessageBox.warning(self, "TM init failed", str(exc))
+
+    def _ensure_tm_store(self) -> bool:
+        if self._tm_store is None:
+            self._init_tm_store()
+        if self._tm_store is None:
+            return False
+        if self._tm_query_pool is None:
+            self._tm_query_pool = ThreadPoolExecutor(
+                max_workers=1, thread_name_prefix="tzp-tm"
+            )
+        return True
 
     def _locale_for_path(self, path: Path) -> str | None:
         try:
@@ -1606,7 +1619,7 @@ class MainWindow(QMainWindow):
         self._child_windows.append(win)
 
     def _import_tmx(self) -> None:
-        if not self._tm_store:
+        if not self._ensure_tm_store():
             QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
             return
         path, _ = QFileDialog.getOpenFileName(
@@ -1654,7 +1667,7 @@ class MainWindow(QMainWindow):
         )
 
     def _export_tmx(self) -> None:
-        if not self._tm_store:
+        if not self._ensure_tm_store():
             QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
             return
         path, _ = QFileDialog.getSaveFileName(
@@ -1709,7 +1722,7 @@ class MainWindow(QMainWindow):
         self._start_tm_rebuild(locales, interactive=True, force=True)
 
     def _maybe_bootstrap_tm(self) -> None:
-        if self._test_mode or not self._tm_store:
+        if self._test_mode or not self._ensure_tm_store():
             return
         if not self._selected_locales:
             return
@@ -1927,10 +1940,8 @@ class MainWindow(QMainWindow):
             total = sum(sizes)
         if total > 0:
             self._content_splitter.setSizes([tree_width, max(100, total - tree_width)])
-        self._mark_cached_dirty()
-        self._auto_open_last_file()
-        self._mark_cached_dirty()
-        QTimer.singleShot(0, self._maybe_bootstrap_tm)
+        self._tm_bootstrap_pending = bool(self._selected_locales)
+        self._schedule_post_locale_tasks()
 
     def _file_chosen(self, index) -> None:
         """Populate table when user activates a translation file."""
@@ -2334,7 +2345,10 @@ class MainWindow(QMainWindow):
         idx = self._left_group.id(button)
         if idx >= 0:
             self._left_stack.setCurrentIndex(idx)
-        if idx == 1:
+        if idx == 1 and self._ensure_tm_store():
+            if self._tm_bootstrap_pending:
+                self._tm_bootstrap_pending = False
+                self._maybe_bootstrap_tm()
             self._schedule_tm_update()
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
@@ -2532,6 +2546,15 @@ class MainWindow(QMainWindow):
     def _mark_cached_dirty(self) -> None:
         for path in self._all_draft_files(self._selected_locales):
             self.fs_model.set_dirty(path, True)
+
+    def _schedule_post_locale_tasks(self) -> None:
+        if self._post_locale_timer.isActive():
+            self._post_locale_timer.stop()
+        self._post_locale_timer.start()
+
+    def _run_post_locale_tasks(self) -> None:
+        self._mark_cached_dirty()
+        self._auto_open_last_file()
 
     def _hash_for_cache(
         self, key: str | Entry, cache_map: dict[int, CacheEntry]
@@ -4502,6 +4525,7 @@ class MainWindow(QMainWindow):
             self._scroll_idle_timer,
             self._tooltip_timer,
             self._tree_width_timer,
+            self._post_locale_timer,
             self._tm_update_timer,
             self._tm_flush_timer,
             self._tm_query_timer,
