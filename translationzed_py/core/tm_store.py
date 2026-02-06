@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -56,6 +57,8 @@ def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
 
 
 class TMStore:
+    _QUERY_LOCAL = threading.local()
+
     def __init__(self, root: Path) -> None:
         cfg = _load_app_config(root)
         self._path = root / cfg.config_dir / "tm.sqlite"
@@ -86,10 +89,27 @@ class TMStore:
         ).fetchone()
         return row is not None
 
+    @staticmethod
+    def _configure_conn(conn: sqlite3.Connection) -> None:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA temp_store=MEMORY")
+
     def _configure(self) -> None:
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA temp_store=MEMORY")
+        self._configure_conn(self._conn)
+
+    @classmethod
+    def _query_conn_for_path(cls, db_path: Path) -> sqlite3.Connection:
+        local = cls._QUERY_LOCAL
+        conn = getattr(local, "conn", None)
+        path = getattr(local, "path", None)
+        if conn is None or path != db_path:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cls._configure_conn(conn)
+            local.conn = conn
+            local.path = db_path
+        return conn
 
     def _ensure_schema(self) -> None:
         self._conn.execute(
@@ -330,20 +350,16 @@ class TMStore:
         min_score: int | None = None,
         origins: Iterable[str] | None = None,
     ) -> list[TMMatch]:
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            return cls._query_conn(
-                conn,
-                source_text,
-                source_locale=source_locale,
-                target_locale=target_locale,
-                limit=limit,
-                min_score=min_score,
-                origins=origins,
-            )
-        finally:
-            conn.close()
+        conn = cls._query_conn_for_path(db_path)
+        return cls._query_conn(
+            conn,
+            source_text,
+            source_locale=source_locale,
+            target_locale=target_locale,
+            limit=limit,
+            min_score=min_score,
+            origins=origins,
+        )
 
     @classmethod
     def _query_conn(
