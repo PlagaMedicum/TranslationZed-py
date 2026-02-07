@@ -260,16 +260,16 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | User drops `.tmx` files into the managed TM import folder outside the app. |
 | **Flow** |
 |  1 | On TM panel activation, SYS scans TM import folder for new/changed/removed `.tmx` files. |
-|  2 | SYS auto-detects source/target locales when possible; for unresolved files, SYS immediately shows locale-mapping dialog(s). |
+|  2 | SYS auto-detects source/target locales when possible; unresolved files trigger immediate locale-mapping dialogs with **Skip all for now** support. |
 |  3 | SYS imports locale-resolved files and removes TM entries for missing files. |
-|  4 | If mapping is still unresolved (user cancels or invalid pair), SYS keeps file in pending state and excludes it from TM suggestions. |
+|  4 | If mapping is unresolved or TM parsing fails, SYS keeps file in pending/error state and excludes it from TM suggestions. |
 | **Post-condition** | TM store reflects folder content without mixing unrelated locale pairs. |
 
 ### UC-13f  Resolve Pending Imported TMs
 | **Trigger** | *TM ▸ Resolve Pending Imported TMs…* |
 | **Flow** |
 |  1 | SYS lists pending import files lacking reliable locale mapping. |
-|  2 | SYS asks user to select source/target locales per file. |
+|  2 | SYS asks user to select source/target locales per file (with **Skip all for now** option). |
 |  3 | SYS imports resolved files and marks them ready. |
 |  4 | SYS keeps unresolved files pending if user cancels mapping; pending files remain excluded from TM suggestions. |
 
@@ -296,6 +296,15 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  2 | SYS re-runs/refines TM suggestions using active filters. |
 |  3 | SYS shows explicit states when filters exclude all matches. |
 | **Post-condition** | TM list reflects persisted filter policy and current row context. |
+
+### UC-13j  Manage Imported TMs in Preferences
+| **Trigger** | *General ▸ Preferences ▸ TM tab* |
+| **Flow** |
+|  1 | SYS lists imported TM files with locale pair, status, and enabled toggle for ready files. |
+|  2 | User may queue TMX imports, remove selected imported TM files, or toggle ready files on/off. |
+|  3 | On confirmation, SYS applies removals/toggles and imports queued files into managed TM folder. |
+|  4 | SYS re-syncs imported TMs and refreshes TM suggestions when TM panel is active. |
+| **Post-condition** | Imported TM set and enable-state match preferences changes; disabled TMs are ignored by suggestions. |
 
 ---
 ## 4  GUI Wireframe (ASCII)

@@ -140,7 +140,8 @@ They include:
 - GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
 - TM: SQLite store round‑trip, exact/fuzzy query, TMX import/export.
-- TM import metadata: per-file import registry, replace/delete lifecycle, and TM source-name propagation in query results.
+- TM import metadata: per-file import registry, replace/delete lifecycle, TM source-name propagation,
+  and query gating for `enabled`/`ready` import files.
 
 **Not covered yet (automation gaps, by layer):**
 
@@ -162,6 +163,7 @@ They include:
 - Cache‑dirty dots driven by cache header `has_drafts` (startup + after edits).
 - Preferences persistence for UI state: tree width, column widths, view toggles, search/replace scopes.
 - TM import-folder sync: drop-in discovery, pending locale mapping, manual resolve flow, and stale-file cleanup.
+- Preferences TM tab actions: queued import, remove, and enable/disable interactions against TM store.
 - Detail panel large‑string guard: truncated preview + focus‑load full text; no truncated commit.
 
 **System / functional / regression / smoke gaps**

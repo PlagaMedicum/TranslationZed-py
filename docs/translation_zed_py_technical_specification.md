@@ -73,12 +73,16 @@ translationzed_py/
 ├── core/
 │   ├── project_scanner.py   # locate locales / files
 │   ├── parser.py            # loss‑less token parser
+│   ├── parse_utils.py       # token helpers / encoding utilities
+│   ├── lazy_entries.py      # lazy/on-demand entry access for large files
 │   ├── model.py             # Entry, ParsedFile
 │   ├── saver.py             # multi‑file atomic writer
 │   ├── search.py            # index + query API
 │   ├── status_cache.py      # binary per-file status store
+│   ├── en_hash_cache.py     # EN hash index + migration helpers
 │   ├── tm_store.py          # project TM storage/query (SQLite)
 │   ├── tmx_io.py            # TMX import/export
+│   ├── atomic_io.py         # atomic write helpers
 │   ├── app_config.py        # TOML-configurable paths/adapters/formats
 │   └── preferences.py       # user settings (settings.env)
 ├── gui/
@@ -130,7 +134,7 @@ This table binds technical sections to canonical UC IDs.
 | Search and replace scopes | UC-05a, UC-05b, UC-07 |
 | Conflict/orphan cache handling | UC-06, UC-06b |
 | Save, dirty marker, exit behavior | UC-10a, UC-10b, UC-11, UC-12 |
-| Side panel + TM workflows | UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i |
+| Side panel + TM workflows | UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j |
 
 ### 5.1  `core.project_scanner`
 
@@ -480,21 +484,24 @@ UNTOUCHED).
   - Exact match returns score **100**.
   - Fuzzy match uses `SequenceMatcher` on a bounded candidate set; keeps scores ≥30.
   - Project TM outranks imported TM.
-  - TM suggestions include source name (`tm_name`) so users see where each match came from.
+  - TM suggestions include source name (`tm_name`); when missing, UI falls back to TM file path.
   - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.
+  - Imported rows are query-visible only when the import record is **enabled** and in **ready** state.
 - TMX import/export:
   - `core.tmx_io.iter_tmx_pairs` streams `<tu>`/`<tuv>` pairs for a **source+target locale**.
   - `core.tmx_io.write_tmx` exports current TM to TMX for a source+target locale pair.
   - Imported TMX files are copied into and synchronized from `TM_IMPORT_DIR`; drop-in files are
-    discovered on TM panel activation.
+    discovered on TM panel activation (synchronization trigger).
   - Locale mapping for imported TMX is auto-detected when reliable; unresolved files trigger an
-    immediate locale-mapping dialog when TM panel is opened.
-  - Pending/unresolved imported files are excluded from TM suggestions until mapping is completed.
+    immediate locale-mapping dialog when TM panel is opened, with **Skip all for now** support.
+  - Pending/unresolved/error imported files are excluded from TM suggestions until resolved.
+  - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
+    new imports.
 - Project TM rebuild:
    - UI can rebuild project TM by scanning selected locales and pairing target entries with EN source.
    - Auto‑bootstrap runs when a selected locale pair has no TM entries.
    - Rebuild/bootstrapping runs asynchronously (background worker).
-- Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i.
+- Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j.
 
 ---
 
@@ -634,6 +641,8 @@ The stack is **per-file** and cleared on successful save or file reload.
   `gui.main_window`; move file/session/save/conflict workflows to explicit services.
 - Clean-architecture boundary ownership is not yet codified per module package; add a strict
   dependency matrix and enforce it in review/testing.
+- Module-level structure map is still shallow for some areas: add explicit responsibility + boundary
+  notes for `core.lazy_entries`, `core.en_hash_cache`, `core.parse_utils`, and `gui.perf_trace`.
 - Derived docs (`flows`, `checklists`, `technical_notes_current_state`) must be kept synced to
   this document; stale statements should be treated as documentation defects and fixed quickly.
 

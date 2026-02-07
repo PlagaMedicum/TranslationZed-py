@@ -480,8 +480,12 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Managed TM import folder (`TM_IMPORT_DIR`) with default under runtime root; configurable in Preferences.
      - [✓] TMX import now copies files into managed folder; drop-in `.tmx` files are discovered and synced.
      - [✓] Locale-pair safety for imported TMs: unresolved locale metadata is kept pending until mapped manually.
+     - [✓] TM panel open triggers import-folder sync and immediate mapping dialogs; mapping dialog supports **Skip all for now**.
      - [✓] TM suggestions display TM source name (`tm_name`) so users can see where each match comes from.
+     - [✓] TM source label fallback: use TM path when `tm_name` is missing.
      - [✓] Menu action to resolve pending imported TMs with manual locale mapping.
+     - [✓] Imported TM visibility policy: only `ready + enabled` imports are considered in TM query results.
+     - [✓] Preferences TM tab supports queued import, remove, and enable/disable per imported TM file.
    - **Deferred**: LanguageTool API (post‑v0.2).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.
