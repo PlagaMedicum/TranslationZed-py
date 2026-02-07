@@ -150,6 +150,18 @@ from translationzed_py.core.tm_query import (
 from translationzed_py.core.tm_query import (
     origins_for as _tm_origins_for,
 )
+from translationzed_py.core.tm_rebuild import (
+    TMRebuildResult,
+)
+from translationzed_py.core.tm_rebuild import (
+    collect_rebuild_locales as _tm_collect_rebuild_locales,
+)
+from translationzed_py.core.tm_rebuild import (
+    format_rebuild_status as _tm_format_rebuild_status,
+)
+from translationzed_py.core.tm_rebuild import (
+    rebuild_project_tm as _tm_rebuild_project_tm,
+)
 from translationzed_py.core.tm_store import TMMatch, TMStore
 
 from .delegates import (
@@ -247,102 +259,8 @@ def _patch_message_boxes_for_tests() -> None:
     _TEST_DIALOGS_PATCHED = True
 
 
-_TM_REBUILD_BATCH = 1000
-_TMRebuildLocale = tuple[str, Path, str]
 # Avoid blocking UI by deferring detail-panel loads for huge strings.
 _DETAIL_LAZY_THRESHOLD = 100_000
-
-
-def _tm_en_path_for(root: Path, locale: str, path: Path) -> Path | None:
-    locale_root = root / locale
-    try:
-        rel = path.relative_to(locale_root)
-    except ValueError:
-        try:
-            rel_full = path.relative_to(root)
-            if rel_full.parts and rel_full.parts[0] == locale:
-                rel = Path(*rel_full.parts[1:])
-            else:
-                return None
-        except ValueError:
-            return None
-    candidate = root / "EN" / rel
-    if candidate.exists():
-        return candidate
-    stem = rel.stem
-    for token in (locale, locale.replace(" ", "_")):
-        suffix = f"_{token}"
-        if stem.endswith(suffix):
-            new_stem = stem[: -len(suffix)] + "_EN"
-            alt = rel.with_name(new_stem + rel.suffix)
-            alt_path = root / "EN" / alt
-            if alt_path.exists():
-                return alt_path
-    return None
-
-
-def _tm_rebuild_worker(
-    root: Path,
-    locales: list[_TMRebuildLocale],
-    source_locale: str,
-    en_encoding: str,
-) -> dict[str, int]:
-    store = TMStore(root)
-    totals = {
-        "files": 0,
-        "entries": 0,
-        "skipped_missing_source": 0,
-        "skipped_parse": 0,
-        "skipped_empty": 0,
-    }
-    try:
-        for locale, locale_path, target_encoding in locales:
-            for target_path in list_translatable_files(locale_path):
-                en_path = _tm_en_path_for(root, locale, target_path)
-                if en_path is None:
-                    totals["skipped_missing_source"] += 1
-                    continue
-                try:
-                    target_pf = parse(target_path, encoding=target_encoding)
-                    en_pf = parse(en_path, encoding=en_encoding)
-                except Exception:
-                    totals["skipped_parse"] += 1
-                    continue
-                source_by_key = {entry.key: entry.value for entry in en_pf.entries}
-                batch: list[tuple[str, str, str]] = []
-                for entry in target_pf.entries:
-                    value = entry.value
-                    if value is None:
-                        totals["skipped_empty"] += 1
-                        continue
-                    value_text = str(value)
-                    if not value_text:
-                        totals["skipped_empty"] += 1
-                        continue
-                    source_text = source_by_key.get(entry.key)
-                    if not source_text:
-                        totals["skipped_missing_source"] += 1
-                        continue
-                    batch.append((entry.key, str(source_text), value_text))
-                    if len(batch) >= _TM_REBUILD_BATCH:
-                        totals["entries"] += store.upsert_project_entries(
-                            batch,
-                            source_locale=source_locale,
-                            target_locale=locale,
-                            file_path=str(target_path),
-                        )
-                        batch.clear()
-                if batch:
-                    totals["entries"] += store.upsert_project_entries(
-                        batch,
-                        source_locale=source_locale,
-                        target_locale=locale,
-                        file_path=str(target_path),
-                    )
-                totals["files"] += 1
-    finally:
-        store.close()
-    return totals
 
 
 class _CommitPlainTextEdit(QPlainTextEdit):
@@ -515,7 +433,7 @@ class MainWindow(QMainWindow):
         self._tm_query_future: Future[list[TMMatch]] | None = None
         self._tm_query_key: TMQueryKey | None = None
         self._tm_rebuild_pool: ThreadPoolExecutor | None = None
-        self._tm_rebuild_future: Future[dict[str, int]] | None = None
+        self._tm_rebuild_future: Future[TMRebuildResult] | None = None
         self._tm_rebuild_locales: list[str] = []
         self._tm_rebuild_interactive = False
         self._tm_bootstrap_pending = False
@@ -1963,21 +1881,6 @@ class MainWindow(QMainWindow):
             return
         self._start_tm_rebuild(locales, interactive=False, force=False)
 
-    def _collect_tm_rebuild_locales(
-        self, locales: Iterable[str]
-    ) -> tuple[list[_TMRebuildLocale], str]:
-        en_meta = self._locales.get("EN")
-        en_encoding = en_meta.charset if en_meta else "utf-8"
-        out: list[_TMRebuildLocale] = []
-        for locale in locales:
-            if locale == "EN":
-                continue
-            meta = self._locales.get(locale)
-            if not meta:
-                continue
-            out.append((locale, meta.path, meta.charset))
-        return out, en_encoding
-
     def _start_tm_rebuild(
         self, locales: Iterable[str], *, interactive: bool, force: bool
     ) -> None:
@@ -1986,7 +1889,10 @@ class MainWindow(QMainWindow):
         if self._tm_rebuild_future is not None and not self._tm_rebuild_future.done():
             self.statusBar().showMessage("TM rebuild already running.", 3000)
             return
-        locale_specs, en_encoding = self._collect_tm_rebuild_locales(locales)
+        locale_specs, en_encoding = _tm_collect_rebuild_locales(
+            self._locales,
+            list(locales),
+        )
         if not locale_specs:
             if interactive:
                 QMessageBox.information(self, "TM rebuild", "No TM entries found.")
@@ -1995,17 +1901,17 @@ class MainWindow(QMainWindow):
             self._tm_rebuild_pool = ThreadPoolExecutor(
                 max_workers=1, thread_name_prefix="tzp-tm-rebuild"
             )
-        self._tm_rebuild_locales = sorted({entry[0] for entry in locale_specs})
+        self._tm_rebuild_locales = sorted({entry.locale for entry in locale_specs})
         self._tm_rebuild_interactive = interactive
         label = ", ".join(self._tm_rebuild_locales)
         prefix = "Rebuilding TM" if force else "Bootstrapping TM"
         self.statusBar().showMessage(f"{prefix} for {label}…", 0)
         self._tm_rebuild_future = self._tm_rebuild_pool.submit(
-            _tm_rebuild_worker,
+            _tm_rebuild_project_tm,
             self._root,
             locale_specs,
-            self._tm_source_locale,
-            en_encoding,
+            source_locale=self._tm_source_locale,
+            en_encoding=en_encoding,
         )
         if not self._tm_rebuild_timer.isActive():
             self._tm_rebuild_timer.start()
@@ -2030,23 +1936,9 @@ class MainWindow(QMainWindow):
             return
         self._finish_tm_rebuild(result)
 
-    def _finish_tm_rebuild(self, result: dict[str, int]) -> None:
+    def _finish_tm_rebuild(self, result: TMRebuildResult) -> None:
         self._tm_cache.clear()
-        total_missing = result.get("skipped_missing_source", 0)
-        parts = [
-            f"TM rebuild complete: {result.get('entries', 0)} entries",
-            f"{result.get('files', 0)} files",
-        ]
-        skipped = []
-        if total_missing:
-            skipped.append(f"missing source {total_missing}")
-        if result.get("skipped_parse"):
-            skipped.append(f"parse errors {result['skipped_parse']}")
-        if result.get("skipped_empty"):
-            skipped.append(f"empty values {result['skipped_empty']}")
-        if skipped:
-            parts.append(f"skipped {', '.join(skipped)}")
-        message = " · ".join(parts)
+        message = _tm_format_rebuild_status(result)
         self.statusBar().showMessage(message, 8000)
         if self._left_stack.currentIndex() == 1:
             self._update_tm_suggestions()
