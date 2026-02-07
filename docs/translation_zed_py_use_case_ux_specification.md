@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.19 · 2026‑02‑05_
+_version 0.3.22 · 2026‑02‑07_
 
 ---
 ## 1  Actors
@@ -23,7 +23,7 @@ Only one human actor interacts via mouse / keyboard.  All persistence is managed
 ## 3  Primary Use‑Cases
 Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 
-### UC‑00  Startup EN Update Check
+### UC-00  Startup EN Update Check
 | Field | Value |
 |-------|-------|
 | **Goal** | Detect upstream English changes and require user acknowledgment. |
@@ -37,7 +37,7 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 |  5 | On **Dismiss**, SYS proceeds to normal startup and keeps the old hash index (reminder will appear again next launch). |
 | **Post‑condition** | EN hash cache is either current or marked as needing attention. |
 
-### UC‑01  Open Project Folder
+### UC-01  Open Project Folder
 | Field | Value |
 |-------|-------|
 | **Goal** | Load a Project Zomboid `translations` root so the user can pick a locale. |
@@ -57,10 +57,10 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 | **Alternate Flow A4** | *Malformed `language.txt`* – SYS shows a warning; invalid locales are skipped and cannot be opened until fixed. Other selected locales open normally. |
 | **Post‑condition** | Target locale(s) are active; window title updated to `TranslationZed‑Py – <root>`. |
 
-### UC‑02  Switch Locale
-Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditions: a project is already open.  Steps 3‑6 repeat with the new locale selection (checkboxes).  SYS MUST persist drafts to cache before switching (no prompt).
+### UC-02  Switch Locale
+Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions: a project is already open.  Steps 3‑6 repeat with the new locale selection (checkboxes).  SYS MUST persist drafts to cache before switching (no prompt).
 
-### UC‑03  Edit Translation
+### UC-03  Edit Translation
 | Field | Value |
 |-------|-------|
 | **Goal** | Modify a single key’s translation string. |
@@ -73,7 +73,7 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  5 | SYS MUST move focus to next row, same column. |
 | **Post‑condition** | Row background remains default (status unaffected).
 
-### UC-03 bis  Undo / Redo
+### UC-03b  Undo / Redo
 | Field | Value |
 |-------|-------|
 | **Goal** | Revert or re-apply the most recent edit(s) to translation strings or status changes. |
@@ -86,21 +86,28 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 | **Post-condition** | Stack pointer advanced; menu items auto-enabled / disabled. |
 
 
-### UC‑04  Mark as Proofread
+### UC-04a  Mark as Proofread
 | **Trigger** | `Ctrl+P` or context‑menu → **Mark Proofread** on selected rows. |
 | **Flow** |
 |  1 | SYS sets `Entry.status = PROOFREAD`. |
 |  2 | Table delegate re‑paints cell background light‑blue. |
 |  3 | Toolbar **Status ▼** label reflects the selected row status. |
 
-### UC‑04b  Mark as For Review
+### UC-04b  Mark as For Review
 | **Trigger** | `Ctrl+U` or Status ▼ → **For review** on selected rows. |
 | **Flow** |
 |  1 | SYS sets `Entry.status = FOR_REVIEW`. |
 |  2 | Table delegate re‑paints cell background **orange**. |
 |  3 | Toolbar **Status ▼** label reflects the selected row status. |
 
-### UC‑05  Search & Navigate
+### UC-04c  Mark as Translated
+| **Trigger** | `Ctrl+T` or Status ▼ → **Translated** on selected rows. |
+| **Flow** |
+|  1 | SYS sets `Entry.status = TRANSLATED`. |
+|  2 | Table delegate re‑paints cell background **green**. |
+|  3 | Toolbar **Status ▼** label reflects the selected row status. |
+
+### UC-05a  Search & Navigate
 | **Trigger** | Press **Enter** in search box (`Ctrl+F`) or use `F3` / `Shift+F3`. |
 | **Parameter** | Mode (Key / Source / Translation) and Regex toggle. |
 | **Flow** |
@@ -108,18 +115,18 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  2 | If the current file has no matches and the scope includes other files, SYS opens the next file with a match. |
 |  3 | `F3` / `Shift+F3` moves to next/prev match across files (opening files as needed), wrapping within scope. |
 
-### UC‑05 ter  Search & Replace
+### UC-05b  Search & Replace
 | **Trigger** | Toggle **Replace** control to expand the replace row. |
-| **Scope** | Current file only; **Translation** column only. |
+| **Scope** | Scope is taken from Preferences (`FILE | LOCALE | POOL`); **Translation** column only. |
 | **Flow** |
 |  1 | SYS exposes a **Replace** field plus **Replace** / **Replace All** buttons. |
 |  2 | If Regex is enabled, `$1`‑style capture references are allowed in Replace text. |
 |  3 | **Replace** updates only the current match row. |
-|  4 | **Replace All** updates all matches in the current file. |
+|  4 | **Replace All** updates all matches in the active replace scope. |
 |  5 | If the regex can match empty strings (e.g., `(.*)`), SYS performs a single replacement per cell. |
-| **Future** | A locale‑scope **Replace All** will apply to all files in the **current locale only** and must be explicitly labeled to avoid ambiguity. |
+| **Safety** | Multi-file replace requires explicit confirmation with affected files/counts before apply. |
 
-### UC‑06  Resolve Cache/Original Conflicts
+### UC-06  Resolve Cache/Original Conflicts
 | Field | Value |
 |-------|-------|
 | **Goal** | Resolve conflicts between cached drafts and modified originals. |
@@ -134,7 +141,20 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  6 | While the conflict table is visible, SYS MUST disable normal editing and file switching. |
 | **Post‑condition** | Conflicts resolved before returning to normal editing; cache updated accordingly. |
 
-### UC‑09  Preferences (Settings)
+### UC-06b  Orphan Cache Warning
+| Field | Value |
+|-------|-------|
+| **Goal** | Prevent silent drift from stale cache files that no longer map to source files. |
+| **Primary Actor** | SYS |
+| **Trigger** | After locale selection is applied for an open/switch flow. |
+| **Main Success Scenario** |
+|  1 | SYS scans cache entries only for selected locales and detects files whose source file is missing. |
+|  2 | SYS shows a warning dialog with **Purge** and **Dismiss** actions and a detailed list of orphan paths. |
+|  3 | On **Purge**, SYS deletes only detected orphan cache files. |
+|  4 | On **Dismiss**, SYS keeps cache files unchanged. |
+| **Post-condition** | User explicitly decides whether orphan caches are removed; no silent destructive cleanup. |
+
+### UC-07  Preferences (Settings)
 | Field | Value |
 |-------|-------|
 | **Goal** | Centralize non‑frequent settings to keep the toolbar uncluttered. |
@@ -148,10 +168,10 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  5 | User sets **Replace scope** (File / Locale / Locale Pool). |
 |  6 | User toggles general options (Prompt on Exit, Wrap Text, etc.). |
 |  7 | User toggles View options (whitespace glyphs, tag/escape highlighting, large‑text optimizations). |
-|  7 | On Apply/OK, SYS persists settings to `.tzp-config/settings.env`. |
+|  8 | On Apply/OK, SYS persists settings to `.tzp-config/settings.env`. |
 | **Post‑condition** | Next app launch uses the selected defaults; toolbar remains minimal. |
 
-### UC‑10  First Run — Select Default Root
+### UC-08  First Run - Select Default Root
 | Field | Value |
 |-------|-------|
 | **Goal** | Store a default project root when launching without CLI args. |
@@ -163,42 +183,119 @@ Same as UC‑01 but triggered via *Project ▸ Switch Locale…*.  Preconditio
 |  3 | SYS continues startup using the selected root. |
 | **Post‑condition** | Subsequent launches use the default root unless CLI args override. |
 
-### UC‑05 bis  Copy / Cut / Paste
+### UC-09  Copy / Cut / Paste
 | **Trigger** | *Edit ▸ Copy/Cut/Paste* or standard shortcuts. |
 | **Flow** |
 |  1 | If a **row** is selected, SYS copies the full row as tab‑delimited values: `Key\tSource\tValue\tStatus`. |
 |  2 | If a **cell** is selected, SYS copies only that cell. |
 |  3 | Cut/Paste only apply to the **Translation** cell (Value column). |
 
-### UC‑06  Save Project (Write Original)
+### UC-10a  Save Project (Write Original)
 | **Trigger** | *Project ▸ Save* (`Ctrl+S`) |
 | **Flow** |
 |  1 | SYS prompts **Write / Cache only / Cancel** and shows a scrollable list of files to be written (only files opened in this session). |
-|  2 | On **Write**, SYS MUST call `saver.write_atomic()` for every dirty file. |
+|  2 | On **Write**, SYS MUST call saver write flow for every dirty file. |
 |  3 | On success, `dirty` flags cleared and baseline updated. |
 |  4 | SYS writes (or updates) per‑file cache entries under `.tzp-cache/<locale>/<relative>.bin` for **edited files only** (status only; draft values cleared). |
 |  5 | Status line shows “Saved HH:MM:SS”.
 
-### UC‑06 bis  Dirty Indicator in File Tree
+### UC-10b  Dirty Indicator in File Tree
 | **Trigger** | Any edit that marks a file dirty. |
 | **Flow** |
 |  1 | SYS marks the file as dirty in the tree with a leading dot (`●`). |
 |  2 | On successful save, SYS removes the dot. |
 
-### UC‑07  Exit Application
+### UC-11  Exit Application
 | **Trigger** | Window close button or *Project ▸ Exit* |
 | **Flow** |
 |  1 | If ANY dirty files exist **and** `prompt_write_on_exit=true`, SYS prompts **Write / Cache only / Cancel** (only files opened in this session). |
-|  2 | On **Write**, UC‑06 is executed. |
+|  2 | On **Write**, UC-10a is executed. |
 |  3 | On **Cache only**, SYS persists drafts to `.tzp-cache` and exits. |
 |  4 | If `prompt_write_on_exit=false`, SYS skips the prompt and performs **Cache only**. |
 |  5 | SYS shuts down, releasing file handles. |
 
-### UC‑08  Crash Recovery (Deferred)
+### UC-12  Crash Recovery (Deferred)
 | **Trigger** | Application restarts after abnormal termination. |
 | **Flow** |
 |  1 | v0.1 relies on `.tzp-cache` only; no extra recovery file is created. |
 |  2 | Future: optional recovery prompt may be added if cache is extended. |
+
+### UC-13a  Side Panel Mode Switch
+| **Trigger** | Click **Files**, **TM**, or **Search** in the left panel toggle bar. |
+| **Flow** |
+|  1 | SYS switches the left panel stack to the selected mode. |
+|  2 | SYS preserves side-panel visibility and width preference. |
+|  3 | If TM mode is selected, SYS refreshes TM suggestions for current row context. |
+
+### UC-13b  TM Suggestions Query
+| Field | Value |
+|-------|-------|
+| **Goal** | Show ranked translation memory suggestions for the selected row. |
+| **Primary Actor** | TR / PR |
+| **Trigger** | TM panel active and row selection changes. |
+| **Main Success Scenario** |
+|  1 | SYS extracts Source text and target locale from current row/file. |
+|  2 | SYS runs asynchronous TM query (source locale → target locale). |
+|  3 | SYS shows ranked matches in TM list, including TM source name for each occurrence; stale async responses are ignored. |
+|  4 | SYS shows clear empty/error states: no context, no matches, filtered-out, query failure. |
+| **Post-condition** | TM list reflects current row and active filters without blocking the UI thread. |
+
+### UC-13c  Apply TM Suggestion
+| **Trigger** | Double-click a TM suggestion or press **Apply** in TM panel. |
+| **Flow** |
+|  1 | SYS writes selected suggestion text into current Translation cell. |
+|  2 | SYS sets row status to **For review**. |
+|  3 | SYS updates table/status widgets and persists draft/cache state via normal edit pipeline. |
+
+### UC-13d  Import TMX
+| **Trigger** | *TM ▸ Import TMX…* |
+| **Flow** |
+|  1 | SYS opens TMX file picker. |
+|  2 | SYS copies selected TMX into managed TM import folder (default: `imported_tms` at runtime root). |
+|  3 | SYS detects source/target locales from TMX metadata; if unresolved, SYS asks user to map locales manually. |
+|  4 | SYS imports TM units into project TM store for resolved locale pair (`origin=import`) and records TM source name. |
+|  5 | SYS reports imported unit count and unresolved/failed files when applicable. |
+
+### UC-13e  Drop-In TMX Sync
+| **Trigger** | User drops `.tmx` files into the managed TM import folder outside the app. |
+| **Flow** |
+|  1 | On TM panel activation, SYS scans TM import folder for new/changed/removed `.tmx` files. |
+|  2 | SYS auto-detects source/target locales when possible; for unresolved files, SYS immediately shows locale-mapping dialog(s). |
+|  3 | SYS imports locale-resolved files and removes TM entries for missing files. |
+|  4 | If mapping is still unresolved (user cancels or invalid pair), SYS keeps file in pending state and excludes it from TM suggestions. |
+| **Post-condition** | TM store reflects folder content without mixing unrelated locale pairs. |
+
+### UC-13f  Resolve Pending Imported TMs
+| **Trigger** | *TM ▸ Resolve Pending Imported TMs…* |
+| **Flow** |
+|  1 | SYS lists pending import files lacking reliable locale mapping. |
+|  2 | SYS asks user to select source/target locales per file. |
+|  3 | SYS imports resolved files and marks them ready. |
+|  4 | SYS keeps unresolved files pending if user cancels mapping; pending files remain excluded from TM suggestions. |
+
+### UC-13g  Export TMX
+| **Trigger** | *TM ▸ Export TMX…* |
+| **Flow** |
+|  1 | SYS opens save dialog for TMX output path. |
+|  2 | SYS asks user for source/target locales to export. |
+|  3 | SYS writes TMX stream from project TM for selected pair and reports exported unit count. |
+
+### UC-13h  Rebuild Project TM (Selected Locales)
+| **Trigger** | *TM ▸ Rebuild Project TM (Selected Locales)* |
+| **Flow** |
+|  1 | SYS validates selected non-EN locales. |
+|  2 | SYS starts background rebuild worker that pairs EN source with target translations. |
+|  3 | SYS updates status bar progress/result and preserves UI responsiveness. |
+|  4 | On completion, SYS clears TM query cache and refreshes TM panel when visible. |
+| **Notes** | SYS may also auto-bootstrap TM when selected locale pair has no TM entries. |
+
+### UC-13i  TM Filters
+| **Trigger** | User changes TM filter controls (minimum score, project/import origin toggles). |
+| **Flow** |
+|  1 | SYS persists filter values in preferences. |
+|  2 | SYS re-runs/refines TM suggestions using active filters. |
+|  3 | SYS shows explicit states when filters exclude all matches. |
+| **Post-condition** | TM list reflects persisted filter policy and current row context. |
 
 ---
 ## 4  GUI Wireframe (ASCII)
@@ -253,7 +350,7 @@ UNTOUCHED ──────────────────────▶ 
 ## 7  Assumptions & Open Issues
 1. **File Encoding**: Each locale *may* use a different charset.  SYS MUST read `<locale>/language.txt` for the `charset = …` setting (e.g. `Cp1251`) and decode all files accordingly.  When saving, files SHOULD be written back in the same charset; missing `charset` is a hard error for that locale and the locale cannot open until fixed (warning shown, other locales still open).
 2. **Multiline Strings**: handled via parser token concatenation; no GUI wrap concerns beyond row height.
-3. **Locale Names**: mapping code → English name shipped in static JSON (ISO‑639‑1).
+3. **Locale Names**: display labels are taken from `<locale>/language.txt` (`text = ...`); locale code is the directory name.
 4. **Accessibility**: basic; no screen‑reader optimisation in MVP.\
 5. **Draft Cache**: SYS MUST persist entry statuses **and draft translations**
    into binary file `.bin` **in the currently selected locale folder
@@ -301,10 +398,4 @@ UNTOUCHED ──────────────────────▶ 
    translation equals Source). Implement **only after** TM import/export is complete.
 
 ---
-_Last updated: 2026‑02‑04 (v0.3.18)_
-### UC‑04c  Mark as Translated
-| **Trigger** | `Ctrl+T` or Status ▼ → **Translated** on selected rows. |
-| **Flow** |
-|  1 | SYS sets `Entry.status = TRANSLATED`. |
-|  2 | Table delegate re‑paints cell background **green**. |
-|  3 | Toolbar **Status ▼** label reflects the selected row status. |
+_Last updated: 2026‑02‑07 (v0.3.22)_

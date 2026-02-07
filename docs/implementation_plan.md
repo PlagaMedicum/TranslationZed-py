@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-05_
+_Last updated: 2026-02-07_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.1 is shipped; this plan now
@@ -337,6 +337,33 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ## 4) v0.2 Focus Plan (draft, ordered)
 
 Priority A — **Core workflow completeness** (ordered, status)
+A0 [→] **Main-window declutter + explicit application layer (Clean architecture)**
+   - **Problem**: orchestration is concentrated in `gui/main_window.py`, blending UI,
+     file/session orchestration, persistence, conflict logic, TM flows, and perf controls.
+   - **Impact**: fragile changes, high regression risk, slower feature delivery, and weak
+     boundary enforcement between GUI/core/infrastructure.
+   - **Target**: move non-UI orchestration into explicit application services with strict
+     dependency direction (GUI -> application -> core/infrastructure adapters).
+   - **Mini-steps (ordered)**:
+     - [ ] Define service boundaries and dependency contracts:
+       - [ ] `ProjectSessionService` (open/switch locale, auto-open policy).
+       - [ ] `FileWorkflowService` (parse/cache overlay/save/write conflict gate).
+       - [ ] `ConflictService` (detect, merge decisions, status rules).
+       - [ ] `SearchReplaceService` (scope resolution + cross-file navigation).
+       - [ ] `PreferencesService` (bootstrap/load/save and root policy).
+     - [ ] Introduce thin DTOs/interfaces so services stay Qt-free.
+     - [ ] Move one workflow at a time from `main_window` into services:
+       1) preferences + startup root/bootstrap,
+       2) locale/session switching,
+       3) file open/save/cache write,
+       4) conflict orchestration,
+       5) search/replace scope execution.
+     - [ ] Keep GUI methods as adapters only (signal wiring + rendering state).
+     - [ ] Add integration tests per extracted service boundary before each next extraction.
+   - **Acceptance**:
+     - [ ] `main_window.py` no longer owns core workflow decisions directly.
+     - [ ] Service-level tests cover open/switch/save/conflict/search flows.
+     - [ ] Behavior parity confirmed by existing regression suite + perf budgets.
 A1 [✓] **Search/Replace scopes**
    - **Problem**: scopes are persisted but not enforced; users expect Locale/Pool yet only File is reliable.
    - **Impact**: false confidence, missed matches, and inconsistent replace behavior.
@@ -450,6 +477,11 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Test-safe TM UI teardown (no modal dialog deadlocks in pytest).
      - [✓] Project‑TM rebuild/bootstrap for selected locales (menu action + auto‑bootstrap if empty, background worker).
      - [✓] TM filters: minimum score and origin toggles (project/import), persisted in preferences.
+     - [✓] Managed TM import folder (`TM_IMPORT_DIR`) with default under runtime root; configurable in Preferences.
+     - [✓] TMX import now copies files into managed folder; drop-in `.tmx` files are discovered and synced.
+     - [✓] Locale-pair safety for imported TMs: unresolved locale metadata is kept pending until mapped manually.
+     - [✓] TM suggestions display TM source name (`tm_name`) so users can see where each match comes from.
+     - [✓] Menu action to resolve pending imported TMs with manual locale mapping.
    - **Deferred**: LanguageTool API (post‑v0.2).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.

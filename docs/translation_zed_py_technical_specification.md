@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.3.13 · 2026‑02‑04**\
+**Version 0.3.22 · 2026‑02‑07**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -77,15 +77,20 @@ translationzed_py/
 │   ├── saver.py             # multi‑file atomic writer
 │   ├── search.py            # index + query API
 │   ├── status_cache.py      # binary per-file status store
+│   ├── tm_store.py          # project TM storage/query (SQLite)
+│   ├── tmx_io.py            # TMX import/export
 │   ├── app_config.py        # TOML-configurable paths/adapters/formats
 │   └── preferences.py       # user settings (settings.env)
 ├── gui/
-│   ├── main_window.py       # QMainWindow skeleton
-│   ├── file_tree_panel.py   # QTreeView wrapper
-│   ├── translation_table.py # QTableView + model → core.model
-│   ├── search_dock.py       # live search bar
+│   ├── app.py               # QApplication bootstrap
+│   ├── commands.py          # undo/redo command objects
+│   ├── dialogs.py           # locale chooser + save dialogs
 │   ├── delegates.py         # paint/edit delegates
-│   └── dialogs.py           # locale chooser, unsaved‑changes
+│   ├── entry_model.py       # table model (Key|Source|Translation|Status)
+│   ├── fs_model.py          # file tree model
+│   ├── main_window.py       # primary GUI controller
+│   ├── perf_trace.py        # opt-in perf tracing
+│   └── preferences_dialog.py# preferences UI
 └── __main__.py              # CLI + GUI entry‑point
 ```
 
@@ -112,6 +117,21 @@ library/format swaps with minimal code churn.
 
 ## 5  Detailed Module Specifications
 
+### 5.0  Use-Case Traceability (UX spec §3)
+
+All UX behavior is normative in `docs/translation_zed_py_use_case_ux_specification.md`.
+This table binds technical sections to canonical UC IDs.
+
+| Technical area | Primary UC references |
+|---|---|
+| Startup EN hash guard | UC-00 |
+| Project open / locale switch / default root | UC-01, UC-02, UC-08 |
+| Entry editing + undo/redo + status shortcuts | UC-03, UC-03b, UC-04a, UC-04b, UC-04c |
+| Search and replace scopes | UC-05a, UC-05b, UC-07 |
+| Conflict/orphan cache handling | UC-06, UC-06b |
+| Save, dirty marker, exit behavior | UC-10a, UC-10b, UC-11, UC-12 |
+| Side panel + TM workflows | UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i |
+
 ### 5.1  `core.project_scanner`
 
 ```python
@@ -130,6 +150,7 @@ def scan_root(root: Path) -> dict[str, Path]:
   - `text` (human‑readable language name for UI)
 - `scan_root` raises if any `language.txt` is missing or malformed.
 - GUI uses a non-raising variant to collect errors, skip invalid locales, and show a warning.
+- Related UCs: UC-01, UC-02, UC-08.
 
 ### 5.2  `core.parser`
 
@@ -167,6 +188,7 @@ Parse algorithm:
    If program-generated status markers are later introduced, they must be
    explicitly namespaced to distinguish them from user comments (e.g. `TZP:`),
    and only those program‑generated comments are writable.
+- Related UCs: UC-03, UC-05b, UC-10a.
 
 ### 5.3  `core.model`
 
@@ -181,15 +203,15 @@ class ParsedFile:
     path: Path
     entries: list[Entry]
     dirty: bool
-    undo_stack: QUndoStack  # provided by QtCore
 ```
 
-- `update(key, new_value, new_status)` pushes `QUndoCommand`.
-- TranslationTableModel paints background per `Status`.
+- Core model stays Qt-free; undo/redo lives in GUI adapters.
+- Table rendering maps row backgrounds by `Status`.
+- Related UCs: UC-03b, UC-04a, UC-04b, UC-04c.
 
 ### 5.4  `core.saver`
 
-`write_atomic(pfile: ParsedFile, encoding: str) -> None`
+`save(pfile: ParsedFile, new_entries: dict[str, str], encoding: str) -> None`
 
 Algorithm:
 
@@ -203,10 +225,11 @@ Algorithm:
      do **not** collapse the chain into a single literal.
    - All non‑literal bytes (comments, whitespace, braces, punctuation) are
      preserved byte‑exactly; ordering is never modified.
-   - After a successful write, recompute in‑memory spans using a cumulative
-     delta to keep subsequent edits stable in the same session.
+  - After a successful write, recompute in‑memory spans using a cumulative
+    delta to keep subsequent edits stable in the same session.
   - Write to `path.with_suffix(".tmp")` encoded with the same charset, then `os.replace`.
 2. Emit Qt signal `saved(files=...)`. `saved(files=...)`.
+- Related UCs: UC-10a, UC-11.
 
 ### 5.5  `core.search`
 
@@ -217,20 +240,26 @@ Algorithm:
 - Returns `(file_path, row_index)` list for selection (multi‑file capable).
 - Future: optional `match_span`/`snippet` payload for preview; not in v0.1.
 - GUI must delegate search logic to this module (no GUI-level search).
+- Related UCs: UC-05a.
 
 ### 5.5.1  Search & Replace UI semantics
 
 - Search runs across selected locales; auto‑selects the **first match in the current file** only.
 - Cross‑file navigation is explicit via next/prev shortcuts; switching files does not auto‑jump.
-- Replace is **current file only** and **Translation column only**.
+- Replace targets the **Translation** column and respects active replace scope.
 - Regex replacement supports `$1`‑style capture references (mapped to Python `\g<1>`).
 - If a regex can match empty strings (e.g. `(.*)`), replacement is applied **once per cell**.
-- Future: replace scopes are configurable via Preferences (see §5.6); scope labels must be explicit.
+- Search/replace scopes are configurable via Preferences and applied independently.
+- Related UCs: UC-05a, UC-05b, UC-07.
 
 ### 5.6  `core.preferences`
 
 - Local config only; no `~` usage.
-- Env file at `<project-root>/.tzp-config/settings.env`.
+- Single settings file only.
+- Env file path: `<runtime-root>/.tzp-config/settings.env`
+  (`runtime-root` = source run `cwd`, frozen build executable directory)
+- `load()` is pure read (no disk writes).
+- `ensure_defaults()` is explicit bootstrap used at startup.
 - Keys:
   - `PROMPT_WRITE_ON_EXIT=true|false`
   - `WRAP_TEXT=true|false`
@@ -238,12 +267,15 @@ Algorithm:
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
   - `DEFAULT_ROOT=<path>` (default project root in Preferences)
+  - `TM_IMPORT_DIR=<path>` (managed folder for imported TMX files)
   - `SEARCH_SCOPE=FILE|LOCALE|POOL`
   - `REPLACE_SCOPE=FILE|LOCALE|POOL`
 - (No last‑open metadata in settings; timestamps live in per‑file cache headers.)
-- Search order: **cwd first, then project root**, later values override earlier.
-- Store: last root path, last locale(s), window geometry, theme, wrap‑text toggle.
+- Store: last root path, last locale(s), window geometry, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
+- **tm_import_dir**: folder scanned for imported `.tmx` files; defaults to
+  `<runtime-root>/imported_tms`.
+- Related UCs: UC-07, UC-08, UC-11.
 
 #### 5.6.1  Search & Replace preferences
 
@@ -283,10 +315,9 @@ Algorithm:
     and avoid full decode for lazy values.
   - Editors always load **full text** (no truncation).
 - When disabled: none of the above guardrails apply.
-  but does not modify it.
-- Users can change or clear `DEFAULT_ROOT` only via Preferences.
+- Users can change or clear `DEFAULT_ROOT` via Preferences.
 
-### 5.6.2  `core.app_config`
+### 5.7  `core.app_config`
 
 - TOML file at `<project-root>/config/app.toml` (checked after cwd, optional).
 - Purpose: minimize hard‑coding and enable quick adapter/format swaps without refactors.
@@ -298,12 +329,12 @@ Algorithm:
 - Swappable adapters are selected by name; actual implementations live behind
   interfaces in the application layer (clean architecture).
 
-### 5.6.3  `config/ci.yaml` (reserved)
+### 5.8  `config/ci.yaml` (reserved)
 
 - YAML placeholder for future CI pipelines.
 - Lists scripted steps (lint/typecheck/test) to keep CI assembly lightweight.
 
-### 5.7  `gui.main_window`
+### 5.9  `gui.main_window`
 
 - Menu structure:
   - **General**: Open, Save, Switch Locale(s), Preferences, Exit
@@ -321,7 +352,7 @@ if dirty_files and not prompt_save():
     event.ignore(); return
 ```
 
-- **Status ▼** triggers `set_selected_status(status)` on TranslationTableModel.
+- **Status ▼** triggers status updates through the active translation model.
 - Status UI: table shows per-row status (colors); the **Status ▼** label shows
   the currently selected row status.
 - Locale selection uses checkboxes for multi-select; EN is excluded from the
@@ -339,8 +370,9 @@ if dirty_files and not prompt_save():
   Row selection is achieved via row header; cell selection remains enabled.
 - Status bar shows `Saved HH:MM:SS | Row i / n | <locale/relative/path>`.
 - Regex help: a small **“?”** button opens Python `re` docs in the browser.
+- Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b.
 
-### 5.7.1  UI Guidelines (GNOME + KDE)
+### 5.9.1  UI Guidelines (GNOME + KDE)
 
 - Prefer **native Qt widgets** and platform theme; avoid custom palettes/styles.
 - Use **standard dialogs** (`QFileDialog`, `QMessageBox`) to match platform HIG.
@@ -350,21 +382,21 @@ if dirty_files and not prompt_save():
   to avoid clutter.
 - Provide **compact, fast UI**: minimal chrome, clear focus order, no heavy redraws.
 
-### 5.8  `gui.translation_table`  `gui.translation_table`
+### 5.10  `gui.entry_model` + `gui.delegates`
 
-- Inherits `QTableView`, uses `TranslationTableModel`.
-- Override `keyPressEvent` to commit on `Qt.Key_Return` then `QModelIndex.sibling(row+1, col)`.
-- Column delegates:
-  - **StatusDelegate**: background colours
-    - **Empty cell**: red (highest priority; overrides status colours)
-    - Untouched: none
-    - For review: orange (#ffd8a8)
-    - Translated: light‑green (#ccffcc)
-    - Proofread: light‑blue (#cce5ff)
-  - **EditDelegate**  : plain `QLineEdit`.
-- Key bindings: `Ctrl+F` opens search, `F3`/`Shift+F3` next/prev match, `Ctrl+P` mark Proofread.
+- Table uses `QTableView` + `TranslationModel` (`entry_model.py`).
+- Delegates:
+  - `StatusDelegate` for status editing/rendering.
+  - `VisualTextDelegate` for highlighting/whitespace glyphs/render optimization.
+- Validation/UI semantics:
+  - Empty source/translation cells render red (highest priority).
+  - Status colors: For review = orange, Translated = green, Proofread = light blue.
+- Shortcuts:
+  - `Ctrl+F` focus search; `F3`/`Shift+F3` navigation.
+  - `Ctrl+P` Proofread, `Ctrl+T` Translated, `Ctrl+U` For review.
+- Related UCs: UC-03, UC-04a, UC-04b, UC-04c, UC-05a.
 
-### 5.9  `core.status_cache`
+### 5.11  `core.status_cache`
 
 Binary cache stored **per translation file** (1:1 with each `.txt`), inside a
 hidden `.tzp-cache/` subfolder under the repo root, preserving relative paths.
@@ -417,8 +449,9 @@ Cache path convention:
 - For a translation file `<root>/<locale>/path/file.txt`, the cache lives at
   `<root>/<cache_dir>/<locale>/path/file.bin` where `cache_dir` is configured in
   `config/app.toml` (default `.tzp-cache`).
+- Related UCs: UC-06, UC-06b, UC-10a, UC-10b, UC-11, UC-12.
 
-### 5.9.1  `core.en_hash_cache`
+### 5.11.1  `core.en_hash_cache`
 
 Track hashes of English files (raw bytes) to detect upstream changes.
 - Stored in a **single index file** at `<root>/<cache_dir>/<en_hash_filename>`,
@@ -428,10 +461,11 @@ Track hashes of English files (raw bytes) to detect upstream changes.
 
 A missing or corrupt cache MUST be ignored gracefully (all entries fall back to
 UNTOUCHED).
+- Related UCs: UC-00.
 
 ---
 
-### 5.9.2  `core.tm_store` + TMX I/O
+### 5.11.2  `core.tm_store` + TMX I/O
 
 - Project‑scoped SQLite DB at `<root>/.tzp-config/tm.sqlite`.
 - Table `tm_entries` stores:
@@ -446,22 +480,31 @@ UNTOUCHED).
   - Exact match returns score **100**.
   - Fuzzy match uses `SequenceMatcher` on a bounded candidate set; keeps scores ≥30.
   - Project TM outranks imported TM.
+  - TM suggestions include source name (`tm_name`) so users see where each match came from.
   - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.
 - TMX import/export:
   - `core.tmx_io.iter_tmx_pairs` streams `<tu>`/`<tuv>` pairs for a **source+target locale**.
   - `core.tmx_io.write_tmx` exports current TM to TMX for a source+target locale pair.
- - Project TM rebuild:
+  - Imported TMX files are copied into and synchronized from `TM_IMPORT_DIR`; drop-in files are
+    discovered on TM panel activation.
+  - Locale mapping for imported TMX is auto-detected when reliable; unresolved files trigger an
+    immediate locale-mapping dialog when TM panel is opened.
+  - Pending/unresolved imported files are excluded from TM suggestions until mapping is completed.
+- Project TM rebuild:
    - UI can rebuild project TM by scanning selected locales and pairing target entries with EN source.
    - Auto‑bootstrap runs when a selected locale pair has no TM entries.
    - Rebuild/bootstrapping runs asynchronously (background worker).
+- Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i.
 
 ---
 
-### 5.10 Conflict resolution (cache vs original)
+### 5.12 Conflict resolution (cache vs original)
 
 - Conflicts compare cached **original snapshots** to current file values (value-only compare).
 - If the user keeps the **cache** value, the entry status is taken from the cache.
 - If the user keeps the **original** value, the entry status is forced to **For review**.
+- Orphan cache detection warns per selected locale with purge/dismiss actions.
+- Related UCs: UC-06, UC-06b.
 
 ---
 
@@ -540,14 +583,14 @@ v0.1 uses **cache‑only** recovery:
 
 ---
 
-## 11  Build, Packaging, CI
+## 12  Build, Packaging, CI
 
 - **Source build**: `pip install -e .[dev]` for development; `make venv` + `make run` for local use.
 - **Executables**: PyInstaller is the baseline packager. Builds must be produced on each target OS
   (Linux/Windows/macOS) and bundle LICENSE + README.
 - **CI**: GitHub Actions matrix (Linux/Windows/macOS) runs ruff, mypy, pytest; Linux runs Qt offscreen.
 
-## 12  Backlog (Post‑v0.1)
+## 13  Backlog (Post‑v0.1)
 
 1. English diff colours (NEW / REMOVED / MODIFIED).
 2. Item/Recipe template generator.
@@ -559,7 +602,7 @@ v0.1 uses **cache‑only** recovery:
    characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
 8. Dark system theme support (follow OS theme; no custom theming).
 
-## 13  Undo / Redo
+## 14  Undo / Redo
 
 The application SHALL expose unlimited undo/redo via `QUndoStack`.
 
@@ -575,7 +618,7 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-## 14  License & Compliance
+## 15  License & Compliance
 
 - **Project license**: GNU GPLv3 (see `LICENSE`). Distributions must provide source and preserve GPL
   notices; interactive UI should expose **Appropriate Legal Notices** (GPLv3 §0) and a no‑warranty
@@ -585,4 +628,15 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-04 (v0.3.11)*
+## 16  Spec Gaps To Resolve
+
+- Application/use-case layer extraction is incomplete: orchestration remains concentrated in
+  `gui.main_window`; move file/session/save/conflict workflows to explicit services.
+- Clean-architecture boundary ownership is not yet codified per module package; add a strict
+  dependency matrix and enforce it in review/testing.
+- Derived docs (`flows`, `checklists`, `technical_notes_current_state`) must be kept synced to
+  this document; stale statements should be treated as documentation defects and fixed quickly.
+
+---
+
+*Last updated: 2026-02-07 (v0.3.22)*

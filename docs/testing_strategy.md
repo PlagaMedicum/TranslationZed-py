@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-04_
+_Last updated: 2026-02-07_
 
 ---
 
@@ -43,12 +43,13 @@ _Last updated: 2026-02-04_
 - Confirm no original files were modified unless explicitly saved.
 
 ### 2.5 Performance Smoke (manual)
-- Open a large locale (e.g., `Recorded_Media_*`) and verify UI responsiveness.
-- Windows edge-case smoke (prod repo):
-  - `BE/UI_BE.txt` (unescaped quotes in `/startrain "intensity"` strings)
-  - `RU/Stash_RU.txt` (`""zippees", ...` double-quote prefix)
-  - `KO/UI_KO.txt` (inner quotes + UTF‑16)
-  - `KO/Recorded_Media_KO.txt` (`// Auto-generated file` header + missing opening quotes)
+- Open large fixture files and verify UI responsiveness.
+- Preferred manual smoke corpus:
+  - `tests/fixtures/perf_root/BE/SurvivalGuide_BE.txt`
+  - `tests/fixtures/perf_root/BE/Recorded_Media_BE.txt`
+  - `tests/fixtures/perf_root/BE/News_BE.txt`
+- Edge-case parse corpus (fixture slices):
+  - `tests/fixtures/prod_like/` and `tests/fixtures/golden/`
 - Measure time from app launch to first table render (target < 2s on cached project).
 - Run a regex search and confirm UI stays responsive (<100ms typical).
 
@@ -97,9 +98,9 @@ Cost:
 
 Decision: maintain a **golden set** for UTF‑8, cp1251, and UTF‑16 to guarantee
 byte‑exact preservation across encodings. Golden inputs/outputs are now present
-under `tests/fixtures/golden/` and validated in tests. Prefer deriving fixtures
-from the `ProjectZomboidTranslations` repo (reference only) to capture real
-edge‑cases in structure and encoding.
+under `tests/fixtures/golden/` and validated in tests. External corpora may be
+used only to derive fixture slices, which must then be committed under `tests/fixtures/`.
+Test and perf workflows must not require external directories.
 
 ---
 
@@ -114,8 +115,8 @@ They include:
 - UTF‑16 (KO) and cp1251 (RU)
 - Subfolders with punctuation
 - `_TVRADIO_TRANSLATIONS` to ignore
-- Real‑world samples should be derived from `ProjectZomboidTranslations/` when possible
-  (reference only; do not vendor full repo into tests).
+- Real-world edge cases should be represented by committed fixture slices only.
+- Do not require external repositories to run `make test` or `make verify`.
 - Manual conflict fixture: `tests/fixtures/conflict_manual/` (prebuilt cache + changed file)
   to exercise the conflict resolution UI.
 
@@ -139,6 +140,7 @@ They include:
 - GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
 - TM: SQLite store round‑trip, exact/fuzzy query, TMX import/export.
+- TM import metadata: per-file import registry, replace/delete lifecycle, and TM source-name propagation in query results.
 
 **Not covered yet (automation gaps, by layer):**
 
@@ -159,6 +161,7 @@ They include:
 - Replace‑all across File/Locale/Pool: confirmation list, cancel path, and per‑file counts.
 - Cache‑dirty dots driven by cache header `has_drafts` (startup + after edits).
 - Preferences persistence for UI state: tree width, column widths, view toggles, search/replace scopes.
+- TM import-folder sync: drop-in discovery, pending locale mapping, manual resolve flow, and stale-file cleanup.
 - Detail panel large‑string guard: truncated preview + focus‑load full text; no truncated commit.
 
 **System / functional / regression / smoke gaps**
