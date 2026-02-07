@@ -23,8 +23,23 @@ class TMMatch:
     target_text: str
     score: int
     origin: str
+    tm_name: str | None
+    tm_path: str | None
     file_path: str | None
     key: str | None
+    updated_at: int
+
+
+@dataclass(frozen=True, slots=True)
+class TMImportFile:
+    tm_path: str
+    tm_name: str
+    source_locale: str
+    target_locale: str
+    mtime_ns: int
+    file_size: int
+    status: str
+    note: str
     updated_at: int
 
 
@@ -124,13 +139,32 @@ class TMStore:
                 source_locale TEXT NOT NULL,
                 target_locale TEXT NOT NULL,
                 origin TEXT NOT NULL,
+                tm_name TEXT,
+                tm_path TEXT,
                 file_path TEXT,
                 key TEXT,
                 updated_at INTEGER NOT NULL
             )
             """
         )
+        self._ensure_tm_entries_columns()
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tm_import_files (
+                tm_path TEXT PRIMARY KEY,
+                tm_name TEXT NOT NULL,
+                source_locale TEXT,
+                target_locale TEXT,
+                mtime_ns INTEGER NOT NULL,
+                file_size INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                note TEXT NOT NULL DEFAULT '',
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
         self._conn.execute("DROP INDEX IF EXISTS tm_project_key")
+        self._conn.execute("DROP INDEX IF EXISTS tm_import_unique")
         self._conn.execute(
             """
             CREATE UNIQUE INDEX IF NOT EXISTS tm_project_key
@@ -140,7 +174,14 @@ class TMStore:
         self._conn.execute(
             """
             CREATE UNIQUE INDEX IF NOT EXISTS tm_import_unique
-            ON tm_entries(origin, source_locale, target_locale, source_norm, target_text)
+            ON tm_entries(
+                origin,
+                source_locale,
+                target_locale,
+                tm_name,
+                source_norm,
+                target_text
+            )
             WHERE origin = 'import'
             """
         )
@@ -156,7 +197,23 @@ class TMStore:
             ON tm_entries(source_locale, target_locale, source_prefix, source_len)
             """
         )
+        self._conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS tm_import_path_lookup
+            ON tm_entries(origin, tm_path)
+            """
+        )
         self._conn.commit()
+
+    def _ensure_tm_entries_columns(self) -> None:
+        cols = {
+            row["name"]
+            for row in self._conn.execute("PRAGMA table_info(tm_entries)").fetchall()
+        }
+        if "tm_name" not in cols:
+            self._conn.execute("ALTER TABLE tm_entries ADD COLUMN tm_name TEXT")
+        if "tm_path" not in cols:
+            self._conn.execute("ALTER TABLE tm_entries ADD COLUMN tm_path TEXT")
 
     def upsert_project_entries(
         self,
@@ -188,6 +245,8 @@ class TMStore:
                     source_locale,
                     target_locale,
                     _PROJECT_ORIGIN,
+                    None,
+                    None,
                     file_path,
                     key,
                     now,
@@ -206,10 +265,12 @@ class TMStore:
                 source_locale,
                 target_locale,
                 origin,
+                tm_name,
+                tm_path,
                 file_path,
                 key,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(origin, source_locale, target_locale, file_path, key)
             DO UPDATE SET
                 source_text=excluded.source_text,
@@ -231,10 +292,14 @@ class TMStore:
         *,
         source_locale: str,
         target_locale: str,
+        tm_name: str | None = None,
+        tm_path: str | None = None,
         updated_at: int | None = None,
     ) -> int:
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
+        tm_name = (tm_name or "").strip() or None
+        tm_path = str(tm_path).strip() if tm_path else None
         now = int(updated_at if updated_at is not None else time.time())
         rows = []
         for source_text, target_text in pairs:
@@ -253,6 +318,8 @@ class TMStore:
                     source_locale,
                     target_locale,
                     _IMPORT_ORIGIN,
+                    tm_name,
+                    tm_path,
                     None,
                     None,
                     now,
@@ -271,10 +338,12 @@ class TMStore:
                 source_locale,
                 target_locale,
                 origin,
+                tm_name,
+                tm_path,
                 file_path,
                 key,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -287,8 +356,150 @@ class TMStore:
         target_locale = _normalize_locale(target_locale)
         pairs = iter_tmx_pairs(path, source_locale, target_locale)
         return self.insert_import_pairs(
-            pairs, source_locale=source_locale, target_locale=target_locale
+            pairs,
+            source_locale=source_locale,
+            target_locale=target_locale,
+            tm_name=path.stem,
+            tm_path=str(path),
         )
+
+    def replace_import_tmx(
+        self,
+        path: Path,
+        *,
+        source_locale: str,
+        target_locale: str,
+        tm_name: str | None = None,
+    ) -> int:
+        source_locale = _normalize_locale(source_locale)
+        target_locale = _normalize_locale(target_locale)
+        name = (tm_name or path.stem).strip() or path.stem
+        path_str = str(path)
+        self._conn.execute(
+            """
+            DELETE FROM tm_entries
+            WHERE origin = ? AND tm_path = ?
+            """,
+            (_IMPORT_ORIGIN, path_str),
+        )
+        count = self.insert_import_pairs(
+            iter_tmx_pairs(path, source_locale, target_locale),
+            source_locale=source_locale,
+            target_locale=target_locale,
+            tm_name=name,
+            tm_path=path_str,
+        )
+        self.upsert_import_file(
+            tm_path=path_str,
+            tm_name=name,
+            source_locale=source_locale,
+            target_locale=target_locale,
+            mtime_ns=path.stat().st_mtime_ns,
+            file_size=path.stat().st_size,
+            status="ready",
+            note="",
+        )
+        return count
+
+    def list_import_files(self) -> list[TMImportFile]:
+        rows = self._conn.execute(
+            """
+            SELECT
+                tm_path,
+                tm_name,
+                COALESCE(source_locale, '') AS source_locale,
+                COALESCE(target_locale, '') AS target_locale,
+                mtime_ns,
+                file_size,
+                status,
+                note,
+                updated_at
+            FROM tm_import_files
+            ORDER BY tm_name COLLATE NOCASE, tm_path
+            """
+        ).fetchall()
+        return [
+            TMImportFile(
+                tm_path=row["tm_path"],
+                tm_name=row["tm_name"],
+                source_locale=row["source_locale"],
+                target_locale=row["target_locale"],
+                mtime_ns=int(row["mtime_ns"]),
+                file_size=int(row["file_size"]),
+                status=row["status"],
+                note=row["note"],
+                updated_at=int(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    def upsert_import_file(
+        self,
+        *,
+        tm_path: str,
+        tm_name: str,
+        source_locale: str = "",
+        target_locale: str = "",
+        mtime_ns: int,
+        file_size: int,
+        status: str,
+        note: str = "",
+        updated_at: int | None = None,
+    ) -> None:
+        now = int(updated_at if updated_at is not None else time.time())
+        self._conn.execute(
+            """
+            INSERT INTO tm_import_files(
+                tm_path,
+                tm_name,
+                source_locale,
+                target_locale,
+                mtime_ns,
+                file_size,
+                status,
+                note,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tm_path) DO UPDATE SET
+                tm_name=excluded.tm_name,
+                source_locale=excluded.source_locale,
+                target_locale=excluded.target_locale,
+                mtime_ns=excluded.mtime_ns,
+                file_size=excluded.file_size,
+                status=excluded.status,
+                note=excluded.note,
+                updated_at=excluded.updated_at
+            """,
+            (
+                tm_path,
+                tm_name,
+                _normalize_locale(source_locale) if source_locale else "",
+                _normalize_locale(target_locale) if target_locale else "",
+                int(mtime_ns),
+                int(file_size),
+                status,
+                note,
+                now,
+            ),
+        )
+        self._conn.commit()
+
+    def delete_import_file(self, tm_path: str) -> None:
+        self._conn.execute(
+            """
+            DELETE FROM tm_entries
+            WHERE origin = ? AND tm_path = ?
+            """,
+            (_IMPORT_ORIGIN, tm_path),
+        )
+        self._conn.execute(
+            """
+            DELETE FROM tm_import_files
+            WHERE tm_path = ?
+            """,
+            (tm_path,),
+        )
+        self._conn.commit()
 
     def export_tmx(
         self,
@@ -393,7 +604,15 @@ class TMStore:
             origin_params = (origin_list[0], origin_list[1])
         exact_rows = conn.execute(
             f"""
-            SELECT source_text, target_text, origin, file_path, key, updated_at
+            SELECT
+                source_text,
+                target_text,
+                origin,
+                tm_name,
+                tm_path,
+                file_path,
+                key,
+                updated_at
             FROM tm_entries
             WHERE source_locale = ? AND target_locale = ? AND source_norm = ?
               AND {origin_clause}
@@ -402,9 +621,14 @@ class TMStore:
             (source_locale, target_locale, norm, *origin_params),
         ).fetchall()
         matches: list[TMMatch] = []
-        seen: set[tuple[str, str, str]] = set()
+        seen: set[tuple[str, str, str, str | None]] = set()
         for row in exact_rows:
-            key = (row["source_text"], row["target_text"], row["origin"])
+            key = (
+                row["source_text"],
+                row["target_text"],
+                row["origin"],
+                row["tm_name"],
+            )
             if key in seen:
                 continue
             seen.add(key)
@@ -414,6 +638,8 @@ class TMStore:
                     target_text=row["target_text"],
                     score=100,
                     origin=row["origin"],
+                    tm_name=row["tm_name"],
+                    tm_path=row["tm_path"],
                     file_path=row["file_path"],
                     key=row["key"],
                     updated_at=row["updated_at"],
@@ -427,7 +653,12 @@ class TMStore:
             conn, norm, source_locale, target_locale, origin_list
         )
         for cand, score in candidates:
-            key = (cand["source_text"], cand["target_text"], cand["origin"])
+            key = (
+                cand["source_text"],
+                cand["target_text"],
+                cand["origin"],
+                cand["tm_name"],
+            )
             if key in seen:
                 continue
             if score < min_score:
@@ -439,6 +670,8 @@ class TMStore:
                     target_text=cand["target_text"],
                     score=score,
                     origin=cand["origin"],
+                    tm_name=cand["tm_name"],
+                    tm_path=cand["tm_path"],
                     file_path=cand["file_path"],
                     key=cand["key"],
                     updated_at=cand["updated_at"],
@@ -474,12 +707,13 @@ class TMStore:
         max_len = int(length * 1.4) if length > 5 else length + 10
         rows = conn.execute(
             f"""
-            SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
-            FROM tm_entries
-            WHERE source_locale = ? AND target_locale = ? AND source_prefix = ?
-              AND source_len BETWEEN ? AND ?
-              AND {origin_clause}
-            ORDER BY updated_at DESC
+                SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
+                     , tm_name, tm_path
+                FROM tm_entries
+                WHERE source_locale = ? AND target_locale = ? AND source_prefix = ?
+                  AND source_len BETWEEN ? AND ?
+                  AND {origin_clause}
+                ORDER BY updated_at DESC
             LIMIT ?
             """,
             (
@@ -496,6 +730,7 @@ class TMStore:
             rows = conn.execute(
                 f"""
                 SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
+                     , tm_name, tm_path
                 FROM tm_entries
                 WHERE source_locale = ? AND target_locale = ?
                   AND source_len BETWEEN ? AND ?
