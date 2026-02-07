@@ -122,6 +122,34 @@ from translationzed_py.core.tm_import_sync import (
 from translationzed_py.core.tm_import_sync import (
     sync_import_folder as _sync_tm_import_folder_core,
 )
+from translationzed_py.core.tm_preferences import (
+    actions_from_values as _tm_pref_actions_from_values,
+)
+from translationzed_py.core.tm_preferences import (
+    apply_actions as _apply_tm_pref_actions_core,
+)
+from translationzed_py.core.tm_query import (
+    TMQueryKey,
+    TMQueryPolicy,
+)
+from translationzed_py.core.tm_query import (
+    current_key_from_lookup as _tm_current_key_from_lookup,
+)
+from translationzed_py.core.tm_query import (
+    filter_matches as _tm_filter_matches,
+)
+from translationzed_py.core.tm_query import (
+    has_enabled_origins as _tm_has_enabled_origins,
+)
+from translationzed_py.core.tm_query import (
+    make_cache_key as _tm_make_cache_key,
+)
+from translationzed_py.core.tm_query import (
+    normalize_min_score as _tm_normalize_min_score,
+)
+from translationzed_py.core.tm_query import (
+    origins_for as _tm_origins_for,
+)
 from translationzed_py.core.tm_store import TMMatch, TMStore
 
 from .delegates import (
@@ -479,15 +507,13 @@ class MainWindow(QMainWindow):
         self._en_cache: dict[Path, ParsedFile] = {}
         self._child_windows: list[MainWindow] = []
         self._tm_store: TMStore | None = None
-        self._tm_cache: OrderedDict[
-            tuple[str, str, str, int, bool, bool], list[TMMatch]
-        ] = OrderedDict()
+        self._tm_cache: OrderedDict[TMQueryKey, list[TMMatch]] = OrderedDict()
         self._tm_cache_limit = 128
         self._tm_pending: dict[str, dict[str, tuple[str, str, str]]] = {}
         self._tm_source_locale = "EN"
         self._tm_query_pool: ThreadPoolExecutor | None = None
         self._tm_query_future: Future[list[TMMatch]] | None = None
-        self._tm_query_key: tuple[str, str, str, int, bool, bool] | None = None
+        self._tm_query_key: TMQueryKey | None = None
         self._tm_rebuild_pool: ThreadPoolExecutor | None = None
         self._tm_rebuild_future: Future[dict[str, int]] | None = None
         self._tm_rebuild_locales: list[str] = []
@@ -2112,73 +2138,48 @@ class MainWindow(QMainWindow):
         self._update_status_bar()
 
     def _apply_tm_preferences_actions(self, values: dict) -> None:
-        remove_paths_raw = values.get("tm_remove_paths", []) or []
-        enabled_raw = values.get("tm_enabled", {}) or {}
-        import_paths_raw = values.get("tm_import_paths", []) or []
-        if not remove_paths_raw and not enabled_raw and not import_paths_raw:
+        actions = _tm_pref_actions_from_values(values)
+        if actions.is_empty():
             return
         if not self._ensure_tm_store():
             return
-        remove_paths = {
-            str(path).strip() for path in remove_paths_raw if str(path).strip()
-        }
-        enabled_map: dict[str, bool] = {}
-        if isinstance(enabled_raw, dict):
-            for path, flag in enabled_raw.items():
-                path_s = str(path).strip()
-                if path_s:
-                    enabled_map[path_s] = bool(flag)
-        copy_failures: list[str] = []
-        sync_paths: set[Path] = set()
-        for source in import_paths_raw:
-            path_s = str(source).strip()
-            if not path_s:
-                continue
-            try:
-                sync_paths.add(self._copy_tmx_to_import_dir(Path(path_s)))
-            except Exception as exc:
-                copy_failures.append(f"{path_s}: {exc}")
-        if remove_paths:
-            confirm = QMessageBox(self)
-            confirm.setIcon(QMessageBox.Warning)
-            confirm.setWindowTitle("Delete imported TM files")
-            confirm.setText(
-                "Selected TM files will be deleted from disk and removed from the TM store."
-            )
-            confirm.setInformativeText("This action cannot be undone.")
-            confirm.setDetailedText("\n".join(sorted(remove_paths)))
-            confirm.setStandardButtons(
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
-            )
-            confirm.setDefaultButton(QMessageBox.StandardButton.Cancel)
-            if confirm.exec() != QMessageBox.StandardButton.Yes:
-                remove_paths = set()
-        for tm_path in remove_paths:
-            path = Path(tm_path)
-            if path.exists():
-                try:
-                    path.unlink()
-                except OSError as exc:
-                    copy_failures.append(f"{tm_path}: {exc}")
-                    continue
-            self._tm_store.delete_import_file(tm_path)
-        for tm_path, enabled in enabled_map.items():
-            if tm_path in remove_paths:
-                continue
-            self._tm_store.set_import_enabled(tm_path, enabled)
-        if sync_paths:
+        if actions.remove_paths and not self._confirm_tm_file_deletion(
+            actions.remove_paths
+        ):
+            actions.remove_paths.clear()
+        report = _apply_tm_pref_actions_core(
+            self._tm_store,
+            actions,
+            copy_to_import_dir=self._copy_tmx_to_import_dir,
+        )
+        if report.sync_paths:
             self._sync_tm_import_folder(
                 interactive=True,
-                only_paths=sync_paths,
+                only_paths=set(report.sync_paths),
                 show_summary=True,
             )
-        if copy_failures:
+        if report.failures:
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Warning)
             msg.setWindowTitle("TM preferences")
             msg.setText("Some TM file operations failed.")
-            msg.setDetailedText("\n".join(copy_failures))
+            msg.setDetailedText("\n".join(report.failures))
             msg.exec()
+
+    def _confirm_tm_file_deletion(self, remove_paths: set[str]) -> bool:
+        confirm = QMessageBox(self)
+        confirm.setIcon(QMessageBox.Warning)
+        confirm.setWindowTitle("Delete imported TM files")
+        confirm.setText(
+            "Selected TM files will be deleted from disk and removed from the TM store."
+        )
+        confirm.setInformativeText("This action cannot be undone.")
+        confirm.setDetailedText("\n".join(sorted(remove_paths)))
+        confirm.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
+        )
+        confirm.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        return confirm.exec() == QMessageBox.StandardButton.Yes
 
     def _switch_locales(self) -> None:
         if not self._write_cache_current():
@@ -4439,8 +4440,23 @@ class MainWindow(QMainWindow):
     def _update_tm_apply_state(self) -> None:
         self._tm_apply_btn.setEnabled(bool(self._tm_list.selectedItems()))
 
+    def _tm_query_policy(self) -> TMQueryPolicy:
+        return TMQueryPolicy(
+            source_locale=self._tm_source_locale,
+            min_score=self._tm_min_score,
+            origin_project=self._tm_origin_project,
+            origin_import=self._tm_origin_import,
+            limit=12,
+        )
+
     def _on_tm_filters_changed(self) -> None:
-        self._tm_min_score = int(self._tm_score_spin.value())
+        self._tm_min_score = _tm_normalize_min_score(int(self._tm_score_spin.value()))
+        if self._tm_score_spin.value() != self._tm_min_score:
+            self._tm_score_spin.blockSignals(True)
+            try:
+                self._tm_score_spin.setValue(self._tm_min_score)
+            finally:
+                self._tm_score_spin.blockSignals(False)
         self._tm_origin_project = bool(self._tm_origin_project_cb.isChecked())
         self._tm_origin_import = bool(self._tm_origin_import_cb.isChecked())
         self._prefs_extras["TM_MIN_SCORE"] = str(self._tm_min_score)
@@ -4454,18 +4470,7 @@ class MainWindow(QMainWindow):
         self._update_tm_suggestions()
 
     def _filter_tm_matches(self, matches: list[TMMatch]) -> list[TMMatch]:
-        filtered: list[TMMatch] = []
-        for match in matches:
-            if match.score < self._tm_min_score:
-                continue
-            if match.origin == "project":
-                if not self._tm_origin_project:
-                    continue
-            else:
-                if not self._tm_origin_import:
-                    continue
-            filtered.append(match)
-        return filtered
+        return _tm_filter_matches(matches, policy=self._tm_query_policy())
 
     def _current_tm_lookup(self) -> tuple[str, str] | None:
         if not (self._current_model and self._current_pf):
@@ -4505,7 +4510,8 @@ class MainWindow(QMainWindow):
             return
         if self._left_stack.currentIndex() != 1:
             return
-        if not self._tm_origin_project and not self._tm_origin_import:
+        policy = self._tm_query_policy()
+        if not _tm_has_enabled_origins(policy):
             self._tm_list.clear()
             self._tm_status_label.setText("No TM origins enabled.")
             self._tm_apply_btn.setEnabled(False)
@@ -4518,13 +4524,10 @@ class MainWindow(QMainWindow):
             return
         source_text, locale = lookup
         self._flush_tm_updates(paths=[self._current_pf.path])
-        cache_key = (
+        cache_key = _tm_make_cache_key(
             source_text,
-            self._tm_source_locale,
-            locale,
-            self._tm_min_score,
-            self._tm_origin_project,
-            self._tm_origin_import,
+            target_locale=locale,
+            policy=policy,
         )
         matches = self._tm_cache.get(cache_key)
         if matches is not None:
@@ -4535,7 +4538,7 @@ class MainWindow(QMainWindow):
         self._tm_apply_btn.setEnabled(False)
         self._start_tm_query(cache_key)
 
-    def _start_tm_query(self, cache_key: tuple[str, str, str, int, bool, bool]) -> None:
+    def _start_tm_query(self, cache_key: TMQueryKey) -> None:
         if not self._tm_store or self._tm_query_pool is None:
             return
         if (
@@ -4553,11 +4556,14 @@ class MainWindow(QMainWindow):
             origin_project,
             origin_import,
         ) = cache_key
-        origins = []
-        if origin_project:
-            origins.append("project")
-        if origin_import:
-            origins.append("import")
+        origins = _tm_origins_for(
+            TMQueryPolicy(
+                source_locale=source_locale,
+                min_score=min_score,
+                origin_project=origin_project,
+                origin_import=origin_import,
+            )
+        )
         self._tm_query_future = self._tm_query_pool.submit(
             TMStore.query_path,
             self._tm_store.db_path,
@@ -4594,16 +4600,12 @@ class MainWindow(QMainWindow):
         if len(self._tm_cache) > self._tm_cache_limit:
             self._tm_cache.popitem(last=False)
         lookup = self._current_tm_lookup()
-        if lookup is None:
-            return
-        current_key = (
-            lookup[0],
-            self._tm_source_locale,
-            lookup[1],
-            self._tm_min_score,
-            self._tm_origin_project,
-            self._tm_origin_import,
+        current_key = _tm_current_key_from_lookup(
+            lookup,
+            policy=self._tm_query_policy(),
         )
+        if current_key is None:
+            return
         if current_key != cache_key:
             return
         self._show_tm_matches(matches)
