@@ -489,6 +489,9 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Preferences removal confirms disk deletion before unlinking TM files.
      - [✓] First clean-architecture extraction for TM flow: folder-sync orchestration moved from `gui.main_window`
        into `core.tm_import_sync` (Qt-free service with unit tests).
+     - [✓] TM query/filter orchestration extracted into `core.tm_query` (policy + cache-key + filtering helpers).
+     - [✓] TM preferences action orchestration extracted into `core.tm_preferences` (Qt-free apply pipeline).
+     - [✓] Integration tests added for Preferences TM deletion-confirmation flow (cancel keeps file; confirm deletes).
    - **Deferred**: LanguageTool API (post‑v0.2).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.

@@ -82,6 +82,8 @@ translationzed_py/
 │   ├── en_hash_cache.py     # EN hash index + migration helpers
 │   ├── tm_store.py          # project TM storage/query (SQLite)
 │   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
+│   ├── tm_query.py          # TM query policy/filter helpers (non-Qt)
+│   ├── tm_preferences.py    # TM preference action orchestration (non-Qt)
 │   ├── tmx_io.py            # TMX import/export
 │   ├── atomic_io.py         # atomic write helpers
 │   ├── app_config.py        # TOML-configurable paths/adapters/formats
@@ -482,6 +484,8 @@ UNTOUCHED).
   - `tm_import_unique` unique on `(origin, source_locale, target_locale, source_norm, target_text)` for imports.
   - `tm_exact_lookup` + `tm_prefix_lookup` for matching.
 - Matching:
+  - `core.tm_query` owns query-policy helpers (origin toggles, min-score normalization,
+    cache-key construction, post-query filtering), used by GUI adapter.
   - Exact match returns score **100**.
   - Fuzzy match uses `SequenceMatcher` on a bounded candidate set; keeps scores ≥30.
   - Project TM outranks imported TM.
@@ -500,6 +504,8 @@ UNTOUCHED).
   - Pending/unresolved/error imported files are excluded from TM suggestions until resolved.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
     new imports.
+  - `core.tm_preferences` applies preference actions (queue-import copy, remove, enable/disable)
+    without Qt dependencies; GUI owns confirmations/dialog presentation.
   - Removing imported TMs requires explicit confirmation that files will be deleted from disk.
 - Project TM rebuild:
    - UI can rebuild project TM by scanning selected locales and pairing target entries with EN source.

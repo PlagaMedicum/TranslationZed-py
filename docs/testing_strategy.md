@@ -144,6 +144,9 @@ They include:
   and query gating for `enabled`/`ready` import files.
 - TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
   (`core.tm_import_sync` unit tests).
+- TM query/policy service: cache-key construction and score/origin filtering semantics.
+- TM preferences service: action parsing + apply pipeline (copy/remove/enable-disable), plus GUI
+  integration tests for deletion confirmation behavior.
 
 **Not covered yet (automation gaps, by layer):**
 
