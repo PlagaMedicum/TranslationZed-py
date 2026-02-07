@@ -114,8 +114,10 @@ def _read_string_token(text: str, pos: int) -> int:
                 i += 1
                 continue
             if text[j] == "." and j + 1 < len(text) and text[j + 1] == ".":
+                # Concat operator belongs outside the string, but only if a new
+                # string follows (allowing newline between segments).
                 k = j + 2
-                while k < len(text) and text[k] in {" ", "\t"}:
+                while k < len(text) and text[k] in {" ", "\t", "\r", "\n"}:
                     k += 1
                 if k < len(text) and text[k] == '"':
                     i += 1
@@ -251,6 +253,7 @@ def _parse_entries_stream(
         entries_eager = []
     current_key: Tok | None = None
     collecting = False
+    concat_pending = False
     seg_lens: list[int] = []
     seg_spans: list[tuple[int, int]] = []
     span_start: int | None = None
@@ -260,10 +263,14 @@ def _parse_entries_stream(
     saw_equal = False
 
     def _finalize_entry() -> None:
-        nonlocal current_key, collecting, seg_lens, seg_spans, span_start, span_end, status, parts
+        nonlocal current_key
+        nonlocal collecting, concat_pending
+        nonlocal seg_lens, seg_spans, span_start, span_end
+        nonlocal status, parts
         if not (collecting and current_key and seg_spans and span_start is not None):
             current_key = None
             collecting = False
+            concat_pending = False
             seg_lens = []
             seg_spans = []
             span_start = None
@@ -275,6 +282,7 @@ def _parse_entries_stream(
         if not key_text:
             current_key = None
             collecting = False
+            concat_pending = False
             seg_lens = []
             seg_spans = []
             span_start = None
@@ -317,6 +325,7 @@ def _parse_entries_stream(
             )
         current_key = None
         collecting = False
+        concat_pending = False
         seg_lens = []
         seg_spans = []
         span_start = None
@@ -333,6 +342,7 @@ def _parse_entries_stream(
             if current_key is None:
                 continue
             collecting = True
+            concat_pending = False
             seg_lens = []
             seg_spans = []
             span_start = None
@@ -347,14 +357,20 @@ def _parse_entries_stream(
             if span_start is None:
                 span_start = tok.span[0]
             span_end = tok.span[1]
+            concat_pending = False
             if not lazy_values:
                 parts.append(seg_text)
+            continue
+        if collecting and tok.kind is Kind.CONCAT:
+            concat_pending = True
             continue
         if collecting and tok.kind is Kind.COMMENT and seg_spans:
             tag = tok.text[2:].strip().upper()
             status = _STATUS_MAP.get(tag, Status.UNTOUCHED)
             continue
         if tok.kind is Kind.NEWLINE:
+            if collecting and concat_pending:
+                continue
             _finalize_entry()
             continue
 

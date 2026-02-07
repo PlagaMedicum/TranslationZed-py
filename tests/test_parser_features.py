@@ -1,4 +1,4 @@
-from translationzed_py.core import Status, parse
+from translationzed_py.core import Status, parse, parse_lazy
 
 
 def _tmp(txt: str, tmp_path):
@@ -14,6 +14,18 @@ def test_escaped_quotes(tmp_path):
 
 def test_concat(tmp_path):
     pf = _tmp('HELLO = "Hel"  ..  "lo"\n', tmp_path)
+    assert pf.entries[0].value == "Hello"
+
+
+def test_concat_multiline(tmp_path):
+    pf = _tmp('HELLO = "Hel"  ..\n  "lo"\n', tmp_path)
+    assert pf.entries[0].value == "Hello"
+
+
+def test_concat_multiline_lazy(tmp_path):
+    file = tmp_path / "f.txt"
+    file.write_text('HELLO = "Hel"  ..\n  "lo"\n', encoding="utf-8")
+    pf = parse_lazy(file)
     assert pf.entries[0].value == "Hello"
 
 
@@ -131,6 +143,15 @@ X = "Hello"
 def test_parse_inner_quotes_with_ellipsis(tmp_path):
     text = 'X = "...called "baldie", "egghead", "skinskull"..."\n'
     pf = _tmp(text, tmp_path)
+    assert pf.entries[0].key == "X"
+    assert "skinskull" in pf.entries[0].value
+
+
+def test_parse_inner_quotes_with_ellipsis_lazy(tmp_path):
+    text = 'X = "...called "baldie", "egghead", "skinskull"..."\n'
+    file = tmp_path / "lazy.txt"
+    file.write_text(text, encoding="utf-8")
+    pf = parse_lazy(file)
     assert pf.entries[0].key == "X"
     assert "skinskull" in pf.entries[0].value
 
