@@ -50,6 +50,7 @@ class PreferencesDialog(QDialog):
     def values(self) -> dict:
         return {
             "default_root": self._default_root_edit.text().strip(),
+            "tm_import_dir": self._tm_import_dir_edit.text().strip(),
             "prompt_write_on_exit": self._prompt_exit_check.isChecked(),
             "wrap_text": self._wrap_text_check.isChecked(),
             "large_text_optimizations": self._large_text_opt_check.isChecked(),
@@ -73,12 +74,23 @@ class PreferencesDialog(QDialog):
         root_layout.addWidget(self._default_root_edit)
         root_layout.addWidget(browse_btn)
 
+        self._tm_import_dir_edit = QLineEdit(self._prefs.get("tm_import_dir", ""))
+        browse_tm_btn = QPushButton("Browse…", self)
+        browse_tm_btn.clicked.connect(self._browse_tm_import_dir)
+        tm_row = QWidget(self)
+        tm_layout = QHBoxLayout(tm_row)
+        tm_layout.setContentsMargins(0, 0, 0, 0)
+        tm_layout.setSpacing(6)
+        tm_layout.addWidget(self._tm_import_dir_edit)
+        tm_layout.addWidget(browse_tm_btn)
+
         self._prompt_exit_check = QCheckBox("Prompt before writing on exit", self)
         self._prompt_exit_check.setChecked(
             bool(self._prefs.get("prompt_write_on_exit", True))
         )
 
         layout.addRow(QLabel("Default root path"), root_row)
+        layout.addRow(QLabel("TM import folder"), tm_row)
         layout.addRow(self._prompt_exit_check)
         return widget
 
@@ -139,6 +151,14 @@ class PreferencesDialog(QDialog):
         )
         if picked:
             self._default_root_edit.setText(str(Path(picked)))
+
+    def _browse_tm_import_dir(self) -> None:
+        start_dir = self._tm_import_dir_edit.text().strip()
+        picked = QFileDialog.getExistingDirectory(
+            self, "Select TM Import Folder", start_dir
+        )
+        if picked:
+            self._tm_import_dir_edit.setText(str(Path(picked)))
 
     @staticmethod
     def _set_combo_value(combo: QComboBox, value: str) -> None:

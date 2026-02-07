@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -20,17 +22,37 @@ _DEFAULTS: dict[str, Any] = {
     "default_root": "",
     "search_scope": "FILE",
     "replace_scope": "FILE",
+    "tm_import_dir": "",
 }
+_REQUIRED_PREF_KEYS = (
+    "prompt_write_on_exit",
+    "wrap_text",
+    "large_text_optimizations",
+    "search_scope",
+    "replace_scope",
+    "tm_import_dir",
+)
+
+
+def _runtime_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path.cwd().resolve()
 
 
 def _config_dir(root: Path | None = None) -> Path:
-    base = root or Path.cwd()
-    cfg = _load_app_config(root)
+    base = Path(root).resolve() if root is not None else _runtime_root()
+    cfg = _load_app_config(base)
     return base / cfg.config_dir
 
 
 def _config_path(root: Path | None = None) -> Path:
     return _config_dir(root) / "settings.env"
+
+
+def _default_tm_import_dir(root: Path | None = None) -> str:
+    base = Path(root).resolve() if root is not None else _runtime_root()
+    return str((base / "imported_tms").resolve())
 
 
 def _parse_env(path: Path) -> dict[str, Any]:
@@ -80,6 +102,8 @@ def _parse_env(path: Path) -> dict[str, Any]:
                 value = value.upper()
                 if value in {"FILE", "LOCALE", "POOL"}:
                     out["replace_scope"] = value
+            elif key == "TM_IMPORT_DIR":
+                out["tm_import_dir"] = value
             else:
                 extras[key] = value
     except OSError:
@@ -89,36 +113,42 @@ def _parse_env(path: Path) -> dict[str, Any]:
     return out
 
 
-def _candidate_roots(root: Path | None) -> list[Path]:
-    roots = [Path.cwd()]
-    if root is not None:
-        roots.append(root)
-    # de-dup while preserving order
-    seen: set[Path] = set()
-    out: list[Path] = []
-    for entry in roots:
-        entry = entry.resolve()
-        if entry in seen:
-            continue
-        seen.add(entry)
-        out.append(entry)
-    return out
-
-
 def load(root: Path | None = None) -> dict[str, Any]:
     """
-    Load preferences from disk, falling back to defaults.
+    Load preferences from disk without side effects.
     Unknown keys are preserved.
     """
     merged = dict(_DEFAULTS)
-    extras: dict[str, str] = {}
-    for base in _candidate_roots(root):
-        parsed = _parse_env(_config_path(base))
-        extras.update(parsed.pop(_EXTRAS_KEY, {}))
-        merged.update(parsed)
+    parsed = _parse_env(_config_path(root))
+    extras = dict(parsed.pop(_EXTRAS_KEY, {}))
+    merged.update(parsed)
+    tm_import_dir = str(merged.get("tm_import_dir", "")).strip()
+    if not tm_import_dir:
+        merged["tm_import_dir"] = _default_tm_import_dir(root)
     if extras:
         merged[_EXTRAS_KEY] = extras
     return merged
+
+
+def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
+    """
+    Ensure settings file exists and contains required keys.
+    Best effort only: returns loaded prefs even when write fails.
+    """
+    path = _config_path(root)
+    parsed = _parse_env(path)
+    prefs = dict(_DEFAULTS)
+    extras = dict(parsed.pop(_EXTRAS_KEY, {}))
+    prefs.update(parsed)
+    tm_import_dir = str(prefs.get("tm_import_dir", "")).strip()
+    if not tm_import_dir:
+        prefs["tm_import_dir"] = _default_tm_import_dir(root)
+    if extras:
+        prefs[_EXTRAS_KEY] = extras
+    if not path.exists() or any(key not in parsed for key in _REQUIRED_PREF_KEYS):
+        with contextlib.suppress(OSError):
+            save(prefs, root)
+    return prefs
 
 
 def save(prefs: dict[str, Any], root: Path | None = None) -> None:
@@ -136,6 +166,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         "DEFAULT_ROOT",
         "SEARCH_SCOPE",
         "REPLACE_SCOPE",
+        "TM_IMPORT_DIR",
     }
     lines = [
         f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
@@ -163,6 +194,9 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     replace_scope = str(prefs.get("replace_scope", "FILE")).strip().upper()
     if replace_scope:
         lines.append(f"REPLACE_SCOPE={replace_scope}")
+    tm_import_dir = str(prefs.get("tm_import_dir", "")).strip()
+    if tm_import_dir:
+        lines.append(f"TM_IMPORT_DIR={tm_import_dir}")
     for key, value in extras.items():
         if key in known_keys:
             continue
