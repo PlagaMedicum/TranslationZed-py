@@ -308,7 +308,9 @@ class VisualTextDelegate(MultiLineEditDelegate):
             base_format.setForeground(palette.text())
         cursor.mergeCharFormat(base_format)
         _apply_visual_formats(doc, text, highlight=highlight, show_ws=show_ws)
-        entry = _DocCacheEntry(text=text, width=width, height=int(doc.size().height()), doc=doc)
+        entry = _DocCacheEntry(
+            text=text, width=width, height=int(doc.size().height()), doc=doc
+        )
         self._doc_cache[cache_key] = entry
         if len(self._doc_cache) > _DOC_CACHE_MAX:
             self._doc_cache.popitem(last=False)
