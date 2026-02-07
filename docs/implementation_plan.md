@@ -365,6 +365,8 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        Qt-free `core.tm_*` services.
      - [✓] Save/exit write orchestration extracted into Qt-free
        `core.save_exit_flow` (`Write Original` + `closeEvent` decision flow).
+     - [✓] Conflict resolution policy extracted into Qt-free `core.conflict_service`
+       (drop-cache/drop-original/merge plan computation + merge entry-update helper).
    - **Acceptance**:
      - [ ] `main_window.py` no longer owns core workflow decisions directly.
      - [ ] Service-level tests cover open/switch/save/conflict/search flows.

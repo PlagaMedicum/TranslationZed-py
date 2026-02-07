@@ -80,6 +80,7 @@ translationzed_py/
 │   ├── search.py            # index + query API
 │   ├── status_cache.py      # binary per-file status store
 │   ├── en_hash_cache.py     # EN hash index + migration helpers
+│   ├── conflict_service.py  # conflict policy + merge planning (non-Qt)
 │   ├── tm_store.py          # project TM storage/query (SQLite)
 │   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
 │   ├── tm_query.py          # TM query policy/filter helpers (non-Qt)
@@ -530,6 +531,10 @@ UNTOUCHED).
 
 ### 5.12 Conflict resolution (cache vs original)
 
+- `core.conflict_service` owns conflict policy helpers:
+  - build merge rows from file/cache/source values,
+  - compute cache write plans for drop-cache, drop-original, and merge outcomes,
+  - enforce status rule: choosing **Original** sets status to **For review**.
 - Conflicts compare cached **original snapshots** to current file values (value-only compare).
 - If the user keeps the **cache** value, the entry status is taken from the cache.
 - If the user keeps the **original** value, the entry status is forced to **For review**.

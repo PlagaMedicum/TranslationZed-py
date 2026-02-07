@@ -150,6 +150,8 @@ They include:
 - TM rebuild service: locale collection, rebuild ingestion, and status message formatting.
 - Save/exit orchestration service: `Write Original` and close-prompt decision flow
   (`core.save_exit_flow` unit tests).
+- Conflict service: merge-row building, drop-cache/drop-original plans, merge outcome planning,
+  and in-memory entry update application (`core.conflict_service` unit tests).
 
 **Not covered yet (automation gaps, by layer):**
 
