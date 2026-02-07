@@ -35,6 +35,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QButtonGroup,
     QCheckBox,
     QComboBox,
@@ -159,7 +160,9 @@ def _bool_from_pref(value: object, default: bool) -> bool:
     return default
 
 
-def _int_from_pref(value: object, default: int, *, min_value: int, max_value: int) -> int:
+def _int_from_pref(
+    value: object, default: int, *, min_value: int, max_value: int
+) -> int:
     try:
         parsed = int(str(value).strip())
     except (TypeError, ValueError):
@@ -737,6 +740,8 @@ class MainWindow(QMainWindow):
         self._scrolling = False
         self._row_height_cache: dict[int, int] = {}
         self._row_height_cache_key: tuple[int, ...] | None = None
+        self._row_resize_budget_ms = 8.0
+        self._row_resize_cursor: int | None = None
         self._tooltip_timer = QTimer(self)
         self._tooltip_timer.setSingleShot(True)
         self._tooltip_timer.setInterval(900)
@@ -959,7 +964,8 @@ class MainWindow(QMainWindow):
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
         self.table.horizontalHeader().sectionResized.connect(self._on_header_resized)
-        QToolTip.setFont(self.table.font())
+        # Use app font for tooltips to avoid table-specific font scaling.
+        QToolTip.setFont(QApplication.font())
         self._right_stack = QStackedWidget(self)
         self._table_container = QWidget(self)
         table_layout = QVBoxLayout(self._table_container)
@@ -1785,10 +1791,7 @@ class MainWindow(QMainWindow):
     ) -> None:
         if not self._tm_store:
             return
-        if (
-            self._tm_rebuild_future is not None
-            and not self._tm_rebuild_future.done()
-        ):
+        if self._tm_rebuild_future is not None and not self._tm_rebuild_future.done():
             self.statusBar().showMessage("TM rebuild already running.", 3000)
             return
         locale_specs, en_encoding = self._collect_tm_rebuild_locales(locales)
@@ -2307,6 +2310,7 @@ class MainWindow(QMainWindow):
         if not span:
             return
         self._pending_row_span = span
+        self._row_resize_cursor = None
         if self._scrolling:
             return
         if self._row_resize_timer.isActive():
@@ -2339,22 +2343,44 @@ class MainWindow(QMainWindow):
             self._row_height_cache_key = signature
             self._row_height_cache.clear()
         start, end = span
+        cursor = self._row_resize_cursor
+        if cursor is not None:
+            start = max(start, cursor)
         perf_trace = PERF_TRACE
         perf_start = perf_trace.start("row_resize")
         rows_processed = 0
+        budget_ms = self._row_resize_budget_ms
+        time_start = time.perf_counter()
         for row in range(start, end + 1):
             rows_processed += 1
             cached = self._row_height_cache.get(row)
             if cached is not None:
                 if self.table.rowHeight(row) != cached:
                     self.table.setRowHeight(row, cached)
+                if (time.perf_counter() - time_start) * 1000.0 >= budget_ms:
+                    self._row_resize_cursor = row + 1
+                    self._pending_row_span = span
+                    self._row_resize_timer.start()
+                    perf_trace.stop(
+                        "row_resize", perf_start, items=rows_processed, unit="rows"
+                    )
+                    return
                 continue
             height = self.table.sizeHintForRow(row)
             if height <= 0:
                 continue
             self._row_height_cache[row] = height
             self.table.setRowHeight(row, height)
+            if (time.perf_counter() - time_start) * 1000.0 >= budget_ms:
+                self._row_resize_cursor = row + 1
+                self._pending_row_span = span
+                self._row_resize_timer.start()
+                perf_trace.stop(
+                    "row_resize", perf_start, items=rows_processed, unit="rows"
+                )
+                return
         self._pending_row_span = None
+        self._row_resize_cursor = None
         perf_trace.stop("row_resize", perf_start, items=rows_processed, unit="rows")
 
     def _on_table_scrolled(self, *_args) -> None:
@@ -2489,9 +2515,9 @@ class MainWindow(QMainWindow):
             self._prefs_extras["TABLE_SRC_RATIO"] = (
                 f"{self._source_translation_ratio:.6f}"
             )
-        if self._wrap_text:
-            self._clear_row_height_cache()
-            self._schedule_row_resize()
+            if self._wrap_text:
+                self._clear_row_height_cache()
+                self._schedule_row_resize()
 
     def _save_current(self) -> bool:
         """Patch file on disk if there are unsaved value edits."""
@@ -3988,7 +4014,7 @@ class MainWindow(QMainWindow):
         self._persist_preferences()
 
     def _apply_wrap_mode(self) -> None:
-        effective = self._wrap_text_user and not self._large_file_mode
+        effective = self._wrap_text_user
         if self._wrap_text != effective:
             self._wrap_text = effective
             self.table.setWordWrap(self._wrap_text)
@@ -4003,7 +4029,7 @@ class MainWindow(QMainWindow):
             finally:
                 self.act_wrap.blockSignals(False)
             if self._large_file_mode:
-                self.act_wrap.setToolTip("Wrap disabled by large-file mode")
+                self.act_wrap.setToolTip("Wrap enabled; large-file mode active")
             else:
                 self.act_wrap.setToolTip("Wrap long strings in table")
 
@@ -4029,9 +4055,6 @@ class MainWindow(QMainWindow):
     def _text_visual_options_table(self) -> tuple[bool, bool, bool]:
         show_ws = self._visual_whitespace
         highlight = self._visual_highlight
-        if self._large_file_mode and self._large_text_optimizations:
-            show_ws = False
-            highlight = False
         return show_ws, highlight, self._large_text_optimizations
 
     def _text_visual_options_detail(self) -> tuple[bool, bool, bool]:
@@ -4357,7 +4380,7 @@ class MainWindow(QMainWindow):
 
     def _tooltip_html(self, text: str) -> str:
         escaped = html.escape(text)
-        return f"<span style=\"white-space: pre-wrap;\">{escaped}</span>"
+        return f'<span style="white-space: pre-wrap;">{escaped}</span>'
 
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
@@ -4368,8 +4391,8 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if self.table.model():
             self._apply_table_layout()
-            if self._wrap_text and self._is_large_file():
-                self._schedule_row_resize()
+        if self._wrap_text and self._is_large_file():
+            self._schedule_row_resize()
         if self.replace_toolbar.isVisible():
             self._align_replace_bar()
 

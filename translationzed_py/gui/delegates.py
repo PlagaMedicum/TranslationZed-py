@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+from collections import OrderedDict
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import (
@@ -153,6 +155,7 @@ _WS_GLYPH_RE = re.compile(r"[ \t]")
 _MAX_RENDER_CHARS = 4000
 _MAX_RENDER_LINES = 12
 MAX_VISUAL_CHARS = 100_000
+_DOC_CACHE_MAX = 256
 
 _TAG_FORMAT = QTextCharFormat()
 _TAG_FORMAT.setForeground(QColor("#2a6f97"))
@@ -169,6 +172,14 @@ _WS_FORMAT.setForeground(_ws_repeat_color)
 _ws_repeat_bg = QColor("#f0f0f0")
 _ws_repeat_bg.setAlpha(140)
 _WS_FORMAT.setBackground(_ws_repeat_bg)
+
+
+@dataclass(frozen=True, slots=True)
+class _DocCacheEntry:
+    text: str
+    width: int
+    height: int
+    doc: QTextDocument
 
 
 def _apply_whitespace_option(doc: QTextDocument, enabled: bool) -> None:
@@ -258,6 +269,50 @@ class VisualTextDelegate(MultiLineEditDelegate):
         super().__init__(parent, read_only=read_only)
         self._options_provider = options_provider or (lambda: (False, False, False))
         self._doc = QTextDocument()
+        self._doc_cache: OrderedDict[tuple, _DocCacheEntry] = OrderedDict()
+
+    def _get_cached_doc(
+        self,
+        text: str,
+        width: int,
+        *,
+        font,
+        palette,
+        show_ws: bool,
+        highlight: bool,
+        selected: bool,
+    ) -> _DocCacheEntry:
+        cache_key = (
+            text,
+            width,
+            font.key(),
+            show_ws,
+            highlight,
+            selected,
+        )
+        entry = self._doc_cache.get(cache_key)
+        if entry is not None:
+            self._doc_cache.move_to_end(cache_key)
+            return entry
+        doc = QTextDocument()
+        doc.setDefaultFont(font)
+        doc.setPlainText(text)
+        _apply_whitespace_option(doc, show_ws)
+        doc.setTextWidth(width)
+        cursor = QTextCursor(doc)
+        cursor.select(QTextCursor.Document)
+        base_format = QTextCharFormat()
+        if selected:
+            base_format.setForeground(palette.highlightedText())
+        else:
+            base_format.setForeground(palette.text())
+        cursor.mergeCharFormat(base_format)
+        _apply_visual_formats(doc, text, highlight=highlight, show_ws=show_ws)
+        entry = _DocCacheEntry(text=text, width=width, height=int(doc.size().height()), doc=doc)
+        self._doc_cache[cache_key] = entry
+        if len(self._doc_cache) > _DOC_CACHE_MAX:
+            self._doc_cache.popitem(last=False)
+        return entry
 
     def createEditor(self, parent, _option, _index):  # noqa: N802
         editor = super().createEditor(parent, _option, _index)
@@ -285,7 +340,24 @@ class VisualTextDelegate(MultiLineEditDelegate):
             line_height = option.fontMetrics.lineSpacing()
             height = line_height * _MAX_RENDER_LINES + 8
             return QSize(0, height)
-        return super().sizeHint(option, index)
+        if not isinstance(text, str) or not text:
+            return super().sizeHint(option, index)
+        show_ws, highlight, optimize = self._options_provider()
+        if optimize and len(text) >= MAX_VISUAL_CHARS:
+            show_ws = False
+            highlight = False
+        width = max(0, option.rect.width() - 8)
+        entry = self._get_cached_doc(
+            text,
+            width,
+            font=option.font,
+            palette=option.palette,
+            show_ws=show_ws,
+            highlight=highlight,
+            selected=False,
+        )
+        height = max(0, entry.height) + 8
+        return QSize(0, height)
 
     def paint(self, painter, option, index):  # noqa: N802
         perf_trace = PERF_TRACE
@@ -345,6 +417,7 @@ class VisualTextDelegate(MultiLineEditDelegate):
                     )
                 else:
                     static_text = QStaticText(text)
+                    static_text.setTextFormat(Qt.PlainText)
                     text_option = QTextOption()
                     text_option.setWrapMode(QTextOption.WrapMode.WordWrap)
                     static_text.setTextOption(text_option)
@@ -353,30 +426,26 @@ class VisualTextDelegate(MultiLineEditDelegate):
                 painter.restore()
                 return
 
-            doc = self._doc
-            doc.setDefaultFont(opt.font)
-            doc.setPlainText(text)
             show_ws, highlight, optimize = self._options_provider()
             if optimize and len(text) >= MAX_VISUAL_CHARS:
                 show_ws = False
                 highlight = False
-            _apply_whitespace_option(doc, show_ws)
             text_rect = opt.rect.adjusted(4, 0, -4, 0)
-            doc.setTextWidth(max(0, text_rect.width()))
-            cursor = QTextCursor(doc)
-            cursor.select(QTextCursor.Document)
-            base_format = QTextCharFormat()
-            if opt.state & QStyle.State_Selected:
-                base_format.setForeground(opt.palette.highlightedText())
-            else:
-                base_format.setForeground(opt.palette.text())
-            cursor.mergeCharFormat(base_format)
-            _apply_visual_formats(doc, text, highlight=highlight, show_ws=show_ws)
+            width = max(0, text_rect.width())
+            entry = self._get_cached_doc(
+                text,
+                width,
+                font=opt.font,
+                palette=opt.palette,
+                show_ws=show_ws,
+                highlight=highlight,
+                selected=bool(opt.state & QStyle.State_Selected),
+            )
 
             painter.save()
             painter.setClipRect(text_rect)
             painter.translate(text_rect.topLeft())
-            doc.drawContents(painter)
+            entry.doc.drawContents(painter)
             painter.restore()
         finally:
             perf_trace.stop("paint", start, items=1, unit="cells")
