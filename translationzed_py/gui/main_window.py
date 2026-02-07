@@ -4,6 +4,7 @@ import contextlib
 import html
 import os
 import re
+import shutil
 import sys
 import time
 import traceback
@@ -82,6 +83,7 @@ from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
 from translationzed_py.core.model import STATUS_ORDER, Status
+from translationzed_py.core.preferences import ensure_defaults as _ensure_preferences
 from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.preferences import save as _save_preferences
 from translationzed_py.core.saver import save
@@ -428,6 +430,7 @@ class MainWindow(QMainWindow):
         self._smoke = os.environ.get("TZP_SMOKE", "") == "1"
         self._test_mode = _in_test_mode()
         _patch_message_boxes_for_tests()
+        _ensure_preferences(None)
         if project_root is None:
             prefs_global = _load_preferences(None)
             default_root = str(prefs_global.get("default_root", "")).strip()
@@ -488,7 +491,7 @@ class MainWindow(QMainWindow):
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
             return
-        prefs = _load_preferences(self._root)
+        prefs = _load_preferences(None)
         self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
         self._wrap_text_user = bool(prefs.get("wrap_text", False))
         self._wrap_text = self._wrap_text_user
@@ -526,7 +529,7 @@ class MainWindow(QMainWindow):
             self._prefs_extras["LAYOUT_RESET_REV"] = "3"
             prefs["__extras__"] = dict(self._prefs_extras)
             with contextlib.suppress(Exception):
-                _save_preferences(prefs, self._root)
+                _save_preferences(prefs, None)
         self._tm_min_score = _int_from_pref(
             self._prefs_extras.get("TM_MIN_SCORE"), 30, min_value=30, max_value=100
         )
@@ -536,6 +539,9 @@ class MainWindow(QMainWindow):
         self._tm_origin_import = _bool_from_pref(
             self._prefs_extras.get("TM_ORIGIN_IMPORT"), True
         )
+        self._tm_import_dir = str(prefs.get("tm_import_dir", "")).strip()
+        if not self._tm_import_dir:
+            self._tm_import_dir = str(self._default_tm_import_dir())
         geom = str(prefs.get("window_geometry", "")).strip()
         if geom:
             with contextlib.suppress(Exception):
@@ -1078,6 +1084,9 @@ class MainWindow(QMainWindow):
         act_import_tmx = QAction("Import TMX…", self)
         act_import_tmx.triggered.connect(self._import_tmx)
         self.menu_tm.addAction(act_import_tmx)
+        act_resolve_tmx = QAction("Resolve Pending Imported TMs…", self)
+        act_resolve_tmx.triggered.connect(self._resolve_pending_tmx)
+        self.menu_tm.addAction(act_resolve_tmx)
         act_export_tmx = QAction("Export TMX…", self)
         act_export_tmx.triggered.connect(self._export_tmx)
         self.menu_tm.addAction(act_export_tmx)
@@ -1483,6 +1492,221 @@ class MainWindow(QMainWindow):
             )
         return True
 
+    def _runtime_root(self) -> Path:
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable).resolve().parent
+        return Path.cwd().resolve()
+
+    def _default_tm_import_dir(self) -> Path:
+        return (self._runtime_root() / "imported_tms").resolve()
+
+    def _tm_import_dir_path(self) -> Path:
+        raw = str(self._tm_import_dir).strip()
+        if not raw:
+            return self._default_tm_import_dir()
+        return Path(raw).expanduser().resolve()
+
+    def _pick_tmx_locales(
+        self,
+        path: Path,
+        langs: set[str],
+        *,
+        interactive: bool,
+    ) -> tuple[str, str] | None:
+        normalized = sorted(
+            {
+                self._normalize_tm_locale(lang)
+                for lang in langs
+                if self._normalize_tm_locale(lang)
+            }
+        )
+        default_source = self._tm_source_locale.strip().upper()
+        default_target = None
+        if self._current_pf:
+            default_target = self._locale_for_path(self._current_pf.path)
+        if default_source and default_source in normalized and len(normalized) == 2:
+            for lang in normalized:
+                if lang != default_source:
+                    return default_source, lang
+        if not interactive:
+            return None
+        choices = normalized or sorted(self._locales.keys())
+        dialog = TmLanguageDialog(
+            choices,
+            parent=self,
+            default_source=default_source or None,
+            default_target=default_target,
+            title=f"TM locale pair: {path.name}",
+        )
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return None
+        source_locale = dialog.source_locale().strip().upper()
+        target_locale = dialog.target_locale().strip().upper()
+        if not source_locale or not target_locale:
+            return None
+        return source_locale, target_locale
+
+    def _normalize_tm_locale(self, raw: str) -> str:
+        value = raw.strip().upper().replace("_", "-")
+        if not value:
+            return ""
+        if value in self._locales:
+            return value
+        base = value.split("-", 1)[0].strip()
+        if base in self._locales:
+            return base
+        return value
+
+    def _sync_tm_import_folder(
+        self,
+        *,
+        interactive: bool,
+        only_paths: set[Path] | None = None,
+        pending_only: bool = False,
+        show_summary: bool = False,
+    ) -> None:
+        if not self._ensure_tm_store():
+            return
+        tm_dir = self._tm_import_dir_path()
+        try:
+            tm_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            if interactive:
+                QMessageBox.warning(self, "TM import folder", str(exc))
+            else:
+                self.statusBar().showMessage(
+                    f"TM import folder unavailable: {exc}", 5000
+                )
+            return
+        target_paths = {
+            path.resolve()
+            for path in only_paths or set()
+            if path.exists() and path.is_file()
+        }
+        files = sorted(
+            path.resolve() for path in tm_dir.glob("*.tmx") if path.is_file()
+        )
+        if target_paths:
+            files = [path for path in files if path in target_paths]
+        records = {
+            Path(rec.tm_path).resolve(): rec
+            for rec in self._tm_store.list_import_files()
+        }
+        if not target_paths:
+            existing_files = {
+                path.resolve() for path in tm_dir.glob("*.tmx") if path.is_file()
+            }
+            for rec_path in list(records):
+                if rec_path not in existing_files:
+                    self._tm_store.delete_import_file(str(rec_path))
+                    records.pop(rec_path, None)
+        imported = 0
+        unresolved: list[str] = []
+        failures: list[str] = []
+        changed = False
+        for path in files:
+            stat = path.stat()
+            record = records.get(path)
+            if pending_only and (record is None or record.status != "needs_mapping"):
+                continue
+            if (
+                not pending_only
+                and record is not None
+                and record.status == "ready"
+                and record.mtime_ns == stat.st_mtime_ns
+                and record.file_size == stat.st_size
+            ):
+                continue
+            from translationzed_py.core.tmx_io import detect_tmx_languages
+
+            try:
+                langs = detect_tmx_languages(path)
+            except Exception as exc:
+                failures.append(f"{path.name}: {exc}")
+                self._tm_store.upsert_import_file(
+                    tm_path=str(path),
+                    tm_name=path.stem,
+                    mtime_ns=stat.st_mtime_ns,
+                    file_size=stat.st_size,
+                    status="error",
+                    note=str(exc),
+                )
+                continue
+            pair = None
+            if record and record.source_locale and record.target_locale:
+                pair = (record.source_locale, record.target_locale)
+            if pair is None:
+                pair = self._pick_tmx_locales(path, langs, interactive=interactive)
+            if pair is None:
+                unresolved.append(path.name)
+                self._tm_store.upsert_import_file(
+                    tm_path=str(path),
+                    tm_name=path.stem,
+                    mtime_ns=stat.st_mtime_ns,
+                    file_size=stat.st_size,
+                    status="needs_mapping",
+                    note=(
+                        "Could not infer source/target locales from TMX. "
+                        "Use TM menu to resolve."
+                    ),
+                )
+                continue
+            source_locale, target_locale = pair
+            try:
+                imported += self._tm_store.replace_import_tmx(
+                    path,
+                    source_locale=source_locale,
+                    target_locale=target_locale,
+                    tm_name=path.stem,
+                )
+            except Exception as exc:
+                failures.append(f"{path.name}: {exc}")
+                self._tm_store.upsert_import_file(
+                    tm_path=str(path),
+                    tm_name=path.stem,
+                    source_locale=source_locale,
+                    target_locale=target_locale,
+                    mtime_ns=stat.st_mtime_ns,
+                    file_size=stat.st_size,
+                    status="error",
+                    note=str(exc),
+                )
+                continue
+            changed = True
+        if changed:
+            self._tm_cache.clear()
+            if self._left_stack.currentIndex() == 1:
+                self._schedule_tm_update()
+        if interactive:
+            parts = []
+            if imported:
+                parts.append(f"Imported {imported} segment(s).")
+            if unresolved:
+                parts.append(
+                    f"{len(unresolved)} file(s) need locale mapping: {', '.join(unresolved[:3])}"
+                )
+            if failures:
+                parts.append(f"{len(failures)} file(s) failed.")
+            if failures or unresolved:
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Warning)
+                msg.setWindowTitle("TM import sync")
+                msg.setText(" ".join(parts))
+                details = []
+                if unresolved:
+                    details.append(
+                        "Pending mapping:\n"
+                        + "\n".join(f"- {name}" for name in unresolved)
+                    )
+                if failures:
+                    details.append("Failures:\n" + "\n".join(failures))
+                msg.setDetailedText("\n\n".join(details))
+                msg.exec()
+            elif show_summary and imported:
+                QMessageBox.information(self, "TM import sync", " ".join(parts))
+            elif show_summary and not parts:
+                QMessageBox.information(self, "TM import sync", "No TM files changed.")
+
     def _locale_for_path(self, path: Path) -> str | None:
         try:
             rel = path.relative_to(self._root)
@@ -1659,40 +1883,35 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
-        from translationzed_py.core.tmx_io import detect_tmx_languages
-
-        langs = detect_tmx_languages(Path(path))
-        default_target = None
-        if self._current_pf:
-            default_target = self._locale_for_path(self._current_pf.path)
-        dialog = TmLanguageDialog(
-            langs,
-            parent=self,
-            default_source=self._tm_source_locale,
-            default_target=default_target,
-            title="Import TMX",
-        )
-        if dialog.exec() != dialog.DialogCode.Accepted:
-            return
-        source_locale = dialog.source_locale()
-        target_locale = dialog.target_locale()
-        if not source_locale or not target_locale:
-            QMessageBox.warning(
-                self, "Invalid locales", "Source/target locales required."
-            )
-            return
         try:
-            count = self._tm_store.import_tmx(
-                Path(path), source_locale=source_locale, target_locale=target_locale
-            )
+            source = Path(path).resolve()
+            tm_dir = self._tm_import_dir_path()
+            tm_dir.mkdir(parents=True, exist_ok=True)
+            dest = tm_dir / source.name
+            if source != dest:
+                if dest.exists():
+                    i = 1
+                    while True:
+                        candidate = tm_dir / f"{source.stem}_{i}{source.suffix}"
+                        if not candidate.exists():
+                            dest = candidate
+                            break
+                        i += 1
+                shutil.copy2(source, dest)
         except Exception as exc:
             QMessageBox.warning(self, "TMX import failed", str(exc))
             return
-        self._tm_cache.clear()
-        QMessageBox.information(
-            self,
-            "TMX import complete",
-            f"Imported {count} translation unit(s).",
+        self._sync_tm_import_folder(
+            interactive=True,
+            only_paths={dest},
+            show_summary=True,
+        )
+
+    def _resolve_pending_tmx(self) -> None:
+        self._sync_tm_import_folder(
+            interactive=True,
+            pending_only=True,
+            show_summary=True,
         )
 
     def _export_tmx(self) -> None:
@@ -1862,6 +2081,7 @@ class MainWindow(QMainWindow):
     def _open_preferences(self) -> None:
         prefs = {
             "default_root": self._default_root,
+            "tm_import_dir": self._tm_import_dir,
             "prompt_write_on_exit": self._prompt_write_on_exit,
             "wrap_text": self._wrap_text_user,
             "large_text_optimizations": self._large_text_optimizations,
@@ -1908,6 +2128,8 @@ class MainWindow(QMainWindow):
             )
             self._apply_text_visual_options()
         self._default_root = str(values.get("default_root", "")).strip()
+        tm_import_dir = str(values.get("tm_import_dir", "")).strip()
+        self._tm_import_dir = tm_import_dir or str(self._default_tm_import_dir())
         search_scope = str(values.get("search_scope", "FILE")).upper()
         if search_scope not in {"FILE", "LOCALE", "POOL"}:
             search_scope = "FILE"
@@ -1920,6 +2142,9 @@ class MainWindow(QMainWindow):
                 self._schedule_search()
         self._replace_scope = replace_scope
         self._persist_preferences()
+        if self._left_stack.currentIndex() == 1:
+            self._sync_tm_import_folder(interactive=True, show_summary=False)
+            self._schedule_tm_update()
         self._update_replace_enabled()
         self._update_status_bar()
 
@@ -2417,6 +2642,7 @@ class MainWindow(QMainWindow):
         if idx >= 0:
             self._left_stack.setCurrentIndex(idx)
         if idx == 1 and self._ensure_tm_store():
+            self._sync_tm_import_folder(interactive=True, show_summary=False)
             if self._tm_bootstrap_pending:
                 self._tm_bootstrap_pending = False
                 self._maybe_bootstrap_tm()
@@ -4117,12 +4343,13 @@ class MainWindow(QMainWindow):
             "last_locales": list(self._selected_locales),
             "window_geometry": geometry,
             "default_root": self._default_root,
+            "tm_import_dir": self._tm_import_dir,
             "search_scope": self._search_scope,
             "replace_scope": self._replace_scope,
             "__extras__": dict(self._prefs_extras),
         }
         with contextlib.suppress(Exception):
-            _save_preferences(prefs, self._root)
+            _save_preferences(prefs, None)
         if self._default_root:
             try:
                 global_prefs = _load_preferences(None)
@@ -4370,8 +4597,14 @@ class MainWindow(QMainWindow):
 
     def _format_tm_item(self, match: TMMatch) -> str:
         origin = "project" if match.origin == "project" else "import"
+        if match.tm_name:
+            source_name = match.tm_name
+        elif match.file_path:
+            source_name = Path(match.file_path).name
+        else:
+            source_name = "Project TM"
         target_preview = self._truncate_text(match.target_text, 80)
-        return f"{match.score:>3}% · {origin}: {target_preview}"
+        return f"{match.score:>3}% · {origin} · {source_name}: {target_preview}"
 
     def _truncate_text(self, text: str, limit: int) -> str:
         if len(text) <= limit:
