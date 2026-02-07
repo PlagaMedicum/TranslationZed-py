@@ -12,6 +12,7 @@ from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
+from typing import Literal
 
 import xxhash
 from PySide6.QtCore import (
@@ -79,6 +80,24 @@ from translationzed_py.core import (
     scan_root_with_errors,
 )
 from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.conflict_service import (
+    ConflictMergeRow as _ConflictMergeRow,
+)
+from translationzed_py.core.conflict_service import (
+    apply_entry_updates as _conflict_apply_entry_updates,
+)
+from translationzed_py.core.conflict_service import (
+    build_merge_rows as _conflict_build_merge_rows,
+)
+from translationzed_py.core.conflict_service import (
+    drop_cache_plan as _conflict_drop_cache_plan,
+)
+from translationzed_py.core.conflict_service import (
+    drop_original_plan as _conflict_drop_original_plan,
+)
+from translationzed_py.core.conflict_service import (
+    merge_plan as _conflict_merge_plan,
+)
 from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
@@ -3540,17 +3559,19 @@ class MainWindow(QMainWindow):
             return False
         if self._current_pf.path != path:
             return False
-        conflict_keys = set(self._conflict_files.get(path, {}))
-        changed_keys = set(self._current_model.changed_keys()) - conflict_keys
-        original_values = self._current_model.baseline_values()
+        plan = _conflict_drop_cache_plan(
+            changed_keys=self._current_model.changed_keys(),
+            baseline_values=self._current_model.baseline_values(),
+            conflict_keys=self._conflict_files.get(path, {}),
+        )
         _write_status_cache(
             self._root,
             path,
             self._current_pf.entries,
-            changed_keys=changed_keys,
-            original_values=original_values,
+            changed_keys=set(plan.changed_keys),
+            original_values=plan.original_values,
         )
-        if not changed_keys:
+        if not plan.changed_keys:
             self.fs_model.set_dirty(path, False)
         self._clear_conflicts(path)
         self._reload_file(path)
@@ -3561,17 +3582,18 @@ class MainWindow(QMainWindow):
             return False
         if self._current_pf.path != path:
             return False
-        conflict_originals = self._conflict_files.get(path, {})
-        changed_keys = set(self._current_model.changed_keys())
-        original_values = self._current_model.baseline_values()
-        original_values.update(conflict_originals)
+        plan = _conflict_drop_original_plan(
+            changed_keys=self._current_model.changed_keys(),
+            baseline_values=self._current_model.baseline_values(),
+            conflict_originals=self._conflict_files.get(path, {}),
+        )
         _write_status_cache(
             self._root,
             path,
             self._current_pf.entries,
-            changed_keys=changed_keys,
-            original_values=original_values,
-            force_original=set(conflict_originals),
+            changed_keys=set(plan.changed_keys),
+            original_values=plan.original_values,
+            force_original=set(plan.force_original),
         )
         self._clear_conflicts(path)
         self._reload_file(path)
@@ -3586,75 +3608,43 @@ class MainWindow(QMainWindow):
         if not conflict_originals:
             return True
         sources = self._conflict_sources.get(path, {})
-        cache_values = {
-            entry.key: entry.value
-            for entry in self._current_pf.entries
-            if entry.key in conflict_originals
-        }
-        rows = [
-            (
-                key,
-                sources.get(key, ""),
-                conflict_originals.get(key, ""),
-                cache_values.get(key, ""),
-            )
-            for key in sorted(conflict_originals)
-        ]
+        rows, cache_values = _conflict_build_merge_rows(
+            self._current_pf.entries,
+            conflict_originals,
+            sources,
+        )
         resolutions = self._run_merge_ui(path, rows)
         if not resolutions:
             return False
-        changed_keys = set(self._current_model.changed_keys())
-        original_values = self._current_model.baseline_values()
-        keep_conflict: set[str] = set()
-        updates: dict[str, str] = {}
-        status_updates: dict[str, Status] = {}
-        for key, (chosen_value, _choice) in resolutions.items():
-            original_value = conflict_originals.get(key, "")
-            if chosen_value == original_value:
-                changed_keys.discard(key)
-            else:
-                changed_keys.add(key)
-                original_values[key] = original_value
-                keep_conflict.add(key)
-            if chosen_value != cache_values.get(key, ""):
-                updates[key] = chosen_value
-            if _choice == "original":
-                status_updates[key] = Status.FOR_REVIEW
-        if updates or status_updates:
-            for idx, entry in enumerate(self._current_pf.entries):
-                if entry.key not in updates and entry.key not in status_updates:
-                    continue
-                new_value = updates.get(entry.key, entry.value)
-                new_status = status_updates.get(entry.key, entry.status)
-                if new_value == entry.value and new_status == entry.status:
-                    continue
-                self._current_pf.entries[idx] = type(entry)(
-                    entry.key,
-                    new_value,
-                    new_status,
-                    entry.span,
-                    entry.segments,
-                    entry.gaps,
-                    entry.raw,
-                    getattr(entry, "key_hash", None),
-                )
+        plan = _conflict_merge_plan(
+            changed_keys=self._current_model.changed_keys(),
+            baseline_values=self._current_model.baseline_values(),
+            conflict_originals=conflict_originals,
+            cache_values=cache_values,
+            resolutions=resolutions,
+        )
+        _conflict_apply_entry_updates(
+            self._current_pf.entries,
+            value_updates=plan.value_updates,
+            status_updates=plan.status_updates,
+        )
         _write_status_cache(
             self._root,
             path,
             self._current_pf.entries,
-            changed_keys=changed_keys,
-            original_values=original_values,
-            force_original=keep_conflict,
+            changed_keys=set(plan.changed_keys),
+            original_values=plan.original_values,
+            force_original=set(plan.force_original),
         )
-        if not changed_keys:
+        if not plan.changed_keys:
             self.fs_model.set_dirty(path, False)
         self._clear_conflicts(path)
         self._reload_file(path)
         return True
 
     def _run_merge_ui(
-        self, path: Path, rows: list[tuple[str, str, str, str]]
-    ) -> dict[str, tuple[str, str]] | None:
+        self, path: Path, rows: list[_ConflictMergeRow]
+    ) -> dict[str, tuple[str, Literal["original", "cache"]]] | None:
         if self._merge_active:
             return None
         self._merge_result = None
@@ -3667,9 +3657,7 @@ class MainWindow(QMainWindow):
         self._set_merge_active(False)
         return self._merge_result
 
-    def _build_merge_view(
-        self, path: Path, rows: list[tuple[str, str, str, str]]
-    ) -> None:
+    def _build_merge_view(self, path: Path, rows: list[_ConflictMergeRow]) -> None:
         if self._merge_container is not None:
             self._right_stack.removeWidget(self._merge_container)
             self._merge_container.deleteLater()
@@ -3695,7 +3683,11 @@ class MainWindow(QMainWindow):
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
 
-        for key, source, original, cache in rows:
+        for row_data in rows:
+            key = row_data.key
+            source = row_data.source_value
+            original = row_data.original_value
+            cache = row_data.cache_value
             row = table.rowCount()
             table.insertRow(row)
 
@@ -3777,7 +3769,7 @@ class MainWindow(QMainWindow):
                     "Choose Original or Cache for every row.",
                 )
                 return
-        out: dict[str, tuple[str, str]] = {}
+        out: dict[str, tuple[str, Literal["original", "cache"]]] = {}
         for key, orig_item, cache_item, btn_original, btn_cache in self._merge_rows:
             if btn_original.isChecked():
                 out[key] = (orig_item.text(), "original")
