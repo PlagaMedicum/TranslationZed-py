@@ -492,6 +492,7 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TM query/filter orchestration extracted into `core.tm_query` (policy + cache-key + filtering helpers).
      - [✓] TM preferences action orchestration extracted into `core.tm_preferences` (Qt-free apply pipeline).
      - [✓] Integration tests added for Preferences TM deletion-confirmation flow (cancel keeps file; confirm deletes).
+     - [✓] TM rebuild orchestration extracted into `core.tm_rebuild` (locale selection + rebuild worker + status formatter).
    - **Deferred**: LanguageTool API (post‑v0.2).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.

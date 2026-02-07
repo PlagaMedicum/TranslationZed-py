@@ -84,6 +84,7 @@ translationzed_py/
 │   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
 │   ├── tm_query.py          # TM query policy/filter helpers (non-Qt)
 │   ├── tm_preferences.py    # TM preference action orchestration (non-Qt)
+│   ├── tm_rebuild.py        # project-TM rebuild service (non-Qt)
 │   ├── tmx_io.py            # TMX import/export
 │   ├── atomic_io.py         # atomic write helpers
 │   ├── app_config.py        # TOML-configurable paths/adapters/formats
@@ -508,6 +509,7 @@ UNTOUCHED).
     without Qt dependencies; GUI owns confirmations/dialog presentation.
   - Removing imported TMs requires explicit confirmation that files will be deleted from disk.
 - Project TM rebuild:
+   - `core.tm_rebuild` owns locale collection, EN mapping, batch ingestion, and status-message formatting.
    - UI can rebuild project TM by scanning selected locales and pairing target entries with EN source.
    - Auto‑bootstrap runs when a selected locale pair has no TM entries.
    - Rebuild/bootstrapping runs asynchronously (background worker).

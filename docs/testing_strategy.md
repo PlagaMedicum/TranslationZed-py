@@ -147,6 +147,7 @@ They include:
 - TM query/policy service: cache-key construction and score/origin filtering semantics.
 - TM preferences service: action parsing + apply pipeline (copy/remove/enable-disable), plus GUI
   integration tests for deletion confirmation behavior.
+- TM rebuild service: locale collection, rebuild ingestion, and status message formatting.
 
 **Not covered yet (automation gaps, by layer):**
 
