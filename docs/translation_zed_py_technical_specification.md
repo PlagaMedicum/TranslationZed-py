@@ -81,6 +81,7 @@ translationzed_py/
 │   ├── status_cache.py      # binary per-file status store
 │   ├── en_hash_cache.py     # EN hash index + migration helpers
 │   ├── tm_store.py          # project TM storage/query (SQLite)
+│   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
 │   ├── tmx_io.py            # TMX import/export
 │   ├── atomic_io.py         # atomic write helpers
 │   ├── app_config.py        # TOML-configurable paths/adapters/formats
@@ -490,6 +491,8 @@ UNTOUCHED).
 - TMX import/export:
   - `core.tmx_io.iter_tmx_pairs` streams `<tu>`/`<tuv>` pairs for a **source+target locale**.
   - `core.tmx_io.write_tmx` exports current TM to TMX for a source+target locale pair.
+  - `core.tm_import_sync.sync_import_folder` owns managed-folder sync decisions (new/changed/missing,
+    pending mapping, error capture) without Qt dependencies.
   - Imported TMX files are copied into and synchronized from `TM_IMPORT_DIR`; drop-in files are
     discovered on TM panel activation (synchronization trigger).
   - Locale mapping for imported TMX is auto-detected when reliable; unresolved files trigger an
@@ -497,6 +500,7 @@ UNTOUCHED).
   - Pending/unresolved/error imported files are excluded from TM suggestions until resolved.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
     new imports.
+  - Removing imported TMs requires explicit confirmation that files will be deleted from disk.
 - Project TM rebuild:
    - UI can rebuild project TM by scanning selected locales and pairing target entries with EN source.
    - Auto‑bootstrap runs when a selected locale pair has no TM entries.

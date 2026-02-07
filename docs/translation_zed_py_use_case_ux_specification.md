@@ -302,8 +302,9 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Flow** |
 |  1 | SYS lists imported TM files with locale pair, status, and enabled toggle for ready files. |
 |  2 | User may queue TMX imports, remove selected imported TM files, or toggle ready files on/off. |
-|  3 | On confirmation, SYS applies removals/toggles and imports queued files into managed TM folder. |
-|  4 | SYS re-syncs imported TMs and refreshes TM suggestions when TM panel is active. |
+|  3 | Before removals are applied, SYS asks for explicit confirmation that selected TM files will be deleted from disk. |
+|  4 | On confirmation, SYS applies removals/toggles and imports queued files into managed TM folder. |
+|  5 | SYS re-syncs imported TMs and refreshes TM suggestions when TM panel is active. |
 | **Post-condition** | Imported TM set and enable-state match preferences changes; disabled TMs are ignored by suggestions. |
 
 ---

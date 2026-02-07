@@ -486,6 +486,9 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Menu action to resolve pending imported TMs with manual locale mapping.
      - [✓] Imported TM visibility policy: only `ready + enabled` imports are considered in TM query results.
      - [✓] Preferences TM tab supports queued import, remove, and enable/disable per imported TM file.
+     - [✓] Preferences removal confirms disk deletion before unlinking TM files.
+     - [✓] First clean-architecture extraction for TM flow: folder-sync orchestration moved from `gui.main_window`
+       into `core.tm_import_sync` (Qt-free service with unit tests).
    - **Deferred**: LanguageTool API (post‑v0.2).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.

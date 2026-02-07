@@ -142,6 +142,8 @@ They include:
 - TM: SQLite store round‑trip, exact/fuzzy query, TMX import/export.
 - TM import metadata: per-file import registry, replace/delete lifecycle, TM source-name propagation,
   and query gating for `enabled`/`ready` import files.
+- TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
+  (`core.tm_import_sync` unit tests).
 
 **Not covered yet (automation gaps, by layer):**
 
