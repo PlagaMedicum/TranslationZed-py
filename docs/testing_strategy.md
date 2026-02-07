@@ -55,14 +55,25 @@ _Last updated: 2026-02-04_
 ### 2.6 Automated performance budgets (always reported)
 - `tests/test_perf_budgets.py` enforces timing budgets for:
   - large‑file open (lazy parse),
+  - eager parse (moderate file size),
   - multi‑file search,
   - cache write and cache read,
   - cache header scans (draft‑flag reads),
   - lazy prefetch window decode,
-  - lazy hash‑index build.
+  - lazy hash‑index build,
+  - lazy preview and max‑value length scans.
   (All env‑tunable.)
 - pytest always prints a **Performance** summary in terminal output,
   including `make verify`, to keep regressions visible.
+
+### 2.7 Real‑data performance scenarios (scripted)
+- `make perf-scenarios` runs perf checks against real files in
+  `ProjectZomboidTranslations/BE/`:
+  - `SurvivalGuide_BE.txt`
+  - `Recorded_Media_BE.txt`
+  - `News_BE.txt`
+- Budgets are env‑tunable (`TZP_PERF_SCEN_*`); pass a different root path as
+  `TZP_PERF_ROOT` or `make perf-scenarios ARGS="/path/to/ProjectZomboidTranslations"`.
 
 ---
 

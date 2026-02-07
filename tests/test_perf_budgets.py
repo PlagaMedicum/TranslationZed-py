@@ -34,6 +34,14 @@ def _write_entries(path: Path, count: int) -> None:
     path.write_text(data, encoding="utf-8")
 
 
+def _write_entries_with_long(path: Path, count: int, long_len: int) -> None:
+    lines = [f'KEY_{idx:05d} = "Value {idx}"' for idx in range(count - 1)]
+    long_value = "A" * max(1, long_len)
+    lines.append(f'KEY_{count - 1:05d} = "{long_value}"')
+    data = "\n".join(lines) + "\n"
+    path.write_text(data, encoding="utf-8")
+
+
 def _make_entries(count: int) -> list[Entry]:
     entries: list[Entry] = []
     for idx in range(count):
@@ -107,6 +115,21 @@ def test_perf_multi_file_search(tmp_path: Path, perf_recorder) -> None:
         f"files={files} entries={count} matches={total}",
     )
     _assert_budget("multi-file search", elapsed_ms, budget_ms)
+
+
+def test_perf_parse_eager(tmp_path: Path, perf_recorder) -> None:
+    count = int(os.getenv("TZP_PERF_EAGER_ENTRIES", "4000"))
+    budget_ms = _budget_ms("TZP_PERF_EAGER_MS", 2000.0)
+    path = tmp_path / "Eager.txt"
+    _write_entries(path, count)
+
+    gc.collect()
+    start = time.perf_counter()
+    pf = parse(path, encoding="utf-8")
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    assert len(pf.entries) == count
+    perf_recorder("parse eager", elapsed_ms, budget_ms, f"entries={count}")
+    _assert_budget("parse eager", elapsed_ms, budget_ms)
 
 
 def test_perf_cache_write(tmp_path: Path, perf_recorder) -> None:
@@ -191,6 +214,55 @@ def test_perf_lazy_prefetch(tmp_path: Path, perf_recorder) -> None:
         "lazy prefetch", elapsed_ms, budget_ms, f"entries={count} window={window}"
     )
     _assert_budget("lazy prefetch", elapsed_ms, budget_ms)
+
+
+def test_perf_lazy_preview(tmp_path: Path, perf_recorder) -> None:
+    length = int(os.getenv("TZP_PERF_PREVIEW_LEN", "200000"))
+    limit = int(os.getenv("TZP_PERF_PREVIEW_LIMIT", "200"))
+    budget_ms = _budget_ms("TZP_PERF_PREVIEW_MS", 50.0)
+    path = tmp_path / "Preview.txt"
+    long_value = "A" * max(1, length)
+    path.write_text(f'KEY = "{long_value}"\n', encoding="utf-8")
+    pf = parse_lazy(path, encoding="utf-8")
+    entries = pf.entries
+    assert hasattr(entries, "preview_at")
+
+    gc.collect()
+    start = time.perf_counter()
+    preview = entries.preview_at(0, limit)
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    assert preview == long_value[:limit]
+    perf_recorder(
+        "lazy preview",
+        elapsed_ms,
+        budget_ms,
+        f"len={length} limit={limit}",
+    )
+    _assert_budget("lazy preview", elapsed_ms, budget_ms)
+
+
+def test_perf_max_value_length(tmp_path: Path, perf_recorder) -> None:
+    count = int(os.getenv("TZP_PERF_MAXLEN_ENTRIES", "20000"))
+    long_len = int(os.getenv("TZP_PERF_MAXLEN_VALUE", "10000"))
+    budget_ms = _budget_ms("TZP_PERF_MAXLEN_MS", 200.0)
+    path = tmp_path / "MaxLen.txt"
+    _write_entries_with_long(path, count, long_len)
+    pf = parse_lazy(path, encoding="utf-8")
+    entries = pf.entries
+    assert hasattr(entries, "max_value_length")
+
+    gc.collect()
+    start = time.perf_counter()
+    max_len = entries.max_value_length()
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    assert max_len >= long_len
+    perf_recorder(
+        "max value length",
+        elapsed_ms,
+        budget_ms,
+        f"entries={count} max_len={max_len}",
+    )
+    _assert_budget("max value length", elapsed_ms, budget_ms)
 
 
 def test_perf_hash_index(tmp_path: Path, perf_recorder) -> None:
