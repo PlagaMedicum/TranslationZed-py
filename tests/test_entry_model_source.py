@@ -50,3 +50,14 @@ def test_source_background_missing_by_row(tmp_path: Path) -> None:
     idx = model.index(0, 1)
     bg = model.data(idx, role=Qt.BackgroundRole)
     assert bg is not None
+
+
+def test_preview_does_not_affect_edit_role(tmp_path: Path) -> None:
+    path = tmp_path / "file.txt"
+    path.write_text('HELLO = "Hello world"\n', encoding="utf-8")
+    pf = parse(path)
+    model = TranslationModel(pf)
+    model.set_preview_limit(5)
+    idx = model.index(0, 2)
+    assert model.data(idx, role=Qt.DisplayRole) == "Hell…"
+    assert model.data(idx, role=Qt.EditRole) == "Hello world"

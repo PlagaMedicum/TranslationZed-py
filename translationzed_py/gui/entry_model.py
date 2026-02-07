@@ -50,6 +50,8 @@ class TranslationModel(QAbstractTableModel):
         self._changed_rows: set[int] = set(self._baseline_by_row)
         self._dirty = bool(self._baseline_by_row)
         self._pf.dirty = self._dirty
+        self._preview_limit: int | None = None
+        self._max_value_len: int | None = None
 
         self.undo_stack = QUndoStack()
 
@@ -159,6 +161,159 @@ class TranslationModel(QAbstractTableModel):
         self._dirty = False
         self._pf.dirty = False
 
+    def set_preview_limit(self, limit: int | None) -> None:
+        self._preview_limit = limit
+
+    def max_value_length(self) -> int:
+        cached = self._max_value_len
+        if cached is not None:
+            return cached
+        max_len = 0
+        entries = self._entries
+        if hasattr(entries, "max_value_length"):
+            try:
+                max_len = int(entries.max_value_length())
+            except Exception:
+                max_len = 0
+        elif hasattr(entries, "meta_at"):
+            for idx in range(len(entries)):
+                try:
+                    meta = entries.meta_at(idx)
+                except Exception:
+                    continue
+                if meta.segments:
+                    max_len = max(max_len, sum(meta.segments))
+        else:
+            for entry in entries:
+                if entry.value:
+                    max_len = max(max_len, len(entry.value))
+        self._max_value_len = max_len
+        return max_len
+
+    def _truncate_preview(self, text: str, limit: int, actual_len: int | None) -> str:
+        if limit <= 0:
+            return ""
+        if actual_len is None:
+            if len(text) <= limit:
+                return text
+        else:
+            if actual_len <= limit:
+                return text
+        return text[: max(0, limit - 1)] + "…"
+
+    def _tooltip_limit_for_length(self, length: int) -> int | None:
+        if length <= 0:
+            return None
+        if length > _TOOLTIP_LARGE_THRESHOLD:
+            return _TOOLTIP_LIMIT_LARGE
+        if length > _TOOLTIP_LIMIT:
+            return _TOOLTIP_LIMIT
+        return None
+
+    def _tooltip_apply_limit(
+        self, text: str, actual_len: int, limit: int | None
+    ) -> str:
+        if not text:
+            return ""
+        if limit is None:
+            return text
+        truncated = text[:limit]
+        if actual_len <= limit:
+            return text
+        return truncated + "\n...(truncated)"
+
+    def _full_source_text(self, row: int) -> str:
+        if self._source_by_row is not None and row < len(self._source_by_row):
+            return self._source_by_row[row] or ""
+        return self._source_values.get(self._entries[row].key, "") or ""
+
+    def _full_value_text(self, row: int) -> str:
+        return self._entries[row].value or ""
+
+    def _source_length_at(self, row: int) -> int:
+        if self._source_by_row is not None and row < len(self._source_by_row):
+            source_row = self._source_by_row
+            if hasattr(source_row, "length_at"):
+                try:
+                    return int(source_row.length_at(row))
+                except Exception:
+                    text = source_row[row]
+                    return len(text) if text else 0
+            text = source_row[row]
+            return len(text) if text else 0
+        text = self._source_values.get(self._entries[row].key, "")
+        return len(text) if text else 0
+
+    def _value_length_at(self, row: int) -> int:
+        entries = self._entries
+        if hasattr(entries, "meta_at"):
+            try:
+                meta = entries.meta_at(row)
+                if meta.segments:
+                    return sum(meta.segments)
+            except Exception:
+                text = entries[row].value
+                return len(text) if text else 0
+        text = entries[row].value
+        return len(text) if text else 0
+
+    def _preview_source_raw(self, row: int, limit: int) -> tuple[str, int]:
+        actual_len = self._source_length_at(row)
+        if self._source_by_row is not None and row < len(self._source_by_row):
+            source_row = self._source_by_row
+            if hasattr(source_row, "preview_at"):
+                try:
+                    preview = source_row.preview_at(row, limit)
+                    return preview[:limit], actual_len
+                except Exception:
+                    preview = ""
+                    return preview, actual_len
+            preview = source_row[row] or ""
+            return preview[:limit], actual_len
+        preview = self._source_values.get(self._entries[row].key, "") or ""
+        return preview[:limit], actual_len
+
+    def _preview_source(self, row: int, limit: int) -> str:
+        preview, actual_len = self._preview_source_raw(row, limit)
+        return self._truncate_preview(preview, limit, actual_len)
+
+    def _preview_value_raw(self, row: int, limit: int) -> tuple[str, int]:
+        entries = self._entries
+        actual_len = self._value_length_at(row)
+        if hasattr(entries, "preview_at"):
+            try:
+                preview = entries.preview_at(row, limit)
+                return preview[:limit], actual_len
+            except Exception:
+                preview = ""
+                return preview, actual_len
+        preview = entries[row].value or ""
+        return preview[:limit], actual_len or len(preview)
+
+    def _preview_value(self, row: int, limit: int) -> str:
+        preview, actual_len = self._preview_value_raw(row, limit)
+        return self._truncate_preview(preview, limit, actual_len)
+
+    def _tooltip_source(self, row: int) -> str:
+        actual_len = self._source_length_at(row)
+        if actual_len <= 0:
+            return ""
+        limit = self._tooltip_limit_for_length(actual_len)
+        if limit is None:
+            return self._full_source_text(row)
+        preview, _ = self._preview_source_raw(row, limit)
+        return self._tooltip_apply_limit(preview, actual_len, limit)
+
+    def _tooltip_value(self, row: int) -> str:
+        actual_len = self._value_length_at(row)
+        if actual_len <= 0:
+            return ""
+        limit = self._tooltip_limit_for_length(actual_len)
+        if limit is None:
+            return self._full_value_text(row)
+        preview, _ = self._preview_value_raw(row, limit)
+        return self._tooltip_apply_limit(preview, actual_len, limit)
+
     def reset_baseline(self) -> None:
         """After writing to disk, treat current values as the new baseline."""
         self.clear_changed_values()
@@ -211,30 +366,16 @@ class TranslationModel(QAbstractTableModel):
 
         e = self._entries[index.row()]
 
-        def _tooltip_text(value: str | None) -> str:
-            text = "" if value is None else str(value)
-            if not text:
-                return ""
-            if len(text) > _TOOLTIP_LARGE_THRESHOLD:
-                text = text[:_TOOLTIP_LIMIT_LARGE] + "\n...(truncated)"
-            elif len(text) > _TOOLTIP_LIMIT:
-                text = text[:_TOOLTIP_LIMIT] + "\n...(truncated)"
-            return text
-
         if role == Qt.TextAlignmentRole and index.column() == 0:
             return Qt.AlignRight | Qt.AlignVCenter
         if role == Qt.ToolTipRole:
             match index.column():
                 case 0:
-                    return _tooltip_text(e.key)
+                    return e.key or ""
                 case 1:
-                    if self._source_by_row is not None and index.row() < len(
-                        self._source_by_row
-                    ):
-                        return _tooltip_text(self._source_by_row[index.row()])
-                    return _tooltip_text(self._source_values.get(e.key, ""))
+                    return self._tooltip_source(index.row())
                 case 2:
-                    return _tooltip_text(e.value)
+                    return self._tooltip_value(index.row())
                 case 3:
                     return e.status.label()
 
@@ -244,12 +385,16 @@ class TranslationModel(QAbstractTableModel):
                 case 0:
                     return e.key
                 case 1:
+                    if self._preview_limit:
+                        return self._preview_source(index.row(), self._preview_limit)
                     if self._source_by_row is not None and index.row() < len(
                         self._source_by_row
                     ):
                         return self._source_by_row[index.row()]
                     return self._source_values.get(e.key, "")
                 case 2:
+                    if self._preview_limit:
+                        return self._preview_value(index.row(), self._preview_limit)
                     return e.value
                 case 3:
                     return e.status.label()

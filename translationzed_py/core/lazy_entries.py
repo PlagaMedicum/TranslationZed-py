@@ -8,6 +8,7 @@ from translationzed_py.core.parse_utils import (
     _decode_text,
     _resolve_encoding,
     _unescape,
+    _unescape_prefix,
 )
 
 
@@ -32,6 +33,7 @@ class LazyEntries:
         self._overrides: dict[int, Entry] = {}
         self._index_by_hash64: dict[int, list[int]] | None = None
         self._index_by_hash16: dict[int, list[int]] | None = None
+        self._max_value_len: int | None = None
 
     def __len__(self) -> int:
         return len(self._metas)
@@ -72,6 +74,58 @@ class LazyEntries:
                 continue
             meta = self._metas[idx]
             self._value_cache[idx] = self._value_for_meta(meta)
+
+    def max_value_length(self) -> int:
+        cached = self._max_value_len
+        if cached is not None:
+            return cached
+        max_len = 0
+        for meta in self._metas:
+            if meta.segments:
+                max_len = max(max_len, sum(meta.segments))
+        self._max_value_len = max_len
+        return max_len
+
+    def preview_at(self, index: int, limit: int) -> str:
+        if limit <= 0:
+            return ""
+        meta = self._metas[index]
+        if meta.raw:
+            return self._preview_raw(limit)
+        parts: list[str] = []
+        remaining = limit
+        for start, end in meta.seg_spans:
+            if remaining <= 0:
+                break
+            raw_slice = self._raw[start:end]
+            text = self._decode_prefix(raw_slice, remaining)
+            if start == 0 and text.startswith("\ufeff"):
+                text = text[1:]
+            if text.startswith('"'):
+                inner = text[1:-1] if text.endswith('"') else text[1:]
+                segment = _unescape_prefix(inner, remaining)
+            else:
+                segment = text.rstrip()
+                if len(segment) > remaining:
+                    segment = segment[:remaining]
+            if segment:
+                parts.append(segment)
+                remaining -= len(segment)
+        return "".join(parts)
+
+    def _decode_prefix(self, raw_slice: bytes, limit: int) -> str:
+        if limit <= 0 or not raw_slice:
+            return ""
+        max_bytes = min(len(raw_slice), limit * 4 + 8)
+        return raw_slice[:max_bytes].decode(self._encoding, errors="replace")
+
+    def _preview_raw(self, limit: int) -> str:
+        if limit <= 0 or not self._raw:
+            return ""
+        text = self._decode_prefix(self._raw, limit)
+        if text.startswith("\ufeff"):
+            text = text[1:]
+        return text[:limit]
 
     def _build_index_by_hash(self, *, bits: int) -> dict[int, list[int]]:
         mask = 0xFFFF if bits == 16 else 0xFFFFFFFFFFFFFFFF

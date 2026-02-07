@@ -28,6 +28,35 @@ def _unescape(raw: str) -> str:
     return "".join(out)
 
 
+def _unescape_prefix(raw: str, limit: int) -> str:
+    """Unescape up to `limit` output chars; avoids scanning full strings for previews."""
+    if limit <= 0:
+        return ""
+    if "\\" not in raw and '""' not in raw:
+        return raw[:limit]
+    out: list[str] = []
+    i = 0
+    out_len = 0
+    while i < len(raw) and out_len < limit:
+        ch = raw[i]
+        if ch == "\\" and i + 1 < len(raw):
+            nxt = raw[i + 1]
+            if nxt in {'"', "\\"}:
+                out.append(nxt)
+                out_len += 1
+                i += 2
+                continue
+        if ch == '"' and i + 1 < len(raw) and raw[i + 1] == '"':
+            out.append('"')
+            out_len += 1
+            i += 2
+            continue
+        out.append(ch)
+        out_len += 1
+        i += 1
+    return "".join(out)
+
+
 def _resolve_encoding(encoding: str, raw: bytes) -> tuple[str, int]:
     enc = encoding.lower().replace("_", "-")
     if enc in {"utf-8", "utf8"} and raw.startswith(codecs.BOM_UTF8):

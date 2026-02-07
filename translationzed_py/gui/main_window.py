@@ -394,6 +394,20 @@ class _LazySourceRows:
         value = entries[idx].value
         return len(value) if value else 0
 
+    def preview_at(self, idx: int, limit: int) -> str:
+        entries = self._entries
+        if hasattr(entries, "preview_at"):
+            try:
+                return entries.preview_at(idx, limit)
+            except Exception:
+                return ""
+        value = entries[idx].value
+        if not value:
+            return ""
+        if limit <= 0:
+            return ""
+        return value[:limit]
+
 
 class MainWindow(QMainWindow):
     """Main window: left file-tree, right translation table."""
@@ -532,6 +546,10 @@ class MainWindow(QMainWindow):
         self._detail_pending_row: int | None = None
         self._detail_pending_active = False
         self._large_file_mode = False
+        self._render_heavy = False
+        self._preview_limit = 800
+        # Derive render-heavy cutoff from preview size to avoid extra tuning knobs.
+        self._render_heavy_threshold = self._preview_limit * 3
         self._current_file_size = 0
         self._merge_active = False
         self._merge_rows: list[
@@ -1866,6 +1884,7 @@ class MainWindow(QMainWindow):
         )
         if large_text_opt != self._large_text_optimizations:
             self._large_text_optimizations = large_text_opt
+            self._update_render_cost_flags()
             self._update_large_file_mode()
         self._apply_wrap_mode()
         visual_highlight = bool(values.get("visual_highlight", self._visual_highlight))
@@ -2082,6 +2101,7 @@ class MainWindow(QMainWindow):
         self._clear_row_height_cache()
         self._apply_table_layout()
         self._table_layout_guard = False
+        self._update_render_cost_flags()
         self._update_large_file_mode()
         self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
         self._update_status_combo_from_selection()
@@ -2200,12 +2220,29 @@ class MainWindow(QMainWindow):
         self._prefs_extras["TABLE_SRC_RATIO"] = f"{ratio:.6f}"
         perf_trace.stop("layout", perf_start, items=1, unit="events")
 
+    def _update_render_cost_flags(self) -> None:
+        self._render_heavy = False
+        if not self._current_model or not self._large_text_optimizations:
+            if self._current_model:
+                self._current_model.set_preview_limit(None)
+            return
+        try:
+            max_len = self._current_model.max_value_length()
+        except Exception:
+            max_len = 0
+        if max_len >= self._render_heavy_threshold:
+            self._render_heavy = True
+            self._current_model.set_preview_limit(self._preview_limit)
+        else:
+            self._current_model.set_preview_limit(None)
+
     def _is_large_file(self) -> bool:
         return bool(
             self._current_model
             and (
                 self._current_model.rowCount() >= self._large_file_row_threshold
                 or self._current_file_size >= self._large_file_bytes_threshold
+                or (self._large_text_optimizations and self._render_heavy)
             )
         )
 
@@ -2985,7 +3022,7 @@ class MainWindow(QMainWindow):
             return
         row = current.row()
         idx = self._current_model.index(row, 2)
-        text = idx.data(Qt.DisplayRole)
+        text = idx.data(Qt.EditRole)
         text = "" if text is None else str(text)
         if not pattern.search(text):
             return
@@ -3053,7 +3090,7 @@ class MainWindow(QMainWindow):
         count = 0
         for row in range(self._current_model.rowCount()):
             idx = self._current_model.index(row, 2)
-            text = idx.data(Qt.DisplayRole)
+            text = idx.data(Qt.EditRole)
             text = "" if text is None else str(text)
             result = self._replace_all_text(
                 text, pattern, replacement, use_regex, matches_empty, has_group_ref
@@ -3183,7 +3220,7 @@ class MainWindow(QMainWindow):
             return True
         for row in range(self._current_model.rowCount()):
             idx = self._current_model.index(row, 2)
-            text = idx.data(Qt.DisplayRole)
+            text = idx.data(Qt.EditRole)
             text = "" if text is None else str(text)
             result = self._replace_all_text(
                 text, pattern, replacement, use_regex, matches_empty, has_group_ref
@@ -3895,7 +3932,9 @@ class MainWindow(QMainWindow):
             for row in sorted(set(full_rows)):
                 cols = [
                     (
-                        self._current_model.index(row, col).data(Qt.DisplayRole)
+                        self._current_model.index(row, col).data(
+                            Qt.EditRole if col in (1, 2) else Qt.DisplayRole
+                        )
                         if self._current_model
                         else ""
                     )
@@ -3908,7 +3947,11 @@ class MainWindow(QMainWindow):
         idx = self.table.currentIndex()
         if not idx.isValid():
             return
-        text = idx.data(Qt.DisplayRole)
+        text = (
+            idx.data(Qt.EditRole)
+            if idx.column() in (1, 2)
+            else idx.data(Qt.DisplayRole)
+        )
         QGuiApplication.clipboard().setText("" if text is None else str(text))
 
     def _cut_selection(self) -> None:
