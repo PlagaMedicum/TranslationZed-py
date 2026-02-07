@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -12,6 +14,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
     QTabWidget,
     QVBoxLayout,
@@ -23,17 +27,31 @@ _SCOPES = [
     ("Locale", "LOCALE"),
     ("Locale Pool", "POOL"),
 ]
+_TM_PATH_ROLE = Qt.UserRole + 1
+_TM_IS_PENDING_ROLE = Qt.UserRole + 2
 
 
 class PreferencesDialog(QDialog):
-    def __init__(self, prefs: dict, *, parent=None) -> None:
+    def __init__(
+        self,
+        prefs: dict,
+        *,
+        tm_files: list[dict[str, object]] | None = None,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Preferences")
         self._prefs = dict(prefs)
+        self._tm_files = list(tm_files or [])
+        self._tm_enabled: dict[str, bool] = {}
+        self._tm_initial_enabled: dict[str, bool] = {}
+        self._tm_remove_paths: set[str] = set()
+        self._tm_import_paths: list[str] = []
 
         tabs = QTabWidget(self)
         tabs.addTab(self._build_general_tab(), "General")
         tabs.addTab(self._build_search_tab(), "Search & Replace")
+        tabs.addTab(self._build_tm_tab(), "TM")
         tabs.addTab(self._build_view_tab(), "View")
 
         buttons = QDialogButtonBox(
@@ -48,6 +66,11 @@ class PreferencesDialog(QDialog):
         layout.addWidget(buttons)
 
     def values(self) -> dict:
+        changed_tm_enabled = {
+            tm_path: enabled
+            for tm_path, enabled in self._tm_enabled.items()
+            if self._tm_initial_enabled.get(tm_path) != enabled
+        }
         return {
             "default_root": self._default_root_edit.text().strip(),
             "tm_import_dir": self._tm_import_dir_edit.text().strip(),
@@ -58,6 +81,9 @@ class PreferencesDialog(QDialog):
             "visual_whitespace": self._visual_whitespace_check.isChecked(),
             "search_scope": self._search_scope_combo.currentData(),
             "replace_scope": self._replace_scope_combo.currentData(),
+            "tm_enabled": changed_tm_enabled,
+            "tm_remove_paths": sorted(self._tm_remove_paths),
+            "tm_import_paths": list(self._tm_import_paths),
         }
 
     def _build_general_tab(self) -> QWidget:
@@ -143,6 +169,109 @@ class PreferencesDialog(QDialog):
         layout.addRow(self._visual_highlight_check)
         layout.addRow(self._visual_whitespace_check)
         return widget
+
+    def _build_tm_tab(self) -> QWidget:
+        widget = QWidget(self)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        label = QLabel(
+            "Imported TM files (unchecked = disabled for suggestions).", widget
+        )
+        layout.addWidget(label)
+        self._tm_list = QListWidget(widget)
+        self._tm_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self._tm_list.itemChanged.connect(self._on_tm_item_changed)
+        layout.addWidget(self._tm_list)
+
+        btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(0, 0, 0, 0)
+        btn_row.setSpacing(6)
+        import_btn = QPushButton("Import TMX…", widget)
+        import_btn.clicked.connect(self._queue_tm_imports)
+        remove_btn = QPushButton("Remove selected", widget)
+        remove_btn.clicked.connect(self._remove_selected_tm_items)
+        btn_row.addWidget(import_btn)
+        btn_row.addWidget(remove_btn)
+        btn_row.addStretch(1)
+        layout.addLayout(btn_row)
+
+        for row in self._tm_files:
+            self._add_tm_file_item(row)
+        return widget
+
+    def _add_tm_file_item(self, row: dict[str, object]) -> None:
+        tm_path = str(row.get("tm_path", "")).strip()
+        if not tm_path:
+            return
+        tm_name = str(row.get("tm_name", "")).strip() or tm_path
+        source_locale = str(row.get("source_locale", "")).strip().upper()
+        target_locale = str(row.get("target_locale", "")).strip().upper()
+        status = str(row.get("status", "")).strip() or "ready"
+        enabled = bool(row.get("enabled", True))
+        if source_locale and target_locale:
+            locale_pair = f"{source_locale}->{target_locale}"
+        else:
+            locale_pair = "unmapped"
+        text = f"{tm_name} [{locale_pair}] ({status})"
+        item = QListWidgetItem(text, self._tm_list)
+        item.setToolTip(tm_path)
+        item.setData(_TM_PATH_ROLE, tm_path)
+        item.setData(_TM_IS_PENDING_ROLE, False)
+        flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
+        if status == "ready":
+            flags |= Qt.ItemIsUserCheckable
+            item.setCheckState(Qt.Checked if enabled else Qt.Unchecked)
+            self._tm_enabled[tm_path] = enabled
+            self._tm_initial_enabled[tm_path] = enabled
+        item.setFlags(flags)
+
+    def _queue_tm_imports(self) -> None:
+        start_dir = self._tm_import_dir_edit.text().strip() or str(Path.cwd())
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Import TMX files",
+            start_dir,
+            "TMX files (*.tmx);;All files (*)",
+        )
+        for raw_path in paths:
+            tm_path = str(Path(raw_path))
+            if tm_path in self._tm_import_paths:
+                continue
+            self._tm_import_paths.append(tm_path)
+            item = QListWidgetItem(
+                f"{Path(tm_path).name} [queued import]", self._tm_list
+            )
+            item.setToolTip(tm_path)
+            item.setData(_TM_PATH_ROLE, tm_path)
+            item.setData(_TM_IS_PENDING_ROLE, True)
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+
+    def _remove_selected_tm_items(self) -> None:
+        items = list(self._tm_list.selectedItems())
+        for item in items:
+            tm_path = str(item.data(_TM_PATH_ROLE) or "").strip()
+            pending = bool(item.data(_TM_IS_PENDING_ROLE))
+            if tm_path:
+                if pending:
+                    self._tm_import_paths = [
+                        p for p in self._tm_import_paths if p != tm_path
+                    ]
+                else:
+                    self._tm_remove_paths.add(tm_path)
+                    self._tm_enabled.pop(tm_path, None)
+                    self._tm_initial_enabled.pop(tm_path, None)
+            row = self._tm_list.row(item)
+            self._tm_list.takeItem(row)
+
+    def _on_tm_item_changed(self, item: QListWidgetItem) -> None:
+        tm_path = str(item.data(_TM_PATH_ROLE) or "").strip()
+        if not tm_path or bool(item.data(_TM_IS_PENDING_ROLE)):
+            return
+        if not (item.flags() & Qt.ItemIsUserCheckable):
+            return
+        self._tm_enabled[tm_path] = item.checkState() == Qt.Checked
 
     def _browse_root(self) -> None:
         start_dir = self._default_root_edit.text().strip()

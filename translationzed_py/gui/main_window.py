@@ -1512,7 +1512,8 @@ class MainWindow(QMainWindow):
         langs: set[str],
         *,
         interactive: bool,
-    ) -> tuple[str, str] | None:
+        allow_skip_all: bool = False,
+    ) -> tuple[tuple[str, str] | None, bool]:
         normalized = sorted(
             {
                 self._normalize_tm_locale(lang)
@@ -1527,9 +1528,9 @@ class MainWindow(QMainWindow):
         if default_source and default_source in normalized and len(normalized) == 2:
             for lang in normalized:
                 if lang != default_source:
-                    return default_source, lang
+                    return (default_source, lang), False
         if not interactive:
-            return None
+            return None, False
         choices = normalized or sorted(self._locales.keys())
         dialog = TmLanguageDialog(
             choices,
@@ -1537,14 +1538,15 @@ class MainWindow(QMainWindow):
             default_source=default_source or None,
             default_target=default_target,
             title=f"TM locale pair: {path.name}",
+            allow_skip_all=allow_skip_all,
         )
         if dialog.exec() != dialog.DialogCode.Accepted:
-            return None
+            return None, dialog.skip_all_requested()
         source_locale = dialog.source_locale().strip().upper()
         target_locale = dialog.target_locale().strip().upper()
         if not source_locale or not target_locale:
-            return None
-        return source_locale, target_locale
+            return None, False
+        return (source_locale, target_locale), False
 
     def _normalize_tm_locale(self, raw: str) -> str:
         value = raw.strip().upper().replace("_", "-")
@@ -1604,6 +1606,7 @@ class MainWindow(QMainWindow):
         unresolved: list[str] = []
         failures: list[str] = []
         changed = False
+        skip_remaining_mappings = False
         for path in files:
             stat = path.stat()
             record = records.get(path)
@@ -1636,7 +1639,17 @@ class MainWindow(QMainWindow):
             if record and record.source_locale and record.target_locale:
                 pair = (record.source_locale, record.target_locale)
             if pair is None:
-                pair = self._pick_tmx_locales(path, langs, interactive=interactive)
+                if skip_remaining_mappings:
+                    pair = None
+                else:
+                    pair, skip_all = self._pick_tmx_locales(
+                        path,
+                        langs,
+                        interactive=interactive,
+                        allow_skip_all=interactive,
+                    )
+                    if skip_all:
+                        skip_remaining_mappings = True
             if pair is None:
                 unresolved.append(path.name)
                 self._tm_store.upsert_import_file(
@@ -1646,7 +1659,7 @@ class MainWindow(QMainWindow):
                     file_size=stat.st_size,
                     status="needs_mapping",
                     note=(
-                        "Could not infer source/target locales from TMX. "
+                        "Locale pair is unresolved for this TMX file. "
                         "Use TM menu to resolve."
                     ),
                 )
@@ -1706,6 +1719,23 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "TM import sync", " ".join(parts))
             elif show_summary and not parts:
                 QMessageBox.information(self, "TM import sync", "No TM files changed.")
+
+    def _copy_tmx_to_import_dir(self, source: Path) -> Path:
+        source = source.resolve()
+        tm_dir = self._tm_import_dir_path()
+        tm_dir.mkdir(parents=True, exist_ok=True)
+        dest = tm_dir / source.name
+        if source != dest:
+            if dest.exists():
+                i = 1
+                while True:
+                    candidate = tm_dir / f"{source.stem}_{i}{source.suffix}"
+                    if not candidate.exists():
+                        dest = candidate
+                        break
+                    i += 1
+            shutil.copy2(source, dest)
+        return dest.resolve()
 
     def _locale_for_path(self, path: Path) -> str | None:
         try:
@@ -1884,20 +1914,7 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            source = Path(path).resolve()
-            tm_dir = self._tm_import_dir_path()
-            tm_dir.mkdir(parents=True, exist_ok=True)
-            dest = tm_dir / source.name
-            if source != dest:
-                if dest.exists():
-                    i = 1
-                    while True:
-                        candidate = tm_dir / f"{source.stem}_{i}{source.suffix}"
-                        if not candidate.exists():
-                            dest = candidate
-                            break
-                        i += 1
-                shutil.copy2(source, dest)
+            dest = self._copy_tmx_to_import_dir(Path(path))
         except Exception as exc:
             QMessageBox.warning(self, "TMX import failed", str(exc))
             return
@@ -2090,7 +2107,22 @@ class MainWindow(QMainWindow):
             "search_scope": self._search_scope,
             "replace_scope": self._replace_scope,
         }
-        dialog = PreferencesDialog(prefs, parent=self)
+        tm_files: list[dict[str, object]] = []
+        if self._ensure_tm_store():
+            with contextlib.suppress(Exception):
+                tm_files = [
+                    {
+                        "tm_path": rec.tm_path,
+                        "tm_name": rec.tm_name,
+                        "source_locale": rec.source_locale,
+                        "target_locale": rec.target_locale,
+                        "enabled": rec.enabled,
+                        "status": rec.status,
+                        "note": rec.note,
+                    }
+                    for rec in self._tm_store.list_import_files()
+                ]
+        dialog = PreferencesDialog(prefs, tm_files=tm_files, parent=self)
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
         self._apply_preferences(dialog.values())
@@ -2130,6 +2162,7 @@ class MainWindow(QMainWindow):
         self._default_root = str(values.get("default_root", "")).strip()
         tm_import_dir = str(values.get("tm_import_dir", "")).strip()
         self._tm_import_dir = tm_import_dir or str(self._default_tm_import_dir())
+        self._apply_tm_preferences_actions(values)
         search_scope = str(values.get("search_scope", "FILE")).upper()
         if search_scope not in {"FILE", "LOCALE", "POOL"}:
             search_scope = "FILE"
@@ -2147,6 +2180,60 @@ class MainWindow(QMainWindow):
             self._schedule_tm_update()
         self._update_replace_enabled()
         self._update_status_bar()
+
+    def _apply_tm_preferences_actions(self, values: dict) -> None:
+        remove_paths_raw = values.get("tm_remove_paths", []) or []
+        enabled_raw = values.get("tm_enabled", {}) or {}
+        import_paths_raw = values.get("tm_import_paths", []) or []
+        if not remove_paths_raw and not enabled_raw and not import_paths_raw:
+            return
+        if not self._ensure_tm_store():
+            return
+        remove_paths = {
+            str(path).strip() for path in remove_paths_raw if str(path).strip()
+        }
+        enabled_map: dict[str, bool] = {}
+        if isinstance(enabled_raw, dict):
+            for path, flag in enabled_raw.items():
+                path_s = str(path).strip()
+                if path_s:
+                    enabled_map[path_s] = bool(flag)
+        copy_failures: list[str] = []
+        sync_paths: set[Path] = set()
+        for source in import_paths_raw:
+            path_s = str(source).strip()
+            if not path_s:
+                continue
+            try:
+                sync_paths.add(self._copy_tmx_to_import_dir(Path(path_s)))
+            except Exception as exc:
+                copy_failures.append(f"{path_s}: {exc}")
+        for tm_path in remove_paths:
+            path = Path(tm_path)
+            if path.exists():
+                try:
+                    path.unlink()
+                except OSError as exc:
+                    copy_failures.append(f"{tm_path}: {exc}")
+                    continue
+            self._tm_store.delete_import_file(tm_path)
+        for tm_path, enabled in enabled_map.items():
+            if tm_path in remove_paths:
+                continue
+            self._tm_store.set_import_enabled(tm_path, enabled)
+        if sync_paths:
+            self._sync_tm_import_folder(
+                interactive=True,
+                only_paths=sync_paths,
+                show_summary=True,
+            )
+        if copy_failures:
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle("TM preferences")
+            msg.setText("Some TM file operations failed.")
+            msg.setDetailedText("\n".join(copy_failures))
+            msg.exec()
 
     def _switch_locales(self) -> None:
         if not self._write_cache_current():
@@ -4599,6 +4686,8 @@ class MainWindow(QMainWindow):
         origin = "project" if match.origin == "project" else "import"
         if match.tm_name:
             source_name = match.tm_name
+        elif match.tm_path:
+            source_name = match.tm_path
         elif match.file_path:
             source_name = Path(match.file_path).name
         else:

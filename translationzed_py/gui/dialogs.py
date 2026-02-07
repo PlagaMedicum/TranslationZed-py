@@ -138,10 +138,12 @@ class TmLanguageDialog(QDialog):
         default_source: str | None = None,
         default_target: str | None = None,
         title: str = "TM language pair",
+        allow_skip_all: bool = False,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
+        self._skip_all = False
         langs = sorted({lang for lang in languages if lang})
         if not langs:
             langs = []
@@ -175,6 +177,11 @@ class TmLanguageDialog(QDialog):
             Qt.Orientation.Horizontal,
             self,
         )
+        if allow_skip_all:
+            skip_btn = buttons.addButton(
+                "Skip all for now", QDialogButtonBox.ActionRole
+            )
+            skip_btn.clicked.connect(self._skip_all_now)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -184,6 +191,13 @@ class TmLanguageDialog(QDialog):
 
     def target_locale(self) -> str:
         return self._target_combo.currentText().strip()
+
+    def skip_all_requested(self) -> bool:
+        return self._skip_all
+
+    def _skip_all_now(self) -> None:
+        self._skip_all = True
+        self.reject()
 
 
 class ReplaceFilesDialog(QDialog):
