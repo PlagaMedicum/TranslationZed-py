@@ -42,11 +42,19 @@ def _pick_indices(count: int) -> list[int]:
 
 def main() -> int:
     root_arg = Path(sys.argv[1]) if len(sys.argv) > 1 else None
-    root = Path(os.getenv("TZP_PERF_ROOT", "")).expanduser()
-    if not root or str(root) == ".":
-        root = Path("tests/fixtures/perf_root")
+    env_root_raw = os.getenv("TZP_PERF_ROOT", "").strip()
+    root = Path("tests/fixtures/perf_root")
     if root_arg:
-        root = root_arg
+        root = root_arg.expanduser()
+    elif env_root_raw:
+        env_root = Path(env_root_raw).expanduser()
+        if env_root.is_dir():
+            root = env_root
+        else:
+            print(
+                f"Warning: TZP_PERF_ROOT does not exist, using fixture root: {env_root}",
+                file=sys.stderr,
+            )
     root = root.resolve()
     if not root.is_dir():
         print(f"Missing translations root: {root}", file=sys.stderr)
