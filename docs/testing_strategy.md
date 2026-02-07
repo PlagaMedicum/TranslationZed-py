@@ -148,6 +148,8 @@ They include:
 - TM preferences service: action parsing + apply pipeline (copy/remove/enable-disable), plus GUI
   integration tests for deletion confirmation behavior.
 - TM rebuild service: locale collection, rebuild ingestion, and status message formatting.
+- Save/exit orchestration service: `Write Original` and close-prompt decision flow
+  (`core.save_exit_flow` unit tests).
 
 **Not covered yet (automation gaps, by layer):**
 

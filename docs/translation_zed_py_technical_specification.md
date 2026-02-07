@@ -85,6 +85,7 @@ translationzed_py/
 │   ├── tm_query.py          # TM query policy/filter helpers (non-Qt)
 │   ├── tm_preferences.py    # TM preference action orchestration (non-Qt)
 │   ├── tm_rebuild.py        # project-TM rebuild service (non-Qt)
+│   ├── save_exit_flow.py    # save/exit decision flow (non-Qt)
 │   ├── tmx_io.py            # TMX import/export
 │   ├── atomic_io.py         # atomic write helpers
 │   ├── app_config.py        # TOML-configurable paths/adapters/formats
@@ -324,6 +325,16 @@ Algorithm:
   - Editors always load **full text** (no truncation).
 - When disabled: none of the above guardrails apply.
 - Users can change or clear `DEFAULT_ROOT` via Preferences.
+
+#### 5.6.4  Save/exit orchestration boundary
+
+- `core.save_exit_flow` owns the Qt-free decision flow for:
+  - **Write Original** action (`cancel` / `write` / `cache` branches).
+  - **Close prompt** flow (pre-close cache write, optional save prompt, final cache guard).
+- `gui.main_window` remains adapter-only for:
+  - presenting save dialogs/messages,
+  - supplying callbacks that perform cache writes and original-file saves.
+- Related UCs: UC-10a, UC-11.
 
 ### 5.7  `core.app_config`
 

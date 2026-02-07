@@ -360,6 +360,11 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        5) search/replace scope execution.
      - [ ] Keep GUI methods as adapters only (signal wiring + rendering state).
      - [ ] Add integration tests per extracted service boundary before each next extraction.
+   - **Implemented slices so far**:
+     - [✓] TM import-folder sync/query/preferences/rebuild workflows extracted into
+       Qt-free `core.tm_*` services.
+     - [✓] Save/exit write orchestration extracted into Qt-free
+       `core.save_exit_flow` (`Write Original` + `closeEvent` decision flow).
    - **Acceptance**:
      - [ ] `main_window.py` no longer owns core workflow decisions directly.
      - [ ] Service-level tests cover open/switch/save/conflict/search flows.
