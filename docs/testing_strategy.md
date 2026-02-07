@@ -67,13 +67,13 @@ _Last updated: 2026-02-04_
   including `make verify`, to keep regressions visible.
 
 ### 2.7 Real‑data performance scenarios (scripted)
-- `make perf-scenarios` runs perf checks against real files in
-  `ProjectZomboidTranslations/BE/`:
+- `make perf-scenarios` runs perf checks against fixture files in
+  `tests/fixtures/perf_root/BE/`:
   - `SurvivalGuide_BE.txt`
   - `Recorded_Media_BE.txt`
   - `News_BE.txt`
 - Budgets are env‑tunable (`TZP_PERF_SCEN_*`); pass a different root path as
-  `TZP_PERF_ROOT` or `make perf-scenarios ARGS="/path/to/ProjectZomboidTranslations"`.
+  `TZP_PERF_ROOT` or `make perf-scenarios ARGS="/path/to/root"`.
 
 ---
 

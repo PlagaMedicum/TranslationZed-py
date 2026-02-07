@@ -37,7 +37,7 @@ check: fmt lint typecheck test
 ## pre-commit verification (cleans caches + runs full checks + perf scenarios)
 verify: clean-cache clean-config check perf-scenarios
 
-## run perf scenarios against real ProjectZomboidTranslations files
+## run perf scenarios against fixture translation files
 perf-scenarios:
 	VENV=$(VENV) bash scripts/perf_scenarios.sh $(ARGS)
 

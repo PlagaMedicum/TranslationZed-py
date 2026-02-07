@@ -44,7 +44,7 @@ def main() -> int:
     root_arg = Path(sys.argv[1]) if len(sys.argv) > 1 else None
     root = Path(os.getenv("TZP_PERF_ROOT", "")).expanduser()
     if not root or str(root) == ".":
-        root = Path("ProjectZomboidTranslations")
+        root = Path("tests/fixtures/perf_root")
     if root_arg:
         root = root_arg
     root = root.resolve()
