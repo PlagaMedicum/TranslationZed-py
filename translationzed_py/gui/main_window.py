@@ -116,6 +116,12 @@ from translationzed_py.core.status_cache import (
     touch_last_opened as _touch_last_opened,
 )
 from translationzed_py.core.status_cache import write as _write_status_cache
+from translationzed_py.core.tm_import_sync import (
+    TMImportSyncReport,
+)
+from translationzed_py.core.tm_import_sync import (
+    sync_import_folder as _sync_tm_import_folder_core,
+)
 from translationzed_py.core.tm_store import TMMatch, TMStore
 
 from .delegates import (
@@ -1580,142 +1586,66 @@ class MainWindow(QMainWindow):
                     f"TM import folder unavailable: {exc}", 5000
                 )
             return
-        target_paths = {
-            path.resolve()
-            for path in only_paths or set()
-            if path.exists() and path.is_file()
-        }
-        files = sorted(
-            path.resolve() for path in tm_dir.glob("*.tmx") if path.is_file()
+        report = _sync_tm_import_folder_core(
+            self._tm_store,
+            tm_dir,
+            resolve_locales=lambda path, langs: self._pick_tmx_locales(
+                path,
+                langs,
+                interactive=interactive,
+                allow_skip_all=interactive,
+            ),
+            only_paths=only_paths,
+            pending_only=pending_only,
         )
-        if target_paths:
-            files = [path for path in files if path in target_paths]
-        records = {
-            Path(rec.tm_path).resolve(): rec
-            for rec in self._tm_store.list_import_files()
-        }
-        if not target_paths:
-            existing_files = {
-                path.resolve() for path in tm_dir.glob("*.tmx") if path.is_file()
-            }
-            for rec_path in list(records):
-                if rec_path not in existing_files:
-                    self._tm_store.delete_import_file(str(rec_path))
-                    records.pop(rec_path, None)
-        imported = 0
-        unresolved: list[str] = []
-        failures: list[str] = []
-        changed = False
-        skip_remaining_mappings = False
-        for path in files:
-            stat = path.stat()
-            record = records.get(path)
-            if pending_only and (record is None or record.status != "needs_mapping"):
-                continue
-            if (
-                not pending_only
-                and record is not None
-                and record.status == "ready"
-                and record.mtime_ns == stat.st_mtime_ns
-                and record.file_size == stat.st_size
-            ):
-                continue
-            from translationzed_py.core.tmx_io import detect_tmx_languages
+        self._apply_tm_sync_report(
+            report,
+            interactive=interactive,
+            show_summary=show_summary,
+        )
 
-            try:
-                langs = detect_tmx_languages(path)
-            except Exception as exc:
-                failures.append(f"{path.name}: {exc}")
-                self._tm_store.upsert_import_file(
-                    tm_path=str(path),
-                    tm_name=path.stem,
-                    mtime_ns=stat.st_mtime_ns,
-                    file_size=stat.st_size,
-                    status="error",
-                    note=str(exc),
-                )
-                continue
-            pair = None
-            if record and record.source_locale and record.target_locale:
-                pair = (record.source_locale, record.target_locale)
-            if pair is None:
-                if skip_remaining_mappings:
-                    pair = None
-                else:
-                    pair, skip_all = self._pick_tmx_locales(
-                        path,
-                        langs,
-                        interactive=interactive,
-                        allow_skip_all=interactive,
-                    )
-                    if skip_all:
-                        skip_remaining_mappings = True
-            if pair is None:
-                unresolved.append(path.name)
-                self._tm_store.upsert_import_file(
-                    tm_path=str(path),
-                    tm_name=path.stem,
-                    mtime_ns=stat.st_mtime_ns,
-                    file_size=stat.st_size,
-                    status="needs_mapping",
-                    note=(
-                        "Locale pair is unresolved for this TMX file. "
-                        "Use TM menu to resolve."
-                    ),
-                )
-                continue
-            source_locale, target_locale = pair
-            try:
-                imported += self._tm_store.replace_import_tmx(
-                    path,
-                    source_locale=source_locale,
-                    target_locale=target_locale,
-                    tm_name=path.stem,
-                )
-            except Exception as exc:
-                failures.append(f"{path.name}: {exc}")
-                self._tm_store.upsert_import_file(
-                    tm_path=str(path),
-                    tm_name=path.stem,
-                    source_locale=source_locale,
-                    target_locale=target_locale,
-                    mtime_ns=stat.st_mtime_ns,
-                    file_size=stat.st_size,
-                    status="error",
-                    note=str(exc),
-                )
-                continue
-            changed = True
-        if changed:
+    def _apply_tm_sync_report(
+        self,
+        report: TMImportSyncReport,
+        *,
+        interactive: bool,
+        show_summary: bool,
+    ) -> None:
+        if report.changed:
             self._tm_cache.clear()
             if self._left_stack.currentIndex() == 1:
                 self._schedule_tm_update()
         if interactive:
             parts = []
-            if imported:
-                parts.append(f"Imported {imported} segment(s).")
-            if unresolved:
+            if report.imported_segments:
+                parts.append(f"Imported {report.imported_segments} segment(s).")
+            if report.unresolved_files:
                 parts.append(
-                    f"{len(unresolved)} file(s) need locale mapping: {', '.join(unresolved[:3])}"
+                    " ".join(
+                        [
+                            f"{len(report.unresolved_files)} file(s) need locale mapping:",
+                            ", ".join(report.unresolved_files[:3]),
+                        ]
+                    )
                 )
-            if failures:
-                parts.append(f"{len(failures)} file(s) failed.")
-            if failures or unresolved:
+            if report.failures:
+                parts.append(f"{len(report.failures)} file(s) failed.")
+            if report.failures or report.unresolved_files:
                 msg = QMessageBox(self)
                 msg.setIcon(QMessageBox.Warning)
                 msg.setWindowTitle("TM import sync")
                 msg.setText(" ".join(parts))
                 details = []
-                if unresolved:
+                if report.unresolved_files:
                     details.append(
                         "Pending mapping:\n"
-                        + "\n".join(f"- {name}" for name in unresolved)
+                        + "\n".join(f"- {name}" for name in report.unresolved_files)
                     )
-                if failures:
-                    details.append("Failures:\n" + "\n".join(failures))
+                if report.failures:
+                    details.append("Failures:\n" + "\n".join(report.failures))
                 msg.setDetailedText("\n\n".join(details))
                 msg.exec()
-            elif show_summary and imported:
+            elif show_summary and report.imported_segments:
                 QMessageBox.information(self, "TM import sync", " ".join(parts))
             elif show_summary and not parts:
                 QMessageBox.information(self, "TM import sync", "No TM files changed.")
@@ -2208,6 +2138,21 @@ class MainWindow(QMainWindow):
                 sync_paths.add(self._copy_tmx_to_import_dir(Path(path_s)))
             except Exception as exc:
                 copy_failures.append(f"{path_s}: {exc}")
+        if remove_paths:
+            confirm = QMessageBox(self)
+            confirm.setIcon(QMessageBox.Warning)
+            confirm.setWindowTitle("Delete imported TM files")
+            confirm.setText(
+                "Selected TM files will be deleted from disk and removed from the TM store."
+            )
+            confirm.setInformativeText("This action cannot be undone.")
+            confirm.setDetailedText("\n".join(sorted(remove_paths)))
+            confirm.setStandardButtons(
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
+            )
+            confirm.setDefaultButton(QMessageBox.StandardButton.Cancel)
+            if confirm.exec() != QMessageBox.StandardButton.Yes:
+                remove_paths = set()
         for tm_path in remove_paths:
             path = Path(tm_path)
             if path.exists():
