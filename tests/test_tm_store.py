@@ -112,6 +112,70 @@ def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
     )
     assert matches
     assert matches[0].tm_name == "pack_ru"
+    store.set_import_enabled(str(tmx_path), False)
+    assert (
+        store.query(
+            "Hello world",
+            source_locale="EN",
+            target_locale="RU",
+            origins=["import"],
+        )
+        == []
+    )
+    count = store.replace_import_tmx(
+        tmx_path,
+        source_locale="EN",
+        target_locale="RU",
+        tm_name="pack_ru",
+    )
+    assert count == 1
+    assert (
+        store.query(
+            "Hello world",
+            source_locale="EN",
+            target_locale="RU",
+            origins=["import"],
+        )
+        == []
+    )
+    stat = tmx_path.stat()
+    store.upsert_import_file(
+        tm_path=str(tmx_path),
+        tm_name="pack_ru",
+        source_locale="EN",
+        target_locale="RU",
+        mtime_ns=stat.st_mtime_ns,
+        file_size=stat.st_size,
+        enabled=True,
+        status="error",
+        note="parse failed",
+    )
+    assert (
+        store.query(
+            "Hello world",
+            source_locale="EN",
+            target_locale="RU",
+            origins=["import"],
+        )
+        == []
+    )
+    store.upsert_import_file(
+        tm_path=str(tmx_path),
+        tm_name="pack_ru",
+        source_locale="EN",
+        target_locale="RU",
+        mtime_ns=stat.st_mtime_ns,
+        file_size=stat.st_size,
+        enabled=True,
+        status="ready",
+        note="",
+    )
+    assert store.query(
+        "Hello world",
+        source_locale="EN",
+        target_locale="RU",
+        origins=["import"],
+    )
     store.delete_import_file(str(tmx_path))
     assert not store.list_import_files()
     store.close()

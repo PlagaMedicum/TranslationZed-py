@@ -15,6 +15,21 @@ _IMPORT_ORIGIN = "import"
 _MIN_FUZZY_SCORE = 30
 _MAX_FUZZY_CANDIDATES = 200
 _MAX_FUZZY_SOURCE_LEN = 5000
+_IMPORT_VISIBLE_SQL = """
+origin != 'import'
+OR tm_path IS NULL
+OR COALESCE(
+    (
+        SELECT CASE
+            WHEN f.enabled = 1 AND f.status = 'ready' THEN 1
+            ELSE 0
+        END
+        FROM tm_import_files f
+        WHERE f.tm_path = tm_entries.tm_path
+    ),
+    1
+) = 1
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +53,7 @@ class TMImportFile:
     target_locale: str
     mtime_ns: int
     file_size: int
+    enabled: bool
     status: str
     note: str
     updated_at: int
@@ -157,12 +173,14 @@ class TMStore:
                 target_locale TEXT,
                 mtime_ns INTEGER NOT NULL,
                 file_size INTEGER NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
                 status TEXT NOT NULL,
                 note TEXT NOT NULL DEFAULT '',
                 updated_at INTEGER NOT NULL
             )
             """
         )
+        self._ensure_tm_import_files_columns()
         self._conn.execute("DROP INDEX IF EXISTS tm_project_key")
         self._conn.execute("DROP INDEX IF EXISTS tm_import_unique")
         self._conn.execute(
@@ -214,6 +232,18 @@ class TMStore:
             self._conn.execute("ALTER TABLE tm_entries ADD COLUMN tm_name TEXT")
         if "tm_path" not in cols:
             self._conn.execute("ALTER TABLE tm_entries ADD COLUMN tm_path TEXT")
+
+    def _ensure_tm_import_files_columns(self) -> None:
+        cols = {
+            row["name"]
+            for row in self._conn.execute(
+                "PRAGMA table_info(tm_import_files)"
+            ).fetchall()
+        }
+        if "enabled" not in cols:
+            self._conn.execute(
+                "ALTER TABLE tm_import_files ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"
+            )
 
     def upsert_project_entries(
         self,
@@ -375,6 +405,17 @@ class TMStore:
         target_locale = _normalize_locale(target_locale)
         name = (tm_name or path.stem).strip() or path.stem
         path_str = str(path)
+        enabled = True
+        row = self._conn.execute(
+            """
+            SELECT enabled
+            FROM tm_import_files
+            WHERE tm_path = ?
+            """,
+            (path_str,),
+        ).fetchone()
+        if row is not None:
+            enabled = bool(row["enabled"])
         self._conn.execute(
             """
             DELETE FROM tm_entries
@@ -396,6 +437,7 @@ class TMStore:
             target_locale=target_locale,
             mtime_ns=path.stat().st_mtime_ns,
             file_size=path.stat().st_size,
+            enabled=enabled,
             status="ready",
             note="",
         )
@@ -411,6 +453,7 @@ class TMStore:
                 COALESCE(target_locale, '') AS target_locale,
                 mtime_ns,
                 file_size,
+                enabled,
                 status,
                 note,
                 updated_at
@@ -426,6 +469,7 @@ class TMStore:
                 target_locale=row["target_locale"],
                 mtime_ns=int(row["mtime_ns"]),
                 file_size=int(row["file_size"]),
+                enabled=bool(row["enabled"]),
                 status=row["status"],
                 note=row["note"],
                 updated_at=int(row["updated_at"]),
@@ -442,6 +486,7 @@ class TMStore:
         target_locale: str = "",
         mtime_ns: int,
         file_size: int,
+        enabled: bool = True,
         status: str,
         note: str = "",
         updated_at: int | None = None,
@@ -456,16 +501,18 @@ class TMStore:
                 target_locale,
                 mtime_ns,
                 file_size,
+                enabled,
                 status,
                 note,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(tm_path) DO UPDATE SET
                 tm_name=excluded.tm_name,
                 source_locale=excluded.source_locale,
                 target_locale=excluded.target_locale,
                 mtime_ns=excluded.mtime_ns,
                 file_size=excluded.file_size,
+                enabled=excluded.enabled,
                 status=excluded.status,
                 note=excluded.note,
                 updated_at=excluded.updated_at
@@ -477,10 +524,22 @@ class TMStore:
                 _normalize_locale(target_locale) if target_locale else "",
                 int(mtime_ns),
                 int(file_size),
+                1 if enabled else 0,
                 status,
                 note,
                 now,
             ),
+        )
+        self._conn.commit()
+
+    def set_import_enabled(self, tm_path: str, enabled: bool) -> None:
+        self._conn.execute(
+            """
+            UPDATE tm_import_files
+            SET enabled = ?, updated_at = ?
+            WHERE tm_path = ?
+            """,
+            (1 if enabled else 0, int(time.time()), tm_path),
         )
         self._conn.commit()
 
@@ -615,6 +674,7 @@ class TMStore:
                 updated_at
             FROM tm_entries
             WHERE source_locale = ? AND target_locale = ? AND source_norm = ?
+              AND ({_IMPORT_VISIBLE_SQL})
               AND {origin_clause}
             ORDER BY CASE origin WHEN 'project' THEN 0 ELSE 1 END, updated_at DESC
             """,
@@ -712,6 +772,7 @@ class TMStore:
                 FROM tm_entries
                 WHERE source_locale = ? AND target_locale = ? AND source_prefix = ?
                   AND source_len BETWEEN ? AND ?
+                  AND ({_IMPORT_VISIBLE_SQL})
                   AND {origin_clause}
                 ORDER BY updated_at DESC
             LIMIT ?
@@ -734,6 +795,7 @@ class TMStore:
                 FROM tm_entries
                 WHERE source_locale = ? AND target_locale = ?
                   AND source_len BETWEEN ? AND ?
+                  AND ({_IMPORT_VISIBLE_SQL})
                   AND {origin_clause}
                 ORDER BY updated_at DESC
                 LIMIT ?
