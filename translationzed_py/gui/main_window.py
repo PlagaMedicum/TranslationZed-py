@@ -86,6 +86,12 @@ from translationzed_py.core.model import STATUS_ORDER, Status
 from translationzed_py.core.preferences import ensure_defaults as _ensure_preferences
 from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.preferences import save as _save_preferences
+from translationzed_py.core.save_exit_flow import (
+    apply_write_original_flow as _apply_write_original_flow,
+)
+from translationzed_py.core.save_exit_flow import (
+    should_accept_close as _should_accept_close,
+)
 from translationzed_py.core.saver import save
 from translationzed_py.core.search import Match as _SearchMatch
 from translationzed_py.core.search import SearchField as _SearchField
@@ -2702,23 +2708,22 @@ class MainWindow(QMainWindow):
         return True
 
     def _request_write_original(self) -> None:
-        self._write_cache_current()
-        files = self._draft_files()
-        if not files:
-            QMessageBox.information(
-                self, "Nothing to write", "No draft changes to write."
-            )
-            return
+        _apply_write_original_flow(
+            write_cache=self._write_cache_current,
+            list_draft_files=self._draft_files,
+            choose_action=self._show_save_files_dialog,
+            save_all=self._save_all_files,
+            notify_nothing_to_write=self._notify_nothing_to_write,
+        )
+
+    def _notify_nothing_to_write(self) -> None:
+        QMessageBox.information(self, "Nothing to write", "No draft changes to write.")
+
+    def _show_save_files_dialog(self, files: list[Path]) -> str:
         rel_files = [str(p.relative_to(self._root)) for p in files]
         dialog = SaveFilesDialog(rel_files, self)
         dialog.exec()
-        decision = dialog.choice()
-        if decision == "cancel":
-            return
-        if decision == "write":
-            self._save_all_files(files)
-        else:
-            self._write_cache_current()
+        return dialog.choice()
 
     def _draft_files(self) -> list[Path]:
         cache_root = self._root / self._app_config.cache_dir
@@ -4723,20 +4728,13 @@ class MainWindow(QMainWindow):
         if self._merge_active:
             event.ignore()
             return
-        self._write_cache_current()
-        if self._prompt_write_on_exit:
-            files = self._draft_files()
-            if files:
-                rel_files = [str(p.relative_to(self._root)) for p in files]
-                dialog = SaveFilesDialog(rel_files, self)
-                dialog.exec()
-                decision = dialog.choice()
-                if decision == "cancel":
-                    event.ignore()
-                    return
-                if decision == "write":
-                    self._save_all_files(files)
-        if not self._write_cache_current():
+        if not _should_accept_close(
+            prompt_write_on_exit=self._prompt_write_on_exit,
+            write_cache=self._write_cache_current,
+            list_draft_files=self._draft_files,
+            choose_action=self._show_save_files_dialog,
+            save_all=self._save_all_files,
+        ):
             event.ignore()
             return
         self._stop_timers()
