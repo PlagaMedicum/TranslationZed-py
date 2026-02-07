@@ -24,6 +24,7 @@ env/
 .coverage
 htmlcov/
 .tzp-cache/
+.tzp-config/
 ProjectZomboidTranslations/
 !tests/fixtures/conflict_manual/.tzp-cache/
 !tests/fixtures/conflict_manual/.tzp-cache/**
