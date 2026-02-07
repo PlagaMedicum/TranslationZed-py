@@ -74,6 +74,7 @@ Releases:
 ## Contributing
 This codebase is largely written by AI (you are welcomed to help verify and improve it!). If you want to contribute, please read the `/docs`
 and try to follow the architecture and standards described there. It was made for LLM to store context and my vision of the project.
+For document ownership and anti-duplication rules, follow `docs/docs_structure.md`.
 
 ## License
 This project is Open-source, licensed under GPLv3. Distributions must include source code and the license text.

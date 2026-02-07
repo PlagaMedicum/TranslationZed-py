@@ -1,4 +1,4 @@
-_Last updated: 2026-01-29 (v0.1)_
+_Last updated: 2026-02-07_
 
 # Checklists
 
@@ -8,8 +8,9 @@ avoid missing mandatory tasks.
 ## Before committing
 
 - **Run** `make verify`
-  - Cleans `.tzp-cache` and `.tzp-config`
-  - Runs formatter, linter, typecheck, and tests
+  - Cleans non-fixture `.tzp-cache` directories
+  - Cleans fixture `.tzp-config` only (does not touch runtime-local user config)
+  - Runs formatter, linter, typecheck, tests, and perf scenarios
 - **Update docs** whenever behavior, UX, or workflows change
   - Keep specs and plan in sync with implemented features
   - Add/adjust questions when requirements are unclear or changed

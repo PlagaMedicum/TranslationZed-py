@@ -1,5 +1,5 @@
 # TranslationZed-Py — Key Flows
-_Last updated: 2026-01-31_
+_Last updated: 2026-02-07_
 
 ---
 
@@ -98,5 +98,5 @@ User: Project ▸ Switch Locale(s)
   -> auto-write cache for current file (no prompt)
   -> re-run locale chooser (checkboxes)
   -> rebuild tree (multiple roots)
-  -> open first file
+  -> open most recently opened file across selected locales (if available)
 ```
