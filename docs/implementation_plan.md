@@ -414,13 +414,14 @@ A7 [→] **UI latency stabilization (scroll + paint)**
      - [✓] Preference toggle for large‑text optimizations (default ON).
      - [✓] Fast paint path for non‑highlight rows (elide‑only when wrap is OFF).
      - [✓] Uniform row heights when wrap is OFF (avoid per‑row sizeHint churn).
-     - [✓] Large‑file mode auto‑disables wrap + table highlighting (≥5,000 rows or ≥1,000,000 bytes).
+     - [✓] Time‑sliced row sizing (budgeted per pass) to avoid long stalls.
+     - [✓] Text layout cache for highlighted/glyph rows (reuse `QTextDocument` layouts).
      - [✓] Add lightweight perf tracing for paint/resize (`TZP_PERF_TRACE=paint,row_resize`).
      - [→] Debounce column/splitter resize to avoid redundant row‑height work.
      - [✓] Add perf tracing for selection/detail sync/layout/startup/cache scan/auto‑open
        (identify remaining hotspots).
-     - [→] Evaluate render‑cost heuristic (e.g., total chars) to auto‑enter large‑file mode
-       when row/size thresholds are not exceeded.
+     - [✓] Render‑cost heuristic (max entry length) to auto‑enter large‑file mode
+       and enable table previews when row/size thresholds are not exceeded.
      - [→] Reduce lazy prefetch window for very long rows to cut decode spikes on scroll.
    - **Acceptance**: large single‑string files (News/Recorded_Media) open and scroll without jank;
      column resize/side‑panel toggles are smooth; no tooltip‑related freezes.

@@ -283,11 +283,14 @@ UNTOUCHED ──────────────────────▶ 
    in both preview and edit (toggled in Preferences → View). When large‑text optimizations are on,
    highlight/whitespace glyphs are suppressed for extremely large values (≥100k chars).
 8. **Large‑file mode (current)**: when large‑text optimizations are enabled and a file exceeds
-   row‑count or size thresholds, table **wrap** and **highlight/glyphs** are auto‑disabled to keep
-   scrolling responsive. Editing still shows full text. Current thresholds: ≥5,000 rows or
-   ≥1,000,000 bytes (subject to tuning). User can disable in Preferences.
+   row‑count or size thresholds, **or** when a render‑cost heuristic detects very long rows
+   (max value length ≥ 3x preview limit), the UI remains fully featured but uses
+   **time‑sliced row sizing** and **cached text layouts** to keep scrolling responsive.
+   Table preview is capped (default 800 chars); editing still shows full text.
+   Current thresholds: ≥5,000 rows or ≥1,000,000 bytes (subject to tuning).
 9. **Tooltips**: plain text only (no highlighting/selection), delayed ~900ms, truncated for large
-   values (800 chars normally, 200 chars when length ≥5,000); used for preview only.
+   values (800 chars normally, 200 chars when length ≥5,000); preview‑only and avoids full
+   decode for lazy values (app font to prevent oversized text).
 10. **Side panel (current)**: left‑side panel switches between **Files / TM / Search**
    and can be hidden/shown via a **left‑side toggle**; the detail editor pane is
    toggled from the **bottom bar**. TM panel includes filters (min score + origin

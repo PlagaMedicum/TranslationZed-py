@@ -128,8 +128,8 @@ From latest clarification:
   placeholders on selection and load full text **only when focused**; length checks use
   entry metadata to avoid forcing lazy decode during selection changes.
 - **Large‑file mode**: active only when large‑text optimizations are ON; if a file is large
-  (≥5,000 rows or ≥1,000,000 bytes), table wrap and table highlight/whitespace glyphs auto‑disable
-  to keep scrolling responsive. User wrap preference is preserved but forced off in the table.
+  (≥5,000 rows or ≥1,000,000 bytes), wrap/highlight/glyphs remain enabled, but table work is
+  throttled via time‑sliced row sizing and cached text layouts to keep scrolling responsive.
 - **No‑wrap render path**: when wrapping is OFF, the table uses uniform row heights and a fast
   elided‑text paint path to avoid expensive per‑row layout work.
 - **Tooltips**: plain text only (no highlighting/selection), delayed (~900ms). Truncation caps:
@@ -266,12 +266,19 @@ Observed hotspots and their current shape (code references are indicative):
 
 **D) Table rendering / row sizing**
 - **Word‑wrap**: row sizing is **windowed** (visible rows + viewport margin) and
-  debounced; full‑table `resizeRowsToContents()` is avoided.
+  debounced; full‑table `resizeRowsToContents()` is avoided. Row sizing is also
+  **time‑sliced** (budgeted per pass) to avoid long UI stalls.
 - **Row‑height cache**: per‑row heights cached and reused; invalidated on column resize,
   row data changes, wrap toggle, and file switch.
 - **Scroll‑idle sizing**: resize pass runs only after scroll idle (no sizing during wheel).
 - **Fast paint path**: when highlights/glyphs are off, cells render via `QStaticText`
   instead of `QTextDocument`.
+- **Text layout cache**: highlighted/glyph runs reuse cached `QTextDocument` layouts
+  keyed by text+width+font to avoid repeated regex/layout work.
+- **Render‑cost heuristic**: per‑file max value length is derived from entry metadata; if it
+  exceeds the preview cutoff (currently 3x preview limit), table preview is enabled and
+  large‑file mode is forced to keep paint/layout costs bounded (using time‑sliced row
+  sizing and cached layouts; wrap/highlight remain enabled).
 - **Giant strings**: delegate caps per‑cell render cost; huge values render as a
   single elided line and painting is clipped to the cell rect.
 - **Detail editors**: when visible, they load **full text** on selection **unless the
@@ -289,13 +296,15 @@ Current mitigations already present:
 - Cache stores **draft values only for changed keys**, limiting cache size.
 - `TranslationModel` tracks a **baseline map** only for edited rows.
 - Windowed row sizing + scroll‑idle resize (visible rows only).
+- Time‑sliced row sizing (budgeted per pass) to avoid long UI stalls.
 - Row‑height cache per visible row; recompute only on data/column change.
 - Fast paint path for non‑highlight rows (`QStaticText`).
-- Large‑file mode auto‑disables wrap + table highlighting/glyphs at ≥5,000 rows or ≥1,000,000 bytes
-  (only when large‑text optimizations are ON).
+- Text layout cache for highlighted/glyph rows (reuse `QTextDocument` layouts by text+width+font).
+- Large‑file mode uses cached layouts + time‑sliced row sizing at ≥5,000 rows or ≥1,000,000 bytes
+  (only when large‑text optimizations are ON), **or** when render‑cost heuristic triggers.
 - Per‑cell render cap for huge strings; editors always load full text.
 - Tooltips are plain text, delayed ~900ms, truncated to 800/200 chars with “...(truncated)”;
-  HTML-like tags are escaped to avoid Qt rich-text rendering.
+  previews avoid full decode for lazy values and use the app font to prevent oversized text.
 - Optional perf tracing for paint/resize and interaction hotspots
   (`TZP_PERF_TRACE=paint,row_resize,selection,detail_sync,layout,cache_scan,auto_open,startup`).
 

@@ -274,10 +274,13 @@ Algorithm:
 - Default: `LARGE_TEXT_OPTIMIZATIONS=true`.
 - When enabled:
   - **Large‑file mode** triggers at ≥5,000 rows or ≥1,000,000 bytes.
-  - Table **wrap** and **highlight/whitespace glyphs** are forced off in large‑file mode
-    (user wrap preference is preserved but not applied to the table).
+  - **Render‑cost heuristic**: if max entry length ≥ 3x preview limit (default 2,400),
+    large‑file mode is forced and table preview is enabled (default 800 chars).
+  - Large‑file mode keeps wrap/highlight/glyphs enabled, but uses **time‑sliced row
+    sizing** and **cached text layouts** to avoid UI stalls.
   - Highlight/whitespace glyphs are suppressed for any value ≥100k chars (table + editors).
-  - Tooltips are plain text, delayed ~900ms, and truncated (800/200 chars); preview‑only.
+  - Tooltips are plain text, delayed ~900ms, and truncated (800/200 chars); preview‑only
+    and avoid full decode for lazy values.
   - Editors always load **full text** (no truncation).
 - When disabled: none of the above guardrails apply.
   but does not modify it.
