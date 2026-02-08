@@ -111,6 +111,18 @@ from translationzed_py.core.model import STATUS_ORDER, Status
 from translationzed_py.core.preferences import ensure_defaults as _ensure_preferences
 from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.preferences import save as _save_preferences
+from translationzed_py.core.preferences_service import (
+    build_persist_payload as _prefs_build_persist_payload,
+)
+from translationzed_py.core.preferences_service import (
+    normalize_loaded_preferences as _prefs_normalize_loaded,
+)
+from translationzed_py.core.preferences_service import (
+    normalize_scope as _prefs_normalize_scope,
+)
+from translationzed_py.core.preferences_service import (
+    resolve_startup_root as _prefs_resolve_startup_root,
+)
 from translationzed_py.core.project_session import (
     collect_draft_files as _session_collect_draft_files,
 )
@@ -443,26 +455,26 @@ class MainWindow(QMainWindow):
         self._test_mode = _in_test_mode()
         _patch_message_boxes_for_tests()
         _ensure_preferences(None)
-        if project_root is None:
-            prefs_global = _load_preferences(None)
-            default_root = str(prefs_global.get("default_root", "")).strip()
-            if default_root and Path(default_root).exists():
-                self._root = Path(default_root).resolve()
-                self._default_root = default_root
-            else:
-                picked = QFileDialog.getExistingDirectory(
-                    self, "Select Project Root", str(Path.cwd())
-                )
-                if not picked:
-                    self._startup_aborted = True
-                    return
-                self._root = Path(picked).resolve()
-                self._default_root = str(self._root)
-                prefs_global["default_root"] = self._default_root
-                with contextlib.suppress(Exception):
-                    _save_preferences(prefs_global, None)
-        else:
-            self._root = Path(project_root).resolve()
+        prefs_global = _load_preferences(None)
+        startup_root = _prefs_resolve_startup_root(
+            project_root=project_root,
+            saved_default_root=str(prefs_global.get("default_root", "")),
+        )
+        if startup_root.root is not None:
+            self._root = startup_root.root
+            self._default_root = startup_root.default_root
+        elif startup_root.requires_picker:
+            picked = QFileDialog.getExistingDirectory(
+                self, "Select Project Root", str(Path.cwd())
+            )
+            if not picked:
+                self._startup_aborted = True
+                return
+            self._root = Path(picked).resolve()
+            self._default_root = str(self._root)
+            prefs_global["default_root"] = self._default_root
+            with contextlib.suppress(Exception):
+                _save_preferences(prefs_global, None)
         if not self._root.exists():
             QMessageBox.warning(self, "Invalid project root", str(self._root))
             self._startup_aborted = True
@@ -502,44 +514,32 @@ class MainWindow(QMainWindow):
             self._startup_aborted = True
             return
         prefs = _load_preferences(None)
-        self._prompt_write_on_exit = bool(prefs.get("prompt_write_on_exit", True))
-        self._wrap_text_user = bool(prefs.get("wrap_text", False))
-        self._wrap_text = self._wrap_text_user
-        self._large_text_optimizations = bool(
-            prefs.get("large_text_optimizations", True)
+        normalized_prefs = _prefs_normalize_loaded(
+            prefs,
+            fallback_default_root=self._default_root,
+            fallback_last_root=str(self._root),
+            default_tm_import_dir=str(self._default_tm_import_dir()),
+            test_mode=self._test_mode,
         )
-        if self._test_mode:
-            self._prompt_write_on_exit = False
-        self._default_root = str(prefs.get("default_root", "") or self._default_root)
-        self._search_scope = str(prefs.get("search_scope", "FILE")).upper()
-        if self._search_scope not in {"FILE", "LOCALE", "POOL"}:
-            self._search_scope = "FILE"
-        self._replace_scope = str(prefs.get("replace_scope", "FILE")).upper()
-        if self._replace_scope not in {"FILE", "LOCALE", "POOL"}:
-            self._replace_scope = "FILE"
+        if normalized_prefs.patched_raw is not None:
+            with contextlib.suppress(Exception):
+                _save_preferences(normalized_prefs.patched_raw, None)
+        self._prompt_write_on_exit = normalized_prefs.prompt_write_on_exit
+        self._wrap_text_user = normalized_prefs.wrap_text
+        self._wrap_text = self._wrap_text_user
+        self._large_text_optimizations = normalized_prefs.large_text_optimizations
+        self._default_root = normalized_prefs.default_root
+        self._search_scope = normalized_prefs.search_scope
+        self._replace_scope = normalized_prefs.replace_scope
         self._search_scope_widget = None
         self._search_scope_action = None
         self._search_scope_icon = None
         self._replace_scope_widget = None
         self._replace_scope_action = None
         self._replace_scope_icon = None
-        self._last_locales = list(prefs.get("last_locales", []) or [])
-        self._last_root = str(prefs.get("last_root", "") or self._root)
-        self._prefs_extras = dict(prefs.get("__extras__", {}))
-        layout_reset_rev = str(self._prefs_extras.get("LAYOUT_RESET_REV", "")).strip()
-        if layout_reset_rev != "3":
-            prefs["window_geometry"] = ""
-            for key in (
-                "TABLE_KEY_WIDTH",
-                "TABLE_STATUS_WIDTH",
-                "TABLE_SRC_RATIO",
-                "TREE_PANEL_WIDTH",
-            ):
-                self._prefs_extras.pop(key, None)
-            self._prefs_extras["LAYOUT_RESET_REV"] = "3"
-            prefs["__extras__"] = dict(self._prefs_extras)
-            with contextlib.suppress(Exception):
-                _save_preferences(prefs, None)
+        self._last_locales = normalized_prefs.last_locales
+        self._last_root = normalized_prefs.last_root
+        self._prefs_extras = normalized_prefs.extras
         self._tm_min_score = _int_from_pref(
             self._prefs_extras.get("TM_MIN_SCORE"), 30, min_value=30, max_value=100
         )
@@ -549,10 +549,8 @@ class MainWindow(QMainWindow):
         self._tm_origin_import = _bool_from_pref(
             self._prefs_extras.get("TM_ORIGIN_IMPORT"), True
         )
-        self._tm_import_dir = str(prefs.get("tm_import_dir", "")).strip()
-        if not self._tm_import_dir:
-            self._tm_import_dir = str(self._default_tm_import_dir())
-        geom = str(prefs.get("window_geometry", "")).strip()
+        self._tm_import_dir = normalized_prefs.tm_import_dir
+        geom = normalized_prefs.window_geometry
         if geom:
             with contextlib.suppress(Exception):
                 self.restoreGeometry(QByteArray.fromBase64(geom.encode("ascii")))
@@ -2071,12 +2069,8 @@ class MainWindow(QMainWindow):
         tm_import_dir = str(values.get("tm_import_dir", "")).strip()
         self._tm_import_dir = tm_import_dir or str(self._default_tm_import_dir())
         self._apply_tm_preferences_actions(values)
-        search_scope = str(values.get("search_scope", "FILE")).upper()
-        if search_scope not in {"FILE", "LOCALE", "POOL"}:
-            search_scope = "FILE"
-        replace_scope = str(values.get("replace_scope", "FILE")).upper()
-        if replace_scope not in {"FILE", "LOCALE", "POOL"}:
-            replace_scope = "FILE"
+        search_scope = _prefs_normalize_scope(values.get("search_scope", "FILE"))
+        replace_scope = _prefs_normalize_scope(values.get("replace_scope", "FILE"))
         if search_scope != self._search_scope:
             self._search_scope = search_scope
             if self.search_edit.text():
@@ -4139,19 +4133,19 @@ class MainWindow(QMainWindow):
             geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
         except Exception:
             geometry = ""
-        prefs = {
-            "prompt_write_on_exit": self._prompt_write_on_exit,
-            "wrap_text": self._wrap_text_user,
-            "large_text_optimizations": self._large_text_optimizations,
-            "last_root": str(self._root),
-            "last_locales": list(self._selected_locales),
-            "window_geometry": geometry,
-            "default_root": self._default_root,
-            "tm_import_dir": self._tm_import_dir,
-            "search_scope": self._search_scope,
-            "replace_scope": self._replace_scope,
-            "__extras__": dict(self._prefs_extras),
-        }
+        prefs = _prefs_build_persist_payload(
+            prompt_write_on_exit=self._prompt_write_on_exit,
+            wrap_text=self._wrap_text_user,
+            large_text_optimizations=self._large_text_optimizations,
+            last_root=str(self._root),
+            last_locales=list(self._selected_locales),
+            window_geometry=geometry,
+            default_root=self._default_root,
+            tm_import_dir=self._tm_import_dir,
+            search_scope=self._search_scope,
+            replace_scope=self._replace_scope,
+            extras=dict(self._prefs_extras),
+        )
         with contextlib.suppress(Exception):
             _save_preferences(prefs, None)
         if self._default_root:
