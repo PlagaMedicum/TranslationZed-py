@@ -92,7 +92,7 @@ def test_tm_workflow_query_cache_limit_and_filtering() -> None:
     filtered = service.filter_matches(
         [
             _match(source="s", target="a", score=100, origin="project"),
-            _match(source="s", target="b", score=40, origin="import"),
+            _match(source="s", target="b", score=55, origin="import"),
             _match(source="s", target="c", score=25, origin="import"),
         ],
         policy=TMQueryPolicy(min_score=30, origin_project=False, origin_import=True),

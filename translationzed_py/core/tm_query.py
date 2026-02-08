@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from .tm_store import TMMatch
 
-_MIN_SCORE = 30
+_MIN_SCORE = 50
 _MAX_SCORE = 100
 
 TMQueryKey = tuple[str, str, str, int, bool, bool]

@@ -511,7 +511,7 @@ class MainWindow(QMainWindow):
         self._last_root = normalized_prefs.last_root
         self._prefs_extras = normalized_prefs.extras
         self._tm_min_score = _int_from_pref(
-            self._prefs_extras.get("TM_MIN_SCORE"), 30, min_value=30, max_value=100
+            self._prefs_extras.get("TM_MIN_SCORE"), 50, min_value=50, max_value=100
         )
         self._tm_origin_project = _bool_from_pref(
             self._prefs_extras.get("TM_ORIGIN_PROJECT"), True
@@ -861,7 +861,7 @@ class MainWindow(QMainWindow):
         tm_filter_row.setSpacing(6)
         tm_filter_row.addWidget(QLabel("Min score", self._tm_panel))
         self._tm_score_spin = QSpinBox(self._tm_panel)
-        self._tm_score_spin.setRange(30, 100)
+        self._tm_score_spin.setRange(50, 100)
         self._tm_score_spin.setValue(self._tm_min_score)
         self._tm_score_spin.setSuffix("%")
         self._tm_score_spin.valueChanged.connect(self._on_tm_filters_changed)
@@ -879,12 +879,24 @@ class MainWindow(QMainWindow):
         self._tm_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._tm_list.itemSelectionChanged.connect(self._update_tm_apply_state)
         self._tm_list.itemDoubleClicked.connect(self._apply_tm_selection)
+        self._tm_source_preview = QPlainTextEdit(self._tm_panel)
+        self._tm_source_preview.setReadOnly(True)
+        self._tm_source_preview.setPlaceholderText("TM source (full text)")
+        self._tm_source_preview.setMaximumHeight(84)
+        self._tm_target_preview = QPlainTextEdit(self._tm_panel)
+        self._tm_target_preview.setReadOnly(True)
+        self._tm_target_preview.setPlaceholderText("TM translation (full text)")
+        self._tm_target_preview.setMaximumHeight(84)
         self._tm_apply_btn = QPushButton("Apply", self._tm_panel)
         self._tm_apply_btn.setEnabled(False)
         self._tm_apply_btn.clicked.connect(self._apply_tm_selection)
         tm_layout.addWidget(self._tm_status_label)
         tm_layout.addLayout(tm_filter_row)
         tm_layout.addWidget(self._tm_list)
+        tm_layout.addWidget(QLabel("Source", self._tm_panel))
+        tm_layout.addWidget(self._tm_source_preview)
+        tm_layout.addWidget(QLabel("Translation", self._tm_panel))
+        tm_layout.addWidget(self._tm_target_preview)
         tm_layout.addWidget(self._tm_apply_btn)
         self._left_stack.addWidget(self._tm_panel)
 
@@ -4107,7 +4119,18 @@ class MainWindow(QMainWindow):
         self._tm_update_timer.start()
 
     def _update_tm_apply_state(self) -> None:
-        self._tm_apply_btn.setEnabled(bool(self._tm_list.selectedItems()))
+        items = self._tm_list.selectedItems()
+        self._tm_apply_btn.setEnabled(bool(items))
+        match = items[0].data(Qt.UserRole) if items else None
+        self._set_tm_preview(match if isinstance(match, TMMatch) else None)
+
+    def _set_tm_preview(self, match: TMMatch | None) -> None:
+        if match is None:
+            self._tm_source_preview.clear()
+            self._tm_target_preview.clear()
+            return
+        self._tm_source_preview.setPlainText(match.source_text)
+        self._tm_target_preview.setPlainText(match.target_text)
 
     def _tm_query_policy(self) -> TMQueryPolicy:
         return TMQueryPolicy(
@@ -4193,6 +4216,7 @@ class MainWindow(QMainWindow):
         self._tm_status_label.setText(plan.message)
         self._tm_list.clear()
         self._tm_apply_btn.setEnabled(False)
+        self._set_tm_preview(None)
         if plan.mode == "query" and plan.cache_key is not None:
             self._start_tm_query(plan.cache_key)
 
@@ -4270,19 +4294,25 @@ class MainWindow(QMainWindow):
         if not matches:
             self._tm_status_label.setText("No TM matches found.")
             self._tm_apply_btn.setEnabled(False)
+            self._set_tm_preview(None)
             return
         filtered = self._filter_tm_matches(matches)
         if not filtered:
             self._tm_status_label.setText("No TM matches (filtered).")
             self._tm_apply_btn.setEnabled(False)
+            self._set_tm_preview(None)
             return
         self._tm_status_label.setText("TM suggestions")
         for match in filtered:
             item = QListWidgetItem(self._format_tm_item(match))
             item.setData(Qt.UserRole, match)
-            item.setToolTip(self._tooltip_html(match.target_text))
+            item.setToolTip(self._tm_tooltip_html(match))
             self._tm_list.addItem(item)
-        self._tm_apply_btn.setEnabled(bool(self._tm_list.selectedItems()))
+        if self._tm_list.count():
+            self._tm_list.setCurrentRow(0)
+        else:
+            self._set_tm_preview(None)
+            self._tm_apply_btn.setEnabled(False)
 
     def _format_tm_item(self, match: TMMatch) -> str:
         origin = "project" if match.origin == "project" else "import"
@@ -4294,8 +4324,22 @@ class MainWindow(QMainWindow):
             source_name = Path(match.file_path).name
         else:
             source_name = "Project TM"
+        source_preview = self._truncate_text(match.source_text, 60)
         target_preview = self._truncate_text(match.target_text, 80)
-        return f"{match.score:>3}% · {origin} · {source_name}: {target_preview}"
+        return (
+            f"{match.score:>3}% · {origin} · {source_name}\n"
+            f"S: {source_preview}\n"
+            f"T: {target_preview}"
+        )
+
+    def _tm_tooltip_html(self, match: TMMatch) -> str:
+        source = html.escape(match.source_text)
+        target = html.escape(match.target_text)
+        return (
+            '<span style="white-space: pre-wrap;">'
+            f"<b>Source</b><br>{source}<br><br><b>Translation</b><br>{target}"
+            "</span>"
+        )
 
     def _truncate_text(self, text: str, limit: int) -> str:
         if len(text) <= limit:
