@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-07_
+_Last updated: 2026-02-08_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.1 is shipped; this plan now
@@ -18,7 +18,7 @@ Legend:
 These are **always-on** constraints; any new feature must preserve them.
 
 1) **Lossless editing**: only translation literals change; all other bytes are preserved.
-2) **Cache-first safety**: draft edits are persisted to `.tzp-cache` on edit.
+2) **Cache-first safety**: draft edits are persisted to `.tzp/cache` on edit.
 3) **Per-locale encoding**: encoding comes from `language.txt` and applies to all files in that locale.
 4) **EN is base**: EN is immutable, shown as Source only.
 5) **Clean separation**: core is Qt-free; GUI uses adapters.
@@ -35,7 +35,7 @@ These are **always-on** constraints; any new feature must preserve them.
 ```
 UI edit (value or status)
   -> TranslationModel updates Entry (immutable replacement)
-  -> write .tzp-cache/<locale>/<rel>.bin (status + draft values)
+  -> write .tzp/cache/<locale>/<rel>.bin (status + draft values)
   -> file tree shows "●" if draft values exist
 
 User "Save" (write originals)
@@ -78,7 +78,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ### Step 2 — Project scanning & metadata [✓]
 - Touchpoints: `core/project_scanner.py`
 - Acceptance:
-  - Locale discovery ignores `_TVRADIO_TRANSLATIONS`, `.tzp-cache`, `.tzp-config`
+  - Locale discovery ignores `_TVRADIO_TRANSLATIONS`, `.git`, `.vscode`, and runtime root `.tzp/`
   - `language.txt` parsed for charset + display name
   - `language.txt` and `credits.txt` excluded from translatable list
   - `language.txt` is read-only (never modified by the app)
@@ -107,7 +107,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ### Step 5 — Status cache per file [✓]
 - Touchpoints: `core/status_cache.py`
 - Acceptance:
-  - Cache stored at `.tzp-cache/<locale>/<rel>.bin`
+  - Cache stored at `.tzp/cache/<locale>/<rel>.bin`
   - Status-only entries stored; draft values stored only for changed keys
   - Cache removed when no status/draft entries remain
   - Cache header stores `last_opened` unix timestamp (u64)
@@ -158,7 +158,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Locale switch writes cache only (no prompt)
 
 ### Step 11 — Preferences + View toggles [✓]
-- Touchpoints: `core/preferences.py`, `gui/main_window.py`, `.tzp-config/settings.env`
+- Touchpoints: `core/preferences.py`, `gui/main_window.py`, `.tzp/config/settings.env`
 - Acceptance:
   - `PROMPT_WRITE_ON_EXIT` and `WRAP_TEXT` persisted
   - Wrap text toggle changes view
@@ -215,7 +215,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Default root path can be set
   - Search scope: File | Locale | Pool
   - Replace scope: File | Locale | Pool
-  - Values persisted to `.tzp-config/settings.env`
+  - Values persisted to `.tzp/config/settings.env`
 
 ### Step 19 — String editor under table (Poedit-style) [✓]
 - Touchpoints: `gui/main_window.py`
@@ -484,7 +484,7 @@ C1 [→] **Translation memory** (Step 29).
    - **Problem**: repetitive phrases require manual recall; no suggestions.
    - **Target**: local SQLite TM + TMX import/export, non‑blocking suggestions.
    - **Scope now**:
-     - SQLite store under `.tzp-config/tm.sqlite` (project‑scoped).
+     - SQLite store under `.tzp/config/tm.sqlite` (project‑scoped).
      - TMX import/export (external TMs) for a **source+target locale pair** only.
      - TM suggestions panel (side‑panel switcher: Files / TM / Search).
      - Ranking: exact match 100%, fuzzy down to ~30% (project TM outranks imported).

@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.22 · 2026‑02‑07_
+_version 0.3.23 · 2026‑02‑08_
 
 ---
 ## 1  Actors
@@ -30,7 +30,7 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 | **Primary Actor** | SYS |
 | **Trigger** | Application startup after a project was previously opened. |
 | **Main Success Scenario** |
-|  1 | SYS loads EN hash index from `.tzp-cache/en.hashes.bin`. |
+|  1 | SYS loads EN hash index from `.tzp/cache/en.hashes.bin`. |
 |  2 | SYS recomputes raw‑byte hashes for EN files in the repo. |
 |  3 | If any hash differs, SYS MUST show a dialog: **“English source changed”** with options **Continue** / **Dismiss**. |
 |  4 | On **Continue**, SYS rewrites the EN hash index to the new values and proceeds to normal startup. |
@@ -51,7 +51,7 @@ Each use‑case is presented in **RFC‑2119** style (MUST, SHOULD, MAY).
 |  4 | SYS MUST show `LocaleChooserDialog` with **checkboxes** for locales, using `language.txt` → `text = ...` as display name. EN is excluded from the editable list. Locales are sorted alphanumerically; **checked locales float to the top**. The last selected locales are pre‑checked. |
 |  5 | TR selects one or more locales and presses **Open**. |
 |  6 | SYS loads the file list for selected locales, populates the left **QTreeView** with **one root per locale** (excluding `language.txt` and `credits.txt`), and opens the **most recently opened file** across selected locales. |
-| **Alternate Flow A1** | *Unsaved Drafts Present* – SYS MUST auto‑persist drafts to `.tzp-cache` before changing the project root (no prompt). |
+| **Alternate Flow A1** | *Unsaved Drafts Present* – SYS MUST auto‑persist drafts to `.tzp/cache` before changing the project root (no prompt). |
 | **Alternate Flow A2** | *No locale selected* – SYS aborts opening the project and closes the window. |
 | **Alternate Flow A3** | *No cache timestamps* – SYS opens no file until user selects one. |
 | **Alternate Flow A4** | *Malformed `language.txt`* – SYS shows a warning; invalid locales are skipped and cannot be opened until fixed. Other selected locales open normally. |
@@ -69,7 +69,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  1 | SYS shows an inline `QLineEdit` pre‑filled with current value. |
 |  2 | TR types new text; presses `Enter` to commit. |
 |  3 | SYS sets `Entry.changed = True` and `dirty` flag on containing `ParsedFile`. |
-|  4 | SYS writes draft value + status to `.tzp-cache/<locale>/<relative>.bin`. |
+|  4 | SYS writes draft value + status to `.tzp/cache/<locale>/<relative>.bin`. |
 |  5 | SYS MUST move focus to next row, same column. |
 | **Post‑condition** | Row background remains default (status unaffected).
 
@@ -168,7 +168,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  5 | User sets **Replace scope** (File / Locale / Locale Pool). |
 |  6 | User toggles general options (Prompt on Exit, Wrap Text, etc.). |
 |  7 | User toggles View options (whitespace glyphs, tag/escape highlighting, large‑text optimizations). |
-|  8 | On Apply/OK, SYS persists settings to `.tzp-config/settings.env`. |
+|  8 | On Apply/OK, SYS persists settings to `.tzp/config/settings.env`. |
 | **Post‑condition** | Next app launch uses the selected defaults; toolbar remains minimal. |
 
 ### UC-08  First Run - Select Default Root
@@ -196,7 +196,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  1 | SYS prompts **Write / Cache only / Cancel** and shows a scrollable list of files to be written (only files opened in this session). |
 |  2 | On **Write**, SYS MUST call saver write flow for every dirty file. |
 |  3 | On success, `dirty` flags cleared and baseline updated. |
-|  4 | SYS writes (or updates) per‑file cache entries under `.tzp-cache/<locale>/<relative>.bin` for **edited files only** (status only; draft values cleared). |
+|  4 | SYS writes (or updates) per‑file cache entries under `.tzp/cache/<locale>/<relative>.bin` for **edited files only** (status only; draft values cleared). |
 |  5 | Status line shows “Saved HH:MM:SS”.
 
 ### UC-10b  Dirty Indicator in File Tree
@@ -210,14 +210,14 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Flow** |
 |  1 | If ANY dirty files exist **and** `prompt_write_on_exit=true`, SYS prompts **Write / Cache only / Cancel** (only files opened in this session). |
 |  2 | On **Write**, UC-10a is executed. |
-|  3 | On **Cache only**, SYS persists drafts to `.tzp-cache` and exits. |
+|  3 | On **Cache only**, SYS persists drafts to `.tzp/cache` and exits. |
 |  4 | If `prompt_write_on_exit=false`, SYS skips the prompt and performs **Cache only**. |
 |  5 | SYS shuts down, releasing file handles. |
 
 ### UC-12  Crash Recovery (Deferred)
 | **Trigger** | Application restarts after abnormal termination. |
 | **Flow** |
-|  1 | v0.1 relies on `.tzp-cache` only; no extra recovery file is created. |
+|  1 | v0.1 relies on `.tzp/cache` only; no extra recovery file is created. |
 |  2 | Future: optional recovery prompt may be added if cache is extended. |
 
 ### UC-13a  Side Panel Mode Switch
@@ -251,7 +251,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | *TM ▸ Import TMX…* |
 | **Flow** |
 |  1 | SYS opens TMX file picker. |
-|  2 | SYS copies selected TMX into managed TM import folder (default: `imported_tms` at runtime root). |
+|  2 | SYS copies selected TMX into managed TM import folder (default: `.tzp/imported_tms` at runtime root). |
 |  3 | SYS detects source/target locales from TMX metadata; if unresolved, SYS asks user to map locales manually. |
 |  4 | SYS imports TM units into project TM store for resolved locale pair (`origin=import`) and records TM source name. |
 |  5 | SYS reports imported unit count and unresolved/failed files when applicable. |
@@ -408,4 +408,4 @@ UNTOUCHED ──────────────────────▶ 
    translation equals Source). Implement **only after** TM import/export is complete.
 
 ---
-_Last updated: 2026‑02‑07 (v0.3.22)_
+_Last updated: 2026‑02‑08 (v0.3.23)_

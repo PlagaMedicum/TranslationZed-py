@@ -1,5 +1,5 @@
 # TranslationZed-Py: Technical Notes (Current State)
-_Last updated: 2026-02-07_
+_Last updated: 2026-02-08_
 
 Purpose:
 - Keep short-lived diagnostics and implementation pressure points.
@@ -36,9 +36,12 @@ Scope:
 ## 2) Verified As-Built Snapshot (concise)
 
 - Preferences:
-  - One local settings file at runtime root (`.tzp-config/settings.env`).
+  - One local settings file at runtime root (`.tzp/config/settings.env`).
   - `preferences.load()` is pure read.
   - Startup explicitly bootstraps defaults via `ensure_defaults()`.
+- Runtime artifacts:
+  - Cache, config, and managed TM defaults are consolidated under `.tzp/`.
+  - Legacy `.tzp-cache` / `.tzp-config` are read for compatibility and migrated on use.
 - Locale metadata:
   - `language.txt` is mandatory.
   - Invalid locales are skipped with warning in GUI.

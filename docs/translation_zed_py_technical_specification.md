@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.3.22 · 2026‑02‑07**\
+**Version 0.3.23 · 2026‑02‑08**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -272,10 +272,13 @@ Algorithm:
 
 - Local config only; no `~` usage.
 - Single settings file only.
-- Env file path: `<runtime-root>/.tzp-config/settings.env`
+- Env file path: `<runtime-root>/.tzp/config/settings.env`
   (`runtime-root` = source run `cwd`, frozen build executable directory)
 - `load()` is pure read (no disk writes).
 - `ensure_defaults()` is explicit bootstrap used at startup.
+- Legacy settings fallback:
+  - if canonical file is missing, load reads legacy `<runtime-root>/.tzp-config/settings.env`.
+  - `ensure_defaults()` writes canonical `.tzp/config/settings.env`, preserving known values.
 - Keys:
   - `PROMPT_WRITE_ON_EXIT=true|false`
   - `WRAP_TEXT=true|false`
@@ -290,7 +293,7 @@ Algorithm:
 - Store: last root path, last locale(s), window geometry, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
 - **tm_import_dir**: folder scanned for imported `.tmx` files; defaults to
-  `<runtime-root>/imported_tms`.
+  `<runtime-root>/.tzp/imported_tms`.
 - `core.preferences_service` owns Qt-free preference policy helpers:
   startup-root resolution (CLI/default-root/picker decision), loaded-preference
   normalization, scope normalization, and persist-payload construction.
@@ -432,27 +435,31 @@ if dirty_files and not prompt_save():
 ### 5.11  `core.status_cache`
 
 Binary cache stored **per translation file** (1:1 with each `.txt`), inside a
-hidden `.tzp-cache/` subfolder under the repo root, preserving relative paths.
+hidden `.tzp/cache/` subfolder under the repo root, preserving relative paths.
 
 * **Layout**
 
 | Offset | Type | Description |
 |--------|------|-------------|
-| 0      | 4s   | magic `TZC4` |
+| 0      | 4s   | magic `TZC5` |
 | 4      | u64  | `last_opened_unix` |
 | 12     | u32  | entry-count |
-| 16     | …   | repeated: `u64 key-hash` • `u8 status` • `u8 flags` • `u32 draft_len` • `u32 orig_len` • `draft bytes` • `orig bytes` |
+| 16     | u32  | header flags (`bit0 = has_drafts`) |
+| 20     | …   | repeated: `u64 key-hash` • `u8 status` • `u8 flags` • `u32 draft_len` • `u32 orig_len` • `draft bytes` • `orig bytes` |
 
   *Key-hash* is `xxhash64(key_bytes)` stored as **u64** (collision‑resistant).  
   Status byte values follow `core.model.Status` order.  
   Flags: bit0 = `has_draft`, bit1 = `has_original`.
   When set, the corresponding UTF‑8 byte payload follows (`draft_len` / `orig_len`).
 
-Legacy caches:
+Legacy cache formats:
 - `TZC3` uses **u16** key hashes (new status order) and is proactively migrated on startup.
 - `TZC2` uses the **old** status order (Untouched=0, Translated=1, Proofread=2, For review=3).
 - On read, legacy bytes are mapped into the new enum order and rewritten as `TZC3`.
-- On startup, any `TZC3` files are proactively migrated to `TZC4` (u64 hashes).
+- On startup, any `TZC3` files are proactively migrated to `TZC5` (u64 hashes + header flags).
+- Legacy path fallback:
+  - read path precedence is `.tzp/cache/...` then legacy `.tzp-cache/...`.
+  - on successful read/write, cache is canonicalized to `.tzp/cache/...`.
 
 ```python
 def read(root: Path, file_path: Path) -> dict[int, CacheEntry]: ...
@@ -481,7 +488,7 @@ def write(
 Cache path convention:
 - For a translation file `<root>/<locale>/path/file.txt`, the cache lives at
   `<root>/<cache_dir>/<locale>/path/file.bin` where `cache_dir` is configured in
-  `config/app.toml` (default `.tzp-cache`).
+  `config/app.toml` (default `.tzp/cache`).
 - Related UCs: UC-06, UC-06b, UC-10a, UC-10b, UC-11, UC-12.
 
 ### 5.11.1  `core.en_hash_cache`
@@ -500,7 +507,9 @@ UNTOUCHED).
 
 ### 5.11.2  `core.tm_store` + TMX I/O
 
-- Project‑scoped SQLite DB at `<root>/.tzp-config/tm.sqlite`.
+- Project‑scoped SQLite DB at `<root>/.tzp/config/tm.sqlite`.
+- If `<root>/.tzp/config/tm.sqlite` is absent but legacy `<root>/.tzp-config/tm.sqlite`
+  exists, store bootstrap migrates the legacy DB into the canonical path.
 - Table `tm_entries` stores:
   - `source_text`, `target_text`, `source_norm`, `source_prefix`, `source_len`
   - `source_locale`, `target_locale`, `origin` (`project` or `import`)
@@ -578,9 +587,9 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 6. **Editing Capabilities** – cell editing + undo/redo; status coloring and
    toolbar **Status ▼** label reflects the selected row.
 7. **Cache & EN Hashes** – per‑file draft cache at
-   `<root>/.tzp-cache/<locale>/<relative>.bin`, auto‑written on edit
+   `<root>/.tzp/cache/<locale>/<relative>.bin`, auto‑written on edit
    (status + draft values) and on save (status only); EN hash cache as a single index file
-   `<root>/.tzp-cache/en.hashes.bin` (raw bytes).
+   `<root>/.tzp/cache/en.hashes.bin` (raw bytes).
 8. **Persistence & Safety** – atomic multi‑file save, prompt only when writing
    originals (“Write / Cache only / Cancel”). Crash‑recovery cache is planned,
    not required in initial builds.
@@ -609,7 +618,7 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 ## 9  Crash Recovery
 
 v0.1 uses **cache‑only** recovery:
-- Drafts are persisted to `.tzp-cache` on edit.
+- Drafts are persisted to `.tzp/cache` on edit.
 - No separate temp recovery file is created.
 - If future crash recovery is needed, it will build on cache state only.
 
@@ -689,4 +698,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-07 (v0.3.22)*
+*Last updated: 2026-02-08 (v0.3.23)*

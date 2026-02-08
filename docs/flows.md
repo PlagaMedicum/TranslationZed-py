@@ -1,5 +1,5 @@
 # TranslationZed-Py — Key Flows
-_Last updated: 2026-02-07_
+_Last updated: 2026-02-08_
 
 ---
 
@@ -63,7 +63,7 @@ User selects file in tree
 ```
 User edits cell
   -> update Entry value + status
-  -> write .tzp-cache/<locale>/<rel>.bin (status + draft value)
+  -> write .tzp/cache/<locale>/<rel>.bin (status + draft value)
   -> add dirty dot (●) in tree if value changed
 
 User: Save
@@ -74,7 +74,7 @@ User: Save
        if conflicts for current file: block save until resolved
        saver preserves concat structure + trivia
        write file.tmp -> replace
-       write .tzp-cache/<locale>/<rel>.bin (status only)
+       write .tzp/cache/<locale>/<rel>.bin (status only)
        remove dirty dot (●)
 ```
 

@@ -1,5 +1,5 @@
 # TranslationZed-Py — Architecture Overview
-_Last updated: 2026-01-28_
+_Last updated: 2026-02-08_
 
 ---
 
@@ -63,8 +63,8 @@ Dependency rule:
 - Parse `language.txt` metadata (charset + display name).
 - Parse files using locale encoding (UTF‑16 included).
 - Serialize edits while preserving concat structure + trivia.
-- Maintain per-file cache in `.tzp-cache/`.
-- Maintain EN hash index in `.tzp-cache/en.hashes.bin`.
+- Maintain per-file cache in `.tzp/cache/`.
+- Maintain EN hash index in `.tzp/cache/en.hashes.bin`.
 
 ---
 
