@@ -154,6 +154,8 @@ They include:
   and in-memory entry update application (`core.conflict_service` unit tests).
 - Project-session service: draft-file discovery and last-opened path selection
   (`core.project_session` unit tests).
+- File-workflow service: cache overlay for open-path state reconstruction and cache-apply
+  planning for write-from-cache path (`core.file_workflow` unit tests).
 
 **Not covered yet (automation gaps, by layer):**
 
