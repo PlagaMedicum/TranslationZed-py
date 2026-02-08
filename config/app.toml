@@ -1,6 +1,6 @@
 [paths]
-cache_dir = ".tzp-cache"
-config_dir = ".tzp-config"
+cache_dir = ".tzp/cache"
+config_dir = ".tzp/config"
 
 [cache]
 extension = ".bin"

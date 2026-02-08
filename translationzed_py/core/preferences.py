@@ -5,7 +5,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.app_config import (
+    LEGACY_CONFIG_DIR,
+)
+from translationzed_py.core.app_config import (
+    load as _load_app_config,
+)
 from translationzed_py.core.atomic_io import write_text_atomic
 
 _BOOL_TRUE = {"1", "true", "yes", "on"}
@@ -46,13 +51,32 @@ def _config_dir(root: Path | None = None) -> Path:
     return base / cfg.config_dir
 
 
+def _legacy_config_dir(root: Path | None = None) -> Path:
+    base = Path(root).resolve() if root is not None else _runtime_root()
+    return base / LEGACY_CONFIG_DIR
+
+
 def _config_path(root: Path | None = None) -> Path:
     return _config_dir(root) / "settings.env"
 
 
+def _legacy_config_path(root: Path | None = None) -> Path:
+    return _legacy_config_dir(root) / "settings.env"
+
+
+def _existing_config_path(root: Path | None = None) -> Path:
+    current = _config_path(root)
+    if current.exists():
+        return current
+    legacy = _legacy_config_path(root)
+    if legacy != current and legacy.exists():
+        return legacy
+    return current
+
+
 def _default_tm_import_dir(root: Path | None = None) -> str:
     base = Path(root).resolve() if root is not None else _runtime_root()
-    return str((base / "imported_tms").resolve())
+    return str((base / ".tzp" / "imported_tms").resolve())
 
 
 def _parse_env(path: Path) -> dict[str, Any]:
@@ -119,7 +143,7 @@ def load(root: Path | None = None) -> dict[str, Any]:
     Unknown keys are preserved.
     """
     merged = dict(_DEFAULTS)
-    parsed = _parse_env(_config_path(root))
+    parsed = _parse_env(_existing_config_path(root))
     extras = dict(parsed.pop(_EXTRAS_KEY, {}))
     merged.update(parsed)
     tm_import_dir = str(merged.get("tm_import_dir", "")).strip()
@@ -136,7 +160,7 @@ def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
     Best effort only: returns loaded prefs even when write fails.
     """
     path = _config_path(root)
-    parsed = _parse_env(path)
+    parsed = _parse_env(_existing_config_path(root))
     prefs = dict(_DEFAULTS)
     extras = dict(parsed.pop(_EXTRAS_KEY, {}))
     prefs.update(parsed)

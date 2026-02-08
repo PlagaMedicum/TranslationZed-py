@@ -5,7 +5,12 @@ from pathlib import Path
 
 import xxhash
 
-from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.app_config import (
+    LEGACY_CACHE_DIR,
+)
+from translationzed_py.core.app_config import (
+    load as _load_app_config,
+)
 from translationzed_py.core.atomic_io import write_bytes_atomic
 from translationzed_py.core.project_scanner import list_translatable_files, scan_root
 
@@ -21,6 +26,23 @@ def _hash_bytes(data: bytes) -> int:
 def _cache_path(root: Path) -> Path:
     cfg = _load_app_config(root)
     return root / cfg.cache_dir / cfg.en_hash_filename
+
+
+def _legacy_cache_path(root: Path) -> Path:
+    cfg = _load_app_config(root)
+    current = root / cfg.cache_dir / cfg.en_hash_filename
+    legacy = root / LEGACY_CACHE_DIR / cfg.en_hash_filename
+    return legacy if legacy != current else current
+
+
+def _read_cache_path(root: Path) -> Path:
+    current = _cache_path(root)
+    if current.exists():
+        return current
+    legacy = _legacy_cache_path(root)
+    if legacy.exists():
+        return legacy
+    return current
 
 
 def compute(root: Path) -> dict[str, int]:
@@ -40,7 +62,7 @@ def compute(root: Path) -> dict[str, int]:
 
 
 def read(root: Path) -> dict[str, int]:
-    cache_path = _cache_path(root)
+    cache_path = _read_cache_path(root)
     try:
         data = cache_path.read_bytes()
     except OSError:
@@ -75,9 +97,12 @@ def read(root: Path) -> dict[str, int]:
 
 def write(root: Path, hashes: dict[str, int]) -> None:
     cache_path = _cache_path(root)
+    legacy_cache_path = _legacy_cache_path(root)
     if not hashes:
         if cache_path.exists():
             cache_path.unlink()
+        if legacy_cache_path != cache_path and legacy_cache_path.exists():
+            legacy_cache_path.unlink()
         return
     items = sorted(hashes.items())
     buf = bytearray()

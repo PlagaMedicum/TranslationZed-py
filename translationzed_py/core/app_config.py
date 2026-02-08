@@ -16,8 +16,8 @@ except ModuleNotFoundError:  # pragma: no cover
 
 @dataclass(frozen=True, slots=True)
 class AppConfig:
-    cache_dir: str = ".tzp-cache"
-    config_dir: str = ".tzp-config"
+    cache_dir: str = ".tzp/cache"
+    config_dir: str = ".tzp/config"
     cache_ext: str = ".bin"
     translation_ext: str = ".txt"
     comment_prefix: str = "--"
@@ -25,6 +25,10 @@ class AppConfig:
     parser_adapter: str = "lua_v1"
     ui_adapter: str = "pyside6"
     cache_adapter: str = "binary_v1"
+
+
+LEGACY_CACHE_DIR = ".tzp-cache"
+LEGACY_CONFIG_DIR = ".tzp-config"
 
 
 def _candidate_roots(root: Path | None) -> list[Path]:

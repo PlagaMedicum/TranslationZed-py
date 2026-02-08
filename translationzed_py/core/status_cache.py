@@ -8,7 +8,12 @@ from pathlib import Path
 
 import xxhash
 
-from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.app_config import (
+    LEGACY_CACHE_DIR,
+)
+from translationzed_py.core.app_config import (
+    load as _load_app_config,
+)
 from translationzed_py.core.atomic_io import write_bytes_atomic
 from translationzed_py.core.model import Entry, Status
 from translationzed_py.core.project_scanner import LocaleMeta
@@ -101,16 +106,48 @@ def _cache_path(root: Path, file_path: Path) -> Path:
     return root / cfg.cache_dir / rel_cache
 
 
+def _legacy_cache_path(root: Path, file_path: Path) -> Path:
+    cfg = _load_app_config(root)
+    rel = file_path.relative_to(root)
+    rel_cache = rel.parent / f"{rel.stem}{cfg.cache_ext}"
+    legacy = root / LEGACY_CACHE_DIR / rel_cache
+    current = root / cfg.cache_dir / rel_cache
+    return legacy if legacy != current else current
+
+
+def _read_cache_path(root: Path, file_path: Path) -> Path:
+    current = _cache_path(root, file_path)
+    if current.exists():
+        return current
+    legacy = _legacy_cache_path(root, file_path)
+    if legacy.exists():
+        return legacy
+    return current
+
+
+def _cache_roots(root: Path) -> tuple[Path, ...]:
+    cfg = _load_app_config(root)
+    current = root / cfg.cache_dir
+    legacy = root / LEGACY_CACHE_DIR
+    if legacy == current:
+        return (current,)
+    return (current, legacy)
+
+
 def cache_path(root: Path, file_path: Path) -> Path:
     return _cache_path(root, file_path)
 
 
 def _original_path_from_cache(root: Path, cache_path: Path) -> Path | None:
     cfg = _load_app_config(root)
-    cache_root = root / cfg.cache_dir
-    try:
-        rel = cache_path.relative_to(cache_root)
-    except ValueError:
+    rel: Path | None = None
+    for cache_root in _cache_roots(root):
+        try:
+            rel = cache_path.relative_to(cache_root)
+            break
+        except ValueError:
+            continue
+    if rel is None:
         return None
     if not rel.parts:
         return None
@@ -121,23 +158,28 @@ def _original_path_from_cache(root: Path, cache_path: Path) -> Path | None:
 
 def legacy_cache_paths(root: Path) -> list[Path]:
     cfg = _load_app_config(root)
-    cache_root = root / cfg.cache_dir
-    if not cache_root.exists():
-        return []
+    cache_roots = _cache_roots(root)
     out: list[Path] = []
-    for cache_path in cache_root.rglob(f"*{cfg.cache_ext}"):
-        if cache_path.name == cfg.en_hash_filename:
+    seen: set[Path] = set()
+    for cache_root in cache_roots:
+        if not cache_root.exists():
             continue
-        try:
-            with cache_path.open("rb") as handle:
-                head = handle.read(4)
-        except OSError:
-            continue
-        if not head:
-            continue
-        if head in {_MAGIC_V4, _MAGIC_V5}:
-            continue
-        out.append(cache_path)
+        for cache_path in cache_root.rglob(f"*{cfg.cache_ext}"):
+            if cache_path in seen:
+                continue
+            seen.add(cache_path)
+            if cache_path.name == cfg.en_hash_filename:
+                continue
+            try:
+                with cache_path.open("rb") as handle:
+                    head = handle.read(4)
+            except OSError:
+                continue
+            if not head:
+                continue
+            if head in {_MAGIC_V4, _MAGIC_V5}:
+                continue
+            out.append(cache_path)
     return out
 
 
@@ -428,7 +470,8 @@ def read(root: Path, file_path: Path) -> CacheMap:
     Read per-file cache, returning a mapping { key_hash: CacheEntry }.
     Missing or corrupt files are ignored.
     """
-    status_file = _cache_path(root, file_path)
+    status_file = _read_cache_path(root, file_path)
+    current_status_file = _cache_path(root, file_path)
     try:
         data = status_file.read_bytes()
         parsed = _read_rows_any(data)
@@ -448,14 +491,30 @@ def read(root: Path, file_path: Path) -> CacheMap:
             and parsed.hash_bits == 16
             and parsed.magic != _MAGIC_V3
         ):
+            upgrade_target = (
+                current_status_file
+                if status_file != current_status_file
+                else status_file
+            )
             with contextlib.suppress(OSError):
                 _write_rows(
-                    status_file,
+                    upgrade_target,
                     parsed.rows,
                     parsed.last_opened,
                     hash_bits=16,
                     magic=_MAGIC_V3,
                 )
+                if status_file != upgrade_target:
+                    status_file.unlink(missing_ok=True)
+        elif status_file != current_status_file:
+            with contextlib.suppress(OSError):
+                _write_rows(
+                    current_status_file,
+                    parsed.rows,
+                    parsed.last_opened,
+                    hash_bits=parsed.hash_bits,
+                )
+                status_file.unlink(missing_ok=True)
         return out
     except (OSError, struct.error):
         return CacheMap()
@@ -476,13 +535,15 @@ def write(
     per-file cache. Values are stored only for keys in `changed_keys`.
     """
     status_file = _cache_path(root, file_path)
+    legacy_status_file = _legacy_cache_path(root, file_path)
+    read_status_file = _read_cache_path(root, file_path)
     changed_keys = changed_keys or set()
     rows: list[tuple[int, Status, str | None, str | None]] = []
     original_values = original_values or {}
     force_original = force_original or set()
     existing: CacheMap | dict[int, CacheEntry] = {}
     existing_hash_bits = 64
-    if changed_keys and status_file.exists():
+    if changed_keys:
         existing = read(root, file_path)
         existing_hash_bits = getattr(existing, "hash_bits", 64)
     for e in entries:
@@ -506,12 +567,17 @@ def write(
     if not rows:
         if status_file.exists():
             status_file.unlink()
+        if legacy_status_file != status_file and legacy_status_file.exists():
+            legacy_status_file.unlink()
         return
-    if last_opened is None and status_file.exists():
-        last_opened = read_last_opened_from_path(status_file)
+    if last_opened is None and read_status_file.exists():
+        last_opened = read_last_opened_from_path(read_status_file)
     if last_opened is None:
         last_opened = 0
     _write_rows(status_file, rows, last_opened, hash_bits=64)
+    if legacy_status_file != status_file and legacy_status_file.exists():
+        with contextlib.suppress(OSError):
+            legacy_status_file.unlink()
 
 
 def read_last_opened_from_path(path: Path) -> int:
@@ -584,7 +650,8 @@ def read_has_drafts_from_path(path: Path) -> bool:
 
 
 def touch_last_opened(root: Path, file_path: Path, last_opened: int) -> bool:
-    status_file = _cache_path(root, file_path)
+    status_file = _read_cache_path(root, file_path)
+    current_status_file = _cache_path(root, file_path)
     try:
         data = status_file.read_bytes()
     except OSError:
@@ -596,12 +663,15 @@ def touch_last_opened(root: Path, file_path: Path, last_opened: int) -> bool:
     if parsed.hash_bits == 64 and magic != _MAGIC_V5:
         magic = _MAGIC_V5
     _write_rows(
-        status_file,
+        current_status_file,
         parsed.rows,
         last_opened,
         hash_bits=parsed.hash_bits,
         magic=magic,
     )
+    if status_file != current_status_file:
+        with contextlib.suppress(OSError):
+            status_file.unlink(missing_ok=True)
     return True
 
 

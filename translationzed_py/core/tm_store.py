@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 import threading
 import time
@@ -7,6 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from .app_config import LEGACY_CONFIG_DIR
 from .app_config import load as _load_app_config
 from .tmx_io import iter_tmx_pairs, write_tmx
 
@@ -92,12 +94,36 @@ class TMStore:
 
     def __init__(self, root: Path) -> None:
         cfg = _load_app_config(root)
-        self._path = root / cfg.config_dir / "tm.sqlite"
+        self._path = self._resolve_db_path(root, cfg.config_dir)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self._path)
         self._conn.row_factory = sqlite3.Row
         self._configure()
         self._ensure_schema()
+
+    @staticmethod
+    def _resolve_db_path(root: Path, config_dir: str) -> Path:
+        primary = root / config_dir / "tm.sqlite"
+        legacy = root / LEGACY_CONFIG_DIR / "tm.sqlite"
+        if primary.exists():
+            return primary
+        if legacy == primary or not legacy.exists():
+            return primary
+        primary.parent.mkdir(parents=True, exist_ok=True)
+        if TMStore._migrate_legacy_db(legacy, primary):
+            return primary
+        return legacy
+
+    @staticmethod
+    def _migrate_legacy_db(legacy: Path, primary: Path) -> bool:
+        try:
+            with sqlite3.connect(legacy) as src, sqlite3.connect(primary) as dst:
+                src.backup(dst)
+            return True
+        except sqlite3.Error:
+            with contextlib.suppress(OSError):
+                primary.unlink(missing_ok=True)
+            return False
 
     def close(self) -> None:
         self._conn.close()

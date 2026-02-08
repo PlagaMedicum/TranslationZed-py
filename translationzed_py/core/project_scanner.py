@@ -21,6 +21,14 @@ class LocaleMeta:
     charset: str
 
 
+def _top_level_dir(path_value: str) -> str | None:
+    normalized = path_value.replace("\\", "/").strip("/")
+    if not normalized:
+        return None
+    head = normalized.split("/", 1)[0].strip()
+    return head or None
+
+
 def _parse_language_file(path: Path) -> tuple[str, str]:
     if not path.exists():
         raise LanguageFileError(f"Missing language.txt: {path}")
@@ -78,6 +86,11 @@ def _scan_root_collect(root: Path) -> tuple[dict[str, LocaleMeta], list[str]]:
         raise NotADirectoryError(root)
 
     cfg = _load_app_config(root)
+    runtime_dirs = {
+        name
+        for name in (_top_level_dir(cfg.cache_dir), _top_level_dir(cfg.config_dir))
+        if name
+    }
     locales: dict[str, LocaleMeta] = {}
     errors: list[str] = []
     for child in root.iterdir():
@@ -85,7 +98,7 @@ def _scan_root_collect(root: Path) -> tuple[dict[str, LocaleMeta], list[str]]:
             continue
         if child.name in _IGNORE_DIRS:
             continue
-        if child.name in {cfg.cache_dir, cfg.config_dir}:
+        if child.name in runtime_dirs:
             continue
         lang_file = child / "language.txt"
         try:
