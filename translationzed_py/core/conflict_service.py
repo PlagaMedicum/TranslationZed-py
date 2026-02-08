@@ -31,6 +31,94 @@ class ConflictMergePlan:
     status_updates: dict[str, Status]
 
 
+@dataclass(frozen=True, slots=True)
+class ConflictResolution:
+    changed_keys: frozenset[str]
+    original_values: dict[str, str]
+    force_original: frozenset[str]
+    value_updates: dict[str, str]
+    status_updates: dict[str, Status]
+
+
+@dataclass(frozen=True, slots=True)
+class ConflictWorkflowService:
+    def resolve_drop_cache(
+        self,
+        *,
+        changed_keys: Iterable[str],
+        baseline_values: Mapping[str, str],
+        conflict_originals: Mapping[str, str],
+    ) -> ConflictResolution:
+        plan = drop_cache_plan(
+            changed_keys=changed_keys,
+            baseline_values=baseline_values,
+            conflict_keys=conflict_originals,
+        )
+        return ConflictResolution(
+            changed_keys=plan.changed_keys,
+            original_values=plan.original_values,
+            force_original=plan.force_original,
+            value_updates={},
+            status_updates={},
+        )
+
+    def resolve_drop_original(
+        self,
+        *,
+        changed_keys: Iterable[str],
+        baseline_values: Mapping[str, str],
+        conflict_originals: Mapping[str, str],
+    ) -> ConflictResolution:
+        plan = drop_original_plan(
+            changed_keys=changed_keys,
+            baseline_values=baseline_values,
+            conflict_originals=conflict_originals,
+        )
+        return ConflictResolution(
+            changed_keys=plan.changed_keys,
+            original_values=plan.original_values,
+            force_original=plan.force_original,
+            value_updates={},
+            status_updates={},
+        )
+
+    def resolve_merge(
+        self,
+        *,
+        changed_keys: Iterable[str],
+        baseline_values: Mapping[str, str],
+        conflict_originals: Mapping[str, str],
+        cache_values: Mapping[str, str],
+        resolutions: Mapping[str, tuple[str, Literal["original", "cache"]]],
+    ) -> ConflictResolution:
+        plan = merge_plan(
+            changed_keys=changed_keys,
+            baseline_values=baseline_values,
+            conflict_originals=conflict_originals,
+            cache_values=cache_values,
+            resolutions=resolutions,
+        )
+        return ConflictResolution(
+            changed_keys=plan.changed_keys,
+            original_values=plan.original_values,
+            force_original=plan.force_original,
+            value_updates=plan.value_updates,
+            status_updates=plan.status_updates,
+        )
+
+    def apply_resolution(
+        self,
+        entries: EntrySequence,
+        *,
+        resolution: ConflictResolution,
+    ) -> bool:
+        return apply_entry_updates(
+            entries,
+            value_updates=resolution.value_updates,
+            status_updates=resolution.status_updates,
+        )
+
+
 def build_merge_rows(
     entries: Sequence[Entry],
     conflict_originals: Mapping[str, str],

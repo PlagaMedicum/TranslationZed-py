@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from translationzed_py.core.conflict_service import (
+    ConflictResolution,
+    ConflictWorkflowService,
     apply_entry_updates,
     build_merge_rows,
     drop_cache_plan,
@@ -95,3 +97,34 @@ def test_apply_entry_updates_modifies_only_target_keys() -> None:
     assert entries[1].status == Status.FOR_REVIEW
     assert entries[0].key_hash == 123
     assert entries[1].key_hash == 123
+
+
+def test_conflict_workflow_service_drop_cache_builds_resolution() -> None:
+    service = ConflictWorkflowService()
+    resolution = service.resolve_drop_cache(
+        changed_keys={"A", "B"},
+        baseline_values={"A": "a0", "B": "b0"},
+        conflict_originals={"B": "b-file"},
+    )
+    assert isinstance(resolution, ConflictResolution)
+    assert set(resolution.changed_keys) == {"A"}
+    assert resolution.value_updates == {}
+    assert resolution.status_updates == {}
+
+
+def test_conflict_workflow_service_merge_builds_and_applies_resolution() -> None:
+    service = ConflictWorkflowService()
+    resolution = service.resolve_merge(
+        changed_keys={"A"},
+        baseline_values={"A": "a0"},
+        conflict_originals={"A": "a-file"},
+        cache_values={"A": "a-cache"},
+        resolutions={"A": ("a-file", "original")},
+    )
+
+    entries = [_entry("A", "a-cache", Status.TRANSLATED)]
+    changed = service.apply_resolution(entries, resolution=resolution)
+
+    assert changed is True
+    assert entries[0].value == "a-file"
+    assert entries[0].status == Status.FOR_REVIEW

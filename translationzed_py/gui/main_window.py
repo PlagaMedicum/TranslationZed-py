@@ -84,19 +84,10 @@ from translationzed_py.core.conflict_service import (
     ConflictMergeRow as _ConflictMergeRow,
 )
 from translationzed_py.core.conflict_service import (
-    apply_entry_updates as _conflict_apply_entry_updates,
+    ConflictWorkflowService as _ConflictWorkflowService,
 )
 from translationzed_py.core.conflict_service import (
     build_merge_rows as _conflict_build_merge_rows,
-)
-from translationzed_py.core.conflict_service import (
-    drop_cache_plan as _conflict_drop_cache_plan,
-)
-from translationzed_py.core.conflict_service import (
-    drop_original_plan as _conflict_drop_original_plan,
-)
-from translationzed_py.core.conflict_service import (
-    merge_plan as _conflict_merge_plan,
 )
 from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
@@ -486,6 +477,7 @@ class MainWindow(QMainWindow):
             read_last_opened=_read_last_opened_from_path,
         )
         self._file_workflow_service = _FileWorkflowService()
+        self._conflict_workflow_service = _ConflictWorkflowService()
         self._search_replace_service = _SearchReplaceService()
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
@@ -3217,10 +3209,11 @@ class MainWindow(QMainWindow):
         files = self._files_for_scope(scope)
         if not files:
             return
+        current_path = self._current_pf.path if self._current_pf else None
         if scope != "FILE" and len(files) > 1:
             locale = (
-                self._locale_for_path(self._current_pf.path)
-                if self._current_pf
+                self._locale_for_path(current_path)
+                if current_path is not None
                 else None
             )
             scope_label = _sr_scope_label(
@@ -3228,53 +3221,53 @@ class MainWindow(QMainWindow):
                 current_locale=locale,
                 selected_locale_count=len(self._selected_locales),
             )
-            counts: list[tuple[str, int]] = []
-            total = 0
-            current_path = self._current_pf.path if self._current_pf else None
-            for path in files:
-                if current_path and path == current_path:
-                    file_count = self._replace_all_count_in_model(
-                        pattern, replacement, use_regex, matches_empty, has_group_ref
-                    )
-                else:
-                    file_count = self._replace_all_count_in_file(
-                        path,
-                        pattern,
-                        replacement,
-                        use_regex,
-                        matches_empty,
-                        has_group_ref,
-                    )
-                if file_count is None:
-                    return
-                total += file_count
-                if file_count:
-                    try:
-                        rel = str(path.relative_to(self._root))
-                    except ValueError:
-                        rel = str(path)
-                    counts.append((rel, file_count))
-            if total == 0:
+
+            def _display_name(path: Path) -> str:
+                with contextlib.suppress(ValueError):
+                    return str(path.relative_to(self._root))
+                return str(path)
+
+            plan = self._search_replace_service.build_replace_all_plan(
+                files=files,
+                current_file=current_path,
+                display_name=_display_name,
+                count_in_current=lambda: self._replace_all_count_in_model(
+                    pattern, replacement, use_regex, matches_empty, has_group_ref
+                ),
+                count_in_file=lambda path: self._replace_all_count_in_file(
+                    path,
+                    pattern,
+                    replacement,
+                    use_regex,
+                    matches_empty,
+                    has_group_ref,
+                ),
+            )
+            if plan is None:
                 return
-            dialog = ReplaceFilesDialog(counts, scope_label, self)
+            if plan.total == 0:
+                return
+            dialog = ReplaceFilesDialog(plan.counts, scope_label, self)
             dialog.exec()
             if not dialog.confirmed():
                 return
-        if (
-            self._current_pf
-            and self._current_pf.path in files
-            and not self._replace_all_in_model(
+        applied = self._search_replace_service.apply_replace_all(
+            files=files,
+            current_file=current_path,
+            apply_in_current=lambda: self._replace_all_in_model(
                 pattern, replacement, use_regex, matches_empty, has_group_ref
-            )
-        ):
+            ),
+            apply_in_file=lambda path: self._replace_all_in_file(
+                path,
+                pattern,
+                replacement,
+                use_regex,
+                matches_empty,
+                has_group_ref,
+            ),
+        )
+        if not applied:
             return
-        for path in files:
-            if self._current_pf and path == self._current_pf.path:
-                continue
-            if not self._replace_all_in_file(
-                path, pattern, replacement, use_regex, matches_empty, has_group_ref
-            ):
-                return
         self._schedule_search()
 
     def _replace_all_in_model(
@@ -3427,19 +3420,20 @@ class MainWindow(QMainWindow):
             return False
         if self._current_pf.path != path:
             return False
-        plan = _conflict_drop_cache_plan(
+        resolution = self._conflict_workflow_service.resolve_drop_cache(
             changed_keys=self._current_model.changed_keys(),
             baseline_values=self._current_model.baseline_values(),
-            conflict_keys=self._conflict_files.get(path, {}),
+            conflict_originals=self._conflict_files.get(path, {}),
         )
         _write_status_cache(
             self._root,
             path,
             self._current_pf.entries,
-            changed_keys=set(plan.changed_keys),
-            original_values=plan.original_values,
+            changed_keys=set(resolution.changed_keys),
+            original_values=resolution.original_values,
+            force_original=set(resolution.force_original),
         )
-        if not plan.changed_keys:
+        if not resolution.changed_keys:
             self.fs_model.set_dirty(path, False)
         self._clear_conflicts(path)
         self._reload_file(path)
@@ -3450,7 +3444,7 @@ class MainWindow(QMainWindow):
             return False
         if self._current_pf.path != path:
             return False
-        plan = _conflict_drop_original_plan(
+        resolution = self._conflict_workflow_service.resolve_drop_original(
             changed_keys=self._current_model.changed_keys(),
             baseline_values=self._current_model.baseline_values(),
             conflict_originals=self._conflict_files.get(path, {}),
@@ -3459,9 +3453,9 @@ class MainWindow(QMainWindow):
             self._root,
             path,
             self._current_pf.entries,
-            changed_keys=set(plan.changed_keys),
-            original_values=plan.original_values,
-            force_original=set(plan.force_original),
+            changed_keys=set(resolution.changed_keys),
+            original_values=resolution.original_values,
+            force_original=set(resolution.force_original),
         )
         self._clear_conflicts(path)
         self._reload_file(path)
@@ -3484,27 +3478,26 @@ class MainWindow(QMainWindow):
         resolutions = self._run_merge_ui(path, rows)
         if not resolutions:
             return False
-        plan = _conflict_merge_plan(
+        resolution = self._conflict_workflow_service.resolve_merge(
             changed_keys=self._current_model.changed_keys(),
             baseline_values=self._current_model.baseline_values(),
             conflict_originals=conflict_originals,
             cache_values=cache_values,
             resolutions=resolutions,
         )
-        _conflict_apply_entry_updates(
+        self._conflict_workflow_service.apply_resolution(
             self._current_pf.entries,
-            value_updates=plan.value_updates,
-            status_updates=plan.status_updates,
+            resolution=resolution,
         )
         _write_status_cache(
             self._root,
             path,
             self._current_pf.entries,
-            changed_keys=set(plan.changed_keys),
-            original_values=plan.original_values,
-            force_original=set(plan.force_original),
+            changed_keys=set(resolution.changed_keys),
+            original_values=resolution.original_values,
+            force_original=set(resolution.force_original),
         )
-        if not plan.changed_keys:
+        if not resolution.changed_keys:
             self.fs_model.set_dirty(path, False)
         self._clear_conflicts(path)
         self._reload_file(path)

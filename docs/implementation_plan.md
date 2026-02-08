@@ -379,8 +379,12 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        `core.search_replace_service` (scope resolution + replace transform helpers).
      - [✓] Cross-file search traversal is now delegated through
        `SearchReplaceService.search_across_files`.
+     - [✓] Replace-all counting/apply orchestration is delegated through
+       `SearchReplaceService` helpers (`build_replace_all_plan` / `apply_replace_all`).
      - [✓] Preferences/root-policy helpers extracted into Qt-free
        `core.preferences_service` (startup-root resolution + normalize/persist payload helpers).
+     - [✓] Conflict action orchestration now routes through
+       `ConflictWorkflowService` (drop-cache/drop-original/merge resolution + apply hook).
    - **Acceptance**:
      - [ ] `main_window.py` no longer owns core workflow decisions directly.
      - [ ] Service-level tests cover open/switch/save/conflict/search flows.
