@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 import sqlite3
 import threading
 import time
@@ -14,7 +15,7 @@ from .tmx_io import iter_tmx_pairs, write_tmx
 
 _PROJECT_ORIGIN = "project"
 _IMPORT_ORIGIN = "import"
-_MIN_FUZZY_SCORE = 30
+_MIN_FUZZY_SCORE = 50
 _MAX_FUZZY_CANDIDATES = 200
 _MAX_FUZZY_SOURCE_LEN = 5000
 _IMPORT_VISIBLE_SQL = """
@@ -67,6 +68,31 @@ def _normalize(text: str) -> str:
 
 def _prefix(text: str, length: int = 8) -> str:
     return text[:length] if text else ""
+
+
+def _query_tokens(text: str) -> tuple[str, ...]:
+    tokens = []
+    for raw in re.split(r"\s+", text):
+        token = raw.strip(".,;:!?\"'()[]{}")
+        if len(token) < 2:
+            continue
+        tokens.append(token)
+    return tuple(dict.fromkeys(tokens))
+
+
+def _contains_composed_phrase(text: str, query: str) -> bool:
+    if query in text:
+        return True
+    parts = _query_tokens(query)
+    if len(parts) < 2:
+        return False
+    pos = 0
+    for part in parts:
+        found = text.find(part, pos)
+        if found < 0:
+            return False
+        pos = found + len(part)
+    return True
 
 
 def _normalize_locale(locale: str) -> str:
@@ -736,7 +762,11 @@ class TMStore:
         if len(norm) > _MAX_FUZZY_SOURCE_LEN:
             return matches
         candidates = cls._fuzzy_candidates(
-            conn, norm, source_locale, target_locale, origin_list
+            conn,
+            norm,
+            source_locale,
+            target_locale,
+            origin_list,
         )
         for cand, score in candidates:
             key = (
@@ -777,6 +807,7 @@ class TMStore:
     ) -> list[tuple[sqlite3.Row, int]]:
         from difflib import SequenceMatcher
 
+        query_tokens = set(_query_tokens(norm))
         origin_list = _normalize_origins(origins)
         if not origin_list:
             return []
@@ -838,8 +869,18 @@ class TMStore:
         scored: list[tuple[sqlite3.Row, int]] = []
         for row in rows:
             cand_norm = row["source_norm"]
+            if query_tokens:
+                cand_tokens = set(_query_tokens(cand_norm))
+                if cand_tokens:
+                    overlap = len(query_tokens & cand_tokens) / max(
+                        1, len(query_tokens)
+                    )
+                    if overlap < 0.5:
+                        continue
             ratio = SequenceMatcher(None, norm, cand_norm, autojunk=False).ratio()
             score = int(round(ratio * 100))
+            if _contains_composed_phrase(cand_norm, norm):
+                score = max(score, 90)
             scored.append((row, score))
         scored.sort(
             key=lambda item: (

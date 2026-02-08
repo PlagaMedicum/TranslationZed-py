@@ -67,6 +67,34 @@ def test_tm_store_exact_and_fuzzy(tmp_path: Path) -> None:
     store.close()
 
 
+def test_tm_store_filters_low_token_overlap_candidates(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k1", "water bottle", "water bottle tr"),
+            ("k2", "better battle", "better battle tr"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    fuzzy = store.query(
+        "water bottle!!",
+        source_locale="EN",
+        target_locale="BE",
+        limit=10,
+    )
+
+    assert any(match.source_text == "water bottle" for match in fuzzy)
+    assert all(match.source_text != "better battle" for match in fuzzy)
+    store.close()
+
+
 def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
