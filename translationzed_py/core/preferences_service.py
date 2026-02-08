@@ -37,7 +37,9 @@ class LoadedPreferences:
 
 @dataclass(frozen=True, slots=True)
 class PreferencesService:
-    def resolve_startup_root(self, *, project_root: str | None) -> StartupRootResolution:
+    def resolve_startup_root(
+        self, *, project_root: str | None
+    ) -> StartupRootResolution:
         prefs_global = _load_preferences(None)
         return resolve_startup_root(
             project_root=project_root,

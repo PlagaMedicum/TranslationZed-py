@@ -4139,9 +4139,7 @@ class MainWindow(QMainWindow):
         self._update_tm_suggestions()
 
     def _filter_tm_matches(self, matches: list[TMMatch]) -> list[TMMatch]:
-        return self._tm_workflow.filter_matches(
-            matches, policy=self._tm_query_policy()
-        )
+        return self._tm_workflow.filter_matches(matches, policy=self._tm_query_policy())
 
     def _current_tm_lookup(self) -> tuple[str, str] | None:
         if not (self._current_model and self._current_pf):
