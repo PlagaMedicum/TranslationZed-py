@@ -72,9 +72,8 @@ def _prefix(text: str, length: int = 8) -> str:
 
 
 def _query_tokens(text: str) -> tuple[str, ...]:
-    tokens = []
-    for raw in re.split(r"\s+", text):
-        token = raw.strip(".,;:!?\"'()[]{}")
+    tokens: list[str] = []
+    for token in re.findall(r"\w+", text, flags=re.UNICODE):
         if len(token) < 2:
             continue
         tokens.append(token)

@@ -64,6 +64,7 @@ from PySide6.QtWidgets import (
     QTableView,
     QTableWidget,
     QTableWidgetItem,
+    QTextEdit,
     QToolBar,
     QToolButton,
     QToolTip,
@@ -4137,8 +4138,9 @@ class MainWindow(QMainWindow):
         self._tm_source_preview.setPlainText(match.source_text)
         self._tm_target_preview.setPlainText(match.target_text)
         terms = self._tm_query_terms()
-        self._highlight_tm_preview(self._tm_source_preview, terms)
-        self._highlight_tm_preview(self._tm_target_preview, terms)
+        with contextlib.suppress(Exception):
+            self._highlight_tm_preview(self._tm_source_preview, terms)
+            self._highlight_tm_preview(self._tm_target_preview, terms)
 
     def _tm_query_terms(self) -> list[str]:
         lookup = self._current_tm_lookup()
@@ -4160,7 +4162,7 @@ class MainWindow(QMainWindow):
         fmt = QTextCharFormat()
         fmt.setBackground(QColor(255, 235, 120, 170))
         fmt.setForeground(QColor(0, 0, 0))
-        selections: list[QPlainTextEdit.ExtraSelection] = []
+        selections: list[QTextEdit.ExtraSelection] = []
         doc = editor.document()
         max_hits = 200
         for term in terms:
@@ -4171,7 +4173,7 @@ class MainWindow(QMainWindow):
                 cursor = doc.find(pattern, pos)
                 if cursor.isNull():
                     break
-                sel = QPlainTextEdit.ExtraSelection()
+                sel = QTextEdit.ExtraSelection()
                 sel.cursor = cursor
                 sel.format = fmt
                 selections.append(sel)

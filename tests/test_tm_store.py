@@ -95,6 +95,30 @@ def test_tm_store_filters_low_token_overlap_candidates(tmp_path: Path) -> None:
     store.close()
 
 
+def test_tm_store_tagged_query_matches_phrase_candidate(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [("k1", "Make new item", "Зрабіць новы прадмет")],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    fuzzy = store.query(
+        "<LINE> Make item",
+        source_locale="EN",
+        target_locale="BE",
+        limit=10,
+    )
+
+    assert any(match.source_text == "Make new item" for match in fuzzy)
+    store.close()
+
+
 def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
