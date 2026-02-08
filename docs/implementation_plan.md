@@ -346,11 +346,13 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
      dependency direction (GUI -> application -> core/infrastructure adapters).
    - **Mini-steps (ordered)**:
      - [ ] Define service boundaries and dependency contracts:
-       - [→] `ProjectSessionService` (open/switch locale, auto-open policy).
-       - [→] `FileWorkflowService` (parse/cache overlay/save/write conflict gate).
-       - [→] `ConflictService` (detect, merge decisions, status rules).
-       - [→] `SearchReplaceService` (scope resolution + cross-file navigation).
-       - [→] `PreferencesService` (bootstrap/load/save and root policy).
+       - [✓] `ProjectSessionService` (open/switch locale, auto-open policy).
+       - [✓] `FileWorkflowService` (parse/cache overlay/save/write conflict gate).
+       - [✓] `ConflictService` (detect, merge decisions, status rules).
+       - [✓] `SearchReplaceService` (scope resolution + cross-file navigation).
+       - [✓] `PreferencesService` (bootstrap/load/save and root policy).
+       - [✓] `TMWorkflowService` (TM pending queue + query planning + query cache policy).
+       - [✓] `RenderWorkflowService` (large-file decisions + visible/prefetch span policy).
      - [ ] Introduce thin DTOs/interfaces so services stay Qt-free.
      - [ ] Move one workflow at a time from `main_window` into services:
        1) preferences + startup root/bootstrap,
@@ -383,8 +385,14 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        `SearchReplaceService` helpers (`build_replace_all_plan` / `apply_replace_all`).
      - [✓] Preferences/root-policy helpers extracted into Qt-free
        `core.preferences_service` (startup-root resolution + normalize/persist payload helpers).
+     - [✓] Main-window preference I/O orchestration delegated through
+       `PreferencesService` (startup resolution, defaults bootstrap, persist path).
      - [✓] Conflict action orchestration now routes through
        `ConflictWorkflowService` (drop-cache/drop-original/merge resolution + apply hook).
+     - [✓] TM query/pending orchestration delegated through
+       `TMWorkflowService` (cache key planning, pending batch flush, stale result guard).
+     - [✓] Large-file/render policy calculations delegated through
+       `RenderWorkflowService` (render-heavy mode, large-file detection, span math).
    - **Acceptance**:
      - [ ] `main_window.py` no longer owns core workflow decisions directly.
      - [ ] Service-level tests cover open/switch/save/conflict/search flows.
