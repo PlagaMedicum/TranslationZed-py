@@ -293,7 +293,10 @@ Algorithm:
 - Store: last root path, last locale(s), window geometry, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
 - **tm_import_dir**: folder scanned for imported `.tmx` files; defaults to
-  `<runtime-root>/.tzp/imported_tms`.
+  `<runtime-root>/.tzp/tms`.
+- Legacy TM import paths (`<runtime-root>/.tzp/imported_tms` and
+  `<runtime-root>/imported_tms`) are auto-migrated into
+  `<runtime-root>/.tzp/tms` by `ensure_defaults()`.
 - `core.preferences_service` owns Qt-free preference policy helpers:
   startup-root resolution (CLI/default-root/picker decision), loaded-preference
   normalization, scope normalization, and persist-payload construction.

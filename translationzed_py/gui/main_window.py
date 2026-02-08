@@ -1499,7 +1499,7 @@ class MainWindow(QMainWindow):
         return Path.cwd().resolve()
 
     def _default_tm_import_dir(self) -> Path:
-        return (self._runtime_root() / ".tzp" / "imported_tms").resolve()
+        return (self._runtime_root() / ".tzp" / "tms").resolve()
 
     def _tm_import_dir_path(self) -> Path:
         raw = str(self._tm_import_dir).strip()

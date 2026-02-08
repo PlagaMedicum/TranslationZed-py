@@ -9,7 +9,7 @@ def test_tm_preferences_apply_handles_remove_toggle_and_import(tmp_path: Path) -
     root.mkdir()
     store = TMStore(root)
 
-    managed = root / ".tzp" / "imported_tms"
+    managed = root / ".tzp" / "tms"
     managed.mkdir(parents=True, exist_ok=True)
     existing = managed / "existing.tmx"
     existing.write_text("x", encoding="utf-8")

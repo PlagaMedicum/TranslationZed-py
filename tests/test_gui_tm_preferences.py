@@ -46,7 +46,7 @@ def test_tm_preferences_delete_cancel_keeps_file(tmp_path, qtbot, monkeypatch):
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
-    tm_path = root / ".tzp" / "imported_tms" / "sample.tmx"
+    tm_path = root / ".tzp" / "tms" / "sample.tmx"
     _register_imported_tm(win, tm_path)
 
     monkeypatch.setattr(
@@ -64,7 +64,7 @@ def test_tm_preferences_delete_confirm_removes_file(tmp_path, qtbot, monkeypatch
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
-    tm_path = root / ".tzp" / "imported_tms" / "sample.tmx"
+    tm_path = root / ".tzp" / "tms" / "sample.tmx"
     _register_imported_tm(win, tm_path)
 
     monkeypatch.setattr(
@@ -147,7 +147,7 @@ def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
     qtbot.addWidget(win)
     assert win._ensure_tm_store()
 
-    tm_path = root / ".tzp" / "imported_tms" / "sample_import.tmx"
+    tm_path = root / ".tzp" / "tms" / "sample_import.tmx"
     tm_path.parent.mkdir(parents=True, exist_ok=True)
     tm_path.write_text("tmx", encoding="utf-8")
     win._tm_store.insert_import_pairs(

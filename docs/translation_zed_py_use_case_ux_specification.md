@@ -251,7 +251,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | *TM ▸ Import TMX…* |
 | **Flow** |
 |  1 | SYS opens TMX file picker. |
-|  2 | SYS copies selected TMX into managed TM import folder (default: `.tzp/imported_tms` at runtime root). |
+|  2 | SYS copies selected TMX into managed TM import folder (default: `.tzp/tms` at runtime root). |
 |  3 | SYS detects source/target locales from TMX metadata; if unresolved, SYS asks user to map locales manually. |
 |  4 | SYS imports TM units into project TM store for resolved locale pair (`origin=import`) and records TM source name. |
 |  5 | SYS reports imported unit count and unresolved/failed files when applicable. |

@@ -164,7 +164,7 @@ def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
-    tmx_path = root / ".tzp" / "imported_tms" / "pack_ru.tmx"
+    tmx_path = root / ".tzp" / "tms" / "pack_ru.tmx"
     tmx_path.parent.mkdir(parents=True, exist_ok=True)
     tmx_path.write_text(
         """<?xml version="1.0" encoding="UTF-8"?>

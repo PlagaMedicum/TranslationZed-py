@@ -157,7 +157,7 @@ def test_preferences_service_persist_main_window_preferences(
         last_locales=["BE", "RU"],
         window_geometry="abc",
         default_root=str(default_root),
-        tm_import_dir=str(tmp_path / ".tzp" / "imported_tms"),
+        tm_import_dir=str(tmp_path / ".tzp" / "tms"),
         search_scope="locale",
         replace_scope="pool",
         extras={"X": "1"},

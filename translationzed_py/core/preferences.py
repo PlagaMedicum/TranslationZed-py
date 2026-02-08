@@ -75,8 +75,63 @@ def _existing_config_path(root: Path | None = None) -> Path:
 
 
 def _default_tm_import_dir(root: Path | None = None) -> str:
+    return str(_canonical_tm_import_dir(root))
+
+
+def _canonical_tm_import_dir(root: Path | None = None) -> Path:
     base = Path(root).resolve() if root is not None else _runtime_root()
-    return str((base / ".tzp" / "imported_tms").resolve())
+    return (base / ".tzp" / "tms").resolve()
+
+
+def _legacy_tm_import_dirs(root: Path | None = None) -> tuple[Path, ...]:
+    base = Path(root).resolve() if root is not None else _runtime_root()
+    return (
+        (base / ".tzp" / "imported_tms").resolve(),
+        (base / "imported_tms").resolve(),
+    )
+
+
+def _normalize_tm_import_dir(value: object, root: Path | None = None) -> str:
+    canonical = _canonical_tm_import_dir(root)
+    raw = str(value).strip()
+    if not raw:
+        return str(canonical)
+    path = Path(raw).expanduser().resolve()
+    if path == canonical:
+        return str(canonical)
+    if path in _legacy_tm_import_dirs(root):
+        return str(canonical)
+    return str(path)
+
+
+def _migrate_legacy_tm_import_dirs(root: Path | None = None) -> bool:
+    canonical = _canonical_tm_import_dir(root)
+    changed = False
+    with contextlib.suppress(OSError):
+        canonical.mkdir(parents=True, exist_ok=True)
+    for legacy in _legacy_tm_import_dirs(root):
+        if legacy == canonical or not legacy.exists() or not legacy.is_dir():
+            continue
+        for source in sorted(legacy.iterdir()):
+            if not source.is_file():
+                continue
+            dest = canonical / source.name
+            if dest.exists():
+                idx = 1
+                while True:
+                    candidate = canonical / f"{source.stem}_{idx}{source.suffix}"
+                    if not candidate.exists():
+                        dest = candidate
+                        break
+                    idx += 1
+            try:
+                source.replace(dest)
+            except OSError:
+                continue
+            changed = True
+        with contextlib.suppress(OSError):
+            legacy.rmdir()
+    return changed
 
 
 def _parse_env(path: Path) -> dict[str, Any]:
@@ -146,9 +201,10 @@ def load(root: Path | None = None) -> dict[str, Any]:
     parsed = _parse_env(_existing_config_path(root))
     extras = dict(parsed.pop(_EXTRAS_KEY, {}))
     merged.update(parsed)
-    tm_import_dir = str(merged.get("tm_import_dir", "")).strip()
-    if not tm_import_dir:
-        merged["tm_import_dir"] = _default_tm_import_dir(root)
+    merged["tm_import_dir"] = _normalize_tm_import_dir(
+        merged.get("tm_import_dir", ""),
+        root,
+    )
     if extras:
         merged[_EXTRAS_KEY] = extras
     return merged
@@ -164,12 +220,27 @@ def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
     prefs = dict(_DEFAULTS)
     extras = dict(parsed.pop(_EXTRAS_KEY, {}))
     prefs.update(parsed)
-    tm_import_dir = str(prefs.get("tm_import_dir", "")).strip()
-    if not tm_import_dir:
-        prefs["tm_import_dir"] = _default_tm_import_dir(root)
+    prefs["tm_import_dir"] = _normalize_tm_import_dir(
+        prefs.get("tm_import_dir", ""),
+        root,
+    )
+    migrated_tm_dirs = _migrate_legacy_tm_import_dirs(root)
     if extras:
         prefs[_EXTRAS_KEY] = extras
-    if not path.exists() or any(key not in parsed for key in _REQUIRED_PREF_KEYS):
+    parsed_tm_dir = str(parsed.get("tm_import_dir", "")).strip()
+    if parsed_tm_dir:
+        parsed_tm_dir_norm = str(Path(parsed_tm_dir).expanduser().resolve())
+        tm_dir_changed = (
+            _normalize_tm_import_dir(parsed_tm_dir, root) != parsed_tm_dir_norm
+        )
+    else:
+        tm_dir_changed = False
+    if (
+        not path.exists()
+        or any(key not in parsed for key in _REQUIRED_PREF_KEYS)
+        or tm_dir_changed
+        or migrated_tm_dirs
+    ):
         with contextlib.suppress(OSError):
             save(prefs, root)
     return prefs
