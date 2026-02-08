@@ -105,6 +105,9 @@ from translationzed_py.core.preferences_service import (
 from translationzed_py.core.project_session import (
     ProjectSessionService as _ProjectSessionService,
 )
+from translationzed_py.core.render_workflow_service import (
+    RenderWorkflowService as _RenderWorkflowService,
+)
 from translationzed_py.core.save_exit_flow import (
     apply_write_original_flow as _apply_write_original_flow,
 )
@@ -454,6 +457,7 @@ class MainWindow(QMainWindow):
             has_drafts=_read_has_drafts_from_path,
             read_last_opened=_read_last_opened_from_path,
         )
+        self._render_workflow_service = _RenderWorkflowService()
         self._file_workflow_service = _FileWorkflowService()
         self._conflict_workflow_service = _ConflictWorkflowService()
         self._search_replace_service = _SearchReplaceService()
@@ -2336,28 +2340,30 @@ class MainWindow(QMainWindow):
 
     def _update_render_cost_flags(self) -> None:
         self._render_heavy = False
-        if not self._current_model or not self._large_text_optimizations:
-            if self._current_model:
-                self._current_model.set_preview_limit(None)
+        if not self._current_model:
             return
         try:
             max_len = self._current_model.max_value_length()
         except Exception:
             max_len = 0
-        if max_len >= self._render_heavy_threshold:
-            self._render_heavy = True
-            self._current_model.set_preview_limit(self._preview_limit)
-        else:
-            self._current_model.set_preview_limit(None)
+        decision = self._render_workflow_service.decide_render_cost(
+            max_value_length=max_len,
+            large_text_optimizations=self._large_text_optimizations,
+            render_heavy_threshold=self._render_heavy_threshold,
+            preview_limit=self._preview_limit,
+        )
+        self._render_heavy = decision.render_heavy
+        self._current_model.set_preview_limit(decision.preview_limit)
 
     def _is_large_file(self) -> bool:
-        return bool(
-            self._current_model
-            and (
-                self._current_model.rowCount() >= self._large_file_row_threshold
-                or self._current_file_size >= self._large_file_bytes_threshold
-                or (self._large_text_optimizations and self._render_heavy)
-            )
+        return self._render_workflow_service.is_large_file(
+            has_model=self._current_model is not None,
+            row_count=self._current_model.rowCount() if self._current_model else 0,
+            file_size=self._current_file_size,
+            row_threshold=self._large_file_row_threshold,
+            bytes_threshold=self._large_file_bytes_threshold,
+            large_text_optimizations=self._large_text_optimizations,
+            render_heavy=self._render_heavy,
         )
 
     def _should_parse_lazy(self, path: Path) -> bool:
@@ -2370,35 +2376,31 @@ class MainWindow(QMainWindow):
         if not self._current_model:
             return None
         total = self._current_model.rowCount()
-        if total <= 0:
-            return None
         viewport = self.table.viewport()
         if viewport is None:
             return None
         first = self.table.rowAt(0)
         last = self.table.rowAt(max(0, viewport.height() - 1))
-        if first < 0:
-            first = 0
-        if last < 0:
-            last = total - 1
-        visible = max(1, last - first + 1)
-        margin = max(2, int(visible * self._row_cache_margin_pct))
-        start = max(0, first - margin)
-        end = min(total - 1, last + margin)
-        return start, end
+        return self._render_workflow_service.visible_row_span(
+            total_rows=total,
+            first_visible=first,
+            last_visible=last,
+            margin_pct=self._row_cache_margin_pct,
+        )
 
     def _prefetch_visible_rows(self) -> None:
         if not self._current_model:
             return
         span = self._visible_row_span()
-        if not span:
+        prefetch = self._render_workflow_service.prefetch_span(
+            span=span,
+            total_rows=self._current_model.rowCount(),
+            margin=self._lazy_row_prefetch_margin,
+            large_file_mode=self._is_large_file(),
+        )
+        if not prefetch:
             return
-        start, end = span
-        margin = self._lazy_row_prefetch_margin
-        if self._is_large_file():
-            margin = min(margin, 50)
-        start = max(0, start - margin)
-        end = min(self._current_model.rowCount() - 1, end + margin)
+        start, end = prefetch
         self._current_model.prefetch_rows(start, end)
 
     def _should_defer_post_open(self) -> bool:
@@ -2446,17 +2448,18 @@ class MainWindow(QMainWindow):
     def _resize_visible_rows(self) -> None:
         if not self._wrap_text or not self._current_model:
             return
-        span = self._pending_row_span or self._visible_row_span()
-        if not span:
+        raw_span = self._pending_row_span or self._visible_row_span()
+        span = self._render_workflow_service.resume_resize_span(
+            span=raw_span,
+            cursor=self._row_resize_cursor,
+        )
+        if span is None:
             return
         signature = self._row_height_cache_signature()
         if signature != self._row_height_cache_key:
             self._row_height_cache_key = signature
             self._row_height_cache.clear()
         start, end = span
-        cursor = self._row_resize_cursor
-        if cursor is not None:
-            start = max(start, cursor)
         perf_trace = PERF_TRACE
         perf_start = perf_trace.start("row_resize")
         rows_processed = 0
