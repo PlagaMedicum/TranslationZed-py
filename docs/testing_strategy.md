@@ -152,6 +152,8 @@ They include:
   (`core.save_exit_flow` unit tests).
 - Conflict service: merge-row building, drop-cache/drop-original plans, merge outcome planning,
   and in-memory entry update application (`core.conflict_service` unit tests).
+- Project-session service: draft-file discovery and last-opened path selection
+  (`core.project_session` unit tests).
 
 **Not covered yet (automation gaps, by layer):**
 

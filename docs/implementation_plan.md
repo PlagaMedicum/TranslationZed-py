@@ -346,9 +346,9 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
      dependency direction (GUI -> application -> core/infrastructure adapters).
    - **Mini-steps (ordered)**:
      - [ ] Define service boundaries and dependency contracts:
-       - [ ] `ProjectSessionService` (open/switch locale, auto-open policy).
+       - [→] `ProjectSessionService` (open/switch locale, auto-open policy).
        - [ ] `FileWorkflowService` (parse/cache overlay/save/write conflict gate).
-       - [ ] `ConflictService` (detect, merge decisions, status rules).
+       - [→] `ConflictService` (detect, merge decisions, status rules).
        - [ ] `SearchReplaceService` (scope resolution + cross-file navigation).
        - [ ] `PreferencesService` (bootstrap/load/save and root policy).
      - [ ] Introduce thin DTOs/interfaces so services stay Qt-free.
@@ -367,6 +367,8 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        `core.save_exit_flow` (`Write Original` + `closeEvent` decision flow).
      - [✓] Conflict resolution policy extracted into Qt-free `core.conflict_service`
        (drop-cache/drop-original/merge plan computation + merge entry-update helper).
+     - [✓] Session cache-scan/auto-open helpers extracted into Qt-free
+       `core.project_session` (draft discovery + last-opened candidate selection).
    - **Acceptance**:
      - [ ] `main_window.py` no longer owns core workflow decisions directly.
      - [ ] Service-level tests cover open/switch/save/conflict/search flows.

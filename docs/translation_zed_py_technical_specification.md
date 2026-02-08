@@ -81,6 +81,7 @@ translationzed_py/
 │   ├── status_cache.py      # binary per-file status store
 │   ├── en_hash_cache.py     # EN hash index + migration helpers
 │   ├── conflict_service.py  # conflict policy + merge planning (non-Qt)
+│   ├── project_session.py   # session cache scan + auto-open selection (non-Qt)
 │   ├── tm_store.py          # project TM storage/query (SQLite)
 │   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
 │   ├── tm_query.py          # TM query policy/filter helpers (non-Qt)
@@ -384,6 +385,8 @@ if dirty_files and not prompt_save():
   (timestamp stored in cache headers). If no history exists, no file is auto-opened.
 - File tree shows a **dirty dot (●)** prefix for files with cached draft values.
 - Save/Exit prompt lists only files **opened in this session** that have draft values (scrollable list).
+- `core.project_session` owns the Qt-free policy for draft-file discovery and
+  most-recent auto-open path selection; GUI remains adapter-only for opening selected paths.
 - Copy/Paste: if a **row** is selected, copy the whole row; if a **cell** is
   selected, copy that cell. Cut/Paste only applies to Translation column cells.
   Row copy is **tab-delimited**: `Key\tSource\tValue\tStatus`.
