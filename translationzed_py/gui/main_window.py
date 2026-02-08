@@ -181,18 +181,6 @@ from translationzed_py.core.tm_query import (
     TMQueryPolicy,
 )
 from translationzed_py.core.tm_query import (
-    current_key_from_lookup as _tm_current_key_from_lookup,
-)
-from translationzed_py.core.tm_query import (
-    filter_matches as _tm_filter_matches,
-)
-from translationzed_py.core.tm_query import (
-    has_enabled_origins as _tm_has_enabled_origins,
-)
-from translationzed_py.core.tm_query import (
-    make_cache_key as _tm_make_cache_key,
-)
-from translationzed_py.core.tm_query import (
     normalize_min_score as _tm_normalize_min_score,
 )
 from translationzed_py.core.tm_query import (
@@ -211,6 +199,9 @@ from translationzed_py.core.tm_rebuild import (
     rebuild_project_tm as _tm_rebuild_project_tm,
 )
 from translationzed_py.core.tm_store import TMMatch, TMStore
+from translationzed_py.core.tm_workflow_service import (
+    TMWorkflowService as _TMWorkflowService,
+)
 
 from .delegates import (
     MAX_VISUAL_CHARS,
@@ -479,9 +470,7 @@ class MainWindow(QMainWindow):
         self._en_cache: dict[Path, ParsedFile] = {}
         self._child_windows: list[MainWindow] = []
         self._tm_store: TMStore | None = None
-        self._tm_cache: OrderedDict[TMQueryKey, list[TMMatch]] = OrderedDict()
-        self._tm_cache_limit = 128
-        self._tm_pending: dict[str, dict[str, tuple[str, str, str]]] = {}
+        self._tm_workflow = _TMWorkflowService(cache_limit=128)
         self._tm_source_locale = "EN"
         self._tm_query_pool: ThreadPoolExecutor | None = None
         self._tm_query_future: Future[list[TMMatch]] | None = None
@@ -1591,7 +1580,7 @@ class MainWindow(QMainWindow):
         show_summary: bool,
     ) -> None:
         if report.changed:
-            self._tm_cache.clear()
+            self._tm_workflow.clear_cache()
             if self._left_stack.currentIndex() == 1:
                 self._schedule_tm_update()
         if interactive:
@@ -1654,6 +1643,9 @@ class MainWindow(QMainWindow):
         if not rel.parts:
             return None
         return rel.parts[0]
+
+    def _locale_for_string_path(self, path_key: str) -> str | None:
+        return self._locale_for_path(Path(path_key))
 
     def _en_path_for(self, path: Path, locale: str | None) -> Path | None:
         if not locale or locale == "EN":
@@ -1972,7 +1964,7 @@ class MainWindow(QMainWindow):
         self._finish_tm_rebuild(result)
 
     def _finish_tm_rebuild(self, result: TMRebuildResult) -> None:
-        self._tm_cache.clear()
+        self._tm_workflow.clear_cache()
         message = _tm_format_rebuild_status(result)
         self.statusBar().showMessage(message, 8000)
         if self._left_stack.currentIndex() == 1:
@@ -2912,44 +2904,31 @@ class MainWindow(QMainWindow):
     ) -> None:
         if not self._tm_store:
             return
-        self._tm_cache.clear()
-        file_key = str(path)
-        bucket = self._tm_pending.setdefault(file_key, {})
-        for key, source_text, value_text in rows:
-            bucket[key] = (key, source_text, value_text)
+        self._tm_workflow.queue_updates(str(path), rows)
         if self._tm_flush_timer.isActive():
             self._tm_flush_timer.stop()
         self._tm_flush_timer.start()
 
     def _flush_tm_updates(self, *, paths: Iterable[Path] | None = None) -> None:
-        if not self._tm_store or not self._tm_pending:
+        if not self._tm_store:
             return
-        if paths is None:
-            pending_items = list(self._tm_pending.items())
-        else:
-            wanted = {str(path) for path in paths}
-            pending_items = [
-                (path_key, rows)
-                for path_key, rows in self._tm_pending.items()
-                if path_key in wanted
-            ]
-        for path_key, rows in pending_items:
-            if not rows:
-                continue
-            locale = self._locale_for_path(Path(path_key))
-            if not locale:
-                continue
+        wanted = None if paths is None else [str(path) for path in paths]
+        batches = self._tm_workflow.pending_batches(
+            locale_for_path=self._locale_for_string_path,
+            paths=wanted,
+        )
+        for batch in batches:
             try:
                 self._tm_store.upsert_project_entries(
-                    rows.values(),
+                    batch.rows,
                     source_locale=self._tm_source_locale,
-                    target_locale=locale,
-                    file_path=path_key,
+                    target_locale=batch.target_locale,
+                    file_path=batch.file_key,
                 )
             except Exception as exc:
                 QMessageBox.warning(self, "TM update failed", str(exc))
                 continue
-            self._tm_pending.pop(path_key, None)
+            self._tm_workflow.mark_batch_flushed(batch.file_key)
 
     def _on_model_changed(self, *_args) -> None:
         if not (self._current_pf and self._current_model):
@@ -4157,7 +4136,9 @@ class MainWindow(QMainWindow):
         self._update_tm_suggestions()
 
     def _filter_tm_matches(self, matches: list[TMMatch]) -> list[TMMatch]:
-        return _tm_filter_matches(matches, policy=self._tm_query_policy())
+        return self._tm_workflow.filter_matches(
+            matches, policy=self._tm_query_policy()
+        )
 
     def _current_tm_lookup(self) -> tuple[str, str] | None:
         if not (self._current_model and self._current_pf):
@@ -4198,32 +4179,21 @@ class MainWindow(QMainWindow):
         if self._left_stack.currentIndex() != 1:
             return
         policy = self._tm_query_policy()
-        if not _tm_has_enabled_origins(policy):
-            self._tm_list.clear()
-            self._tm_status_label.setText("No TM origins enabled.")
-            self._tm_apply_btn.setEnabled(False)
-            return
         lookup = self._current_tm_lookup()
-        if lookup is None:
-            self._tm_list.clear()
-            self._tm_status_label.setText("Select a row to see TM suggestions.")
-            self._tm_apply_btn.setEnabled(False)
-            return
-        source_text, locale = lookup
-        self._flush_tm_updates(paths=[self._current_pf.path])
-        cache_key = _tm_make_cache_key(
-            source_text,
-            target_locale=locale,
+        if self._current_pf:
+            self._flush_tm_updates(paths=[self._current_pf.path])
+        plan = self._tm_workflow.plan_query(
+            lookup=lookup,
             policy=policy,
         )
-        matches = self._tm_cache.get(cache_key)
-        if matches is not None:
-            self._show_tm_matches(matches)
+        if plan.mode == "cached" and plan.matches is not None:
+            self._show_tm_matches(plan.matches)
             return
-        self._tm_status_label.setText("Searching TM...")
+        self._tm_status_label.setText(plan.message)
         self._tm_list.clear()
         self._tm_apply_btn.setEnabled(False)
-        self._start_tm_query(cache_key)
+        if plan.mode == "query" and plan.cache_key is not None:
+            self._start_tm_query(plan.cache_key)
 
     def _start_tm_query(self, cache_key: TMQueryKey) -> None:
         if not self._tm_store or self._tm_query_pool is None:
@@ -4283,17 +4253,14 @@ class MainWindow(QMainWindow):
             self._tm_status_label.setText("TM lookup failed.")
             self._tm_apply_btn.setEnabled(False)
             return
-        self._tm_cache[cache_key] = matches
-        if len(self._tm_cache) > self._tm_cache_limit:
-            self._tm_cache.popitem(last=False)
         lookup = self._current_tm_lookup()
-        current_key = _tm_current_key_from_lookup(
-            lookup,
+        show_current = self._tm_workflow.accept_query_result(
+            cache_key=cache_key,
+            matches=matches,
+            lookup=lookup,
             policy=self._tm_query_policy(),
         )
-        if current_key is None:
-            return
-        if current_key != cache_key:
+        if not show_current:
             return
         self._show_tm_matches(matches)
 
