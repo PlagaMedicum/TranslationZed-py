@@ -127,7 +127,30 @@ from translationzed_py.core.saver import save
 from translationzed_py.core.search import Match as _SearchMatch
 from translationzed_py.core.search import SearchField as _SearchField
 from translationzed_py.core.search import SearchRow as _SearchRow
-from translationzed_py.core.search import iter_matches as _iter_search_matches
+from translationzed_py.core.search_replace_service import (
+    anchor_row as _sr_anchor_row,
+)
+from translationzed_py.core.search_replace_service import (
+    fallback_row as _sr_fallback_row,
+)
+from translationzed_py.core.search_replace_service import (
+    find_match_in_rows as _sr_find_match_in_rows,
+)
+from translationzed_py.core.search_replace_service import (
+    prioritize_current_file as _sr_prioritize_current_file,
+)
+from translationzed_py.core.search_replace_service import (
+    replace_text as _sr_replace_text,
+)
+from translationzed_py.core.search_replace_service import (
+    scope_files as _sr_scope_files,
+)
+from translationzed_py.core.search_replace_service import (
+    scope_label as _sr_scope_label,
+)
+from translationzed_py.core.search_replace_service import (
+    search_spec_for_column as _sr_search_spec_for_column,
+)
 from translationzed_py.core.status_cache import (
     CacheEntry,
 )
@@ -3069,19 +3092,17 @@ class MainWindow(QMainWindow):
         return pattern, replacement, use_regex, matches_empty, has_group_ref
 
     def _files_for_scope(self, scope: str) -> list[Path]:
-        if not self._current_pf:
-            return []
-        if scope == "FILE":
-            return [self._current_pf.path]
-        if scope == "LOCALE":
-            locale = self._locale_for_path(self._current_pf.path)
-            if not locale:
-                return []
-            return list(self._files_for_locale(locale))
-        files: list[Path] = []
-        for locale in self._selected_locales:
-            files.extend(self._files_for_locale(locale))
-        return files
+        current_path = self._current_pf.path if self._current_pf else None
+        current_locale = (
+            self._locale_for_path(current_path) if current_path is not None else None
+        )
+        return _sr_scope_files(
+            scope=scope,
+            current_file=current_path,
+            current_locale=current_locale,
+            selected_locales=self._selected_locales,
+            files_for_locale=self._files_for_locale,
+        )
 
     def _files_for_locale(self, locale: str) -> list[Path]:
         cached = self._files_by_locale.get(locale)
@@ -3109,24 +3130,20 @@ class MainWindow(QMainWindow):
         idx = self._current_model.index(row, 2)
         text = idx.data(Qt.EditRole)
         text = "" if text is None else str(text)
-        if not pattern.search(text):
+        try:
+            changed, new_text = _sr_replace_text(
+                text,
+                pattern=pattern,
+                replacement=replacement,
+                use_regex=use_regex,
+                matches_empty=matches_empty,
+                has_group_ref=has_group_ref,
+                mode="single",
+            )
+        except re.error as exc:
+            QMessageBox.warning(self, "Replace failed", str(exc))
             return
-        if matches_empty and not has_group_ref:
-            new_text = replacement
-        else:
-            try:
-                if use_regex:
-                    template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
-                    count = 1 if matches_empty else 1
-                    new_text = pattern.sub(
-                        lambda m: m.expand(template), text, count=count
-                    )
-                else:
-                    new_text = pattern.sub(lambda _m: replacement, text, count=1)
-            except re.error as exc:
-                QMessageBox.warning(self, "Replace failed", str(exc))
-                return
-        if new_text != text:
+        if changed:
             self._current_model.setData(idx, new_text, Qt.EditRole)
             self._schedule_search()
 
@@ -3139,28 +3156,19 @@ class MainWindow(QMainWindow):
         matches_empty: bool,
         has_group_ref: bool,
     ) -> tuple[bool, str] | None:
-        if not text:
-            return False, text
-        if matches_empty and not has_group_ref:
-            new_text = replacement
-        else:
-            if not pattern.search(text):
-                return False, text
-            try:
-                if use_regex:
-                    template = re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
-                    count = 1 if matches_empty else 0
-                    new_text = pattern.sub(
-                        lambda m, template=template: m.expand(template),
-                        text,
-                        count=count,
-                    )
-                else:
-                    new_text = pattern.sub(lambda _m: replacement, text)
-            except re.error as exc:
-                QMessageBox.warning(self, "Replace failed", str(exc))
-                return None
-        return new_text != text, new_text
+        try:
+            return _sr_replace_text(
+                text,
+                pattern=pattern,
+                replacement=replacement,
+                use_regex=use_regex,
+                matches_empty=matches_empty,
+                has_group_ref=has_group_ref,
+                mode="all",
+            )
+        except re.error as exc:
+            QMessageBox.warning(self, "Replace failed", str(exc))
+            return None
 
     def _replace_all_count_in_model(
         self,
@@ -3235,15 +3243,16 @@ class MainWindow(QMainWindow):
         if not files:
             return
         if scope != "FILE" and len(files) > 1:
-            if scope == "LOCALE":
-                locale = (
-                    self._locale_for_path(self._current_pf.path)
-                    if self._current_pf
-                    else None
-                )
-                scope_label = f"Locale {locale}" if locale else "Locale"
-            else:
-                scope_label = f"Pool ({len(self._selected_locales)})"
+            locale = (
+                self._locale_for_path(self._current_pf.path)
+                if self._current_pf
+                else None
+            )
+            scope_label = _sr_scope_label(
+                scope=scope,
+                current_locale=locale,
+                selected_locale_count=len(self._selected_locales),
+            )
             counts: list[tuple[str, int]] = []
             total = 0
             current_path = self._current_pf.path if self._current_pf else None
@@ -3791,17 +3800,16 @@ class MainWindow(QMainWindow):
         return rows
 
     def _search_files_for_scope(self) -> list[Path]:
-        files = list(self._files_for_scope(self._search_scope))
-        if self._current_pf and self._current_pf.path in files:
-            current = self._current_pf.path
-            files = [current, *[p for p in files if p != current]]
-        return files
+        current_path = self._current_pf.path if self._current_pf else None
+        return _sr_prioritize_current_file(
+            list(self._files_for_scope(self._search_scope)),
+            current_path,
+        )
 
     def _search_anchor_row(self, direction: int) -> int:
         current = self.table.currentIndex()
-        if current.isValid():
-            return current.row()
-        return -1 if direction > 0 else sys.maxsize
+        row = current.row() if current.isValid() else None
+        return _sr_anchor_row(row, direction)
 
     def _find_match_in_rows(
         self,
@@ -3813,17 +3821,14 @@ class MainWindow(QMainWindow):
         start_row: int,
         direction: int,
     ) -> _SearchMatch | None:
-        if direction >= 0:
-            for match in _iter_search_matches(rows, query, field, use_regex):
-                if match.row > start_row:
-                    return match
-            return None
-        last_match: _SearchMatch | None = None
-        for match in _iter_search_matches(rows, query, field, use_regex):
-            if match.row >= start_row:
-                break
-            last_match = match
-        return last_match
+        return _sr_find_match_in_rows(
+            rows,
+            query,
+            field,
+            use_regex,
+            start_row=start_row,
+            direction=direction,
+        )
 
     def _find_match_in_file(
         self,
@@ -3900,14 +3905,7 @@ class MainWindow(QMainWindow):
         column = int(self.search_mode.currentData())
         self._search_column = column
         use_regex = self.regex_check.isChecked()
-        field_map = {
-            0: _SearchField.KEY,
-            1: _SearchField.SOURCE,
-            2: _SearchField.TRANSLATION,
-        }
-        field = field_map.get(column, _SearchField.TRANSLATION)
-        include_source = field is _SearchField.SOURCE
-        include_value = field is _SearchField.TRANSLATION
+        field, include_source, include_value = _sr_search_spec_for_column(column)
         files = self._search_files_for_scope()
         if not files:
             return False
@@ -3931,7 +3929,7 @@ class MainWindow(QMainWindow):
             )
             if match and self._select_match(match):
                 return True
-        fallback_row = -1 if direction > 0 else sys.maxsize
+        fallback_row = _sr_fallback_row(direction)
         for path in others:
             match = self._find_match_in_file(
                 path,
