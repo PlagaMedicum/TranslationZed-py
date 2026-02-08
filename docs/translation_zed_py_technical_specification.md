@@ -83,6 +83,7 @@ translationzed_py/
 │   ├── conflict_service.py  # conflict policy + merge planning (non-Qt)
 │   ├── file_workflow.py     # file/cache overlay + cache-save planning (non-Qt)
 │   ├── project_session.py   # session cache scan + auto-open selection (non-Qt)
+│   ├── search_replace_service.py # scope/search/replace planning (non-Qt)
 │   ├── tm_store.py          # project TM storage/query (SQLite)
 │   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
 │   ├── tm_query.py          # TM query policy/filter helpers (non-Qt)
@@ -256,6 +257,8 @@ Algorithm:
 
 ### 5.5.1  Search & Replace UI semantics
 
+- `core.search_replace_service` owns Qt-free scope and replace planning:
+  scope file resolution, search traversal anchors/fallbacks, and replace-text transforms.
 - Search runs across selected locales; auto‑selects the **first match in the current file** only.
 - Cross‑file navigation is explicit via next/prev shortcuts; switching files does not auto‑jump.
 - Replace targets the **Translation** column and respects active replace scope.

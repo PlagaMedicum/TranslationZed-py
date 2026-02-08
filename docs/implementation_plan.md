@@ -349,7 +349,7 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        - [→] `ProjectSessionService` (open/switch locale, auto-open policy).
        - [→] `FileWorkflowService` (parse/cache overlay/save/write conflict gate).
        - [→] `ConflictService` (detect, merge decisions, status rules).
-       - [ ] `SearchReplaceService` (scope resolution + cross-file navigation).
+       - [→] `SearchReplaceService` (scope resolution + cross-file navigation).
        - [ ] `PreferencesService` (bootstrap/load/save and root policy).
      - [ ] Introduce thin DTOs/interfaces so services stay Qt-free.
      - [ ] Move one workflow at a time from `main_window` into services:
@@ -371,6 +371,8 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        `core.project_session` (draft discovery + last-opened candidate selection).
      - [✓] File workflow cache-overlay/save helpers extracted into Qt-free
        `core.file_workflow` (open-path cache apply + write-from-cache planning).
+     - [✓] Search/replace scope and traversal helpers extracted into Qt-free
+       `core.search_replace_service` (scope resolution + replace transform helpers).
    - **Acceptance**:
      - [ ] `main_window.py` no longer owns core workflow decisions directly.
      - [ ] Service-level tests cover open/switch/save/conflict/search flows.

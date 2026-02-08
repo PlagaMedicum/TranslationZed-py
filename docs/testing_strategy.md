@@ -156,6 +156,8 @@ They include:
   (`core.project_session` unit tests).
 - File-workflow service: cache overlay for open-path state reconstruction and cache-apply
   planning for write-from-cache path (`core.file_workflow` unit tests).
+- Search/replace service: scope file resolution, search traversal helpers, and
+  replace-text transformation rules (`core.search_replace_service` unit tests).
 
 **Not covered yet (automation gaps, by layer):**
 
