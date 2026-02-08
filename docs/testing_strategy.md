@@ -158,6 +158,8 @@ They include:
   planning for write-from-cache path (`core.file_workflow` unit tests).
 - Search/replace service: scope file resolution, search traversal helpers, and
   replace-text transformation rules (`core.search_replace_service` unit tests).
+- Preferences service: startup-root resolution, loaded-preference normalization,
+  scope normalization, and persist-payload construction (`core.preferences_service` unit tests).
 
 **Not covered yet (automation gaps, by layer):**
 

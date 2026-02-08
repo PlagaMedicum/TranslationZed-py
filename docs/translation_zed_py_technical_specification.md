@@ -84,6 +84,7 @@ translationzed_py/
 │   ├── file_workflow.py     # file/cache overlay + cache-save planning (non-Qt)
 │   ├── project_session.py   # session cache scan + auto-open selection (non-Qt)
 │   ├── search_replace_service.py # scope/search/replace planning (non-Qt)
+│   ├── preferences_service.py # startup root + prefs normalization/persist policy (non-Qt)
 │   ├── tm_store.py          # project TM storage/query (SQLite)
 │   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
 │   ├── tm_query.py          # TM query policy/filter helpers (non-Qt)
@@ -290,6 +291,9 @@ Algorithm:
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
 - **tm_import_dir**: folder scanned for imported `.tmx` files; defaults to
   `<runtime-root>/imported_tms`.
+- `core.preferences_service` owns Qt-free preference policy helpers:
+  startup-root resolution (CLI/default-root/picker decision), loaded-preference
+  normalization, scope normalization, and persist-payload construction.
 - Related UCs: UC-07, UC-08, UC-11.
 
 #### 5.6.1  Search & Replace preferences
