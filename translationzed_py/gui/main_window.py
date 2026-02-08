@@ -101,6 +101,12 @@ from translationzed_py.core.conflict_service import (
 from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
+from translationzed_py.core.file_workflow import (
+    apply_cache_for_write as _workflow_apply_cache_for_write,
+)
+from translationzed_py.core.file_workflow import (
+    apply_cache_overlay as _workflow_apply_cache_overlay,
+)
 from translationzed_py.core.model import STATUS_ORDER, Status
 from translationzed_py.core.preferences import ensure_defaults as _ensure_preferences
 from translationzed_py.core.preferences import load as _load_preferences
@@ -2191,77 +2197,15 @@ class MainWindow(QMainWindow):
         source_lookup = self._load_en_source(path, locale, target_entries=pf.entries)
         self._cache_map = _read_status_cache(self._root, path)
         _touch_last_opened(self._root, path, int(time.time()))
-        changed_keys: set[str] = set()
-        baseline_by_row: dict[int, str] = {}
-        conflict_originals: dict[str, str] = {}
-        original_values: dict[str, str] = {}
-        if self._cache_map:
-            if hasattr(pf.entries, "index_by_hash") and hasattr(pf.entries, "meta_at"):
-                entries = pf.entries
-                hash_bits = getattr(self._cache_map, "hash_bits", 64)
-                index_by_hash = entries.index_by_hash(bits=hash_bits)
-                for key_hash, rec in self._cache_map.items():
-                    indices = index_by_hash.get(key_hash)
-                    if not indices:
-                        continue
-                    for idx in indices:
-                        meta = entries.meta_at(idx)
-                        file_value = entries[idx].value
-                        if (
-                            rec.value is not None
-                            and rec.original is not None
-                            and rec.original != file_value
-                        ):
-                            conflict_originals[meta.key] = file_value
-                        new_value = rec.value if rec.value is not None else file_value
-                        if rec.value is not None and rec.value != file_value:
-                            changed_keys.add(meta.key)
-                            baseline_by_row[idx] = file_value
-                            original_values[meta.key] = (
-                                rec.original if rec.original is not None else file_value
-                            )
-                        if new_value != file_value or rec.status != meta.status:
-                            entries[idx] = Entry(
-                                meta.key,
-                                new_value,
-                                rec.status,
-                                meta.span,
-                                meta.segments,
-                                meta.gaps,
-                                meta.raw,
-                                meta.key_hash,
-                            )
-            else:
-                for idx, e in enumerate(pf.entries):
-                    h = self._hash_for_cache(e, self._cache_map)
-                    if h not in self._cache_map:
-                        continue
-                    rec = self._cache_map[h]
-                    if (
-                        rec.value is not None
-                        and rec.original is not None
-                        and rec.original != e.value
-                    ):
-                        conflict_originals[e.key] = e.value
-                    new_value = rec.value if rec.value is not None else e.value
-                    if rec.value is not None and rec.value != e.value:
-                        changed_keys.add(e.key)
-                        baseline_by_row[idx] = e.value
-                        if rec.original is not None:
-                            original_values[e.key] = rec.original
-                        else:
-                            original_values[e.key] = e.value
-                    if new_value != e.value or rec.status != e.status:
-                        pf.entries[idx] = type(e)(
-                            e.key,
-                            new_value,
-                            rec.status,
-                            e.span,
-                            e.segments,
-                            e.gaps,
-                            e.raw,
-                            getattr(e, "key_hash", None),
-                        )
+        overlay = _workflow_apply_cache_overlay(
+            pf.entries,
+            self._cache_map,
+            hash_for_entry=lambda entry: self._hash_for_cache(entry, self._cache_map),
+        )
+        changed_keys = overlay.changed_keys
+        baseline_by_row = overlay.baseline_by_row
+        conflict_originals = overlay.conflict_originals
+        original_values = overlay.original_values
         self._current_pf = pf
         self._opened_files.add(path)
         if self._current_model:
@@ -2952,31 +2896,14 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self._report_parse_error(path, exc)
             return False
-        changed: dict[str, str] = {}
-        new_entries = []
-        for e in pf.entries:
-            h = self._hash_for_cache(e, cached)
-            rec = cached.get(h)
-            if rec is None:
-                new_entries.append(e)
-                continue
-            if rec.status != e.status:
-                e = type(e)(
-                    e.key,
-                    e.value,
-                    rec.status,
-                    e.span,
-                    e.segments,
-                    e.gaps,
-                    e.raw,
-                    getattr(e, "key_hash", None),
-                )
-            if rec.value is not None:
-                changed[e.key] = rec.value
-            new_entries.append(e)
-        pf.entries = new_entries
-        if changed:
-            save(pf, changed, encoding=encoding)
+        save_overlay = _workflow_apply_cache_for_write(
+            pf.entries,
+            cached,
+            hash_for_entry=lambda entry: self._hash_for_cache(entry, cached),
+        )
+        pf.entries = save_overlay.entries
+        if save_overlay.changed_values:
+            save(pf, save_overlay.changed_values, encoding=encoding)
         _write_status_cache(self._root, path, pf.entries, changed_keys=set())
         self.fs_model.set_dirty(path, False)
         return True
