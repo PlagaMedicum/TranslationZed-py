@@ -11,6 +11,12 @@ from .search import Match, SearchField, SearchRow, iter_matches
 
 
 @dataclass(frozen=True, slots=True)
+class ReplaceAllPlan:
+    total: int
+    counts: list[tuple[str, int]]
+
+
+@dataclass(frozen=True, slots=True)
 class SearchReplaceService:
     def search_across_files(
         self,
@@ -29,6 +35,38 @@ class SearchReplaceService:
             direction=direction,
             wrap=wrap,
             find_in_file=find_in_file,
+        )
+
+    def build_replace_all_plan(
+        self,
+        *,
+        files: list[Path],
+        current_file: Path | None,
+        display_name: Callable[[Path], str],
+        count_in_current: Callable[[], int | None],
+        count_in_file: Callable[[Path], int | None],
+    ) -> ReplaceAllPlan | None:
+        return build_replace_all_plan(
+            files=files,
+            current_file=current_file,
+            display_name=display_name,
+            count_in_current=count_in_current,
+            count_in_file=count_in_file,
+        )
+
+    def apply_replace_all(
+        self,
+        *,
+        files: list[Path],
+        current_file: Path | None,
+        apply_in_current: Callable[[], bool],
+        apply_in_file: Callable[[Path], bool],
+    ) -> bool:
+        return apply_replace_all(
+            files=files,
+            current_file=current_file,
+            apply_in_current=apply_in_current,
+            apply_in_file=apply_in_file,
         )
 
 
@@ -235,3 +273,43 @@ def search_across_files(
     if direction < 0 and anchor_row >= sys.maxsize:
         return None
     return find_in_file(anchor_path, fallback)
+
+
+def build_replace_all_plan(
+    *,
+    files: list[Path],
+    current_file: Path | None,
+    display_name: Callable[[Path], str],
+    count_in_current: Callable[[], int | None],
+    count_in_file: Callable[[Path], int | None],
+) -> ReplaceAllPlan | None:
+    total = 0
+    counts: list[tuple[str, int]] = []
+    for path in files:
+        if current_file and path == current_file:
+            file_count = count_in_current()
+        else:
+            file_count = count_in_file(path)
+        if file_count is None:
+            return None
+        total += file_count
+        if file_count:
+            counts.append((display_name(path), file_count))
+    return ReplaceAllPlan(total=total, counts=counts)
+
+
+def apply_replace_all(
+    *,
+    files: list[Path],
+    current_file: Path | None,
+    apply_in_current: Callable[[], bool],
+    apply_in_file: Callable[[Path], bool],
+) -> bool:
+    if current_file and current_file in files and not apply_in_current():
+        return False
+    for path in files:
+        if current_file and path == current_file:
+            continue
+        if not apply_in_file(path):
+            return False
+    return True

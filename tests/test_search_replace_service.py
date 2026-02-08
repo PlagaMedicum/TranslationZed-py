@@ -7,6 +7,8 @@ from translationzed_py.core.search import SearchField, SearchRow
 from translationzed_py.core.search_replace_service import (
     SearchReplaceService,
     anchor_row,
+    apply_replace_all,
+    build_replace_all_plan,
     fallback_row,
     find_match_in_rows,
     prioritize_current_file,
@@ -235,3 +237,52 @@ def test_search_replace_service_wraps_search_across_files() -> None:
         ),
     )
     assert match is not None and match.file == Path("a.txt")
+
+
+def test_build_replace_all_plan_aggregates_counts() -> None:
+    files = [Path("a.txt"), Path("b.txt"), Path("c.txt")]
+    plan = build_replace_all_plan(
+        files=files,
+        current_file=Path("b.txt"),
+        display_name=lambda path: path.stem,
+        count_in_current=lambda: 2,
+        count_in_file=lambda path: 1 if path != Path("c.txt") else 0,
+    )
+    assert plan is not None
+    assert plan.total == 3
+    assert plan.counts == [("a", 1), ("b", 2)]
+
+
+def test_apply_replace_all_runs_current_then_other_files() -> None:
+    files = [Path("a.txt"), Path("b.txt"), Path("c.txt")]
+    calls: list[str] = []
+
+    ok = apply_replace_all(
+        files=files,
+        current_file=Path("b.txt"),
+        apply_in_current=lambda: calls.append("current") is None or True,
+        apply_in_file=lambda path: calls.append(path.name) is None or True,
+    )
+
+    assert ok is True
+    assert calls == ["current", "a.txt", "c.txt"]
+
+
+def test_search_replace_service_wraps_replace_all_helpers() -> None:
+    service = SearchReplaceService()
+    files = [Path("a.txt")]
+    plan = service.build_replace_all_plan(
+        files=files,
+        current_file=Path("a.txt"),
+        display_name=lambda path: str(path),
+        count_in_current=lambda: 4,
+        count_in_file=lambda _path: 0,
+    )
+    assert plan is not None
+    assert plan.total == 4
+    assert service.apply_replace_all(
+        files=files,
+        current_file=Path("a.txt"),
+        apply_in_current=lambda: True,
+        apply_in_file=lambda _path: True,
+    )
