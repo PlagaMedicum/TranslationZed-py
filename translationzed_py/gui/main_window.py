@@ -1621,6 +1621,15 @@ class MainWindow(QMainWindow):
                         ]
                     )
                 )
+            if report.zero_segment_files:
+                parts.append(
+                    " ".join(
+                        [
+                            f"{len(report.zero_segment_files)} file(s) imported with 0 segments:",
+                            ", ".join(report.zero_segment_files[:3]),
+                        ]
+                    )
+                )
             if report.unresolved_files:
                 parts.append(
                     " ".join(
@@ -1632,7 +1641,10 @@ class MainWindow(QMainWindow):
                 )
             if report.failures:
                 parts.append(f"{len(report.failures)} file(s) failed.")
-            if report.failures or report.unresolved_files:
+            has_issues = bool(
+                report.failures or report.unresolved_files or report.zero_segment_files
+            )
+            if has_issues:
                 msg = QMessageBox(self)
                 msg.setIcon(QMessageBox.Warning)
                 msg.setWindowTitle("TM import sync")
@@ -1650,6 +1662,11 @@ class MainWindow(QMainWindow):
                         "Pending mapping:\n"
                         + "\n".join(f"- {name}" for name in report.unresolved_files)
                     )
+                if report.zero_segment_files:
+                    details.append(
+                        "Imported with 0 segments:\n"
+                        + "\n".join(f"- {name}" for name in report.zero_segment_files)
+                    )
                 if report.failures:
                     details.append("Failures:\n" + "\n".join(report.failures))
                 msg.setDetailedText("\n\n".join(details))
@@ -1665,7 +1682,16 @@ class MainWindow(QMainWindow):
                 )
                 msg.exec()
             elif show_summary and not parts:
-                QMessageBox.information(self, "TM import sync", "No TM files changed.")
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Information)
+                msg.setWindowTitle("TM import sync")
+                msg.setText("No TM files changed (already up to date).")
+                if report.checked_files:
+                    msg.setDetailedText(
+                        "Checked:\n"
+                        + "\n".join(f"- {name}" for name in report.checked_files)
+                    )
+                msg.exec()
 
     def _copy_tmx_to_import_dir(self, source: Path) -> Path:
         source = source.resolve()
@@ -2040,6 +2066,9 @@ class MainWindow(QMainWindow):
                         "tm_name": rec.tm_name,
                         "source_locale": rec.source_locale,
                         "target_locale": rec.target_locale,
+                        "source_locale_raw": rec.source_locale_raw,
+                        "target_locale_raw": rec.target_locale_raw,
+                        "segment_count": rec.segment_count,
                         "enabled": rec.enabled,
                         "status": rec.status,
                         "note": rec.note,

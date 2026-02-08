@@ -208,13 +208,33 @@ class PreferencesDialog(QDialog):
         tm_name = str(row.get("tm_name", "")).strip() or tm_path
         source_locale = str(row.get("source_locale", "")).strip().upper()
         target_locale = str(row.get("target_locale", "")).strip().upper()
+        source_locale_raw = str(row.get("source_locale_raw", "")).strip()
+        target_locale_raw = str(row.get("target_locale_raw", "")).strip()
+        try:
+            segment_count = max(0, int(row.get("segment_count", 0) or 0))
+        except (TypeError, ValueError):
+            segment_count = 0
         status = str(row.get("status", "")).strip() or "ready"
         enabled = bool(row.get("enabled", True))
         if source_locale and target_locale:
             locale_pair = f"{source_locale}->{target_locale}"
         else:
             locale_pair = "unmapped"
-        text = f"{tm_name} [{locale_pair}] ({status})"
+        raw_pair = ""
+        if source_locale_raw and target_locale_raw:
+            normalized_raw = (
+                source_locale_raw.upper().replace("_", "-"),
+                target_locale_raw.upper().replace("_", "-"),
+            )
+            normalized_pair = (
+                source_locale.upper().replace("_", "-"),
+                target_locale.upper().replace("_", "-"),
+            )
+            if normalized_raw != normalized_pair:
+                raw_pair = f" {{{source_locale_raw}->{target_locale_raw}}}"
+        text = f"{tm_name} [{locale_pair}{raw_pair}] ({status}, {segment_count} seg)"
+        if segment_count == 0:
+            text += " [WARNING: 0 segments]"
         item = QListWidgetItem(text, self._tm_list)
         item.setToolTip(tm_path)
         item.setData(_TM_PATH_ROLE, tm_path)

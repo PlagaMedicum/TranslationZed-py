@@ -11,6 +11,7 @@ from translationzed_py.core import preferences
 from translationzed_py.core.tm_store import TMMatch
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
+from translationzed_py.gui.preferences_dialog import PreferencesDialog
 
 
 def _make_project(tmp_path: Path) -> Path:
@@ -25,7 +26,14 @@ def _make_project(tmp_path: Path) -> Path:
     return root
 
 
-def _register_imported_tm(win: MainWindow, path: Path) -> None:
+def _register_imported_tm(
+    win: MainWindow,
+    path: Path,
+    *,
+    source_locale_raw: str = "",
+    target_locale_raw: str = "",
+    segment_count: int = 1,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("tmx", encoding="utf-8")
     assert win._ensure_tm_store()
@@ -35,6 +43,9 @@ def _register_imported_tm(win: MainWindow, path: Path) -> None:
         tm_name=path.stem,
         source_locale="EN",
         target_locale="BE",
+        source_locale_raw=source_locale_raw,
+        target_locale_raw=target_locale_raw,
+        segment_count=segment_count,
         mtime_ns=stat.st_mtime_ns,
         file_size=stat.st_size,
         enabled=True,
@@ -193,3 +204,45 @@ def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
         if isinstance(match, TMMatch):
             origins.append(match.origin)
     assert "import" in origins
+
+
+def test_preferences_tm_list_shows_segment_count_and_zero_warning(
+    tmp_path, qtbot, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    tm_path = root / ".tzp" / "tms" / "sample_meta.tmx"
+    _register_imported_tm(
+        win,
+        tm_path,
+        source_locale_raw="en-US",
+        target_locale_raw="be-BY",
+        segment_count=0,
+    )
+    tm_files = [
+        {
+            "tm_path": rec.tm_path,
+            "tm_name": rec.tm_name,
+            "source_locale": rec.source_locale,
+            "target_locale": rec.target_locale,
+            "source_locale_raw": rec.source_locale_raw,
+            "target_locale_raw": rec.target_locale_raw,
+            "segment_count": rec.segment_count,
+            "enabled": rec.enabled,
+            "status": rec.status,
+            "note": rec.note,
+        }
+        for rec in win._tm_store.list_import_files()
+    ]
+    dialog = PreferencesDialog(
+        {"tm_import_dir": str(root / ".tzp" / "tms")}, tm_files=tm_files
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog._tm_list.count() == 1
+    text = dialog._tm_list.item(0).text()
+    assert "0 seg" in text
+    assert "{en-US->be-BY}" in text
+    assert "WARNING: 0 segments" in text
