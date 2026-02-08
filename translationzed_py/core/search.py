@@ -28,6 +28,25 @@ class Match:
     row: int
 
 
+def _matches_literal(text: str, query: str) -> bool:
+    lowered = text.lower()
+    needle = query.lower()
+    if needle in lowered:
+        return True
+    parts = [part for part in needle.split() if part]
+    # Phrase composition mode: allow non-contiguous token matches in order,
+    # but only for meaningful multi-token queries.
+    if len(parts) < 2 or sum(len(part) for part in parts) < 4:
+        return False
+    pos = 0
+    for part in parts:
+        found = lowered.find(part, pos)
+        if found < 0:
+            return False
+        pos = found + len(part)
+    return True
+
+
 def iter_matches(
     rows: Iterable[SearchRow],
     query: str,
@@ -57,7 +76,7 @@ def iter_matches(
             if matcher.search(text):
                 yield Match(row.file, row.row)
         else:
-            if query in text.lower():
+            if _matches_literal(text, query):
                 yield Match(row.file, row.row)
 
 

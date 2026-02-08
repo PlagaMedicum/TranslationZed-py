@@ -19,3 +19,17 @@ def test_search_regex():
     ]
     matches = search(rows, r"KEY_\w+", SearchField.KEY, True)
     assert [m.row for m in matches] == [0, 1]
+
+
+def test_search_plain_composed_phrase_matches_non_contiguous_tokens():
+    rows = [
+        SearchRow(
+            Path("A.txt"),
+            0,
+            "KEY_ONE",
+            "<H1> COMBAT <BR> <TEXT> Mechanics section",
+            "",
+        ),
+    ]
+    matches = search(rows, "combat mechanics", SearchField.SOURCE, False)
+    assert [m.row for m in matches] == [0]
