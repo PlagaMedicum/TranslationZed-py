@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from translationzed_py.core import preferences
 from translationzed_py.core.preferences_service import (
+    PreferencesService,
     build_persist_payload,
     normalize_loaded_preferences,
     normalize_scope,
@@ -119,3 +121,68 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
     assert payload["__extras__"] == {"A": "1"}
     assert payload["default_root"] == "/default"
     assert payload["tm_import_dir"] == "/tm"
+
+
+def test_preferences_service_load_normalized_bootstraps_settings(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    service = PreferencesService()
+
+    loaded = service.load_normalized_preferences(
+        fallback_default_root="",
+        fallback_last_root=str(tmp_path),
+        default_tm_import_dir="/fallback/tm",
+        test_mode=False,
+    )
+
+    assert loaded.wrap_text is False
+    assert loaded.search_scope == "FILE"
+    assert (tmp_path / ".tzp" / "config" / "settings.env").exists()
+
+
+def test_preferences_service_persist_main_window_preferences(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    default_root = tmp_path / "project"
+    default_root.mkdir(parents=True)
+    service = PreferencesService()
+
+    service.persist_main_window_preferences(
+        prompt_write_on_exit=False,
+        wrap_text=True,
+        large_text_optimizations=True,
+        last_root=str(default_root),
+        last_locales=["BE", "RU"],
+        window_geometry="abc",
+        default_root=str(default_root),
+        tm_import_dir=str(tmp_path / ".tzp" / "imported_tms"),
+        search_scope="locale",
+        replace_scope="pool",
+        extras={"X": "1"},
+    )
+
+    saved = preferences.load(None)
+    assert saved["prompt_write_on_exit"] is False
+    assert saved["wrap_text"] is True
+    assert saved["default_root"] == str(default_root)
+    assert saved["search_scope"] == "LOCALE"
+    assert saved["replace_scope"] == "POOL"
+    assert saved["__extras__"]["X"] == "1"
+
+
+def test_preferences_service_resolve_startup_uses_saved_default(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    default_root = tmp_path / "workspace"
+    default_root.mkdir(parents=True)
+    service = PreferencesService()
+    service.persist_default_root(str(default_root))
+
+    startup = service.resolve_startup_root(project_root=None)
+
+    assert startup.root == default_root.resolve()
+    assert startup.default_root == str(default_root)
+    assert startup.requires_picker is False

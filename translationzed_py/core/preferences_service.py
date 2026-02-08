@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from .preferences import ensure_defaults as _ensure_preferences
+from .preferences import load as _load_preferences
+from .preferences import save as _save_preferences
 
 _VALID_SCOPES = {"FILE", "LOCALE", "POOL"}
 
@@ -28,6 +33,83 @@ class LoadedPreferences:
     tm_import_dir: str
     window_geometry: str
     patched_raw: dict[str, Any] | None
+
+
+@dataclass(frozen=True, slots=True)
+class PreferencesService:
+    def resolve_startup_root(self, *, project_root: str | None) -> StartupRootResolution:
+        prefs_global = _load_preferences(None)
+        return resolve_startup_root(
+            project_root=project_root,
+            saved_default_root=str(prefs_global.get("default_root", "")),
+        )
+
+    def persist_default_root(self, default_root: str) -> None:
+        raw = default_root.strip()
+        if not raw:
+            return
+        try:
+            prefs = _load_preferences(None)
+            prefs["default_root"] = raw
+            _save_preferences(prefs, None)
+        except Exception:
+            return
+
+    def load_normalized_preferences(
+        self,
+        *,
+        fallback_default_root: str,
+        fallback_last_root: str,
+        default_tm_import_dir: str,
+        test_mode: bool,
+        layout_reset_rev: str = "3",
+    ) -> LoadedPreferences:
+        _ensure_preferences(None)
+        raw = _load_preferences(None)
+        normalized = normalize_loaded_preferences(
+            raw,
+            fallback_default_root=fallback_default_root,
+            fallback_last_root=fallback_last_root,
+            default_tm_import_dir=default_tm_import_dir,
+            test_mode=test_mode,
+            layout_reset_rev=layout_reset_rev,
+        )
+        if normalized.patched_raw is not None:
+            with contextlib.suppress(Exception):
+                _save_preferences(normalized.patched_raw, None)
+        return normalized
+
+    def persist_main_window_preferences(
+        self,
+        *,
+        prompt_write_on_exit: bool,
+        wrap_text: bool,
+        large_text_optimizations: bool,
+        last_root: str,
+        last_locales: list[str],
+        window_geometry: str,
+        default_root: str,
+        tm_import_dir: str,
+        search_scope: str,
+        replace_scope: str,
+        extras: dict[str, str],
+    ) -> None:
+        prefs = build_persist_payload(
+            prompt_write_on_exit=prompt_write_on_exit,
+            wrap_text=wrap_text,
+            large_text_optimizations=large_text_optimizations,
+            last_root=last_root,
+            last_locales=last_locales,
+            window_geometry=window_geometry,
+            default_root=default_root,
+            tm_import_dir=tm_import_dir,
+            search_scope=search_scope,
+            replace_scope=replace_scope,
+            extras=extras,
+        )
+        with contextlib.suppress(Exception):
+            _save_preferences(prefs, None)
+        self.persist_default_root(default_root)
 
 
 def resolve_startup_root(

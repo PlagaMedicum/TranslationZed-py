@@ -96,20 +96,11 @@ from translationzed_py.core.file_workflow import (
     FileWorkflowService as _FileWorkflowService,
 )
 from translationzed_py.core.model import STATUS_ORDER, Status
-from translationzed_py.core.preferences import ensure_defaults as _ensure_preferences
-from translationzed_py.core.preferences import load as _load_preferences
-from translationzed_py.core.preferences import save as _save_preferences
 from translationzed_py.core.preferences_service import (
-    build_persist_payload as _prefs_build_persist_payload,
-)
-from translationzed_py.core.preferences_service import (
-    normalize_loaded_preferences as _prefs_normalize_loaded,
+    PreferencesService as _PreferencesService,
 )
 from translationzed_py.core.preferences_service import (
     normalize_scope as _prefs_normalize_scope,
-)
-from translationzed_py.core.preferences_service import (
-    resolve_startup_root as _prefs_resolve_startup_root,
 )
 from translationzed_py.core.project_session import (
     ProjectSessionService as _ProjectSessionService,
@@ -436,14 +427,12 @@ class MainWindow(QMainWindow):
         self._startup_aborted = False
         self._root = Path(".").resolve()
         self._default_root = ""
+        self._preferences_service = _PreferencesService()
         self._smoke = os.environ.get("TZP_SMOKE", "") == "1"
         self._test_mode = _in_test_mode()
         _patch_message_boxes_for_tests()
-        _ensure_preferences(None)
-        prefs_global = _load_preferences(None)
-        startup_root = _prefs_resolve_startup_root(
-            project_root=project_root,
-            saved_default_root=str(prefs_global.get("default_root", "")),
+        startup_root = self._preferences_service.resolve_startup_root(
+            project_root=project_root
         )
         if startup_root.root is not None:
             self._root = startup_root.root
@@ -457,9 +446,7 @@ class MainWindow(QMainWindow):
                 return
             self._root = Path(picked).resolve()
             self._default_root = str(self._root)
-            prefs_global["default_root"] = self._default_root
-            with contextlib.suppress(Exception):
-                _save_preferences(prefs_global, None)
+            self._preferences_service.persist_default_root(self._default_root)
         if not self._root.exists():
             QMessageBox.warning(self, "Invalid project root", str(self._root))
             self._startup_aborted = True
@@ -508,17 +495,12 @@ class MainWindow(QMainWindow):
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
             return
-        prefs = _load_preferences(None)
-        normalized_prefs = _prefs_normalize_loaded(
-            prefs,
+        normalized_prefs = self._preferences_service.load_normalized_preferences(
             fallback_default_root=self._default_root,
             fallback_last_root=str(self._root),
             default_tm_import_dir=str(self._default_tm_import_dir()),
             test_mode=self._test_mode,
         )
-        if normalized_prefs.patched_raw is not None:
-            with contextlib.suppress(Exception):
-                _save_preferences(normalized_prefs.patched_raw, None)
         self._prompt_write_on_exit = normalized_prefs.prompt_write_on_exit
         self._wrap_text_user = normalized_prefs.wrap_text
         self._wrap_text = self._wrap_text_user
@@ -4082,7 +4064,7 @@ class MainWindow(QMainWindow):
             geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
         except Exception:
             geometry = ""
-        prefs = _prefs_build_persist_payload(
+        self._preferences_service.persist_main_window_preferences(
             prompt_write_on_exit=self._prompt_write_on_exit,
             wrap_text=self._wrap_text_user,
             large_text_optimizations=self._large_text_optimizations,
@@ -4095,15 +4077,6 @@ class MainWindow(QMainWindow):
             replace_scope=self._replace_scope,
             extras=dict(self._prefs_extras),
         )
-        with contextlib.suppress(Exception):
-            _save_preferences(prefs, None)
-        if self._default_root:
-            try:
-                global_prefs = _load_preferences(None)
-                global_prefs["default_root"] = self._default_root
-                _save_preferences(global_prefs, None)
-            except Exception:
-                pass
 
     def _on_model_data_changed(self, top_left, bottom_right, roles=None) -> None:
         if not self._current_model:
