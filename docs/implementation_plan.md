@@ -409,6 +409,8 @@ A2 [✓] **Multi‑file search navigation (Next/Prev only)**
    - **Target**: on‑demand Next/Prev traversal across File/Locale/Pool; no results list.
    - **Navigation**: Prev/Next wraps across files; selection and row focus remain stable.
    - **Implemented**: scope‑aware Next/Prev navigation without a results list (on‑demand scans).
+   - **Implemented**: plain search supports phrase-composition matching (ordered non-contiguous query tokens),
+     which improves EN/source lookups when tags/markup split words.
 A3 [✓] **Replace‑all safety**
    - **Problem**: replace‑all across multiple files is high‑risk and currently lacks a clear safety gate.
    - **Impact**: accidental mass edits; undo is noisy and can span many files.
@@ -516,6 +518,8 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TM panel open triggers import-folder sync and immediate mapping dialogs; mapping dialog supports **Skip all for now**.
      - [✓] TM suggestions display TM source name (`tm_name`) so users can see where each match comes from.
      - [✓] TM source label fallback: use TM path when `tm_name` is missing.
+     - [✓] TM panel now shows full Source/Translation text for selected suggestion (not preview-only).
+     - [✓] TM minimum score default/floor raised to **50%** to suppress low-quality fuzzy noise.
      - [✓] Menu action to resolve pending imported TMs with manual locale mapping.
      - [✓] Imported TM visibility policy: only `ready + enabled` imports are considered in TM query results.
      - [✓] Preferences TM tab supports queued import, remove, and enable/disable per imported TM file.
