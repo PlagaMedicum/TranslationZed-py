@@ -117,3 +117,40 @@ def test_sync_import_folder_deletes_missing_import_files(tmp_path: Path) -> None
         == []
     )
     store.close()
+
+
+def test_sync_import_folder_reimports_ready_file_when_entries_missing(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    tmx_path = tm_dir / "pack_ru.tmx"
+    _write_tmx(tmx_path)
+    store = TMStore(root)
+    stat = tmx_path.stat()
+    store.upsert_import_file(
+        tm_path=str(tmx_path),
+        tm_name="pack_ru",
+        source_locale="EN",
+        target_locale="RU",
+        mtime_ns=stat.st_mtime_ns,
+        file_size=stat.st_size,
+        enabled=True,
+        status="ready",
+    )
+
+    report = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+
+    assert report.imported_segments == 1
+    assert store.query(
+        "Hello world",
+        source_locale="EN",
+        target_locale="RU",
+        origins=["import"],
+    )
+    store.close()

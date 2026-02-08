@@ -532,6 +532,8 @@ UNTOUCHED).
   - Imported rows are query-visible only when the import record is **enabled** and in **ready** state.
 - TMX import/export:
   - `core.tmx_io.iter_tmx_pairs` streams `<tu>`/`<tuv>` pairs for a **source+target locale**.
+  - TMX locale matching accepts BCP47-style region variants (e.g. `en-US` matches `EN`,
+    `be-BY` matches `BE`) to avoid zero-unit imports for region-tagged memories.
   - `core.tmx_io.write_tmx` exports current TM to TMX for a source+target locale pair.
   - `core.tm_import_sync.sync_import_folder` owns managed-folder sync decisions (new/changed/missing,
     pending mapping, error capture) without Qt dependencies.
@@ -540,6 +542,8 @@ UNTOUCHED).
   - Locale mapping for imported TMX is auto-detected when reliable; unresolved files trigger an
     immediate locale-mapping dialog when TM panel is opened, with **Skip all for now** support.
   - Pending/unresolved/error imported files are excluded from TM suggestions until resolved.
+  - A `ready` import record with zero import entries is treated as stale and re-imported
+    on next sync, so older failed/partial imports self-heal automatically.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
     new imports.
   - `core.tm_preferences` applies preference actions (queue-import copy, remove, enable/disable)

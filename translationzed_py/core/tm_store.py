@@ -612,6 +612,18 @@ class TMStore:
         )
         self._conn.commit()
 
+    def has_import_entries(self, tm_path: str) -> bool:
+        row = self._conn.execute(
+            """
+            SELECT 1
+            FROM tm_entries
+            WHERE origin = ? AND tm_path = ?
+            LIMIT 1
+            """,
+            (_IMPORT_ORIGIN, tm_path),
+        ).fetchone()
+        return row is not None
+
     def export_tmx(
         self,
         path: Path,

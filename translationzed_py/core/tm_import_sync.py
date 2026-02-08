@@ -59,7 +59,14 @@ def sync_import_folder(
         record = records.get(path)
         if pending_only and (record is None or record.status != "needs_mapping"):
             continue
-        if _is_up_to_date_ready(record, stat.st_mtime_ns, stat.st_size, pending_only):
+        has_entries = bool(record) and store.has_import_entries(str(path))
+        if _is_up_to_date_ready(
+            record,
+            stat.st_mtime_ns,
+            stat.st_size,
+            pending_only,
+            has_entries=has_entries,
+        ):
             continue
         try:
             langs = detect_tmx_languages(path)
@@ -136,7 +143,11 @@ def _is_up_to_date_ready(
     mtime_ns: int,
     file_size: int,
     pending_only: bool,
+    *,
+    has_entries: bool,
 ) -> bool:
     if pending_only or record is None or record.status != "ready":
+        return False
+    if not has_entries:
         return False
     return record.mtime_ns == mtime_ns and record.file_size == file_size

@@ -22,13 +22,23 @@ def _seg_text(elem: ET.Element | None) -> str:
     return "".join(elem.itertext())
 
 
+def _normalize_locale_tag(value: str) -> str:
+    return value.strip().lower().replace("_", "-")
+
+
+def _locale_base(value: str) -> str:
+    return value.split("-", 1)[0] if value else ""
+
+
 def iter_tmx_pairs(
     path: Path, source_locale: str, target_locale: str
 ) -> Iterator[tuple[str, str]]:
-    source_locale = source_locale.strip().lower()
-    target_locale = target_locale.strip().lower()
+    source_locale = _normalize_locale_tag(source_locale)
+    target_locale = _normalize_locale_tag(target_locale)
     if not source_locale or not target_locale:
         return
+    source_base = _locale_base(source_locale)
+    target_base = _locale_base(target_locale)
     for _event, elem in ET.iterparse(path, events=("end",)):
         if _local_name(elem.tag) != "tu":
             continue
@@ -37,18 +47,19 @@ def iter_tmx_pairs(
         for tuv in elem:
             if _local_name(tuv.tag) != "tuv":
                 continue
-            lang = _lang_value(tuv).lower()
+            lang = _normalize_locale_tag(_lang_value(tuv))
             if not lang:
                 continue
+            lang_base = _locale_base(lang)
             seg = None
             for child in tuv:
                 if _local_name(child.tag) == "seg":
                     seg = child
                     break
             text = _seg_text(seg)
-            if lang == source_locale:
+            if lang == source_locale or lang_base == source_base:
                 source_text = text
-            elif lang == target_locale:
+            elif lang == target_locale or lang_base == target_base:
                 target_text = text
         if source_text and target_text:
             yield source_text, target_text

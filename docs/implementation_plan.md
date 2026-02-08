@@ -516,6 +516,8 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TMX import now copies files into managed folder; drop-in `.tmx` files are discovered and synced.
      - [✓] Locale-pair safety for imported TMs: unresolved locale metadata is kept pending until mapped manually.
      - [✓] TM panel open triggers import-folder sync and immediate mapping dialogs; mapping dialog supports **Skip all for now**.
+     - [✓] TMX import locale matching accepts region variants (`en-US`/`be-BY` -> `EN`/`BE`) to prevent zero-segment imports from locale-tag mismatch.
+     - [✓] TM import sync auto-recovers `ready` records with missing import entries by forcing re-import on next sync.
      - [✓] TM suggestions display TM source name (`tm_name`) so users can see where each match comes from.
      - [✓] TM source label fallback: use TM path when `tm_name` is missing.
      - [✓] TM panel now shows full Source/Translation text for selected suggestion (not preview-only).
