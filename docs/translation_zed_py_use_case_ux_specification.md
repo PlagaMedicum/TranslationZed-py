@@ -398,7 +398,7 @@ UNTOUCHED ──────────────────────▶ 
 9. **Tooltips**: plain text only (no highlighting/selection), delayed ~900ms, truncated for large
    values (800 chars normally, 200 chars when length ≥5,000); preview‑only and avoids full
    decode for lazy values (app font to prevent oversized text).
-10. **Side panel (current)**: left‑side panel switches between **Files / Suggestions / Search**
+10. **Side panel (current)**: left‑side panel switches between **Files / TM / Search**
    and can be hidden/shown via a **left‑side toggle**; the detail editor pane is
    toggled from the **bottom bar**. TM panel includes filters (min score + origin
    toggles for project/import) and supports project‑TM rebuild from selected locales.

@@ -506,7 +506,7 @@ C1 [→] **Translation memory** (Step 29).
    - **Scope now**:
      - SQLite store under `.tzp/config/tm.sqlite` (project‑scoped).
      - TMX import/export (external TMs) for a **source+target locale pair** only.
-     - TM suggestions panel (side‑panel switcher: Files / Suggestions / Search).
+     - TM suggestions panel (side‑panel switcher: Files / TM / Search).
      - Ranking: exact match 100%, fuzzy down to ~5% (project TM outranks imported).
      - [✓] Non‑blocking TM suggestion lookup (background worker + stale result guard).
      - [✓] Test-safe TM UI teardown (no modal dialog deadlocks in pytest).

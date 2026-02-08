@@ -816,7 +816,7 @@ class MainWindow(QMainWindow):
         self._left_files_btn.setText("Files")
         self._left_files_btn.setCheckable(True)
         self._left_tm_btn = QToolButton(self)
-        self._left_tm_btn.setText("Suggestions")
+        self._left_tm_btn.setText("TM")
         self._left_tm_btn.setCheckable(True)
         self._left_search_btn = QToolButton(self)
         self._left_search_btn.setText("Search")
