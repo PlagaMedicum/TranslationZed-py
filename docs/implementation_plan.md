@@ -519,7 +519,7 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TM suggestions display TM source name (`tm_name`) so users can see where each match comes from.
      - [✓] TM source label fallback: use TM path when `tm_name` is missing.
      - [✓] TM panel now shows full Source/Translation text for selected suggestion (not preview-only).
-     - [✓] TM minimum score default/floor raised to **50%** to suppress low-quality fuzzy noise.
+     - [✓] TM minimum score default set to **50%** (user-adjustable from 30% to 100%).
      - [✓] Menu action to resolve pending imported TMs with manual locale mapping.
      - [✓] Imported TM visibility policy: only `ready + enabled` imports are considered in TM query results.
      - [✓] Preferences TM tab supports queued import, remove, and enable/disable per imported TM file.

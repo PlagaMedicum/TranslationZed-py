@@ -22,17 +22,20 @@ from PySide6.QtCore import (
     QItemSelectionModel,
     QModelIndex,
     QPoint,
+    QRegularExpression,
     Qt,
     QTimer,
     QUrl,
 )
 from PySide6.QtGui import (
     QAction,
+    QColor,
     QCursor,
     QDesktopServices,
     QGuiApplication,
     QIcon,
     QKeySequence,
+    QTextCharFormat,
     QTextOption,
 )
 from PySide6.QtWidgets import (
@@ -511,7 +514,7 @@ class MainWindow(QMainWindow):
         self._last_root = normalized_prefs.last_root
         self._prefs_extras = normalized_prefs.extras
         self._tm_min_score = _int_from_pref(
-            self._prefs_extras.get("TM_MIN_SCORE"), 50, min_value=50, max_value=100
+            self._prefs_extras.get("TM_MIN_SCORE"), 50, min_value=30, max_value=100
         )
         self._tm_origin_project = _bool_from_pref(
             self._prefs_extras.get("TM_ORIGIN_PROJECT"), True
@@ -861,7 +864,7 @@ class MainWindow(QMainWindow):
         tm_filter_row.setSpacing(6)
         tm_filter_row.addWidget(QLabel("Min score", self._tm_panel))
         self._tm_score_spin = QSpinBox(self._tm_panel)
-        self._tm_score_spin.setRange(50, 100)
+        self._tm_score_spin.setRange(30, 100)
         self._tm_score_spin.setValue(self._tm_min_score)
         self._tm_score_spin.setSuffix("%")
         self._tm_score_spin.valueChanged.connect(self._on_tm_filters_changed)
@@ -4128,9 +4131,58 @@ class MainWindow(QMainWindow):
         if match is None:
             self._tm_source_preview.clear()
             self._tm_target_preview.clear()
+            self._tm_source_preview.setExtraSelections([])
+            self._tm_target_preview.setExtraSelections([])
             return
         self._tm_source_preview.setPlainText(match.source_text)
         self._tm_target_preview.setPlainText(match.target_text)
+        terms = self._tm_query_terms()
+        self._highlight_tm_preview(self._tm_source_preview, terms)
+        self._highlight_tm_preview(self._tm_target_preview, terms)
+
+    def _tm_query_terms(self) -> list[str]:
+        lookup = self._current_tm_lookup()
+        if lookup is None:
+            return []
+        source_text, _locale = lookup
+        out: list[str] = []
+        for raw in re.split(r"\s+", source_text.lower()):
+            token = raw.strip(".,;:!?\"'()[]{}<>")
+            if len(token) < 2 or token in out:
+                continue
+            out.append(token)
+        return out
+
+    def _highlight_tm_preview(self, editor: QPlainTextEdit, terms: list[str]) -> None:
+        if not terms:
+            editor.setExtraSelections([])
+            return
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor(255, 235, 120, 170))
+        fmt.setForeground(QColor(0, 0, 0))
+        selections: list[QPlainTextEdit.ExtraSelection] = []
+        doc = editor.document()
+        max_hits = 200
+        for term in terms:
+            pattern = QRegularExpression(re.escape(term))
+            pattern.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
+            pos = 0
+            while True:
+                cursor = doc.find(pattern, pos)
+                if cursor.isNull():
+                    break
+                sel = QPlainTextEdit.ExtraSelection()
+                sel.cursor = cursor
+                sel.format = fmt
+                selections.append(sel)
+                if len(selections) >= max_hits:
+                    editor.setExtraSelections(selections)
+                    return
+                next_pos = cursor.selectionEnd()
+                if next_pos <= pos:
+                    next_pos = pos + 1
+                pos = next_pos
+        editor.setExtraSelections(selections)
 
     def _tm_query_policy(self) -> TMQueryPolicy:
         return TMQueryPolicy(

@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from .tm_store import TMMatch
 
-_MIN_SCORE = 50
+# UI/filters allow 30..100; app default is set at the GUI layer.
+_MIN_SCORE = 30
 _MAX_SCORE = 100
 
 TMQueryKey = tuple[str, str, str, int, bool, bool]

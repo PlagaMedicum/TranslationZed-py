@@ -4,6 +4,7 @@ from translationzed_py.core.tm_query import (
     filter_matches,
     has_enabled_origins,
     make_cache_key,
+    normalize_min_score,
     origins_for,
 )
 from translationzed_py.core.tm_store import TMMatch
@@ -47,3 +48,9 @@ def test_tm_query_origin_controls_and_filtering() -> None:
     assert len(filtered) == 1
     assert filtered[0].origin == "project"
     assert filtered[0].score == 100
+
+
+def test_tm_query_min_score_normalization_range() -> None:
+    assert normalize_min_score(10) == 30
+    assert normalize_min_score(50) == 50
+    assert normalize_min_score(200) == 100

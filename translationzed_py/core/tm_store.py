@@ -15,7 +15,8 @@ from .tmx_io import iter_tmx_pairs, write_tmx
 
 _PROJECT_ORIGIN = "project"
 _IMPORT_ORIGIN = "import"
-_MIN_FUZZY_SCORE = 50
+# Store query accepts 30..100 when explicitly requested; GUI default is 50.
+_MIN_FUZZY_SCORE = 30
 _MAX_FUZZY_CANDIDATES = 200
 _MAX_FUZZY_SOURCE_LEN = 5000
 _IMPORT_VISIBLE_SQL = """
