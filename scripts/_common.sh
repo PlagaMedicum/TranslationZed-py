@@ -39,6 +39,7 @@ PY
   case "$abs" in
     "$ROOT_DIR/tests/fixtures/"*)
       rm -rf "$abs/.tzp-config"
+      rm -rf "$abs/.tzp/config"
       ;;
   esac
 }

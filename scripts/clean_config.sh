@@ -6,5 +6,5 @@ FIXTURES_DIR="$ROOT_DIR/tests/fixtures"
 # Non-destructive by design: only fixture configs are reset.
 
 if [ -d "$FIXTURES_DIR" ]; then
-  find "$FIXTURES_DIR" -type d -name ".tzp-config" -prune -exec rm -rf {} +
+  find "$FIXTURES_DIR" -type d \( -path "*/.tzp/config" -o -name ".tzp-config" \) -prune -exec rm -rf {} +
 fi

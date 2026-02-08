@@ -19,7 +19,7 @@ conflict flow immediately.
    - If you keep **Original**, the entry is marked **For review**.
 
 Notes:
-- Cache file is pre-generated at `.tzp-cache/BE/ui.bin`.
+- Cache file is pre-generated at `.tzp/cache/BE/ui.bin`.
 - This fixture is UTF‑8 only.
 
 ## Additional encoding fixtures

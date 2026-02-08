@@ -12,4 +12,6 @@ while IFS= read -r cache_dir; do
       ;;
   esac
   rm -rf "$cache_dir"
-done < <(find "$ROOT_DIR" -type d -name ".tzp-cache" -prune)
+done < <(
+  find "$ROOT_DIR" -type d \( -path "*/.tzp/cache" -o -name ".tzp-cache" \) -prune
+)

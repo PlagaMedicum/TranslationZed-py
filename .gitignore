@@ -23,15 +23,19 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
+.tzp/
 .tzp-cache/
 .tzp-config/
 ProjectZomboidTranslations/
-!tests/fixtures/conflict_manual/.tzp-cache/
-!tests/fixtures/conflict_manual/.tzp-cache/**
-!tests/fixtures/conflict_manual_cp1251/.tzp-cache/
-!tests/fixtures/conflict_manual_cp1251/.tzp-cache/**
-!tests/fixtures/conflict_manual_utf16/.tzp-cache/
-!tests/fixtures/conflict_manual_utf16/.tzp-cache/**
+!tests/fixtures/conflict_manual/.tzp/
+!tests/fixtures/conflict_manual/.tzp/cache/
+!tests/fixtures/conflict_manual/.tzp/cache/**
+!tests/fixtures/conflict_manual_cp1251/.tzp/
+!tests/fixtures/conflict_manual_cp1251/.tzp/cache/
+!tests/fixtures/conflict_manual_cp1251/.tzp/cache/**
+!tests/fixtures/conflict_manual_utf16/.tzp/
+!tests/fixtures/conflict_manual_utf16/.tzp/cache/
+!tests/fixtures/conflict_manual_utf16/.tzp/cache/**
 
 # ─── Dev tool config ───────────────────────────────────────────────────────────
 .idea/
