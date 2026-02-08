@@ -6,6 +6,8 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QMessageBox
 
+from translationzed_py.core import preferences
+from translationzed_py.core.tm_store import TMMatch
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
 
@@ -73,3 +75,63 @@ def test_tm_preferences_delete_confirm_removes_file(tmp_path, qtbot, monkeypatch
 
     assert not tm_path.exists()
     assert all(rec.tm_path != str(tm_path) for rec in win._tm_store.list_import_files())
+
+
+def test_tm_min_score_spin_allows_five_and_changes_filter(tmp_path, qtbot, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    monkeypatch.setattr(win, "_persist_preferences", lambda: None)
+
+    assert win._tm_score_spin.minimum() == 5
+    assert win._tm_score_spin.maximum() == 100
+    assert win._tm_min_score == 50
+
+    matches = [
+        TMMatch(
+            source_text="s low",
+            target_text="t low",
+            score=10,
+            origin="project",
+            tm_name=None,
+            tm_path=None,
+            file_path=None,
+            key=None,
+            updated_at=1,
+        ),
+        TMMatch(
+            source_text="s high",
+            target_text="t high",
+            score=90,
+            origin="project",
+            tm_name=None,
+            tm_path=None,
+            file_path=None,
+            key=None,
+            updated_at=1,
+        ),
+    ]
+
+    win._show_tm_matches(matches)
+    assert win._tm_list.count() == 1
+
+    win._tm_score_spin.setValue(5)
+    assert win._tm_min_score == 5
+    assert win._prefs_extras["TM_MIN_SCORE"] == "5"
+
+    win._show_tm_matches(matches)
+    assert win._tm_list.count() == 2
+
+
+def test_tm_min_score_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    win._tm_score_spin.setValue(5)
+
+    saved = preferences.load(None)
+    extras = dict(saved.get("__extras__", {}))
+    assert extras.get("TM_MIN_SCORE") == "5"

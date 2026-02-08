@@ -51,6 +51,11 @@ def test_tm_query_origin_controls_and_filtering() -> None:
 
 
 def test_tm_query_min_score_normalization_range() -> None:
-    assert normalize_min_score(10) == 30
+    assert normalize_min_score(1) == 5
+    assert normalize_min_score(10) == 10
     assert normalize_min_score(50) == 50
     assert normalize_min_score(200) == 100
+
+
+def test_tm_query_default_min_score_is_precision_first() -> None:
+    assert TMQueryPolicy().min_score == 50

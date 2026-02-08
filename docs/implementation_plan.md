@@ -507,7 +507,7 @@ C1 [→] **Translation memory** (Step 29).
      - SQLite store under `.tzp/config/tm.sqlite` (project‑scoped).
      - TMX import/export (external TMs) for a **source+target locale pair** only.
      - TM suggestions panel (side‑panel switcher: Files / TM / Search).
-     - Ranking: exact match 100%, fuzzy down to ~30% (project TM outranks imported).
+     - Ranking: exact match 100%, fuzzy down to ~5% (project TM outranks imported).
      - [✓] Non‑blocking TM suggestion lookup (background worker + stale result guard).
      - [✓] Test-safe TM UI teardown (no modal dialog deadlocks in pytest).
      - [✓] Project‑TM rebuild/bootstrap for selected locales (menu action + auto‑bootstrap if empty, background worker).
@@ -519,7 +519,7 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TM suggestions display TM source name (`tm_name`) so users can see where each match comes from.
      - [✓] TM source label fallback: use TM path when `tm_name` is missing.
      - [✓] TM panel now shows full Source/Translation text for selected suggestion (not preview-only).
-     - [✓] TM minimum score default set to **50%** (user-adjustable from 30% to 100%).
+     - [✓] TM minimum score default set to **50%** (user-adjustable from 5% to 100%).
      - [✓] Menu action to resolve pending imported TMs with manual locale mapping.
      - [✓] Imported TM visibility policy: only `ready + enabled` imports are considered in TM query results.
      - [✓] Preferences TM tab supports queued import, remove, and enable/disable per imported TM file.

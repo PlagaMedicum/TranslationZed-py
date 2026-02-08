@@ -515,7 +515,7 @@ class MainWindow(QMainWindow):
         self._last_root = normalized_prefs.last_root
         self._prefs_extras = normalized_prefs.extras
         self._tm_min_score = _int_from_pref(
-            self._prefs_extras.get("TM_MIN_SCORE"), 50, min_value=30, max_value=100
+            self._prefs_extras.get("TM_MIN_SCORE"), 50, min_value=5, max_value=100
         )
         self._tm_origin_project = _bool_from_pref(
             self._prefs_extras.get("TM_ORIGIN_PROJECT"), True
@@ -865,7 +865,7 @@ class MainWindow(QMainWindow):
         tm_filter_row.setSpacing(6)
         tm_filter_row.addWidget(QLabel("Min score", self._tm_panel))
         self._tm_score_spin = QSpinBox(self._tm_panel)
-        self._tm_score_spin.setRange(30, 100)
+        self._tm_score_spin.setRange(5, 100)
         self._tm_score_spin.setValue(self._tm_min_score)
         self._tm_score_spin.setSuffix("%")
         self._tm_score_spin.valueChanged.connect(self._on_tm_filters_changed)

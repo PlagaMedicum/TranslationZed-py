@@ -295,7 +295,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  1 | SYS persists filter values in preferences. |
 |  2 | SYS re-runs/refines TM suggestions using active filters. |
 |  3 | SYS shows explicit states when filters exclude all matches. |
-| **Post-condition** | TM list reflects persisted filter policy and current row context. |
+| **Post-condition** | TM list reflects persisted filter policy and current row context. Minimum score supports 5..100 (default 50). |
 
 ### UC-13j  Manage Imported TMs in Preferences
 | **Trigger** | *General ▸ Preferences ▸ TM tab* |

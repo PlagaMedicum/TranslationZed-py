@@ -4,8 +4,9 @@ from dataclasses import dataclass
 
 from .tm_store import TMMatch
 
-# UI/filters allow 30..100; app default is set at the GUI layer.
-_MIN_SCORE = 30
+# TM filters allow broad recall (5..100) while keeping default precision at 50%.
+_MIN_SCORE = 5
+_DEFAULT_SCORE = 50
 _MAX_SCORE = 100
 
 TMQueryKey = tuple[str, str, str, int, bool, bool]
@@ -14,7 +15,7 @@ TMQueryKey = tuple[str, str, str, int, bool, bool]
 @dataclass(frozen=True, slots=True)
 class TMQueryPolicy:
     source_locale: str = "EN"
-    min_score: int = _MIN_SCORE
+    min_score: int = _DEFAULT_SCORE
     origin_project: bool = True
     origin_import: bool = True
     limit: int = 12

@@ -522,7 +522,7 @@ UNTOUCHED).
   - `core.tm_query` owns query-policy helpers (origin toggles, min-score normalization,
     cache-key construction, post-query filtering), used by GUI adapter.
   - Exact match returns score **100**.
-  - Fuzzy match uses `SequenceMatcher` on a bounded candidate set; keeps scores ≥30.
+  - Fuzzy match uses `SequenceMatcher` on a bounded candidate set; keeps scores at/above configured min score (5..100, default 50).
   - Project TM outranks imported TM.
   - TM suggestions include source name (`tm_name`); when missing, UI falls back to TM file path.
   - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.
