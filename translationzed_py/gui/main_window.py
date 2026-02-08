@@ -105,6 +105,12 @@ from translationzed_py.core.model import STATUS_ORDER, Status
 from translationzed_py.core.preferences import ensure_defaults as _ensure_preferences
 from translationzed_py.core.preferences import load as _load_preferences
 from translationzed_py.core.preferences import save as _save_preferences
+from translationzed_py.core.project_session import (
+    collect_draft_files as _session_collect_draft_files,
+)
+from translationzed_py.core.project_session import (
+    find_last_opened_file as _session_find_last_opened_file,
+)
 from translationzed_py.core.save_exit_flow import (
     apply_write_original_flow as _apply_write_original_flow,
 )
@@ -2745,49 +2751,24 @@ class MainWindow(QMainWindow):
         return dialog.choice()
 
     def _draft_files(self) -> list[Path]:
-        cache_root = self._root / self._app_config.cache_dir
-        if not cache_root.exists():
-            return []
-        files: list[Path] = []
-        for cache_path in cache_root.rglob(f"*{self._app_config.cache_ext}"):
-            try:
-                rel = cache_path.relative_to(cache_root)
-            except ValueError:
-                continue
-            original = (self._root / rel).with_suffix(self._app_config.translation_ext)
-            if not original.exists():
-                continue
-            if original not in self._opened_files:
-                continue
-            if _read_has_drafts_from_path(cache_path):
-                files.append(original)
-        return sorted(set(files))
+        return _session_collect_draft_files(
+            root=self._root,
+            cache_dir=self._app_config.cache_dir,
+            cache_ext=self._app_config.cache_ext,
+            translation_ext=self._app_config.translation_ext,
+            has_drafts=_read_has_drafts_from_path,
+            opened_files=self._opened_files,
+        )
 
     def _all_draft_files(self, locales: Iterable[str] | None = None) -> list[Path]:
-        cache_root = self._root / self._app_config.cache_dir
-        if not cache_root.exists():
-            return []
-        locale_list = [loc for loc in locales or [] if loc]
-        cache_dirs = (
-            [cache_root / loc for loc in locale_list] if locale_list else [cache_root]
+        return _session_collect_draft_files(
+            root=self._root,
+            cache_dir=self._app_config.cache_dir,
+            cache_ext=self._app_config.cache_ext,
+            translation_ext=self._app_config.translation_ext,
+            has_drafts=_read_has_drafts_from_path,
+            locales=locales,
         )
-        files: list[Path] = []
-        for cache_dir in cache_dirs:
-            if not cache_dir.exists():
-                continue
-            for cache_path in cache_dir.rglob(f"*{self._app_config.cache_ext}"):
-                try:
-                    rel = cache_path.relative_to(cache_root)
-                except ValueError:
-                    continue
-                original = (self._root / rel).with_suffix(
-                    self._app_config.translation_ext
-                )
-                if not original.exists():
-                    continue
-                if _read_has_drafts_from_path(cache_path):
-                    files.append(original)
-        return sorted(set(files))
 
     def _mark_cached_dirty(self) -> None:
         perf_trace = PERF_TRACE
@@ -2830,39 +2811,15 @@ class MainWindow(QMainWindow):
     def _auto_open_last_file(self) -> None:
         perf_trace = PERF_TRACE
         perf_start = perf_trace.start("auto_open")
-        scanned = 0
         try:
-            cache_root = self._root / self._app_config.cache_dir
-            if not cache_root.exists():
-                return
-            locale_dirs = [cache_root / loc for loc in self._selected_locales if loc]
-            if not locale_dirs:
-                return
-            best_ts = 0
-            best_path: Path | None = None
-            for cache_dir in locale_dirs:
-                if not cache_dir.exists():
-                    continue
-                for cache_path in cache_dir.rglob(f"*{self._app_config.cache_ext}"):
-                    scanned += 1
-                    ts = _read_last_opened_from_path(cache_path)
-                    if ts <= 0:
-                        continue
-                    try:
-                        rel = cache_path.relative_to(cache_root)
-                    except ValueError:
-                        continue
-                    original = (self._root / rel).with_suffix(
-                        self._app_config.translation_ext
-                    )
-                    if not original.exists():
-                        continue
-                    locale = self._locale_for_path(original)
-                    if locale not in self._selected_locales:
-                        continue
-                    if ts > best_ts:
-                        best_ts = ts
-                        best_path = original
+            best_path, scanned = _session_find_last_opened_file(
+                root=self._root,
+                cache_dir=self._app_config.cache_dir,
+                cache_ext=self._app_config.cache_ext,
+                translation_ext=self._app_config.translation_ext,
+                selected_locales=self._selected_locales,
+                read_last_opened=_read_last_opened_from_path,
+            )
             if not best_path:
                 return
             index = self.fs_model.index_for_path(best_path)
