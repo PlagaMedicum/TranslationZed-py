@@ -597,6 +597,13 @@ class MainWindow(QMainWindow):
         self.tree_toggle.toggled.connect(self._toggle_tree_panel)
         self.toolbar.addWidget(self.tree_toggle)
         self.toolbar.addSeparator()
+        self.tm_rebuild_btn = QToolButton(self)
+        self.tm_rebuild_btn.setText("Rebuild TM")
+        self.tm_rebuild_btn.setAutoRaise(True)
+        self.tm_rebuild_btn.setToolTip("Rebuild project TM for selected locales")
+        self.tm_rebuild_btn.clicked.connect(self._rebuild_tm_selected)
+        self.toolbar.addWidget(self.tm_rebuild_btn)
+        self.toolbar.addSeparator()
         status_label = QLabel("Status:", self)
         status_label.setContentsMargins(0, 0, 4, 0)
         self.toolbar.addWidget(status_label)
@@ -809,7 +816,7 @@ class MainWindow(QMainWindow):
         self._left_files_btn.setText("Files")
         self._left_files_btn.setCheckable(True)
         self._left_tm_btn = QToolButton(self)
-        self._left_tm_btn.setText("TM")
+        self._left_tm_btn.setText("Suggestions")
         self._left_tm_btn.setCheckable(True)
         self._left_search_btn = QToolButton(self)
         self._left_search_btn.setText("Search")
@@ -1605,8 +1612,15 @@ class MainWindow(QMainWindow):
                 self._schedule_tm_update()
         if interactive:
             parts = []
-            if report.imported_segments:
-                parts.append(f"Imported {report.imported_segments} segment(s).")
+            if report.imported_files:
+                parts.append(
+                    " ".join(
+                        [
+                            f"Imported {len(report.imported_files)} file(s),",
+                            f"{report.imported_segments} segment(s).",
+                        ]
+                    )
+                )
             if report.unresolved_files:
                 parts.append(
                     " ".join(
@@ -1622,8 +1636,15 @@ class MainWindow(QMainWindow):
                 msg = QMessageBox(self)
                 msg.setIcon(QMessageBox.Warning)
                 msg.setWindowTitle("TM import sync")
-                msg.setText(" ".join(parts))
+                msg.setText(
+                    " ".join(parts) if parts else "TM import sync finished with issues."
+                )
                 details = []
+                if report.imported_files:
+                    details.append(
+                        "Imported:\n"
+                        + "\n".join(f"- {name}" for name in report.imported_files)
+                    )
                 if report.unresolved_files:
                     details.append(
                         "Pending mapping:\n"
@@ -1633,8 +1654,16 @@ class MainWindow(QMainWindow):
                     details.append("Failures:\n" + "\n".join(report.failures))
                 msg.setDetailedText("\n\n".join(details))
                 msg.exec()
-            elif show_summary and report.imported_segments:
-                QMessageBox.information(self, "TM import sync", " ".join(parts))
+            elif show_summary and report.imported_files:
+                msg = QMessageBox(self)
+                msg.setIcon(QMessageBox.Information)
+                msg.setWindowTitle("TM import sync")
+                msg.setText(" ".join(parts))
+                msg.setDetailedText(
+                    "Imported:\n"
+                    + "\n".join(f"- {name}" for name in report.imported_files)
+                )
+                msg.exec()
             elif show_summary and not parts:
                 QMessageBox.information(self, "TM import sync", "No TM files changed.")
 

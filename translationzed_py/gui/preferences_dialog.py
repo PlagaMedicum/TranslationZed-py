@@ -50,7 +50,7 @@ class PreferencesDialog(QDialog):
 
         tabs = QTabWidget(self)
         tabs.addTab(self._build_general_tab(), "General")
-        tabs.addTab(self._build_search_tab(), "Search & Replace")
+        tabs.addTab(self._build_search_tab(), "Search / Replace")
         tabs.addTab(self._build_tm_tab(), "TM")
         tabs.addTab(self._build_view_tab(), "View")
 

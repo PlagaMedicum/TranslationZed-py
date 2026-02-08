@@ -45,6 +45,7 @@ def test_sync_import_folder_imports_and_reports_changed(tmp_path: Path) -> None:
     )
 
     assert report.imported_segments == 1
+    assert report.imported_files == ("pack_ru.tmx (1 segment(s))",)
     assert report.changed is True
     assert report.unresolved_files == ()
     assert report.failures == ()
@@ -75,6 +76,7 @@ def test_sync_import_folder_skip_all_marks_remaining_unresolved(tmp_path: Path) 
     assert calls["count"] == 1
     assert sorted(report.unresolved_files) == ["one.tmx", "two.tmx"]
     assert report.imported_segments == 0
+    assert report.imported_files == ()
     records = store.list_import_files()
     assert len(records) == 2
     assert all(rec.status == "needs_mapping" for rec in records)

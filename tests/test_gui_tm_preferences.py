@@ -4,6 +4,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
 from translationzed_py.core import preferences
@@ -135,3 +136,60 @@ def test_tm_min_score_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
     saved = preferences.load(None)
     extras = dict(saved.get("__extras__", {}))
     assert extras.get("TM_MIN_SCORE") == "5"
+
+
+def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    (root / "EN" / "ui.txt").write_text('UI_KEY = "Hello world"\n', encoding="utf-8")
+    (root / "BE" / "ui.txt").write_text('UI_KEY = ""\n', encoding="utf-8")
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    assert win._ensure_tm_store()
+
+    tm_path = root / ".tzp" / "imported_tms" / "sample_import.tmx"
+    tm_path.parent.mkdir(parents=True, exist_ok=True)
+    tm_path.write_text("tmx", encoding="utf-8")
+    win._tm_store.insert_import_pairs(
+        [("Hello world", "Hello from import")],
+        source_locale="EN",
+        target_locale="BE",
+        tm_name="sample_import",
+        tm_path=str(tm_path),
+    )
+    stat = tm_path.stat()
+    win._tm_store.upsert_import_file(
+        tm_path=str(tm_path),
+        tm_name="sample_import",
+        source_locale="EN",
+        target_locale="BE",
+        mtime_ns=stat.st_mtime_ns,
+        file_size=stat.st_size,
+        enabled=True,
+        status="ready",
+    )
+
+    ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    model = win.table.model()
+    win.table.setCurrentIndex(model.index(0, 2))
+    lookup = win._current_tm_lookup()
+    assert lookup is not None
+    source_text, target_locale = lookup
+    matches = win._tm_store.query(
+        source_text,
+        source_locale=win._tm_source_locale,
+        target_locale=target_locale,
+        limit=12,
+        min_score=win._tm_min_score,
+        origins=("project", "import"),
+    )
+    win._show_tm_matches(matches)
+    assert win._tm_list.count() > 0
+    origins = []
+    for i in range(win._tm_list.count()):
+        item = win._tm_list.item(i)
+        match = item.data(Qt.UserRole)
+        if isinstance(match, TMMatch):
+            origins.append(match.origin)
+    assert "import" in origins

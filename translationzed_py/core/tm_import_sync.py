@@ -13,6 +13,7 @@ LocaleResolver = Callable[[Path, set[str]], tuple[tuple[str, str] | None, bool]]
 @dataclass(frozen=True, slots=True)
 class TMImportSyncReport:
     imported_segments: int
+    imported_files: tuple[str, ...]
     unresolved_files: tuple[str, ...]
     failures: tuple[str, ...]
     changed: bool
@@ -49,6 +50,7 @@ def sync_import_folder(
                 changed = True
 
     imported = 0
+    imported_files: list[str] = []
     unresolved: list[str] = []
     failures: list[str] = []
     skip_remaining_mappings = False
@@ -98,12 +100,14 @@ def sync_import_folder(
             continue
         source_locale, target_locale = pair
         try:
-            imported += store.replace_import_tmx(
+            count = store.replace_import_tmx(
                 path,
                 source_locale=source_locale,
                 target_locale=target_locale,
                 tm_name=path.stem,
             )
+            imported += count
+            imported_files.append(f"{path.name} ({count} segment(s))")
             changed = True
         except Exception as exc:
             failures.append(f"{path.name}: {exc}")
@@ -120,6 +124,7 @@ def sync_import_folder(
 
     return TMImportSyncReport(
         imported_segments=imported,
+        imported_files=tuple(imported_files),
         unresolved_files=tuple(unresolved),
         failures=tuple(failures),
         changed=changed,
