@@ -119,6 +119,47 @@ def test_tm_store_tagged_query_matches_phrase_candidate(tmp_path: Path) -> None:
     store.close()
 
 
+def test_tm_store_fuzzy_prefix_lookup_finds_neighboring_strings(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k_run", "Official: Run", "Run tr"),
+            ("k_rest", "Official: Rest", "Rest tr"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+        updated_at=1,
+    )
+    noisy = [
+        (f"noise_{i}", f"Random token {i:03d}", f"noise tr {i:03d}") for i in range(350)
+    ]
+    store.upsert_project_entries(
+        noisy,
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+        updated_at=2,
+    )
+
+    fuzzy = store.query(
+        "Official: Rest",
+        source_locale="EN",
+        target_locale="BE",
+        limit=10,
+        min_score=30,
+    )
+
+    run = next((m for m in fuzzy if m.source_text == "Official: Run"), None)
+    assert run is not None
+    assert run.score >= 80
+    store.close()
+
+
 def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()

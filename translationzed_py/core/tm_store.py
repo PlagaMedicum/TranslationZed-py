@@ -818,7 +818,8 @@ class TMStore:
         else:
             origin_clause = "origin IN (?, ?)"
             origin_params = (origin_list[0], origin_list[1])
-        prefix = _prefix(norm, 6)
+        # Keep lookup prefix length aligned with stored/indexed source_prefix.
+        prefix = _prefix(norm)
         length = len(norm)
         min_len = max(1, int(length * 0.6))
         max_len = int(length * 1.4) if length > 5 else length + 10
