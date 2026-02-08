@@ -153,10 +153,92 @@ def test_tm_store_fuzzy_prefix_lookup_finds_neighboring_strings(tmp_path: Path) 
         limit=10,
         min_score=30,
     )
+    strict = store.query(
+        "Official: Rest",
+        source_locale="EN",
+        target_locale="BE",
+        limit=10,
+        min_score=90,
+    )
 
     run = next((m for m in fuzzy if m.source_text == "Official: Run"), None)
     assert run is not None
     assert run.score >= 80
+    assert all(match.source_text != "Official: Run" for match in strict)
+    store.close()
+
+
+def test_tm_store_keeps_fuzzy_neighbors_when_exact_pool_is_large(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [("k_run", "Official: Run", "Run tr"), ("k_rest", "Official: Rest", "Rest tr")],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+        updated_at=1,
+    )
+    for i in range(20):
+        store.insert_import_pairs(
+            [("Official: Rest", f"Imported rest {i}")],
+            source_locale="EN",
+            target_locale="BE",
+            tm_name=f"tm_{i}",
+            tm_path=str(root / ".tzp" / "tms" / f"tm_{i}.tmx"),
+            updated_at=2 + i,
+        )
+
+    fuzzy = store.query(
+        "Official: Rest",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=30,
+    )
+
+    assert any(match.source_text == "Official: Run" for match in fuzzy)
+    store.close()
+
+
+def test_tm_store_fuzzy_prefix_lookup_handles_dense_prefix_sets(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [("k_run", "Official: Run", "Run tr"), ("k_rest", "Official: Rest", "Rest tr")],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+        updated_at=1,
+    )
+    noisy = [
+        (f"noise_{i}", f"Official: Token {i:04d}", f"Noise tr {i:04d}")
+        for i in range(1500)
+    ]
+    store.upsert_project_entries(
+        noisy,
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+        updated_at=3,
+    )
+
+    fuzzy = store.query(
+        "Official: Rest",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=30,
+    )
+
+    assert any(match.source_text == "Official: Run" for match in fuzzy)
     store.close()
 
 
@@ -190,6 +272,8 @@ def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
         tmx_path,
         source_locale="EN",
         target_locale="RU",
+        source_locale_raw="en-US",
+        target_locale_raw="ru-RU",
         tm_name="pack_ru",
     )
     assert count == 1
@@ -197,6 +281,9 @@ def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
     assert records
     assert records[0].tm_name == "pack_ru"
     assert records[0].target_locale == "RU"
+    assert records[0].source_locale_raw == "en-US"
+    assert records[0].target_locale_raw == "ru-RU"
+    assert records[0].segment_count == 1
     matches = store.query(
         "Hello world",
         source_locale="EN",

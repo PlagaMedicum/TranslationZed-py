@@ -17,7 +17,8 @@ _PROJECT_ORIGIN = "project"
 _IMPORT_ORIGIN = "import"
 # Store query accepts 5..100 when explicitly requested; GUI default is 50.
 _MIN_FUZZY_SCORE = 5
-_MAX_FUZZY_CANDIDATES = 200
+_MAX_FUZZY_CANDIDATES = 1200
+_FUZZY_RESERVED_SLOTS = 3
 _MAX_FUZZY_SOURCE_LEN = 5000
 _IMPORT_VISIBLE_SQL = """
 origin != 'import'
@@ -55,6 +56,9 @@ class TMImportFile:
     tm_name: str
     source_locale: str
     target_locale: str
+    source_locale_raw: str
+    target_locale_raw: str
+    segment_count: int
     mtime_ns: int
     file_size: int
     enabled: bool
@@ -223,6 +227,9 @@ class TMStore:
                 tm_name TEXT NOT NULL,
                 source_locale TEXT,
                 target_locale TEXT,
+                source_locale_raw TEXT NOT NULL DEFAULT '',
+                target_locale_raw TEXT NOT NULL DEFAULT '',
+                segment_count INTEGER NOT NULL DEFAULT 0,
                 mtime_ns INTEGER NOT NULL,
                 file_size INTEGER NOT NULL,
                 enabled INTEGER NOT NULL DEFAULT 1,
@@ -295,6 +302,18 @@ class TMStore:
         if "enabled" not in cols:
             self._conn.execute(
                 "ALTER TABLE tm_import_files ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"
+            )
+        if "source_locale_raw" not in cols:
+            self._conn.execute(
+                "ALTER TABLE tm_import_files ADD COLUMN source_locale_raw TEXT NOT NULL DEFAULT ''"
+            )
+        if "target_locale_raw" not in cols:
+            self._conn.execute(
+                "ALTER TABLE tm_import_files ADD COLUMN target_locale_raw TEXT NOT NULL DEFAULT ''"
+            )
+        if "segment_count" not in cols:
+            self._conn.execute(
+                "ALTER TABLE tm_import_files ADD COLUMN segment_count INTEGER NOT NULL DEFAULT 0"
             )
 
     def upsert_project_entries(
@@ -451,6 +470,8 @@ class TMStore:
         *,
         source_locale: str,
         target_locale: str,
+        source_locale_raw: str = "",
+        target_locale_raw: str = "",
         tm_name: str | None = None,
     ) -> int:
         source_locale = _normalize_locale(source_locale)
@@ -487,6 +508,9 @@ class TMStore:
             tm_name=name,
             source_locale=source_locale,
             target_locale=target_locale,
+            source_locale_raw=source_locale_raw.strip(),
+            target_locale_raw=target_locale_raw.strip(),
+            segment_count=count,
             mtime_ns=path.stat().st_mtime_ns,
             file_size=path.stat().st_size,
             enabled=enabled,
@@ -503,6 +527,9 @@ class TMStore:
                 tm_name,
                 COALESCE(source_locale, '') AS source_locale,
                 COALESCE(target_locale, '') AS target_locale,
+                COALESCE(source_locale_raw, '') AS source_locale_raw,
+                COALESCE(target_locale_raw, '') AS target_locale_raw,
+                COALESCE(segment_count, 0) AS segment_count,
                 mtime_ns,
                 file_size,
                 enabled,
@@ -519,6 +546,9 @@ class TMStore:
                 tm_name=row["tm_name"],
                 source_locale=row["source_locale"],
                 target_locale=row["target_locale"],
+                source_locale_raw=row["source_locale_raw"],
+                target_locale_raw=row["target_locale_raw"],
+                segment_count=int(row["segment_count"]),
                 mtime_ns=int(row["mtime_ns"]),
                 file_size=int(row["file_size"]),
                 enabled=bool(row["enabled"]),
@@ -536,6 +566,9 @@ class TMStore:
         tm_name: str,
         source_locale: str = "",
         target_locale: str = "",
+        source_locale_raw: str = "",
+        target_locale_raw: str = "",
+        segment_count: int = 0,
         mtime_ns: int,
         file_size: int,
         enabled: bool = True,
@@ -551,17 +584,23 @@ class TMStore:
                 tm_name,
                 source_locale,
                 target_locale,
+                source_locale_raw,
+                target_locale_raw,
+                segment_count,
                 mtime_ns,
                 file_size,
                 enabled,
                 status,
                 note,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(tm_path) DO UPDATE SET
                 tm_name=excluded.tm_name,
                 source_locale=excluded.source_locale,
                 target_locale=excluded.target_locale,
+                source_locale_raw=excluded.source_locale_raw,
+                target_locale_raw=excluded.target_locale_raw,
+                segment_count=excluded.segment_count,
                 mtime_ns=excluded.mtime_ns,
                 file_size=excluded.file_size,
                 enabled=excluded.enabled,
@@ -574,6 +613,9 @@ class TMStore:
                 tm_name,
                 _normalize_locale(source_locale) if source_locale else "",
                 _normalize_locale(target_locale) if target_locale else "",
+                source_locale_raw.strip(),
+                target_locale_raw.strip(),
+                max(0, int(segment_count)),
                 int(mtime_ns),
                 int(file_size),
                 1 if enabled else 0,
@@ -746,6 +788,7 @@ class TMStore:
         ).fetchall()
         matches: list[TMMatch] = []
         seen: set[tuple[str, str, str, str | None]] = set()
+        max_exact = max(1, limit - _FUZZY_RESERVED_SLOTS)
         for row in exact_rows:
             key = (
                 row["source_text"],
@@ -769,8 +812,8 @@ class TMStore:
                     updated_at=row["updated_at"],
                 )
             )
-            if len(matches) >= limit:
-                return matches
+            if len(matches) >= max_exact:
+                break
         if len(norm) > _MAX_FUZZY_SOURCE_LEN:
             return matches
         candidates = cls._fuzzy_candidates(
@@ -781,6 +824,8 @@ class TMStore:
             origin_list,
         )
         for cand, score in candidates:
+            if cand["source_norm"] == norm:
+                continue
             key = (
                 cand["source_text"],
                 cand["target_text"],

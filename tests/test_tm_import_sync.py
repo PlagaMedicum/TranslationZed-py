@@ -48,7 +48,9 @@ def test_sync_import_folder_imports_and_reports_changed(tmp_path: Path) -> None:
     assert report.imported_files == ("pack_ru.tmx (1 segment(s))",)
     assert report.changed is True
     assert report.unresolved_files == ()
+    assert report.zero_segment_files == ()
     assert report.failures == ()
+    assert report.checked_files == ("pack_ru.tmx",)
     assert store.query(
         "Hello world",
         source_locale="EN",
@@ -77,6 +79,7 @@ def test_sync_import_folder_skip_all_marks_remaining_unresolved(tmp_path: Path) 
     assert sorted(report.unresolved_files) == ["one.tmx", "two.tmx"]
     assert report.imported_segments == 0
     assert report.imported_files == ()
+    assert report.zero_segment_files == ()
     records = store.list_import_files()
     assert len(records) == 2
     assert all(rec.status == "needs_mapping" for rec in records)
@@ -147,10 +150,40 @@ def test_sync_import_folder_reimports_ready_file_when_entries_missing(
     )
 
     assert report.imported_segments == 1
+    assert report.zero_segment_files == ()
     assert store.query(
         "Hello world",
         source_locale="EN",
         target_locale="RU",
         origins=["import"],
     )
+    store.close()
+
+
+def test_sync_import_folder_reports_zero_segment_imports_and_raw_locales(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    tmx_path = tm_dir / "pack_region.tmx"
+    _write_tmx(tmx_path, source_lang="en-US", target_lang="be-BY")
+    store = TMStore(root)
+
+    report = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+
+    assert report.imported_segments == 0
+    assert report.imported_files == ("pack_region.tmx (0 segment(s))",)
+    assert report.zero_segment_files == ("pack_region.tmx",)
+    records = store.list_import_files()
+    assert len(records) == 1
+    assert records[0].source_locale == "EN"
+    assert records[0].target_locale == "RU"
+    assert records[0].source_locale_raw == "en-US"
+    assert records[0].target_locale_raw == "be-BY"
+    assert records[0].segment_count == 0
     store.close()
