@@ -1,11 +1,9 @@
 # ─── Configurable vars ────────────────────────────────────────────────────────
 PY      ?= python            # override on CLI:  make PY=python3.12 venv
-PIP     ?= $(PY) -m pip
 VENV    ?= .venv
-VENV_ACT = . $(VENV)/bin/activate &&
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt lint typecheck test check verify run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win
+.PHONY: venv install precommit fmt lint typecheck test check verify verify-core verify-fast run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win
 
 ## create .venv and populate dev deps (one-off)
 venv:
@@ -34,8 +32,14 @@ test:
 ## run all quality gates
 check: fmt lint typecheck test
 
-## pre-commit verification (cleans caches + runs full checks + perf scenarios)
-verify: clean-cache clean-config check perf-scenarios
+## pre-commit core verification (clean fixtures + full quality gates)
+verify-core: clean-cache clean-config check
+
+## fastest full developer gate (no cache/config cleanup, no perf scenarios)
+verify-fast: check
+
+## full verification (core gate + perf scenarios)
+verify: verify-core perf-scenarios
 
 ## run perf scenarios against fixture translation files
 perf-scenarios:
