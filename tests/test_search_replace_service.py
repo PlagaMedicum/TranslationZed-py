@@ -5,6 +5,7 @@ from pathlib import Path
 
 from translationzed_py.core.search import SearchField, SearchRow
 from translationzed_py.core.search_replace_service import (
+    SearchReplaceService,
     anchor_row,
     fallback_row,
     find_match_in_rows,
@@ -12,6 +13,7 @@ from translationzed_py.core.search_replace_service import (
     replace_text,
     scope_files,
     scope_label,
+    search_across_files,
     search_spec_for_column,
 )
 
@@ -179,3 +181,57 @@ def test_replace_text_handles_regex_groups_and_empty_match_case() -> None:
     )
     assert changed is True
     assert text == "Xabc"
+
+
+def test_search_across_files_honors_direction_and_wrap() -> None:
+    files = [Path("a.txt"), Path("b.txt"), Path("c.txt")]
+    calls: list[tuple[Path, int]] = []
+
+    def finder(path: Path, start_row: int):
+        calls.append((path, start_row))
+        if path == Path("b.txt") and start_row == 9:
+            return None
+        if path == Path("c.txt") and start_row == -1:
+            return SearchRow(path, 2, "K", "", "match")
+        return None
+
+    match = search_across_files(
+        files=files,
+        anchor_path=Path("b.txt"),
+        anchor_row=9,
+        direction=1,
+        wrap=True,
+        find_in_file=finder,
+    )
+
+    assert match is not None and match.file == Path("c.txt") and match.row == 2
+    assert calls[:2] == [(Path("b.txt"), 9), (Path("a.txt"), -1)]
+
+
+def test_search_across_files_no_wrap_returns_none() -> None:
+    files = [Path("a.txt"), Path("b.txt")]
+    match = search_across_files(
+        files=files,
+        anchor_path=Path("a.txt"),
+        anchor_row=3,
+        direction=1,
+        wrap=False,
+        find_in_file=lambda _path, _row: None,
+    )
+    assert match is None
+
+
+def test_search_replace_service_wraps_search_across_files() -> None:
+    service = SearchReplaceService()
+    files = [Path("a.txt"), Path("b.txt")]
+    match = service.search_across_files(
+        files=files,
+        anchor_path=Path("x.txt"),
+        anchor_row=-1,
+        direction=1,
+        wrap=True,
+        find_in_file=lambda path, _row: (
+            SearchRow(path, 1, "K", "", "m") if path == Path("a.txt") else None
+        ),
+    )
+    assert match is not None and match.file == Path("a.txt")

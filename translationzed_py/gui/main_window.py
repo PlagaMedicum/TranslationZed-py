@@ -124,10 +124,7 @@ from translationzed_py.core.preferences_service import (
     resolve_startup_root as _prefs_resolve_startup_root,
 )
 from translationzed_py.core.project_session import (
-    collect_draft_files as _session_collect_draft_files,
-)
-from translationzed_py.core.project_session import (
-    find_last_opened_file as _session_find_last_opened_file,
+    ProjectSessionService as _ProjectSessionService,
 )
 from translationzed_py.core.save_exit_flow import (
     apply_write_original_flow as _apply_write_original_flow,
@@ -140,10 +137,10 @@ from translationzed_py.core.search import Match as _SearchMatch
 from translationzed_py.core.search import SearchField as _SearchField
 from translationzed_py.core.search import SearchRow as _SearchRow
 from translationzed_py.core.search_replace_service import (
-    anchor_row as _sr_anchor_row,
+    SearchReplaceService as _SearchReplaceService,
 )
 from translationzed_py.core.search_replace_service import (
-    fallback_row as _sr_fallback_row,
+    anchor_row as _sr_anchor_row,
 )
 from translationzed_py.core.search_replace_service import (
     find_match_in_rows as _sr_find_match_in_rows,
@@ -484,6 +481,14 @@ class MainWindow(QMainWindow):
         self._selected_locales: list[str] = []
         self._current_encoding = "utf-8"
         self._app_config = _load_app_config(self._root)
+        self._project_session_service = _ProjectSessionService(
+            cache_dir=self._app_config.cache_dir,
+            cache_ext=self._app_config.cache_ext,
+            translation_ext=self._app_config.translation_ext,
+            has_drafts=_read_has_drafts_from_path,
+            read_last_opened=_read_last_opened_from_path,
+        )
+        self._search_replace_service = _SearchReplaceService()
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
         self._opened_files: set[Path] = set()
@@ -2712,22 +2717,14 @@ class MainWindow(QMainWindow):
         return dialog.choice()
 
     def _draft_files(self) -> list[Path]:
-        return _session_collect_draft_files(
+        return self._project_session_service.collect_draft_files(
             root=self._root,
-            cache_dir=self._app_config.cache_dir,
-            cache_ext=self._app_config.cache_ext,
-            translation_ext=self._app_config.translation_ext,
-            has_drafts=_read_has_drafts_from_path,
             opened_files=self._opened_files,
         )
 
     def _all_draft_files(self, locales: Iterable[str] | None = None) -> list[Path]:
-        return _session_collect_draft_files(
+        return self._project_session_service.collect_draft_files(
             root=self._root,
-            cache_dir=self._app_config.cache_dir,
-            cache_ext=self._app_config.cache_ext,
-            translation_ext=self._app_config.translation_ext,
-            has_drafts=_read_has_drafts_from_path,
             locales=locales,
         )
 
@@ -2773,13 +2770,9 @@ class MainWindow(QMainWindow):
         perf_trace = PERF_TRACE
         perf_start = perf_trace.start("auto_open")
         try:
-            best_path, scanned = _session_find_last_opened_file(
+            best_path, scanned = self._project_session_service.find_last_opened_file(
                 root=self._root,
-                cache_dir=self._app_config.cache_dir,
-                cache_ext=self._app_config.cache_ext,
-                translation_ext=self._app_config.translation_ext,
                 selected_locales=self._selected_locales,
-                read_last_opened=_read_last_opened_from_path,
             )
             if not best_path:
                 return
@@ -2831,30 +2824,20 @@ class MainWindow(QMainWindow):
         self._migration_count += migrated
 
     def _warn_orphan_caches(self) -> None:
-        cache_root = self._root / self._app_config.cache_dir
-        if not cache_root.exists():
-            return
-        for locale in self._selected_locales:
-            if locale in self._orphan_cache_warned_locales:
-                continue
-            locale_cache = cache_root / locale
-            if not locale_cache.exists():
-                continue
-            missing: list[Path] = []
-            for cache_path in locale_cache.rglob(f"*{self._app_config.cache_ext}"):
-                try:
-                    rel = cache_path.relative_to(cache_root)
-                except ValueError:
-                    continue
-                original = (self._root / rel).with_suffix(
-                    self._app_config.translation_ext
-                )
-                if not original.exists():
-                    missing.append(cache_path)
-            if not missing:
-                continue
+        missing_by_locale = self._project_session_service.collect_orphan_cache_paths(
+            root=self._root,
+            selected_locales=self._selected_locales,
+            warned_locales=self._orphan_cache_warned_locales,
+        )
+        for locale, missing in missing_by_locale.items():
             self._orphan_cache_warned_locales.add(locale)
-            rels = [str(p.relative_to(cache_root)) for p in missing]
+            rels = []
+            for path in missing:
+                try:
+                    rel = path.relative_to(self._root)
+                except ValueError:
+                    rel = path
+                rels.append(str(rel))
             preview = "\n".join(rels[:20])
             if len(rels) > 20:
                 preview = f"{preview}\n... ({len(rels) - 20} more)"
@@ -3907,51 +3890,26 @@ class MainWindow(QMainWindow):
             anchor_path = self._current_pf.path if self._current_pf else files[0]
         if anchor_row is None:
             anchor_row = self._search_anchor_row(direction)
-        others = [p for p in files if p != anchor_path]
-        if direction < 0:
-            others = list(reversed(others))
-        if anchor_path:
-            match = self._find_match_in_file(
-                anchor_path,
-                query=query,
-                field=field,
-                use_regex=use_regex,
-                include_source=include_source,
-                include_value=include_value,
-                start_row=anchor_row,
-                direction=direction,
-            )
-            if match and self._select_match(match):
-                return True
-        fallback_row = _sr_fallback_row(direction)
-        for path in others:
-            match = self._find_match_in_file(
+
+        def _find_in_file(path: Path, start_row: int) -> _SearchMatch | None:
+            return self._find_match_in_file(
                 path,
                 query=query,
                 field=field,
                 use_regex=use_regex,
                 include_source=include_source,
                 include_value=include_value,
-                start_row=fallback_row,
+                start_row=start_row,
                 direction=direction,
             )
-            if match and self._select_match(match):
-                return True
-        if not wrap or not anchor_path:
-            return False
-        if direction > 0 and anchor_row < 0:
-            return False
-        if direction < 0 and anchor_row >= sys.maxsize:
-            return False
-        match = self._find_match_in_file(
-            anchor_path,
-            query=query,
-            field=field,
-            use_regex=use_regex,
-            include_source=include_source,
-            include_value=include_value,
-            start_row=fallback_row,
+
+        match = self._search_replace_service.search_across_files(
+            files=files,
+            anchor_path=anchor_path,
+            anchor_row=anchor_row,
             direction=direction,
+            wrap=wrap,
+            find_in_file=_find_in_file,
         )
         return bool(match and self._select_match(match))
 

@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from translationzed_py.core.project_session import (
+    ProjectSessionService,
     collect_draft_files,
+    collect_orphan_cache_paths,
     find_last_opened_file,
 )
 
@@ -109,3 +111,43 @@ def test_collect_draft_files_reads_legacy_cache_dir(tmp_path: Path) -> None:
     )
 
     assert files == [root / "BE" / "a.txt"]
+
+
+def test_collect_orphan_cache_paths_filters_warned_locales(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    _touch(root / ".tzp" / "cache" / "BE" / "orphan.bin")
+    _touch(root / ".tzp-cache" / "RU" / "legacy_orphan.bin")
+    _touch(root / "RU" / "ok.txt")
+    _touch(root / ".tzp" / "cache" / "RU" / "ok.bin")
+
+    out = collect_orphan_cache_paths(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        selected_locales=["BE", "RU"],
+        warned_locales={"RU"},
+    )
+
+    assert set(out) == {"BE"}
+    assert out["BE"] == [root / ".tzp" / "cache" / "BE" / "orphan.bin"]
+
+
+def test_project_session_service_delegates_to_helpers(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    _touch(root / "BE" / "a.txt")
+    cache_path = root / ".tzp" / "cache" / "BE" / "a.bin"
+    _touch(cache_path)
+
+    svc = ProjectSessionService(
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        has_drafts=lambda path: path == cache_path,
+        read_last_opened=lambda path: 123 if path == cache_path else 0,
+    )
+
+    assert svc.collect_draft_files(root=root, locales=["BE"]) == [root / "BE" / "a.txt"]
+    best, scanned = svc.find_last_opened_file(root=root, selected_locales=["BE"])
+    assert best == root / "BE" / "a.txt"
+    assert scanned == 1

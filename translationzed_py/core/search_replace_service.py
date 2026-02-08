@@ -3,10 +3,33 @@ from __future__ import annotations
 import re
 import sys
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from .search import Match, SearchField, SearchRow, iter_matches
+
+
+@dataclass(frozen=True, slots=True)
+class SearchReplaceService:
+    def search_across_files(
+        self,
+        *,
+        files: list[Path],
+        anchor_path: Path | None,
+        anchor_row: int,
+        direction: int,
+        wrap: bool,
+        find_in_file: Callable[[Path, int], Match | None],
+    ) -> Match | None:
+        return search_across_files(
+            files=files,
+            anchor_path=anchor_path,
+            anchor_row=anchor_row,
+            direction=direction,
+            wrap=wrap,
+            find_in_file=find_in_file,
+        )
 
 
 def scope_files(
@@ -175,3 +198,40 @@ def _replace_all(
 
 def _regex_template(replacement: str) -> str:
     return re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
+
+
+def search_across_files(
+    *,
+    files: list[Path],
+    anchor_path: Path | None,
+    anchor_row: int,
+    direction: int,
+    wrap: bool,
+    find_in_file: Callable[[Path, int], Match | None],
+) -> Match | None:
+    if not files:
+        return None
+    if anchor_path not in files:
+        anchor_path = files[0]
+
+    ordered_others = [path for path in files if path != anchor_path]
+    if direction < 0:
+        ordered_others = list(reversed(ordered_others))
+
+    match = find_in_file(anchor_path, anchor_row)
+    if match is not None:
+        return match
+
+    fallback = fallback_row(direction)
+    for path in ordered_others:
+        match = find_in_file(path, fallback)
+        if match is not None:
+            return match
+
+    if not wrap:
+        return None
+    if direction > 0 and anchor_row < 0:
+        return None
+    if direction < 0 and anchor_row >= sys.maxsize:
+        return None
+    return find_in_file(anchor_path, fallback)
