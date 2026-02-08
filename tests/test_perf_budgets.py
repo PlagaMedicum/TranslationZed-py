@@ -145,7 +145,7 @@ def test_perf_cache_write(tmp_path: Path, perf_recorder) -> None:
     start = time.perf_counter()
     write_cache(root, file_path, entries, changed_keys=changed_keys)
     elapsed_ms = (time.perf_counter() - start) * 1000.0
-    cache_path = root / ".tzp-cache" / "EN" / "ui.bin"
+    cache_path = root / ".tzp" / "cache" / "EN" / "ui.bin"
     assert cache_path.exists()
     perf_recorder("cache write", elapsed_ms, budget_ms, f"entries={count}")
     _assert_budget("cache write", elapsed_ms, budget_ms)
@@ -180,7 +180,7 @@ def test_perf_cache_header_scan(tmp_path: Path, perf_recorder) -> None:
         file_path = root / "EN" / f"file_{idx}.txt"
         file_path.parent.mkdir(parents=True, exist_ok=True)
         write_cache(root, file_path, entry, changed_keys=changed_keys)
-    cache_root = root / ".tzp-cache" / "EN"
+    cache_root = root / ".tzp" / "cache" / "EN"
     paths = list(cache_root.rglob("*.bin"))
     assert len(paths) == files
 

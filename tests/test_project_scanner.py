@@ -20,7 +20,7 @@ def test_scan_root_discovers_locales(tmp_path: Path) -> None:
             encoding="utf-8",
         )
         (root / loc / "ui.txt").write_text("dummy")
-    (root / ".tzp-cache").mkdir()
+    (root / ".tzp" / "cache").mkdir(parents=True)
     (root / "_TVRADIO_TRANSLATIONS").mkdir()
     (root / ".git").mkdir()
     (root / ".vscode").mkdir()

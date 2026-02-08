@@ -28,7 +28,7 @@ def test_roundtrip():
         object.__setattr__(pf.entries[0], "status", Status.TRANSLATED)
 
         write(root, path, pf.entries)
-        cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
+        cache_path = root / ".tzp" / "cache" / "EN" / "dummy.bin"
         assert cache_path.read_bytes().startswith(b"TZC5")
         assert list(read(root, path).values()) == [
             CacheEntry(Status.TRANSLATED, None, None)
@@ -60,6 +60,29 @@ def test_roundtrip_with_value_override():
         assert entry.original == "Hi"
 
 
+def test_read_migrates_legacy_cache_path():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "root"
+        loc = root / "EN"
+        loc.mkdir(parents=True)
+        path = loc / "dummy.txt"
+        path.write_text('GREETING = "Hi"\n', encoding="utf-8")
+
+        pf = parse(path)
+        object.__setattr__(pf.entries[0], "status", Status.TRANSLATED)
+        write(root, path, pf.entries)
+
+        current_path = root / ".tzp" / "cache" / "EN" / "dummy.bin"
+        legacy_path = root / ".tzp-cache" / "EN" / "dummy.bin"
+        legacy_path.parent.mkdir(parents=True, exist_ok=True)
+        current_path.replace(legacy_path)
+
+        cache = read(root, path)
+        assert list(cache.values()) == [CacheEntry(Status.TRANSLATED, None, None)]
+        assert current_path.exists()
+        assert not legacy_path.exists()
+
+
 def test_write_skips_empty_cache():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "root"
@@ -70,9 +93,9 @@ def test_write_skips_empty_cache():
 
         pf = parse(path)
         write(root, path, pf.entries, changed_keys=set())
-        cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
+        cache_path = root / ".tzp" / "cache" / "EN" / "dummy.bin"
         assert not cache_path.exists()
-        assert not (root / ".tzp-cache").exists()
+        assert not (root / ".tzp" / "cache").exists()
 
 
 def test_last_opened_written():
@@ -86,7 +109,7 @@ def test_last_opened_written():
         pf = parse(path)
         object.__setattr__(pf.entries[0], "status", Status.TRANSLATED)
         write(root, path, pf.entries, last_opened=123)
-        cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
+        cache_path = root / ".tzp" / "cache" / "EN" / "dummy.bin"
         assert read_last_opened_from_path(cache_path) == 123
 
 
@@ -98,7 +121,7 @@ def test_legacy_status_mapping_v3():
         path = loc / "dummy.txt"
         path.write_text('GREETING = "Hi"\n', encoding="utf-8")
 
-        cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
+        cache_path = root / ".tzp" / "cache" / "EN" / "dummy.bin"
         cache_path.parent.mkdir(parents=True, exist_ok=True)
 
         key_a = "HELLO"
@@ -128,7 +151,7 @@ def test_migrate_all_upgrades_u16_cache(tmp_path):
     path = root / "EN" / "dummy.txt"
     path.write_text('HELLO = "Hi"\n', encoding="utf-8")
 
-    cache_path = root / ".tzp-cache" / "EN" / "dummy.bin"
+    cache_path = root / ".tzp" / "cache" / "EN" / "dummy.bin"
     cache_path.parent.mkdir(parents=True, exist_ok=True)
 
     key = "HELLO"

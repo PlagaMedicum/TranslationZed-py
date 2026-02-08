@@ -43,7 +43,7 @@ def test_tm_preferences_delete_cancel_keeps_file(tmp_path, qtbot, monkeypatch):
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
-    tm_path = root / "imported_tms" / "sample.tmx"
+    tm_path = root / ".tzp" / "imported_tms" / "sample.tmx"
     _register_imported_tm(win, tm_path)
 
     monkeypatch.setattr(
@@ -61,7 +61,7 @@ def test_tm_preferences_delete_confirm_removes_file(tmp_path, qtbot, monkeypatch
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
-    tm_path = root / "imported_tms" / "sample.tmx"
+    tm_path = root / ".tzp" / "imported_tms" / "sample.tmx"
     _register_imported_tm(win, tm_path)
 
     monkeypatch.setattr(

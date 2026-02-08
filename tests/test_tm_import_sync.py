@@ -33,7 +33,7 @@ def _write_tmx(path: Path, source_lang: str = "EN", target_lang: str = "RU") -> 
 def test_sync_import_folder_imports_and_reports_changed(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
-    tm_dir = root / "imported_tms"
+    tm_dir = root / ".tzp" / "imported_tms"
     tmx_path = tm_dir / "pack_ru.tmx"
     _write_tmx(tmx_path)
     store = TMStore(root)
@@ -60,7 +60,7 @@ def test_sync_import_folder_imports_and_reports_changed(tmp_path: Path) -> None:
 def test_sync_import_folder_skip_all_marks_remaining_unresolved(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
-    tm_dir = root / "imported_tms"
+    tm_dir = root / ".tzp" / "imported_tms"
     _write_tmx(tm_dir / "one.tmx")
     _write_tmx(tm_dir / "two.tmx")
     store = TMStore(root)
@@ -84,7 +84,7 @@ def test_sync_import_folder_skip_all_marks_remaining_unresolved(tmp_path: Path) 
 def test_sync_import_folder_deletes_missing_import_files(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
-    tm_dir = root / "imported_tms"
+    tm_dir = root / ".tzp" / "imported_tms"
     tmx_path = tm_dir / "pack_ru.tmx"
     _write_tmx(tmx_path)
     store = TMStore(root)
