@@ -526,6 +526,7 @@ UNTOUCHED).
     cache-key construction, post-query filtering), used by GUI adapter.
   - Exact match returns score **100**.
   - Fuzzy match uses `SequenceMatcher` on a bounded candidate set; keeps scores at/above configured min score (5..100, default 50).
+  - Query reserves room for fuzzy neighbors even when many exact duplicates exist, so related strings (e.g., `Rest`/`Run`) remain visible.
   - Project TM outranks imported TM.
   - TM suggestions include source name (`tm_name`); when missing, UI falls back to TM file path.
   - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.
@@ -544,8 +545,10 @@ UNTOUCHED).
   - Pending/unresolved/error imported files are excluded from TM suggestions until resolved.
   - A `ready` import record with zero import entries is treated as stale and re-imported
     on next sync, so older failed/partial imports self-heal automatically.
+  - Import registry stores normalized locales, original TMX locale tags, and last imported segment count per TM file.
+  - Sync summary reports imported/unresolved/failed files; zero-segment imports are surfaced as warnings.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
-    new imports.
+    new imports, with per-file segment counts and raw locale-tag metadata display.
   - `core.tm_preferences` applies preference actions (queue-import copy, remove, enable/disable)
     without Qt dependencies; GUI owns confirmations/dialog presentation.
   - Removing imported TMs requires explicit confirmation that files will be deleted from disk.

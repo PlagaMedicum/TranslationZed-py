@@ -254,7 +254,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  2 | SYS copies selected TMX into managed TM import folder (default: `.tzp/tms` at runtime root). |
 |  3 | SYS detects source/target locales from TMX metadata; if unresolved, SYS asks user to map locales manually. |
 |  4 | SYS imports TM units into project TM store for resolved locale pair (`origin=import`) and records TM source name. |
-|  5 | SYS reports imported unit count and unresolved/failed files when applicable. |
+|  5 | SYS reports imported unit count and unresolved/failed files when applicable; zero-segment imports are reported as warnings. |
 
 ### UC-13e  Drop-In TMX Sync
 | **Trigger** | User drops `.tmx` files into the managed TM import folder outside the app. |
@@ -300,7 +300,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 ### UC-13j  Manage Imported TMs in Preferences
 | **Trigger** | *General ▸ Preferences ▸ TM tab* |
 | **Flow** |
-|  1 | SYS lists imported TM files with locale pair, status, and enabled toggle for ready files. |
+|  1 | SYS lists imported TM files with locale pair, raw locale tags in braces (when different), segment count, status, and enabled toggle for ready files. |
 |  2 | User may queue TMX imports, remove selected imported TM files, or toggle ready files on/off. |
 |  3 | Before removals are applied, SYS asks for explicit confirmation that selected TM files will be deleted from disk. |
 |  4 | On confirmation, SYS applies removals/toggles and imports queued files into managed TM folder. |

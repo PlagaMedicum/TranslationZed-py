@@ -518,13 +518,16 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TM panel open triggers import-folder sync and immediate mapping dialogs; mapping dialog supports **Skip all for now**.
      - [✓] TMX import locale matching accepts region variants (`en-US`/`be-BY` -> `EN`/`BE`) to prevent zero-segment imports from locale-tag mismatch.
      - [✓] TM import sync auto-recovers `ready` records with missing import entries by forcing re-import on next sync.
+     - [✓] TM import registry now persists per-file `segment_count` and original TMX locale tags (`source_locale_raw`, `target_locale_raw`).
+     - [✓] TM sync summary now reports imported/unresolved/failed file groups and explicitly warns on zero-segment imports.
      - [✓] TM suggestions display TM source name (`tm_name`) so users can see where each match comes from.
      - [✓] TM source label fallback: use TM path when `tm_name` is missing.
      - [✓] TM panel now shows full Source/Translation text for selected suggestion (not preview-only).
      - [✓] TM minimum score default set to **50%** (user-adjustable from 5% to 100%).
+     - [✓] TM fuzzy query keeps neighboring suggestions visible even when many exact duplicates exist.
      - [✓] Menu action to resolve pending imported TMs with manual locale mapping.
      - [✓] Imported TM visibility policy: only `ready + enabled` imports are considered in TM query results.
-     - [✓] Preferences TM tab supports queued import, remove, and enable/disable per imported TM file.
+     - [✓] Preferences TM tab supports queued import, remove, enable/disable per imported TM file, plus segment-count visibility and zero-segment warning marker.
      - [✓] Preferences removal confirms disk deletion before unlinking TM files.
      - [✓] First clean-architecture extraction for TM flow: folder-sync orchestration moved from `gui.main_window`
        into `core.tm_import_sync` (Qt-free service with unit tests).
