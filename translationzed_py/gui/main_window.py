@@ -102,10 +102,7 @@ from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
 from translationzed_py.core.file_workflow import (
-    apply_cache_for_write as _workflow_apply_cache_for_write,
-)
-from translationzed_py.core.file_workflow import (
-    apply_cache_overlay as _workflow_apply_cache_overlay,
+    FileWorkflowService as _FileWorkflowService,
 )
 from translationzed_py.core.model import STATUS_ORDER, Status
 from translationzed_py.core.preferences import ensure_defaults as _ensure_preferences
@@ -488,6 +485,7 @@ class MainWindow(QMainWindow):
             has_drafts=_read_has_drafts_from_path,
             read_last_opened=_read_last_opened_from_path,
         )
+        self._file_workflow_service = _FileWorkflowService()
         self._search_replace_service = _SearchReplaceService()
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
@@ -2219,7 +2217,7 @@ class MainWindow(QMainWindow):
         source_lookup = self._load_en_source(path, locale, target_entries=pf.entries)
         self._cache_map = _read_status_cache(self._root, path)
         _touch_last_opened(self._root, path, int(time.time()))
-        overlay = _workflow_apply_cache_overlay(
+        overlay = self._file_workflow_service.apply_cache_overlay(
             pf.entries,
             self._cache_map,
             hash_for_entry=lambda entry: self._hash_for_cache(entry, self._cache_map),
@@ -2896,7 +2894,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self._report_parse_error(path, exc)
             return False
-        save_overlay = _workflow_apply_cache_for_write(
+        save_overlay = self._file_workflow_service.apply_cache_for_write(
             pf.entries,
             cached,
             hash_for_entry=lambda entry: self._hash_for_cache(entry, cached),

@@ -373,6 +373,8 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        (draft discovery, auto-open candidate selection, orphan-cache detection).
      - [✓] File workflow cache-overlay/save helpers extracted into Qt-free
        `core.file_workflow` (open-path cache apply + write-from-cache planning).
+     - [✓] Main-window adapter now delegates cache-overlay and cache-for-write
+       paths via `FileWorkflowService`.
      - [✓] Search/replace scope and traversal helpers extracted into Qt-free
        `core.search_replace_service` (scope resolution + replace transform helpers).
      - [✓] Cross-file search traversal is now delegated through

@@ -21,6 +21,35 @@ class CacheWriteOverlay:
     changed_values: dict[str, str]
 
 
+@dataclass(frozen=True, slots=True)
+class FileWorkflowService:
+    def apply_cache_overlay(
+        self,
+        entries: EntrySequence,
+        cache_map: Mapping[int, CacheEntry],
+        *,
+        hash_for_entry: Callable[[Entry], int],
+    ) -> CacheOverlayResult:
+        return apply_cache_overlay(
+            entries,
+            cache_map,
+            hash_for_entry=hash_for_entry,
+        )
+
+    def apply_cache_for_write(
+        self,
+        entries: Iterable[Entry],
+        cache_map: Mapping[int, CacheEntry],
+        *,
+        hash_for_entry: Callable[[Entry], int],
+    ) -> CacheWriteOverlay:
+        return apply_cache_for_write(
+            entries,
+            cache_map,
+            hash_for_entry=hash_for_entry,
+        )
+
+
 def apply_cache_overlay(
     entries: EntrySequence,
     cache_map: Mapping[int, CacheEntry],

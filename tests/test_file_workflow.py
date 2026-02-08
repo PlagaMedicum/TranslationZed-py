@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from translationzed_py.core.file_workflow import (
+    FileWorkflowService,
     apply_cache_for_write,
     apply_cache_overlay,
 )
@@ -139,3 +140,24 @@ def test_apply_cache_for_write_returns_changed_values_and_statuses() -> None:
     assert result.entries[1].status == Status.TRANSLATED
     assert result.entries[1].value == "file-b"
     assert result.entries[0].key_hash == 31
+
+
+def test_file_workflow_service_wraps_overlay_helpers() -> None:
+    service = FileWorkflowService()
+    entries = [_entry("A", "file-a", Status.UNTOUCHED, key_hash=11)]
+    cache = CacheMap(hash_bits=64)
+    cache[1] = CacheEntry(Status.TRANSLATED, "draft-a", "orig-a")
+
+    overlay = service.apply_cache_overlay(
+        entries,
+        cache,
+        hash_for_entry=lambda _entry: 1,
+    )
+    write_overlay = service.apply_cache_for_write(
+        entries,
+        cache,
+        hash_for_entry=lambda _entry: 1,
+    )
+
+    assert overlay.changed_keys == {"A"}
+    assert write_overlay.changed_values == {"A": "draft-a"}
