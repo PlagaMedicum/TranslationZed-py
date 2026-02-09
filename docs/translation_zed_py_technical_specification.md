@@ -565,7 +565,8 @@ UNTOUCHED).
 - Project TM rebuild:
    - `core.tm_rebuild` owns locale collection, EN mapping, batch ingestion, and status-message formatting.
    - UI can rebuild project TM by scanning selected locales and pairing target entries with EN source.
-   - Auto‑bootstrap runs when a selected locale pair has no TM entries.
+   - Auto‑bootstrap runs once per session on first TM-panel activation for selected locales
+     (even if DB already has entries), to prevent stale/partial project-index behavior.
    - Rebuild/bootstrapping runs asynchronously (background worker).
 - Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j.
 

@@ -149,6 +149,9 @@ Regression tests cover:
 - deterministic corpus acceptance scenarios loaded from
   `tests/fixtures/tm_ranking/corpus.json` and executed by
   `tests/test_tm_ranking_corpus.py`.
+  The corpus is split into multiple profiles and CI enforces at least two:
+  - `synthetic_core`: targeted algorithm edge-cases and tie-break contracts.
+  - `pz_fixture_like`: PZ-style tagged/phrase patterns and dense phrase pools.
 
 See `tests/test_tm_store.py` and `tests/test_tm_ranking_corpus.py` for executable examples.
 

@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-07_
+_Last updated: 2026-02-09_
 
 ---
 
@@ -150,7 +150,11 @@ They include:
   and that EN affix stemming is enabled for EN source locale only.
 - TM relevance acceptance corpus: deterministic fixture
   `tests/fixtures/tm_ranking/corpus.json` validated by `tests/test_tm_ranking_corpus.py`
-  in the default `make test` / `make verify` pipeline.
+  in the default `make test` / `make verify` pipeline, with profile-level coverage
+  (`synthetic_core` + `pz_fixture_like`) enforced in CI.
+- TM bootstrap behavior: opening TM panel triggers one-time project bootstrap
+  for selected locales even when DB already has stale partial entries
+  (`tests/test_gui_tm_preferences.py`).
 - TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
   (`core.tm_import_sync` unit tests).
 - TM query/policy service: cache-key construction and score/origin filtering semantics.

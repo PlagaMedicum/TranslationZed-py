@@ -290,7 +290,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  2 | SYS starts background rebuild worker that pairs EN source with target translations. |
 |  3 | SYS updates status bar progress/result and preserves UI responsiveness. |
 |  4 | On completion, SYS clears TM query cache and refreshes TM panel when visible. |
-| **Notes** | SYS may also auto-bootstrap TM when selected locale pair has no TM entries. |
+| **Notes** | SYS auto-bootstraps TM once per session on first TM-panel activation for selected locales (including stale/partial DB states). |
 
 ### UC-13i  TM Filters
 | **Trigger** | User changes TM filter controls (minimum score, project/import origin toggles). |
