@@ -29,6 +29,7 @@ _SCOPES = [
 ]
 _TM_PATH_ROLE = Qt.UserRole + 1
 _TM_IS_PENDING_ROLE = Qt.UserRole + 2
+_TM_STATUS_ROLE = Qt.UserRole + 3
 
 
 class PreferencesDialog(QDialog):
@@ -50,6 +51,7 @@ class PreferencesDialog(QDialog):
         self._tm_resolve_pending = False
         self._tm_export_tmx = False
         self._tm_rebuild = False
+        self._tm_resolve_btn: QPushButton | None = None
 
         tabs = QTabWidget(self)
         tabs.addTab(self._build_general_tab(), "General")
@@ -185,7 +187,16 @@ class PreferencesDialog(QDialog):
         label = QLabel(
             "Imported TM files (unchecked = disabled for suggestions).", widget
         )
+        label.setWordWrap(True)
         layout.addWidget(label)
+        self._tm_formats_label = QLabel(
+            "Formats: import/export TMX (.tmx, TMX 1.4). "
+            "Runtime TM index: .tzp/config/tm.sqlite. "
+            "Managed imported TM folder: .tzp/tms.",
+            widget,
+        )
+        self._tm_formats_label.setWordWrap(True)
+        layout.addWidget(self._tm_formats_label)
         self._tm_list = QListWidget(widget)
         self._tm_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._tm_list.itemChanged.connect(self._on_tm_item_changed)
@@ -195,8 +206,12 @@ class PreferencesDialog(QDialog):
         btn_row.setContentsMargins(0, 0, 0, 0)
         btn_row.setSpacing(6)
         import_btn = QPushButton("Import TMX…", widget)
+        import_btn.setToolTip("Queue TMX files for import into the managed TM folder")
         import_btn.clicked.connect(self._queue_tm_imports)
         remove_btn = QPushButton("Remove selected", widget)
+        remove_btn.setToolTip(
+            "Remove selected imported TM files (with confirmation before delete)"
+        )
         remove_btn.clicked.connect(self._remove_selected_tm_items)
         btn_row.addWidget(import_btn)
         btn_row.addWidget(remove_btn)
@@ -206,13 +221,18 @@ class PreferencesDialog(QDialog):
         ops_row = QHBoxLayout()
         ops_row.setContentsMargins(0, 0, 0, 0)
         ops_row.setSpacing(6)
-        resolve_btn = QPushButton("Resolve Pending", widget)
-        resolve_btn.clicked.connect(self._request_tm_resolve_pending)
+        self._tm_resolve_btn = QPushButton("Resolve Pending", widget)
+        self._tm_resolve_btn.setToolTip(
+            "Resolve pending/unmapped/error imported TM files"
+        )
+        self._tm_resolve_btn.clicked.connect(self._request_tm_resolve_pending)
         export_btn = QPushButton("Export TMX…", widget)
+        export_btn.setToolTip("Export current TM entries to a TMX file")
         export_btn.clicked.connect(self._request_tm_export)
         rebuild_btn = QPushButton("Rebuild TM", widget)
+        rebuild_btn.setToolTip("Rebuild project TM from selected locale files")
         rebuild_btn.clicked.connect(self._request_tm_rebuild)
-        ops_row.addWidget(resolve_btn)
+        ops_row.addWidget(self._tm_resolve_btn)
         ops_row.addWidget(export_btn)
         ops_row.addWidget(rebuild_btn)
         ops_row.addStretch(1)
@@ -220,6 +240,7 @@ class PreferencesDialog(QDialog):
 
         for row in self._tm_files:
             self._add_tm_file_item(row)
+        self._update_tm_action_state()
         return widget
 
     def _add_tm_file_item(self, row: dict[str, object]) -> None:
@@ -260,6 +281,7 @@ class PreferencesDialog(QDialog):
         item.setToolTip(tm_path)
         item.setData(_TM_PATH_ROLE, tm_path)
         item.setData(_TM_IS_PENDING_ROLE, False)
+        item.setData(_TM_STATUS_ROLE, status)
         flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
         if status == "ready":
             flags |= Qt.ItemIsUserCheckable
@@ -287,7 +309,9 @@ class PreferencesDialog(QDialog):
             item.setToolTip(tm_path)
             item.setData(_TM_PATH_ROLE, tm_path)
             item.setData(_TM_IS_PENDING_ROLE, True)
+            item.setData(_TM_STATUS_ROLE, "queued")
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+        self._update_tm_action_state()
 
     def _remove_selected_tm_items(self) -> None:
         items = list(self._tm_list.selectedItems())
@@ -305,6 +329,7 @@ class PreferencesDialog(QDialog):
                     self._tm_initial_enabled.pop(tm_path, None)
             row = self._tm_list.row(item)
             self._tm_list.takeItem(row)
+        self._update_tm_action_state()
 
     def _on_tm_item_changed(self, item: QListWidgetItem) -> None:
         tm_path = str(item.data(_TM_PATH_ROLE) or "").strip()
@@ -313,6 +338,23 @@ class PreferencesDialog(QDialog):
         if not (item.flags() & Qt.ItemIsUserCheckable):
             return
         self._tm_enabled[tm_path] = item.checkState() == Qt.Checked
+
+    def _update_tm_action_state(self) -> None:
+        if self._tm_resolve_btn is None:
+            return
+        has_pending = False
+        for idx in range(self._tm_list.count()):
+            item = self._tm_list.item(idx)
+            if item is None:
+                continue
+            if bool(item.data(_TM_IS_PENDING_ROLE)):
+                has_pending = True
+                break
+            status = str(item.data(_TM_STATUS_ROLE) or "").strip().lower()
+            if status and status != "ready":
+                has_pending = True
+                break
+        self._tm_resolve_btn.setEnabled(has_pending)
 
     def _request_tm_resolve_pending(self) -> None:
         self._tm_resolve_pending = True

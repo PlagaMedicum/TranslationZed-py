@@ -309,6 +309,51 @@ def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
     assert values["tm_rebuild"] is False
 
 
+def test_preferences_tm_tab_shows_format_and_storage_description(tmp_path, qtbot):
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {"tm_import_dir": str(root / ".tzp" / "tms")}, tm_files=[]
+    )
+    qtbot.addWidget(dialog)
+
+    text = dialog._tm_formats_label.text()
+    assert "TMX" in text
+    assert ".tzp/config/tm.sqlite" in text
+    assert ".tzp/tms" in text
+
+
+def test_preferences_tm_resolve_button_enables_for_pending_items(tmp_path, qtbot):
+    root = _make_project(tmp_path)
+    dialog_empty = PreferencesDialog(
+        {"tm_import_dir": str(root / ".tzp" / "tms")},
+        tm_files=[],
+    )
+    qtbot.addWidget(dialog_empty)
+    assert dialog_empty._tm_resolve_btn is not None
+    assert dialog_empty._tm_resolve_btn.isEnabled() is False
+
+    dialog_pending = PreferencesDialog(
+        {"tm_import_dir": str(root / ".tzp" / "tms")},
+        tm_files=[
+            {
+                "tm_path": str(root / ".tzp" / "tms" / "pending.tmx"),
+                "tm_name": "pending",
+                "source_locale": "EN",
+                "target_locale": "BE",
+                "source_locale_raw": "",
+                "target_locale_raw": "",
+                "segment_count": 0,
+                "enabled": True,
+                "status": "pending",
+                "note": "unmapped",
+            }
+        ],
+    )
+    qtbot.addWidget(dialog_pending)
+    assert dialog_pending._tm_resolve_btn is not None
+    assert dialog_pending._tm_resolve_btn.isEnabled() is True
+
+
 def test_preferences_tm_list_shows_segment_count_and_zero_warning(
     tmp_path, qtbot, monkeypatch
 ):
