@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "description": "Deterministic TM ranking acceptance corpus for CI.",
+  "cases": [
+    {
+      "id": "drop_neighbors_multi_token",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "Drop one",
+      "min_score": 5,
+      "limit": 12,
+      "entries": [
+        {"origin": "project", "key": "k1", "source": "Drop one", "target": "drop-one tr", "updated_at": 1},
+        {"origin": "project", "key": "k2", "source": "Drop all", "target": "drop-all tr", "updated_at": 2},
+        {"origin": "project", "key": "k3", "source": "Drop-all", "target": "drop-all-hyphen tr", "updated_at": 3},
+        {"origin": "project", "key": "k4", "source": "Drop", "target": "drop tr", "updated_at": 4},
+        {"origin": "project", "key": "k5", "source": "Drap all", "target": "typo tr", "updated_at": 5},
+        {"origin": "project", "key": "k6", "source": "Drink one", "target": "drink-one tr", "updated_at": 6}
+      ],
+      "expect_top": "Drop one",
+      "expect_present": [
+        {"source": "Drop all", "min_score": 60},
+        {"source": "Drop-all", "min_score": 50},
+        {"source": "Drap all", "min_score": 40}
+      ],
+      "expect_order": [
+        ["Drop all", "Drop"],
+        ["Drop-all", "Drop"]
+      ]
+    },
+    {
+      "id": "single_token_noise_control",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "All",
+      "min_score": 5,
+      "limit": 12,
+      "entries": [
+        {"origin": "project", "key": "k1", "source": "All", "target": "all tr", "updated_at": 1},
+        {"origin": "project", "key": "k2", "source": "Apply all", "target": "apply-all tr", "updated_at": 2},
+        {"origin": "project", "key": "k3", "source": "Small crate", "target": "small tr", "updated_at": 3},
+        {"origin": "project", "key": "k4", "source": "Allow all", "target": "allow tr", "updated_at": 4}
+      ],
+      "expect_present": [
+        {"source": "Apply all", "min_score": 40}
+      ],
+      "expect_absent": [
+        "Small crate"
+      ]
+    },
+    {
+      "id": "en_affix_matching",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "Favorite",
+      "min_score": 20,
+      "limit": 12,
+      "entries": [
+        {"origin": "project", "key": "k1", "source": "Favorite", "target": "favorite tr", "updated_at": 1},
+        {"origin": "project", "key": "k2", "source": "Favorites", "target": "favorites tr", "updated_at": 2},
+        {"origin": "project", "key": "k3", "source": "Factory", "target": "factory tr", "updated_at": 3}
+      ],
+      "expect_present": [
+        {"source": "Favorites", "min_score": 85}
+      ]
+    },
+    {
+      "id": "non_en_affix_scope",
+      "source_locale": "FR",
+      "target_locale": "BE",
+      "query": "Run",
+      "min_score": 5,
+      "limit": 12,
+      "entries": [
+        {"origin": "project", "key": "k1", "source": "Run", "target": "run tr", "updated_at": 1},
+        {"origin": "project", "key": "k2", "source": "Running", "target": "running tr", "updated_at": 2}
+      ],
+      "expect_present": [
+        {"source": "Run", "min_score": 100}
+      ],
+      "expect_absent": [
+        "Running"
+      ]
+    },
+    {
+      "id": "exact_pool_still_shows_neighbor",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "Official: Rest",
+      "min_score": 30,
+      "limit": 12,
+      "entries": [
+        {"origin": "project", "key": "k_run", "source": "Official: Run", "target": "run tr", "updated_at": 1},
+        {"origin": "project", "key": "k_rest", "source": "Official: Rest", "target": "rest tr", "updated_at": 2},
+        {"origin": "import", "source": "Official: Rest", "target": "imported rest 1", "tm_name": "tm_1", "updated_at": 3},
+        {"origin": "import", "source": "Official: Rest", "target": "imported rest 2", "tm_name": "tm_2", "updated_at": 4},
+        {"origin": "import", "source": "Official: Rest", "target": "imported rest 3", "tm_name": "tm_3", "updated_at": 5},
+        {"origin": "import", "source": "Official: Rest", "target": "imported rest 4", "tm_name": "tm_4", "updated_at": 6},
+        {"origin": "import", "source": "Official: Rest", "target": "imported rest 5", "tm_name": "tm_5", "updated_at": 7},
+        {"origin": "import", "source": "Official: Rest", "target": "imported rest 6", "tm_name": "tm_6", "updated_at": 8}
+      ],
+      "expect_present": [
+        {"source": "Official: Run", "min_score": 70}
+      ]
+    }
+  ]
+}
