@@ -375,7 +375,13 @@ Algorithm:
   - **General**: Open, Save, Switch Locale(s), Preferences, Exit
   - **Edit**: Copy, Cut, Paste
   - **View**: Wrap Long Strings (checkable), Prompt on Exit (checkable)
-- Toolbar: `[Status ▼] [Key|Source|Trans] [Regex☑] [Search box]`
+- Toolbar:
+  - side-panel toggle glyph,
+  - `Status` selector,
+  - regex toggle + regex help link + case-sensitive (`Aa`) toggle,
+  - search box + previous/next navigation,
+  - replace-bar toggle glyph,
+  - search column selector (`Key|Source|Trans`).
  - Status bar:
    - Saved timestamp, row indicator, current file path.
    - When search/replace is active, append **scope indicator(s)**:
@@ -409,6 +415,8 @@ if dirty_files and not prompt_save():
   Row selection is achieved via row header; cell selection remains enabled.
 - Status bar shows `Saved HH:MM:SS | Row i / n | <locale/relative/path>`.
 - Regex help: a small **“?”** button opens Python `re` docs in the browser.
+- Search execution is explicit (Enter / next / previous); typing only updates controls,
+  it does not auto-run search.
 - Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b.
 
 ### 5.9.1  UI Guidelines (GNOME + KDE)
@@ -417,8 +425,8 @@ if dirty_files and not prompt_save():
 - Use **standard dialogs** (`QFileDialog`, `QMessageBox`) to match platform HIG.
 - Keep **menu bar visible** by default; toolbar sits below menu (KDE‑friendly).
 - Use **standard shortcuts** and avoid duplicate accelerators.
-- Toolbar style: **Text‑only** buttons with generous hit‑targets; use separators
-  to avoid clutter.
+- Toolbar style: compact mixed controls (text + icon-only glyphs where appropriate),
+  with separators to keep visual groups clear.
 - Provide **compact, fast UI**: minimal chrome, clear focus order, no heavy redraws.
 
 ### 5.10  `gui.entry_model` + `gui.delegates`
@@ -561,6 +569,8 @@ UNTOUCHED).
   - Sync summary reports imported/unresolved/failed files; zero-segment imports are surfaced as warnings.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
     new imports, with per-file segment counts and raw locale-tag metadata display.
+  - Preferences TM tab shows explicit format/storage hints (`TMX .tmx`, `.tzp/config/tm.sqlite`,
+    `.tzp/tms`) to reduce import/export ambiguity.
   - TM operational commands (resolve pending imports, export TMX, rebuild TM) are executed from
     Preferences TM tab; top menu does not duplicate these commands.
   - Rebuild is also available as an icon-only button inside the TM side panel filter row.

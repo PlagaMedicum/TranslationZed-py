@@ -226,6 +226,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  1 | SYS switches the left panel stack to the selected mode. |
 |  2 | SYS preserves side-panel visibility and width preference. |
 |  3 | If TM mode is selected, SYS refreshes TM suggestions for current row context. |
+|  4 | Search side-panel tab is currently a placeholder; search execution is handled by toolbar search controls. |
 
 ### UC-13b  TM Suggestions Query
 | Field | Value |
@@ -304,22 +305,23 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | *General ▸ Preferences ▸ TM tab* |
 | **Flow** |
 |  1 | SYS lists imported TM files with locale pair, raw locale tags in braces (when different), segment count, status, and enabled toggle for ready files. |
-|  2 | User may queue TMX imports, remove selected imported TM files, or toggle ready files on/off. |
-|  3 | Before removals are applied, SYS asks for explicit confirmation that selected TM files will be deleted from disk. |
-|  4 | On confirmation, SYS applies removals/toggles and imports queued files into managed TM folder. |
-|  5 | User may run TM operations directly from this tab: **Resolve Pending**, **Export TMX…**, **Rebuild TM**. |
-|  6 | SYS re-syncs imported TMs and refreshes TM suggestions when TM panel is active. |
+|  2 | SYS shows inline TM format/storage hints (TMX import/export and runtime `.tzp` paths) to clarify data flow. |
+|  3 | User may queue TMX imports, remove selected imported TM files, or toggle ready files on/off. |
+|  4 | Before removals are applied, SYS asks for explicit confirmation that selected TM files will be deleted from disk. |
+|  5 | On confirmation, SYS applies removals/toggles and imports queued files into managed TM folder. |
+|  6 | User may run TM operations directly from this tab: **Resolve Pending**, **Export TMX…**, **Rebuild TM**. |
+|  7 | SYS re-syncs imported TMs and refreshes TM suggestions when TM panel is active. |
 | **Post-condition** | Imported TM set and enable-state match preferences changes; disabled TMs are ignored by suggestions. |
 
 ---
 ## 4  GUI Wireframe (ASCII)
 ```
 ┌─MenuBar────────────────────────────────────────────┐
-│ Project           Edit                             │
-| (Open|Save|Exit) (Undo|Redo|Copy|Paste|Cut)        |
+│ General          Edit           View        Help   │
+| (Open|Save|Prefs) (Undo|Redo...) (...toggles) (...)|
 └────────────────────────────────────────────────────┘
 ┌─Toolbar────────────────────────────────────────────┐
-│ [Locales ▼] [Key|Source|Trans] [Regex☑] [🔍 Box] [Status ▼ (Proofread)] │
+│ [◀ Files panel] [Status ▼] [Regex ? Aa] [🔍 Search] [↑][↓] [⟳ Replace] [Search in ▼] │
 └────────────────────────────────────────────────────┘
 ┌─QSplitter──────────────────────────────────────────┐
 │◀│File Tree──────────┐┌Table (Key | Src | Trans)───┐│
@@ -327,6 +329,10 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 ││  ● sub/dir/file.txt││ …                         ││
 │└────────────────────┘└────────────────────────────┘│
 └────────────────────────────────────────────────────┘
+┌─Side panel: TM──────────────────────────────────────┐
+│ Min score [%] [Project] [Imported] [↻ Rebuild TM]  │
+│ Ranked suggestions list + full Source/Translation   │
+└──────────────────────────────────────────────────────┘
 ┌─Detail editors (optional, Poedit-style)─────────────┐
 │ Source (read‑only, scrollable, multi‑line)          │
 │ Translation (editable, scrollable, multi‑line)      │

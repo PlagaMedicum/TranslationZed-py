@@ -528,7 +528,7 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TM fuzzy ranking upgraded to token/prefix/affix-aware retrieval with explicit
        single-token noise suppression (`all` should not match `small` by substring only).
      - [✓] Dedicated ranking contract documented in `docs/tm_ranking_algorithm.md`.
-     - [✓] Menu action to resolve pending imported TMs with manual locale mapping.
+     - [✓] Preferences TM action to resolve pending imported TMs with manual locale mapping.
      - [✓] Imported TM visibility policy: only `ready + enabled` imports are considered in TM query results.
      - [✓] Preferences TM tab supports queued import, remove, enable/disable per imported TM file, plus segment-count visibility and zero-segment warning marker.
      - [✓] Preferences removal confirms disk deletion before unlinking TM files.
