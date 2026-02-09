@@ -33,3 +33,26 @@ def test_search_plain_composed_phrase_matches_non_contiguous_tokens():
     ]
     matches = search(rows, "combat mechanics", SearchField.SOURCE, False)
     assert [m.row for m in matches] == [0]
+
+
+def test_search_preview_is_one_line_and_present_for_literal_match():
+    rows = [
+        SearchRow(
+            Path("A.txt"),
+            0,
+            "KEY_ONE",
+            "Line one\nLine two with Needle token\nLine three",
+            "",
+        ),
+    ]
+    matches = search(
+        rows,
+        "needle",
+        SearchField.SOURCE,
+        False,
+        include_preview=True,
+        case_sensitive=False,
+    )
+    assert len(matches) == 1
+    assert "Needle" in matches[0].preview
+    assert "\n" not in matches[0].preview

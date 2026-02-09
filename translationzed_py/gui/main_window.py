@@ -4127,7 +4127,11 @@ class MainWindow(QMainWindow):
             rel = str(match.file.relative_to(self._root))
         except ValueError:
             rel = str(match.file)
-        return f"{rel}:{match.row + 1}"
+        base = f"{rel}:{match.row + 1}"
+        preview = str(getattr(match, "preview", "")).strip()
+        if not preview:
+            return base
+        return f"{base} · {preview}"
 
     def _refresh_search_panel_results(
         self,
@@ -4190,6 +4194,8 @@ class MainWindow(QMainWindow):
                 field,
                 use_regex,
                 case_sensitive=self._search_case_sensitive,
+                include_preview=True,
+                preview_chars=96,
             ):
                 item = QListWidgetItem(self._search_result_label(match))
                 item.setData(Qt.UserRole, (str(match.file), int(match.row)))

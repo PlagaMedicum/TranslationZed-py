@@ -144,6 +144,8 @@ def test_search_side_panel_lists_results_and_navigates(qtbot, tmp_path: Path):
     item = win._search_results_list.item(0)
     assert item is not None
     assert "second.txt:1" in item.text()
+    assert "·" in item.text()
+    assert "Two" in item.text()
 
     win._file_chosen(ix_first)
     win._open_search_result_item(item)
