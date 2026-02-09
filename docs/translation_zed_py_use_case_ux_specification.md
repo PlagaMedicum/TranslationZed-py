@@ -226,7 +226,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  1 | SYS switches the left panel stack to the selected mode. |
 |  2 | SYS preserves side-panel visibility and width preference. |
 |  3 | If TM mode is selected, SYS refreshes TM suggestions for current row context. |
-|  4 | If Search mode is selected, SYS shows a minimal results list produced by toolbar search execution; selecting an item jumps to file/row. |
+|  4 | If Search mode is selected, SYS shows a minimal results list (`<path>:<row> · <one-line excerpt>`) produced by toolbar search execution; selecting an item jumps to file/row. |
 
 ### UC-13b  TM Suggestions Query
 | Field | Value |

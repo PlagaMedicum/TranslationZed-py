@@ -433,7 +433,7 @@ if dirty_files and not prompt_save():
 - Search execution is explicit (Enter / next / previous); typing only updates controls,
   it does not auto-run search.
 - Left Search side panel shows a minimal match list generated from current toolbar query/scope;
-  each item is `<relative path>:<row>` and click navigates to that match.
+  each item is `<relative path>:<row> · <one-line excerpt>` and click navigates to that match.
 - Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b.
 
 ### 5.9.1  UI Guidelines (GNOME + KDE)

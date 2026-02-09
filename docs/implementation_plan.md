@@ -361,6 +361,19 @@ Out of scope for v0.6.0:
 - Cross-locale TM suggestions.
 - Full QA suite beyond the first opt-in checks.
 
+Execution order for v0.6.0 (strict sequence):
+1. Close `A‑P0` first: no-write-on-open guard, read-only encoding diagnostics,
+   and CI gate for byte-preservation invariants.
+2. Finish `A0` extraction: complete remaining `main_window` orchestration moves,
+   then freeze service boundaries before feature expansion.
+3. Complete `A7` latency stabilization: remaining row-resize burst assertions and
+   large-file GUI regression tests.
+4. Advance `C1` TM robustness: ranking diagnostics assertions, production-max
+   stress fixtures, and short-query acceptance coverage.
+5. Deliver `C2` QA MVP: non-blocking checks + persistent toggles + navigable warnings.
+6. Execute `A8` hardening: two consecutive cross-platform RC dry-runs with artifact builds.
+7. Final v0.6 polish: update docs/checklists/changelog only after steps 1..6 are green.
+
 Priority A — **Core workflow completeness** (ordered, status)
 A‑P0 [→] **Encoding integrity conflicts + no-write-on-open guarantee** (**highest priority**)
    - **Problem**: opening locales appears to change some files/encodings even without user edits.
@@ -452,7 +465,7 @@ A2 [✓] **Multi‑file search navigation (Next/Prev + minimal results list)**
    - **Target**: on‑demand Next/Prev traversal across File/Locale/Pool + compact result list for direct jumps.
    - **Navigation**: Prev/Next wraps across files; selection and row focus remain stable.
    - **Implemented**: scope‑aware Next/Prev navigation backed by on‑demand scans.
-   - **Implemented**: minimal Search panel result list (`<path>:<row>`) synchronized with toolbar query/scope.
+   - **Implemented**: minimal Search panel result list (`<path>:<row> · <one-line excerpt>`) synchronized with toolbar query/scope.
    - **Implemented**: plain search supports phrase-composition matching (ordered non-contiguous query tokens),
      which improves EN/source lookups when tags/markup split words.
 A3 [✓] **Replace‑all safety**
