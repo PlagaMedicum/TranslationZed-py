@@ -9,7 +9,28 @@ on:
       - "v*"
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system dependencies (Linux)
+        run: make ci-deps
+      - name: Configure Qt offscreen (Linux)
+        run: echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ".[dev]"
+      - name: Verify project quality gates
+        run: make verify
+      - name: Validate release tag/version/changelog alignment
+        run: make release-check TAG=${{ github.ref_name }}
+
   build:
+    needs: preflight
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
