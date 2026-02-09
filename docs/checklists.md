@@ -1,4 +1,4 @@
-_Last updated: 2026-02-08_
+_Last updated: 2026-02-09_
 
 # Checklists
 
@@ -23,7 +23,28 @@ avoid missing mandatory tasks.
 - **Run** `make verify`
 - **Confirm** `make pack` completes on your platform
 - **Check** `CHANGELOG.md` and version string(s)
+  - `pyproject.toml` `version`
+  - `translationzed_py/version.py` `__version__`
+  - `CHANGELOG.md` release heading must match tag (for example `## [0.5.0] - YYYY-MM-DD`)
 - **Push** tags only when CI is green
+- **Ensure** docs are synchronized for release scope
+  - `docs/translation_zed_py_technical_specification.md`
+  - `docs/translation_zed_py_use_case_ux_specification.md`
+  - `docs/implementation_plan.md`
+  - `docs/testing_strategy.md`
+  - `docs/tm_ranking_algorithm.md` (if TM ranking changed)
+
+## v0.5.0 release gate (current target)
+
+- **Feature readiness**
+  - TM import/sync/query path stable for project+import origins.
+  - TM fuzzy ranking behavior validated against corpus + targeted regression cases.
+  - Large-file editing/scroll behavior within perf budgets.
+- **Verification**
+  - `make verify` passes with fixture-backed perf scenarios.
+  - Manual smoke: open project, edit/save, conflict merge, TM suggestions/apply.
+- **Packaging**
+  - `make pack` produces runnable artifact for release OS.
 
 ## CI troubleshooting
 
