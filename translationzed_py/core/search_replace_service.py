@@ -250,11 +250,19 @@ def search_across_files(
     if not files:
         return None
     if anchor_path not in files:
+        anchor_index = 0
         anchor_path = files[0]
+    else:
+        anchor_index = files.index(anchor_path)
 
-    ordered_others = [path for path in files if path != anchor_path]
     if direction < 0:
-        ordered_others = list(reversed(ordered_others))
+        before = list(reversed(files[:anchor_index]))
+        after = list(reversed(files[anchor_index + 1 :]))
+        ordered_others = before + after if wrap else before
+    else:
+        after = list(files[anchor_index + 1 :])
+        before = list(files[:anchor_index])
+        ordered_others = after + before if wrap else after
 
     match = find_in_file(anchor_path, anchor_row)
     if match is not None:

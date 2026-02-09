@@ -207,7 +207,34 @@ def test_search_across_files_honors_direction_and_wrap() -> None:
     )
 
     assert match is not None and match.file == Path("c.txt") and match.row == 2
-    assert calls[:2] == [(Path("b.txt"), 9), (Path("a.txt"), -1)]
+    assert calls[:2] == [(Path("b.txt"), 9), (Path("c.txt"), -1)]
+
+
+def test_search_across_files_wraps_after_anchor_sequence() -> None:
+    files = [Path("a.txt"), Path("b.txt"), Path("c.txt"), Path("d.txt")]
+    calls: list[tuple[Path, int]] = []
+
+    def finder(path: Path, start_row: int):
+        calls.append((path, start_row))
+        if path == Path("d.txt") and start_row == -1:
+            return SearchRow(path, 3, "K", "", "match")
+        return None
+
+    match = search_across_files(
+        files=files,
+        anchor_path=Path("b.txt"),
+        anchor_row=100,
+        direction=1,
+        wrap=True,
+        find_in_file=finder,
+    )
+
+    assert match is not None and match.file == Path("d.txt")
+    assert calls[:3] == [
+        (Path("b.txt"), 100),
+        (Path("c.txt"), -1),
+        (Path("d.txt"), -1),
+    ]
 
 
 def test_search_across_files_no_wrap_returns_none() -> None:

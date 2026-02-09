@@ -59,3 +59,40 @@ def test_search_moves_to_other_file(qtbot, tmp_path: Path):
     current = win.table.currentIndex()
     assert current.isValid()
     assert current.row() == 0
+
+
+def test_search_pool_cycles_all_files_before_repeating(qtbot, tmp_path: Path):
+    dst = tmp_path / "proj"
+    dst.mkdir()
+    for loc in ("EN", "BE"):
+        (dst / loc).mkdir()
+        (dst / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n", encoding="utf-8"
+        )
+    for name in ("a.txt", "b.txt", "c.txt"):
+        (dst / "BE" / name).write_text(f'UI_KEY = "Needle {name}"\n')
+    win = MainWindow(str(dst), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(dst / "BE" / "b.txt")
+    win._file_chosen(ix)
+    model = win.table.model()
+    assert model is not None
+    win.table.setCurrentIndex(model.index(0, 2))
+    win._search_scope = "POOL"
+    win.search_edit.setText("Needle")
+
+    win._search_next()
+    qtbot.waitUntil(
+        lambda: win._current_pf and win._current_pf.path == dst / "BE" / "c.txt",
+        timeout=1000,
+    )
+    win._search_next()
+    qtbot.waitUntil(
+        lambda: win._current_pf and win._current_pf.path == dst / "BE" / "a.txt",
+        timeout=1000,
+    )
+    win._search_next()
+    qtbot.waitUntil(
+        lambda: win._current_pf and win._current_pf.path == dst / "BE" / "b.txt",
+        timeout=1000,
+    )

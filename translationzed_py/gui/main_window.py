@@ -132,9 +132,6 @@ from translationzed_py.core.search_replace_service import (
     find_match_in_rows as _sr_find_match_in_rows,
 )
 from translationzed_py.core.search_replace_service import (
-    prioritize_current_file as _sr_prioritize_current_file,
-)
-from translationzed_py.core.search_replace_service import (
     replace_text as _sr_replace_text,
 )
 from translationzed_py.core.search_replace_service import (
@@ -3806,11 +3803,7 @@ class MainWindow(QMainWindow):
         return rows
 
     def _search_files_for_scope(self) -> list[Path]:
-        current_path = self._current_pf.path if self._current_pf else None
-        return _sr_prioritize_current_file(
-            list(self._files_for_scope(self._search_scope)),
-            current_path,
-        )
+        return list(self._files_for_scope(self._search_scope))
 
     def _search_anchor_row(self, direction: int) -> int:
         current = self.table.currentIndex()
