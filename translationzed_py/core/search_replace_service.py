@@ -137,14 +137,27 @@ def find_match_in_rows(
     *,
     start_row: int,
     direction: int,
+    case_sensitive: bool = False,
 ) -> Match | None:
     if direction >= 0:
-        for match in iter_matches(rows, query, field, use_regex):
+        for match in iter_matches(
+            rows,
+            query,
+            field,
+            use_regex,
+            case_sensitive=case_sensitive,
+        ):
             if match.row > start_row:
                 return match
         return None
     last_match: Match | None = None
-    for match in iter_matches(rows, query, field, use_regex):
+    for match in iter_matches(
+        rows,
+        query,
+        field,
+        use_regex,
+        case_sensitive=case_sensitive,
+    ):
         if match.row >= start_row:
             break
         last_match = match

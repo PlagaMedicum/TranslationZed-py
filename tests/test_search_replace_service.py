@@ -118,6 +118,32 @@ def test_find_match_in_rows_forward_and_backward() -> None:
     assert back is not None and back.row == 1
 
 
+def test_find_match_in_rows_honors_case_sensitive_toggle() -> None:
+    rows = [SearchRow(Path("x"), 0, "A", "Alpha", "Value")]
+
+    insensitive = find_match_in_rows(
+        rows,
+        "alpha",
+        SearchField.SOURCE,
+        False,
+        start_row=-1,
+        direction=1,
+        case_sensitive=False,
+    )
+    sensitive = find_match_in_rows(
+        rows,
+        "alpha",
+        SearchField.SOURCE,
+        False,
+        start_row=-1,
+        direction=1,
+        case_sensitive=True,
+    )
+
+    assert insensitive is not None and insensitive.row == 0
+    assert sensitive is None
+
+
 def test_replace_text_single_and_all_modes() -> None:
     pattern = re.compile("a")
     changed, text = replace_text(

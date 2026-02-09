@@ -511,6 +511,9 @@ class MainWindow(QMainWindow):
         self._last_locales = normalized_prefs.last_locales
         self._last_root = normalized_prefs.last_root
         self._prefs_extras = normalized_prefs.extras
+        self._search_case_sensitive = _bool_from_pref(
+            self._prefs_extras.get("SEARCH_CASE_SENSITIVE"), False
+        )
         self._tm_min_score = _int_from_pref(
             self._prefs_extras.get("TM_MIN_SCORE"), 50, min_value=5, max_value=100
         )
@@ -629,9 +632,17 @@ class MainWindow(QMainWindow):
         regex_wrap = QWidget(self)
         regex_layout = QHBoxLayout(regex_wrap)
         regex_layout.setContentsMargins(0, 0, 0, 0)
-        regex_layout.setSpacing(0)
+        regex_layout.setSpacing(2)
         regex_layout.addWidget(self.regex_check)
         regex_layout.addWidget(self.regex_help)
+        self.search_case_btn = QToolButton(self)
+        self.search_case_btn.setCheckable(True)
+        self.search_case_btn.setAutoRaise(True)
+        self.search_case_btn.setText("Aa")
+        self.search_case_btn.setChecked(self._search_case_sensitive)
+        self.search_case_btn.toggled.connect(self._toggle_search_case_sensitive)
+        regex_layout.addWidget(self.search_case_btn)
+        self._update_case_toggle_ui()
         self.toolbar.addWidget(regex_wrap)
         self.search_edit = QLineEdit(self)
         self.search_edit.setPlaceholderText("Search")
@@ -3032,6 +3043,27 @@ class MainWindow(QMainWindow):
         if self._search_timer.isActive():
             self._search_timer.stop()
 
+    def _update_case_toggle_ui(self) -> None:
+        if not hasattr(self, "search_case_btn") or self.search_case_btn is None:
+            return
+        if self._search_case_sensitive:
+            self.search_case_btn.setToolTip(
+                "Case-sensitive search (click to ignore case)"
+            )
+        else:
+            self.search_case_btn.setToolTip(
+                "Case-insensitive search (click to match case)"
+            )
+
+    def _toggle_search_case_sensitive(self, checked: bool) -> None:
+        self._search_case_sensitive = bool(checked)
+        self._prefs_extras["SEARCH_CASE_SENSITIVE"] = (
+            "true" if self._search_case_sensitive else "false"
+        )
+        self._update_case_toggle_ui()
+        self._on_search_controls_changed()
+        self._persist_preferences()
+
     def _toggle_replace(self, checked: bool) -> None:
         self._replace_visible = bool(checked)
         self.replace_toolbar.setVisible(self._replace_visible)
@@ -3077,7 +3109,9 @@ class MainWindow(QMainWindow):
         if not query:
             return None, "", False, False, False
         use_regex = self.regex_check.isChecked()
-        flags = re.IGNORECASE | re.MULTILINE
+        flags = re.MULTILINE
+        if not self._search_case_sensitive:
+            flags |= re.IGNORECASE
         try:
             if use_regex:
                 pattern = re.compile(query, flags)
@@ -3819,6 +3853,7 @@ class MainWindow(QMainWindow):
         *,
         start_row: int,
         direction: int,
+        case_sensitive: bool,
     ) -> _SearchMatch | None:
         return _sr_find_match_in_rows(
             rows,
@@ -3827,6 +3862,7 @@ class MainWindow(QMainWindow):
             use_regex,
             start_row=start_row,
             direction=direction,
+            case_sensitive=case_sensitive,
         )
 
     def _find_match_in_file(
@@ -3856,7 +3892,13 @@ class MainWindow(QMainWindow):
                 include_value=include_value,
             )
         return self._find_match_in_rows(
-            rows, query, field, use_regex, start_row=start_row, direction=direction
+            rows,
+            query,
+            field,
+            use_regex,
+            start_row=start_row,
+            direction=direction,
+            case_sensitive=self._search_case_sensitive,
         )
 
     def _select_match(self, match: _SearchMatch) -> bool:

@@ -29,18 +29,16 @@ class Match:
 
 
 def _matches_literal(text: str, query: str) -> bool:
-    lowered = text.lower()
-    needle = query.lower()
-    if needle in lowered:
+    if query in text:
         return True
-    parts = [part for part in needle.split() if part]
+    parts = [part for part in query.split() if part]
     # Phrase composition mode: allow non-contiguous token matches in order,
     # but only for meaningful multi-token queries.
     if len(parts) < 2 or sum(len(part) for part in parts) < 4:
         return False
     pos = 0
     for part in parts:
-        found = lowered.find(part, pos)
+        found = text.find(part, pos)
         if found < 0:
             return False
         pos = found + len(part)
@@ -52,17 +50,23 @@ def iter_matches(
     query: str,
     field: SearchField,
     is_regex: bool,
+    *,
+    case_sensitive: bool = False,
 ) -> Iterable[Match]:
     if not query:
         return
     if is_regex:
         try:
-            matcher = re.compile(query, re.IGNORECASE | re.MULTILINE)
+            flags = re.MULTILINE
+            if not case_sensitive:
+                flags |= re.IGNORECASE
+            matcher = re.compile(query, flags)
         except re.error:
             return
     else:
         matcher = None
-        query = query.lower()
+        if not case_sensitive:
+            query = query.lower()
 
     for row in rows:
         if field is SearchField.KEY:
@@ -76,7 +80,8 @@ def iter_matches(
             if matcher.search(text):
                 yield Match(row.file, row.row)
         else:
-            if _matches_literal(text, query):
+            target = text if case_sensitive else text.lower()
+            if _matches_literal(target, query):
                 yield Match(row.file, row.row)
 
 
@@ -85,5 +90,15 @@ def search(
     query: str,
     field: SearchField,
     is_regex: bool,
+    *,
+    case_sensitive: bool = False,
 ) -> list[Match]:
-    return list(iter_matches(rows, query, field, is_regex))
+    return list(
+        iter_matches(
+            rows,
+            query,
+            field,
+            is_regex,
+            case_sensitive=case_sensitive,
+        )
+    )

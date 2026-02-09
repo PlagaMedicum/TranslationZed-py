@@ -96,3 +96,26 @@ def test_search_pool_cycles_all_files_before_repeating(qtbot, tmp_path: Path):
         lambda: win._current_pf and win._current_pf.path == dst / "BE" / "b.txt",
         timeout=1000,
     )
+
+
+def test_search_case_toggle_controls_literal_matching(qtbot, tmp_path: Path):
+    dst = tmp_path / "proj"
+    dst.mkdir()
+    for loc in ("EN", "BE"):
+        (dst / loc).mkdir()
+        (dst / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n", encoding="utf-8"
+        )
+    (dst / "BE" / "ui.txt").write_text('UI_KEY = "Alpha"\n')
+    win = MainWindow(str(dst), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(dst / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    win.search_mode.setCurrentIndex(2)
+    win.search_edit.setText("alpha")
+
+    win.search_case_btn.setChecked(True)
+    assert win._search_from_anchor(direction=1, anchor_row=-1, wrap=False) is False
+
+    win.search_case_btn.setChecked(False)
+    assert win._search_from_anchor(direction=1, anchor_row=-1, wrap=False) is True
