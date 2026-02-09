@@ -151,6 +151,23 @@ def test_tm_min_score_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
     assert extras.get("TM_MIN_SCORE") == "5"
 
 
+def test_theme_mode_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    win._apply_theme_mode("DARK", persist=True)
+    saved = preferences.load(None)
+    extras = dict(saved.get("__extras__", {}))
+    assert extras.get("UI_THEME_MODE") == "DARK"
+
+    win._apply_theme_mode("SYSTEM", persist=True)
+    saved = preferences.load(None)
+    extras = dict(saved.get("__extras__", {}))
+    assert "UI_THEME_MODE" not in extras
+
+
 def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
@@ -303,12 +320,14 @@ def test_apply_preferences_runs_tm_actions_from_tm_tab(tmp_path, qtbot, monkeypa
 def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
-        {"tm_import_dir": str(root / ".tzp" / "tms")}, tm_files=[]
+        {"tm_import_dir": str(root / ".tzp" / "tms"), "theme_mode": "DARK"},
+        tm_files=[],
     )
     qtbot.addWidget(dialog)
 
     dialog._request_tm_resolve_pending()
     values = dialog.values()
+    assert values["theme_mode"] == "DARK"
     assert values["tm_resolve_pending"] is True
     assert values["tm_export_tmx"] is False
     assert values["tm_rebuild"] is False
