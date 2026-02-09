@@ -531,8 +531,9 @@ UNTOUCHED).
   - Fuzzy scores are capped below exact score (`<= 99`) so score `100` remains exact-only.
   - Query reserves room for fuzzy neighbors even when many exact duplicates exist, so related
     strings (for example, `Drop one`/`Drop all` and `Rest`/`Run`) remain visible.
-  - Prefix/affix token variants are matched via lightweight stemming and token-relation rules;
-    substring-only noise is suppressed for one-token queries.
+  - Prefix/affix token variants are matched via token-relation rules for all locales, with
+    lightweight affix stemming enabled for EN source locale; substring-only noise is
+    suppressed for one-token queries.
   - Single-character token typos (length >= 4) are tolerated in fuzzy token matching.
   - TM suggestion diagnostics expose both ranked score and raw similarity score.
   - Project TM outranks imported TM.

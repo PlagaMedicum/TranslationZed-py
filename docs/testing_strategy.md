@@ -146,6 +146,8 @@ They include:
   neighbors (`Drop one` -> `Drop all`/`Drop-all`), affix/prefix token variants
   (`Run` -> `Running`/`Runner`), single-char typo neighbors (`Drop` -> `Drap`), and
   one-token substring-noise suppression.
+- TM ranking diagnostics and locale-scoped morphology: verify ranked-vs-raw score exposure
+  and that EN affix stemming is enabled for EN source locale only.
 - TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
   (`core.tm_import_sync` unit tests).
 - TM query/policy service: cache-key construction and score/origin filtering semantics.

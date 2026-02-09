@@ -37,10 +37,14 @@ Goals:
 
 ### 3.3 Token Match Semantics (prefix/affix-aware)
 
+Token matching uses two layers:
+- generic (all source locales): exact, one-char typo tolerance, prefix/suffix/substring guards;
+- EN-adapted (only when `source_locale == EN`): lightweight affix stemming.
+
 Two tokens are considered matching when one of the rules holds:
 - exact equality;
-- common lightweight stem equality (`ies`, `ing`, `ed`, `ers`, `er`, `es`, `s`, `ly`,
-  with doubled-consonant normalization like `running` -> `run`);
+- common lightweight EN stem equality (`ies`, `ing`, `ed`, `ers`, `er`, `es`, `s`, `ly`,
+  with doubled-consonant normalization like `running` -> `run`), EN-mode only;
 - one-character substitution tolerance for token length >= 4 (for typo-neighbors like
   `drop` vs `drap`);
 - prefix/suffix relation for token length >= 4 with ratio guard
@@ -48,7 +52,8 @@ Two tokens are considered matching when one of the rules holds:
 - contained-substring relation for token length >= 4 with stricter ratio guard
   (`>= 0.67`).
 
-This is the mechanism that enables prefix/affix matching without rewriting TM data.
+This enables CAT-like prefix/affix matching on EN source strings without introducing
+heavy NLP dependencies.
 
 ## 4) Retrieval Pipeline
 
@@ -143,3 +148,11 @@ Regression tests cover:
 - affix/prefix token matching visibility.
 
 See `tests/test_tm_store.py` for executable examples.
+
+## 10) Scope Limits (Current)
+
+Out of scope for the current implementation:
+- context-ID and neighboring-segment weighting;
+- inline-tag/placeholder penalty model;
+- language-specific lemmatizers beyond lightweight EN-affix normalization;
+- cross-locale source matching.
