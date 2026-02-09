@@ -37,6 +37,7 @@ def _register_imported_tm(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("tmx", encoding="utf-8")
     assert win._ensure_tm_store()
+    win._test_mode = False
     stat = path.stat()
     win._tm_store.upsert_import_file(
         tm_path=str(path),
@@ -157,6 +158,7 @@ def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
     assert win._ensure_tm_store()
+    win._test_mode = False
 
     tm_path = root / ".tzp" / "tms" / "sample_import.tmx"
     tm_path.parent.mkdir(parents=True, exist_ok=True)
@@ -204,6 +206,37 @@ def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
         if isinstance(match, TMMatch):
             origins.append(match.origin)
     assert "import" in origins
+
+
+def test_tm_bootstrap_rebuild_runs_even_when_store_has_entries(
+    tmp_path, qtbot, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    (root / "EN" / "ui.txt").write_text('UI_KEY = "Drop one"\n', encoding="utf-8")
+    (root / "BE" / "ui.txt").write_text('UI_KEY = "Скінуць шт."\n', encoding="utf-8")
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    assert win._ensure_tm_store()
+    win._test_mode = False
+
+    # Simulate stale/incomplete TM DB state from a previous session.
+    win._tm_store.upsert_project_entries(
+        [("UI_KEY", "Drop one", "Скінуць шт.")],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(root / "BE" / "ui.txt"),
+    )
+
+    called: list[tuple[list[str], bool, bool]] = []
+
+    def _capture_start(locales: list[str], *, interactive: bool, force: bool) -> None:
+        called.append((list(locales), interactive, force))
+
+    monkeypatch.setattr(win, "_start_tm_rebuild", _capture_start)
+    win._maybe_bootstrap_tm()
+
+    assert called == [(["BE"], False, False)]
 
 
 def test_preferences_tm_list_shows_segment_count_and_zero_warning(

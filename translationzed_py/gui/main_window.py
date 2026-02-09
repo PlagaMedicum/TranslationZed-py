@@ -1975,18 +1975,7 @@ class MainWindow(QMainWindow):
             return
         if not self._selected_locales:
             return
-        locales: list[str] = []
-        for loc in self._selected_locales:
-            if loc == "EN":
-                continue
-            try:
-                has_entries = self._tm_store.has_entries(
-                    source_locale=self._tm_source_locale, target_locale=loc
-                )
-            except Exception:
-                continue
-            if not has_entries:
-                locales.append(loc)
+        locales = [loc for loc in self._selected_locales if loc != "EN"]
         if not locales:
             return
         self._start_tm_rebuild(locales, interactive=False, force=False)
