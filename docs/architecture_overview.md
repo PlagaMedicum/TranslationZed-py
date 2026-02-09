@@ -1,5 +1,5 @@
 # TranslationZed-Py — Architecture Overview
-_Last updated: 2026-02-08_
+_Last updated: 2026-02-09_
 
 ---
 
@@ -30,9 +30,10 @@ _Last updated: 2026-02-08_
 └───────────────┬───────────────┘
                 │
 ┌───────────────┴───────────────┐
-│ Core (Domain)                  │
-│ - Entry, Status, ParsedFile    │
-│ - Domain rules + invariants    │
+│ Core / Application Services     │
+│ - Entry, Status, ParsedFile     │
+│ - Domain rules + invariants     │
+│ - Qt-free workflow services     │
 └───────────────┬───────────────┘
                 │ Ports / Interfaces
 ┌───────────────┴───────────────┐
@@ -44,8 +45,8 @@ _Last updated: 2026-02-08_
 ```
 
 Dependency rule:
-- **Core depends on nothing** (no Qt, no file IO).
-- **Infrastructure depends on core**, never the reverse.
+- **Core stays Qt-free** (no PySide/Qt types in core APIs).
+- **Core services may perform local IO** through stable helpers/adapters.
 - **GUI depends on core + use cases**, never the reverse.
 
 ---

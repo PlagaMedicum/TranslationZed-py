@@ -145,7 +145,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Multi-file search caches per-file rows (LRU) and skips unused columns for speed
   - Active-file search rows are generated from model data (no QModelIndex lookups)
   - Search runs only on **Enter** / **Prev** / **Next**; typing updates UI only
-  - Multi-file search is **on-demand** (Next/Prev only) and does not build a results list
+  - Multi-file search is **on-demand** (Next/Prev primary) with a minimal results list in Search panel
   - Navigation wraps across files within the selected scope
   - Baseline values stored only for edited rows (lazy baseline capture)
 
@@ -297,13 +297,16 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - **Proofread** cells render with **light‑blue** background (higher priority than Translated).
   - Colors are purely visual (no blocking) and can be toggled later in Preferences
 
-### Step 29 — LanguageTool + Translation Memory (TM) [≈ future]
-- Touchpoints: new `core/tm.py`, `core/languagetool.py`, preferences, GUI suggestions panel
+### Step 29 — Translation Memory (TM) [✓]
+- Touchpoints: `core/tm_store.py`, `core/tm_query.py`, `core/tm_import_sync.py`,
+  `core/tm_preferences.py`, `core/tm_workflow_service.py`, `core/tm_rebuild.py`,
+  `core/tmx_io.py`, `gui/main_window.py`, `gui/preferences_dialog.py`
 - Acceptance:
-  - Import user TMs; generate project TM from accepted translations
-  - Suggestion ranking: **project‑TM** outranks imported TM; both outrank LanguageTool API suggestions
-  - LanguageTool uses configurable server URL and is optional/disabled by default
-  - No blocking UI; suggestions fetched asynchronously
+  - Project-scoped SQLite TM exists and supports asynchronous query/update flows
+  - TMX import/export works for source+target locale pairs
+  - Ranking keeps exact-first order and fuzzy recall down to 5% threshold
+  - Imported TM visibility is controlled by ready/enabled state
+  - TM operations are centralized in Preferences -> TM tab
 
 ### Step 30 — Translation QA checks (post‑TM) [≈ future]
 - Dependency: **complete TM import/export** before starting this step.
@@ -315,6 +318,13 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
     - Missing escape sequences / code blocks
     - Translation equals Source
   - Checks are opt‑in per locale or project; results are non‑blocking warnings by default.
+
+### Step 31 — LanguageTool integration [≈ future]
+- Touchpoints: `core/languagetool.py`, Preferences, TM/QA suggestion surfaces
+- Acceptance:
+  - Configurable server URL and enable toggle
+  - Non-blocking checks/suggestions
+  - LanguageTool suggestions never override TM ranking precedence by default
 
 ---
 
@@ -403,12 +413,13 @@ A1 [✓] **Search/Replace scopes**
    - **Target**: apply File | Locale | Pool to both search and replace; keep search/replace scopes independent.
    - **UX**: status bar must always show active scope(s) and update immediately on change.
    - **Implemented**: independent search/replace scopes are enforced for FILE/LOCALE/POOL; status bar indicators reflect active scopes.
-A2 [✓] **Multi‑file search navigation (Next/Prev only)**
-   - **Problem**: cross‑file navigation must stay lightweight; a results list adds overhead and UI noise.
-   - **Impact**: precomputed lists slow large projects and clutter the workflow.
-   - **Target**: on‑demand Next/Prev traversal across File/Locale/Pool; no results list.
+A2 [✓] **Multi‑file search navigation (Next/Prev + minimal results list)**
+   - **Problem**: cross‑file navigation must stay lightweight while still exposing jumpable context.
+   - **Impact**: full precomputed result browsers can slow large projects and clutter the workflow.
+   - **Target**: on‑demand Next/Prev traversal across File/Locale/Pool + compact result list for direct jumps.
    - **Navigation**: Prev/Next wraps across files; selection and row focus remain stable.
-   - **Implemented**: scope‑aware Next/Prev navigation without a results list (on‑demand scans).
+   - **Implemented**: scope‑aware Next/Prev navigation backed by on‑demand scans.
+   - **Implemented**: minimal Search panel result list (`<path>:<row>`) synchronized with toolbar query/scope.
    - **Implemented**: plain search supports phrase-composition matching (ordered non-contiguous query tokens),
      which improves EN/source lookups when tags/markup split words.
 A3 [✓] **Replace‑all safety**
@@ -431,7 +442,7 @@ A4 [✓] **Large‑file performance** (more urgent now)
    - [✓] **Dirty dot index O(1)**
      - **Problem**: dot detection still walks cache files on startup.
      - **Target**: cache‑header draft flag so “dirty” can be read without parsing rows.
-   - [✓] **On‑demand multi‑file search** (Next/Prev only; no precomputed results list).
+   - [✓] **On‑demand multi‑file search** (Next/Prev primary; minimal results list, no heavy precomputed browser).
    - [✓] **Fast initial open**
      - **Problem**: first render still pays parse + layout costs before user can act.
      - **Target**: first paint within a tight budget; defer non‑critical work (row sizing, full search cache).
@@ -528,6 +539,8 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TM fuzzy ranking upgraded to token/prefix/affix-aware retrieval with explicit
        single-token noise suppression (`all` should not match `small` by substring only).
      - [✓] Dedicated ranking contract documented in `docs/tm_ranking_algorithm.md`.
+     - [✓] TM ranking corpus formalized with bidirectional `Drop one`/`Drop all` recall
+       and low-threshold minimum-density assertions (`expect_min_results` / `expect_min_unique_sources`).
      - [✓] Preferences TM action to resolve pending imported TMs with manual locale mapping.
      - [✓] Imported TM visibility policy: only `ready + enabled` imports are considered in TM query results.
      - [✓] Preferences TM tab supports queued import, remove, enable/disable per imported TM file, plus segment-count visibility and zero-segment warning marker.

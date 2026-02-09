@@ -46,7 +46,7 @@ make test
 ```
 
 Notes:
-- A local config is stored in `.tzp-config/settings.env`.
+- A local config is stored in `.tzp/config/settings.env`.
 - Use `make run` without ARGS to open the default root (set on the first startup).
 
 ## Packaging (executables)

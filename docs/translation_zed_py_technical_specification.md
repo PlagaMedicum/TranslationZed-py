@@ -83,11 +83,13 @@ translationzed_py/
 │   ├── conflict_service.py  # conflict policy + merge planning (non-Qt)
 │   ├── file_workflow.py     # file/cache overlay + cache-save planning (non-Qt)
 │   ├── project_session.py   # session cache scan + auto-open selection (non-Qt)
+│   ├── render_workflow_service.py # large-file render/span policy (non-Qt)
 │   ├── search_replace_service.py # scope/search/replace planning (non-Qt)
 │   ├── preferences_service.py # startup root + prefs normalization/persist policy (non-Qt)
 │   ├── tm_store.py          # project TM storage/query (SQLite)
 │   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
 │   ├── tm_query.py          # TM query policy/filter helpers (non-Qt)
+│   ├── tm_workflow_service.py # TM cache/pending/query orchestration (non-Qt)
 │   ├── tm_preferences.py    # TM preference action orchestration (non-Qt)
 │   ├── tm_rebuild.py        # project-TM rebuild service (non-Qt)
 │   ├── save_exit_flow.py    # save/exit decision flow (non-Qt)
@@ -331,6 +333,8 @@ Algorithm:
 - Default: `LARGE_TEXT_OPTIMIZATIONS=true`.
 - When enabled:
   - **Large‑file mode** triggers at ≥5,000 rows or ≥1,000,000 bytes.
+  - `core.render_workflow_service` owns Qt-free render/span calculations (large-file detection,
+    visible/prefetch windows, resumed row-resize spans).
   - **Render‑cost heuristic**: if max entry length ≥ 3x preview limit (default 2,400),
     large‑file mode is forced and table preview is enabled (default 800 chars).
   - Large‑file mode keeps wrap/highlight/glyphs enabled, but uses **time‑sliced row
@@ -534,6 +538,8 @@ UNTOUCHED).
 - Matching:
   - `core.tm_query` owns query-policy helpers (origin toggles, min-score normalization,
     cache-key construction, post-query filtering), used by GUI adapter.
+  - `core.tm_workflow_service` owns query-cache planning, pending update batching, and stale-result
+    guards for asynchronous TM lookups.
   - Exact match returns score **100**.
   - Fuzzy match uses bounded candidate pools (prefix/token/fallback), token-aware relevance
     gates, and weighted scoring on top of `SequenceMatcher`; keeps scores at/above configured
