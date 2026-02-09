@@ -22,6 +22,7 @@ avoid missing mandatory tasks.
 
 - **Run** `make verify`
 - **Confirm** `make pack` completes on your platform
+- **Run** `make release-check TAG=vX.Y.Z`
 - **Check** `CHANGELOG.md` and version string(s)
   - `pyproject.toml` `version`
   - `translationzed_py/version.py` `__version__`
