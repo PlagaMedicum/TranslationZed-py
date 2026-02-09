@@ -251,7 +251,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  3 | SYS updates table/status widgets and persists draft/cache state via normal edit pipeline. |
 
 ### UC-13d  Import TMX
-| **Trigger** | *TM ▸ Import TMX…* |
+| **Trigger** | *General ▸ Preferences ▸ TM tab ▸ Import TMX…* |
 | **Flow** |
 |  1 | SYS opens TMX file picker. |
 |  2 | SYS copies selected TMX into managed TM import folder (default: `.tzp/tms` at runtime root). |
@@ -269,7 +269,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Post-condition** | TM store reflects folder content without mixing unrelated locale pairs. |
 
 ### UC-13f  Resolve Pending Imported TMs
-| **Trigger** | *TM ▸ Resolve Pending Imported TMs…* |
+| **Trigger** | *General ▸ Preferences ▸ TM tab ▸ Resolve Pending* |
 | **Flow** |
 |  1 | SYS lists pending import files lacking reliable locale mapping. |
 |  2 | SYS asks user to select source/target locales per file (with **Skip all for now** option). |
@@ -277,14 +277,14 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  4 | SYS keeps unresolved files pending if user cancels mapping; pending files remain excluded from TM suggestions. |
 
 ### UC-13g  Export TMX
-| **Trigger** | *TM ▸ Export TMX…* |
+| **Trigger** | *General ▸ Preferences ▸ TM tab ▸ Export TMX…* |
 | **Flow** |
 |  1 | SYS opens save dialog for TMX output path. |
 |  2 | SYS asks user for source/target locales to export. |
 |  3 | SYS writes TMX stream from project TM for selected pair and reports exported unit count. |
 
 ### UC-13h  Rebuild Project TM (Selected Locales)
-| **Trigger** | *TM ▸ Rebuild Project TM (Selected Locales)* |
+| **Trigger** | Toolbar **Rebuild TM** button or *General ▸ Preferences ▸ TM tab ▸ Rebuild TM* |
 | **Flow** |
 |  1 | SYS validates selected non-EN locales. |
 |  2 | SYS starts background rebuild worker that pairs EN source with target translations. |
@@ -307,7 +307,8 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  2 | User may queue TMX imports, remove selected imported TM files, or toggle ready files on/off. |
 |  3 | Before removals are applied, SYS asks for explicit confirmation that selected TM files will be deleted from disk. |
 |  4 | On confirmation, SYS applies removals/toggles and imports queued files into managed TM folder. |
-|  5 | SYS re-syncs imported TMs and refreshes TM suggestions when TM panel is active. |
+|  5 | User may run TM operations directly from this tab: **Resolve Pending**, **Export TMX…**, **Rebuild TM**. |
+|  6 | SYS re-syncs imported TMs and refreshes TM suggestions when TM panel is active. |
 | **Post-condition** | Imported TM set and enable-state match preferences changes; disabled TMs are ignored by suggestions. |
 
 ---

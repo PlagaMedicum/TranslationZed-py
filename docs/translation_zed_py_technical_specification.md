@@ -561,6 +561,8 @@ UNTOUCHED).
   - Sync summary reports imported/unresolved/failed files; zero-segment imports are surfaced as warnings.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
     new imports, with per-file segment counts and raw locale-tag metadata display.
+  - TM operational commands (resolve pending imports, export TMX, rebuild TM) are executed from
+    Preferences TM tab; top menu does not duplicate these commands.
   - `core.tm_preferences` applies preference actions (queue-import copy, remove, enable/disable)
     without Qt dependencies; GUI owns confirmations/dialog presentation.
   - Removing imported TMs requires explicit confirmation that files will be deleted from disk.
