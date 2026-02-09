@@ -5,50 +5,42 @@ All notable changes to this project will be documented in this file.
 ## [0.5.0] - 2026-02-09
 
 ### Added
-- Translation Memory (TM) subsystem:
-  - Project TM SQLite store at `.tzp/config/tm.sqlite`.
-  - TMX import/export for source+target locale pairs.
-  - Managed imported-TM folder at `.tzp/tms` with sync-on-open behavior.
-  - Preferences -> TM operations: import, resolve pending mappings, enable/disable, remove, export, rebuild, diagnostics.
-  - Diagnostics report with copyable output and query/import visibility metrics.
-- TM ranking contract and coverage:
-  - Token/prefix/affix-aware fuzzy matching with EN-adapted stemming.
-  - Score threshold range `5..100` (default `50`), origin filters, and deep-query limits for low-threshold recall.
-  - Deterministic corpus-based acceptance tests for fuzzy ranking/regression behavior.
-- Service-layer extraction for main workflows (Qt-free core orchestration):
-  - `ConflictService`, `FileWorkflowService`, `SearchReplaceService`, `PreferencesService`,
-    `RenderWorkflowService`, `TMWorkflowService`, `tm_import_sync`, `tm_query`, `tm_preferences`,
-    `tm_rebuild`, `save_exit_flow`, `project_session`.
-- Search UX improvements:
-  - Search executes on explicit actions (Enter/Next/Prev), not on typing.
-  - Minimal Search side-panel results list with direct navigation.
-  - Case-sensitive toggle in the toolbar.
-- Expanded performance and verification tooling:
-  - Perf trace categories (`TZP_PERF_TRACE=...`) for hotspot diagnosis.
-  - Fixture-backed perf scenarios integrated into `make verify`.
+- **Translation Memory is now usable in daily work**:
+  - You can get TM suggestions from both project files and imported TMX files.
+  - You can import and export TMX for a source + target locale pair.
+  - Imported TMs can be managed in Preferences -> TM (enable/disable, remove, resolve mapping, rebuild, diagnostics).
+  - Diagnostics are shown in a copyable report to make troubleshooting easier.
+- **Fuzzy matching is broader and more practical**:
+  - Similar strings are found with better token/prefix/affix matching.
+  - Minimum score is adjustable from `5` to `100` (default `50`).
+  - Ranking behavior is now validated by a stable regression corpus.
+- **Search workflow is cleaner**:
+  - Search runs on explicit actions (Enter / Next / Prev), not on every keystroke.
+  - A compact Search side list allows quick jump to found rows.
+  - Added case-sensitive toggle in the toolbar.
 
 ### Changed
-- Runtime-local state layout normalized under `.tzp/`:
-  - `.tzp/config/settings.env`
-  - `.tzp/cache/*`
-  - `.tzp/tms/*`
-- Legacy config/import paths are auto-migrated to canonical `.tzp` paths.
-- Large-file behavior tuned for smoother row sizing/paint and on-demand text preview paths.
-- TM command surface decluttered: operational controls are centralized in Preferences -> TM,
-  with a compact Rebuild glyph button in TM sidebar.
+- Local app data is now consistently stored under one folder: `.tzp/`
+  (`.tzp/config`, `.tzp/cache`, `.tzp/tms`).
+- Older config/import paths are migrated automatically to the new structure.
+- Large files now feel smoother to open and scroll due to rendering and row-size optimizations.
+- TM controls were decluttered:
+  - full management in Preferences -> TM,
+  - quick Rebuild button remains in TM sidebar.
 
 ### Fixed
-- UTF-16 BOM-less parsing fallback now depends on valid `language.txt` charset metadata.
-- `language.txt` is enforced as mandatory and read-only (malformed/missing locale blocks opening that locale).
-- Conflict-resolution status semantics:
-  - Keep cache value -> preserve cached status.
-  - Take original conflicting value -> force status `For review`.
-- Multiple TM/tooltip/runtime regressions in recent iterations (PySide API compatibility and stale UI paths).
+- Locale loading is safer:
+  - BOM-less UTF-16 fallback is used only when charset is declared in `language.txt`.
+  - `language.txt` is mandatory and treated as read-only metadata.
+- Conflict behavior is now consistent:
+  - keep cached value -> keep cached status,
+  - take source/original conflicting value -> set status to `For review`.
+- Fixed multiple TM, tooltip, and runtime stability regressions from recent iterations.
 
 ### Docs & Tests
-- Documentation structure and ownership clarified (`docs/docs_structure.md`).
-- Use-case/spec/plan synchronization improved, including TM diagnostics and ranking behavior.
-- Added targeted UI tests for TM diagnostics output and extended TM ranking corpus assertions.
+- Documentation is more structured and synchronized across spec, UX, and implementation plan.
+- Added focused tests for TM diagnostics output and TM ranking recall behavior.
+- Release process now includes stronger preflight checks (quality gates + tag/version consistency).
 
 ## [0.1.0] - 2026-01-30
 
@@ -57,7 +49,6 @@ All notable changes to this project will be documented in this file.
 - Lossless parser/saver with per-file cache for draft values and statuses.
 - Regex search/replace (current file) and multi-file search navigation.
 - String editor panel (Source read-only, Translation editable).
-- About dialog with GPL notice and expandable license.
 
 ### Changed
 - Packaging support (PyInstaller) and CI for multi-OS lint/typecheck/tests.
