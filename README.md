@@ -7,11 +7,21 @@
 
 # TranslationZed-Py
 
-TranslationZed-Py is a Python Open-source re-implementation of [TranslationZed](https://pzwiki.net/wiki/TranslationZed) for platform-independent translation of Project Zomboid. It is built as a fast, lossless CAT tool for translators, by translators. [Discussion on the PZ forum](https://theindiestone.com/forums/index.php?/topic/91297-translationzed-py-%E2%80%93-a-new-project-zomboid-translation-tool/).
+TranslationZed-Py is a Python Open-source re-implementation of [TranslationZed](https://pzwiki.net/wiki/TranslationZed) for platform-independent translation of Project Zomboid. It is built as a fast, lossless CAT (computer-assisted translation) tool for PZ translators, by PZ translators. [Discussion on the PZ forum](https://theindiestone.com/forums/index.php?/topic/91297-translationzed-py-%E2%80%93-a-new-project-zomboid-translation-tool/).
 
-This project is currently WIP and not fully ready for production use.
+This project is currently WIP, but is fully functional for production use. Still be cautious before sending merge requests into the official translations repo.
 
 This code was written at free time with a broad AI usage.
+
+The main features of this CAT are:
+- Support for all major desktop OSes (Linux, Windows, MacOS).
+- Full parsing and carefull writing of translations into original files without disrupting entries order, comments, indents etc.
+- Cache to track changes in EN strings and support of rows statuses (Untouched, For review, Translated and Proofread). Very handful for collaborative work.
+- Project's and imported TMs support.
+- TM export for selected locale.
+- Full support of search/replace with search entries list, different scopes for search and replace, full regex support.
+- Syntax highlighting and highliting for spaces and new-line character.
+- All basic editing features from other CAT systems.
 
 # Releases
 Prebuilt app folders are published as **[releases](https://github.com/PlagaMedicum/TranslationZed-py/releases)** on GitHub (Linux/Windows/macOS).
