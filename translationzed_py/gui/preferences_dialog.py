@@ -27,6 +27,11 @@ _SCOPES = [
     ("Locale", "LOCALE"),
     ("Locale Pool", "POOL"),
 ]
+_THEME_MODES = [
+    ("System", "SYSTEM"),
+    ("Light", "LIGHT"),
+    ("Dark", "DARK"),
+]
 _TM_PATH_ROLE = Qt.UserRole + 1
 _TM_IS_PENDING_ROLE = Qt.UserRole + 2
 _TM_STATUS_ROLE = Qt.UserRole + 3
@@ -87,6 +92,7 @@ class PreferencesDialog(QDialog):
             "visual_whitespace": self._visual_whitespace_check.isChecked(),
             "search_scope": self._search_scope_combo.currentData(),
             "replace_scope": self._replace_scope_combo.currentData(),
+            "theme_mode": self._theme_mode_combo.currentData(),
             "tm_enabled": changed_tm_enabled,
             "tm_remove_paths": sorted(self._tm_remove_paths),
             "tm_import_paths": list(self._tm_import_paths),
@@ -153,6 +159,11 @@ class PreferencesDialog(QDialog):
         widget = QWidget(self)
         layout = QFormLayout(widget)
 
+        self._theme_mode_combo = QComboBox(self)
+        for label, value in _THEME_MODES:
+            self._theme_mode_combo.addItem(label, value)
+        theme_mode = str(self._prefs.get("theme_mode", "SYSTEM")).upper()
+        self._set_combo_value(self._theme_mode_combo, theme_mode)
         self._wrap_text_check = QCheckBox("Wrap long strings in table", self)
         self._wrap_text_check.setChecked(bool(self._prefs.get("wrap_text", False)))
         self._large_text_opt_check = QCheckBox(
@@ -174,6 +185,7 @@ class PreferencesDialog(QDialog):
             bool(self._prefs.get("visual_whitespace", False))
         )
 
+        layout.addRow(QLabel("Theme"), self._theme_mode_combo)
         layout.addRow(self._wrap_text_check)
         layout.addRow(self._large_text_opt_check)
         layout.addRow(self._visual_highlight_check)

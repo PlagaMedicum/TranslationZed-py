@@ -232,6 +232,9 @@ from .entry_model import TranslationModel
 from .fs_model import FsModel
 from .perf_trace import PERF_TRACE
 from .preferences_dialog import PreferencesDialog
+from .theme import THEME_SYSTEM as _THEME_SYSTEM
+from .theme import apply_theme as _apply_app_theme
+from .theme import normalize_theme_mode as _normalize_theme_mode
 
 _TEST_DIALOGS_PATCHED = False
 _ORIG_QMESSAGEBOX_EXEC = None
@@ -517,6 +520,10 @@ class MainWindow(QMainWindow):
         self._last_locales = normalized_prefs.last_locales
         self._last_root = normalized_prefs.last_root
         self._prefs_extras = normalized_prefs.extras
+        self._theme_mode = _normalize_theme_mode(
+            self._prefs_extras.get("UI_THEME_MODE"), default=_THEME_SYSTEM
+        )
+        self._apply_theme_mode(self._theme_mode, persist=False)
         self._search_case_sensitive = _bool_from_pref(
             self._prefs_extras.get("SEARCH_CASE_SENSITIVE"), False
         )
@@ -2138,6 +2145,7 @@ class MainWindow(QMainWindow):
         prefs = {
             "default_root": self._default_root,
             "tm_import_dir": self._tm_import_dir,
+            "theme_mode": self._theme_mode,
             "prompt_write_on_exit": self._prompt_write_on_exit,
             "wrap_text": self._wrap_text_user,
             "large_text_optimizations": self._large_text_optimizations,
@@ -2173,7 +2181,25 @@ class MainWindow(QMainWindow):
         dialog = AboutDialog(self)
         dialog.exec()
 
+    def _apply_theme_mode(self, mode: object, *, persist: bool) -> None:
+        normalized = _normalize_theme_mode(mode, default=_THEME_SYSTEM)
+        app = QApplication.instance()
+        if app is not None:
+            normalized = _apply_app_theme(app, normalized)
+        self._theme_mode = normalized
+        if normalized == _THEME_SYSTEM:
+            self._prefs_extras.pop("UI_THEME_MODE", None)
+        else:
+            self._prefs_extras["UI_THEME_MODE"] = normalized
+        if persist:
+            self._persist_preferences()
+
     def _apply_preferences(self, values: dict) -> None:
+        theme_mode = _normalize_theme_mode(
+            values.get("theme_mode", self._theme_mode), default=self._theme_mode
+        )
+        if theme_mode != self._theme_mode:
+            self._apply_theme_mode(theme_mode, persist=False)
         self._prompt_write_on_exit = bool(values.get("prompt_write_on_exit", True))
         self._wrap_text_user = bool(values.get("wrap_text", False))
         large_text_opt = bool(
