@@ -291,6 +291,7 @@ Algorithm:
   - `TM_IMPORT_DIR=<path>` (managed folder for imported TMX files)
   - `SEARCH_SCOPE=FILE|LOCALE|POOL`
   - `REPLACE_SCOPE=FILE|LOCALE|POOL`
+  - `UI_THEME_MODE=SYSTEM|LIGHT|DARK` (optional extra key; absent means `SYSTEM`)
 - (No last‑open metadata in settings; timestamps live in per‑file cache headers.)
 - Store: last root path, last locale(s), window geometry, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
@@ -346,7 +347,17 @@ Algorithm:
 - When disabled: none of the above guardrails apply.
 - Users can change or clear `DEFAULT_ROOT` via Preferences.
 
-#### 5.6.4  Save/exit orchestration boundary
+#### 5.6.4  Theme preference
+
+- Theme mode is configured in Preferences → View.
+- Supported modes:
+  - `SYSTEM` (default): use platform/native style + standard palette.
+  - `LIGHT`: explicit light palette using native base style.
+  - `DARK`: explicit dark palette for app surfaces and tooltips.
+- Setting is persisted via extras key `UI_THEME_MODE`; selecting `SYSTEM`
+  clears the override key.
+
+#### 5.6.5  Save/exit orchestration boundary
 
 - `core.save_exit_flow` owns the Qt-free decision flow for:
   - **Write Original** action (`cancel` / `write` / `cache` branches).
@@ -705,7 +716,7 @@ v0.1 uses **cache‑only** recovery:
 6. LanguageTool server API integration for grammar/spell suggestions.
 7. Translation QA checks (post‑TM import/export): per‑check toggles for missing trailing
    characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
-8. Dark system theme support (follow OS theme; no custom theming).
+8. Theme presets beyond `SYSTEM|LIGHT|DARK` (future).
 
 ## 14  Undo / Redo
 

@@ -240,11 +240,13 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Left‑side toggle collapses/expands the file tree panel
   - Last tree width is persisted across restarts
 
-### Step 22 — Dark system theme support [≈ future]
-- Touchpoints: `gui/app.py` (style init), preferences
+### Step 22 — Theme support (system/light/dark) [✓]
+- Touchpoints: `gui/theme.py`, `gui/main_window.py`, `gui/preferences_dialog.py`
 - Acceptance:
-  - Follow OS theme (light/dark) via native Qt styles
-  - No custom theming; use palette only when required
+  - Preferences → View exposes `Theme`: `System`, `Light`, `Dark`
+  - Theme changes apply immediately and affect the whole app
+  - Selected mode persists in `settings.env` extras (`UI_THEME_MODE`)
+  - `System` mode remains the default when no override is stored
 
 ### Step 23 — License compliance UI [✓]
 - Touchpoints: `gui/main_window.py`, `gui/dialogs.py`

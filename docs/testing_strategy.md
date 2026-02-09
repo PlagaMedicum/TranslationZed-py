@@ -142,6 +142,8 @@ They include:
 - GUI save encoding: cp1251 + UTF‑16 write‑back via locale `language.txt`.
 - GUI read-only integrity: open/switch without edits preserves bytes across
   UTF‑8/CP1251/UTF‑16 and LF/CRLF cases.
+- GUI theme mode: normalize/apply (`System|Light|Dark`) and settings persistence
+  via `UI_THEME_MODE` extra key.
 - GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
 - TM: SQLite store round‑trip, exact/fuzzy query, TMX import/export.

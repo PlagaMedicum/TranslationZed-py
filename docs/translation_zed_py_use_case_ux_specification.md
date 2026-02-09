@@ -167,7 +167,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  4 | User sets **Search scope** (File / Locale / Locale Pool). |
 |  5 | User sets **Replace scope** (File / Locale / Locale Pool). |
 |  6 | User toggles general options (Prompt on Exit, Wrap Text, etc.). |
-|  7 | User toggles View options (whitespace glyphs, tag/escape highlighting, large‑text optimizations). |
+|  7 | User sets **Theme** (System / Light / Dark) and toggles View options (whitespace glyphs, tag/escape highlighting, large‑text optimizations). |
 |  8 | On Apply/OK, SYS persists settings to `.tzp/config/settings.env`. |
 | **Post‑condition** | Next app launch uses the selected defaults; toolbar remains minimal. |
 
@@ -421,7 +421,7 @@ UNTOUCHED ──────────────────────▶ 
    and can be hidden/shown via a **left‑side toggle**; the detail editor pane is
    toggled from the **bottom bar**. TM panel includes filters (min score + origin
    toggles for project/import) and supports project‑TM rebuild from selected locales.
-11. **System theme**: future support for OS light/dark theme via native Qt styles (no custom theme).
+11. **Theme modes**: Preferences → View supports **System / Light / Dark**; changes apply app-wide immediately and persist.
 12. **Translation QA checks (future)**: add an opt‑in QA panel with per‑check toggles
    (missing trailing characters, missing/extra newlines, missing escapes/code blocks,
    translation equals Source). Implement **only after** TM import/export is complete.
