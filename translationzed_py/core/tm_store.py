@@ -19,9 +19,11 @@ _IMPORT_ORIGIN = "import"
 _MIN_FUZZY_SCORE = 5
 _MAX_FUZZY_CANDIDATES = 1200
 _FUZZY_RESERVED_SLOTS = 3
+_FUZZY_BUCKET_CANDIDATES = 600
 _SHORT_QUERY_LEN = 4
 _SHORT_QUERY_RESERVED_SLOTS = 6
 _SHORT_QUERY_MAX_CANDIDATES = 5000
+_SHORT_QUERY_BUCKET_CANDIDATES = 2500
 _MAX_FUZZY_SOURCE_LEN = 5000
 _IMPORT_VISIBLE_SQL = """
 origin != 'import'
@@ -87,18 +89,67 @@ def _query_tokens(text: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(tokens))
 
 
-def _contains_composed_phrase(text: str, query: str) -> bool:
-    if query in text:
+def _stem_token(token: str) -> str:
+    if len(token) <= 3:
+        return token
+    if token.endswith("ies") and len(token) > 4:
+        return token[:-3] + "y"
+    for suffix in ("ing", "ed", "ers", "er", "es", "s", "ly"):
+        if not token.endswith(suffix):
+            continue
+        if len(token) - len(suffix) < 3:
+            continue
+        stem = token[: -len(suffix)]
+        # Normalize doubled trailing consonants: "running" -> "run".
+        if len(stem) >= 3 and stem[-1] == stem[-2]:
+            stem = stem[:-1]
+        return stem
+    return token
+
+
+def _token_matches(query_token: str, candidate_token: str) -> bool:
+    if query_token == candidate_token:
         return True
-    parts = _query_tokens(query)
-    if len(parts) < 2:
+    query_stem = _stem_token(query_token)
+    candidate_stem = _stem_token(candidate_token)
+    if len(query_stem) >= 3 and query_stem == candidate_stem:
+        return True
+    shorter, longer = (
+        (query_token, candidate_token)
+        if len(query_token) <= len(candidate_token)
+        else (candidate_token, query_token)
+    )
+    if len(shorter) < 4:
         return False
+    ratio = len(shorter) / len(longer)
+    if (longer.startswith(shorter) or longer.endswith(shorter)) and ratio >= 0.50:
+        return True
+    if shorter in longer:
+        return ratio >= 0.67
+    return False
+
+
+def _contains_composed_phrase(text: str, query: str) -> bool:
+    parts = _query_tokens(query)
+    if not parts:
+        return False
+    text_tokens = _query_tokens(text)
+    if not text_tokens:
+        return False
+    if len(parts) == 1:
+        token = parts[0]
+        return any(_token_matches(token, cand) for cand in text_tokens)
     pos = 0
     for part in parts:
-        found = text.find(part, pos)
-        if found < 0:
+        found = False
+        while pos < len(text_tokens):
+            if _token_matches(part, text_tokens[pos]):
+                found = True
+                pos += 1
+                break
+            pos += 1
+        if not found:
             return False
-        pos = found + len(part)
     return True
 
 
@@ -108,27 +159,20 @@ def _soft_token_overlap(
 ) -> float:
     if not query_tokens or not candidate_tokens:
         return 0.0
-
-    def _token_matches(query_token: str, candidate_token: str) -> bool:
-        if query_token == candidate_token:
-            return True
-        shorter, longer = (
-            (query_token, candidate_token)
-            if len(query_token) <= len(candidate_token)
-            else (candidate_token, query_token)
-        )
-        if len(shorter) < 4:
-            return False
-        if longer.startswith(shorter):
-            return (len(shorter) / len(longer)) >= 0.75
-        if shorter in longer:
-            return (len(shorter) / len(longer)) >= 0.80
-        return False
-
     matched = 0
     for query_token in query_tokens:
         if any(_token_matches(query_token, cand) for cand in candidate_tokens):
             matched += 1
+    return matched / max(1, len(query_tokens))
+
+
+def _exact_token_overlap(
+    query_tokens: set[str],
+    candidate_tokens: set[str],
+) -> float:
+    if not query_tokens or not candidate_tokens:
+        return 0.0
+    matched = sum(1 for token in query_tokens if token in candidate_tokens)
     return matched / max(1, len(query_tokens))
 
 
@@ -305,6 +349,12 @@ class TMStore:
             """
             CREATE INDEX IF NOT EXISTS tm_prefix_lookup
             ON tm_entries(source_locale, target_locale, source_prefix, source_len)
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS tm_len_lookup
+            ON tm_entries(source_locale, target_locale, source_len, origin)
             """
         )
         self._conn.execute(
@@ -919,10 +969,12 @@ class TMStore:
         min_len = max(1, int(length * 0.6))
         max_len = int(length * 1.4) if length > 5 else length + 10
         max_candidates = _MAX_FUZZY_CANDIDATES
+        bucket_candidates = _FUZZY_BUCKET_CANDIDATES
         if length <= _SHORT_QUERY_LEN:
             min_len = 1
             max_len = max(max_len, 40)
             max_candidates = _SHORT_QUERY_MAX_CANDIDATES
+            bucket_candidates = _SHORT_QUERY_BUCKET_CANDIDATES
         rows: list[sqlite3.Row] = []
         seen_rows: set[tuple[object, ...]] = set()
 
@@ -930,6 +982,8 @@ class TMStore:
             where_sql: str,
             order_sql: str,
             params: tuple[object, ...],
+            *,
+            limit: int,
         ) -> list[sqlite3.Row]:
             return conn.execute(
                 f"""
@@ -948,7 +1002,7 @@ class TMStore:
                     target_locale,
                     *params,
                     *origin_params,
-                    max_candidates,
+                    limit,
                 ),
             ).fetchall()
 
@@ -974,18 +1028,20 @@ class TMStore:
             "source_prefix = ? AND source_len BETWEEN ? AND ?",
             "ABS(source_len - ?) ASC, updated_at DESC",
             (prefix, min_len, max_len, length),
+            limit=bucket_candidates,
         )
         fallback_rows = _select_rows(
             "source_len BETWEEN ? AND ?",
             "ABS(source_len - ?) ASC, updated_at DESC",
             (min_len, max_len, length),
+            limit=bucket_candidates,
         )
-        if length <= _SHORT_QUERY_LEN:
-            # For tiny queries, prefix-only retrieval is too strict
-            # (e.g. "all" vs "apply all").
-            # Seed token-containing rows first to keep close phrase neighbors visible.
-            if len(query_tokens) == 1:
-                token = next(iter(query_tokens))
+        token_rows: list[sqlite3.Row] = []
+        if query_tokens:
+            # Query by longest token first to keep phrase neighbors visible even
+            # when source_prefix diverges ("drop one" -> "drop-all").
+            token = max(query_tokens, key=len)
+            if len(token) >= 3:
                 token_rows = _select_rows(
                     "instr(source_norm, ?) > 0 AND source_len BETWEEN ? AND ?",
                     (
@@ -1005,33 +1061,55 @@ class TMStore:
                         f"% {token}",
                         length,
                     ),
+                    limit=bucket_candidates,
                 )
+        if length <= _SHORT_QUERY_LEN:
+            # For tiny queries, prefix-only retrieval is too strict
+            # (e.g. "all" vs "apply all").
+            # Seed token-containing rows first to keep close phrase neighbors visible.
+            if token_rows:
                 _append_unique(token_rows)
             if len(rows) < max_candidates:
                 _append_unique(prefix_rows)
             if len(rows) < max_candidates:
                 _append_unique(fallback_rows)
         else:
-            rows = prefix_rows or fallback_rows
+            _append_unique(prefix_rows)
+            if len(rows) < max_candidates and token_rows:
+                _append_unique(token_rows)
+            if len(rows) < max_candidates:
+                _append_unique(fallback_rows)
         scored: list[tuple[sqlite3.Row, int]] = []
         for row in rows:
             cand_norm = row["source_norm"]
             ratio = SequenceMatcher(None, norm, cand_norm, autojunk=False).ratio()
             composed = _contains_composed_phrase(cand_norm, norm)
+            overlap = 0.0
+            exact_overlap = 0.0
             if query_tokens:
                 cand_tokens = set(_query_tokens(cand_norm))
                 if cand_tokens:
                     overlap = _soft_token_overlap(query_tokens, cand_tokens)
-                    ratio_gate = 0.45 if len(query_tokens) == 1 else 0.75
-                    if overlap < 0.5 and ratio < ratio_gate and not composed:
+                    exact_overlap = _exact_token_overlap(query_tokens, cand_tokens)
+                    if len(query_tokens) == 1:
+                        if overlap < 0.5 and not composed:
+                            continue
+                    elif overlap < 0.34 and ratio < 0.75 and not composed:
                         continue
+                elif not composed:
+                    continue
             score = int(round(ratio * 100))
+            token_bonus = int(round((overlap * 6.0) + (exact_overlap * 4.0)))
+            score = min(100, score + token_bonus)
             if composed:
-                score = max(score, 90)
+                score = max(score, 90 if len(query_tokens) > 1 else 85)
+            if score >= 100 and cand_norm != norm:
+                score = 99
             scored.append((row, score))
         scored.sort(
             key=lambda item: (
                 -item[1],
+                abs(len(item[0]["source_norm"]) - length),
                 0 if item[0]["origin"] == _PROJECT_ORIGIN else 1,
                 -item[0]["updated_at"],
             )

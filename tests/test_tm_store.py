@@ -278,6 +278,102 @@ def test_tm_store_short_query_includes_phrase_neighbors(tmp_path: Path) -> None:
     store.close()
 
 
+def test_tm_store_multi_token_query_includes_non_prefix_neighbors(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k1", "Drop one", "Скінуць шт."),
+            ("k2", "Drop-all", "Пакід. усё"),
+            ("k3", "Drop all", "Пакінуць усё"),
+            ("k4", "Drink one", "Выпіць шт."),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    fuzzy = store.query(
+        "Drop one",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=25,
+    )
+
+    sources = {match.source_text for match in fuzzy}
+    assert "Drop one" in sources
+    assert {"Drop-all", "Drop all"} & sources
+    store.close()
+
+
+def test_tm_store_single_token_query_filters_substring_noise(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k1", "All", "Усе"),
+            ("k2", "Apply all", "Прымяніць усё"),
+            ("k3", "Small crate", "Малы скрыня"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    fuzzy = store.query(
+        "All",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=5,
+    )
+
+    sources = {match.source_text for match in fuzzy}
+    assert "Apply all" in sources
+    assert "Small crate" not in sources
+    store.close()
+
+
+def test_tm_store_token_matching_supports_common_affixes(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k1", "Run", "Бег"),
+            ("k2", "Running", "Бегчы"),
+            ("k3", "Runner", "Бягун"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    fuzzy = store.query(
+        "Run",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=20,
+    )
+
+    sources = {match.source_text for match in fuzzy}
+    assert "Running" in sources
+    assert "Runner" in sources
+    store.close()
+
+
 def test_tm_store_fuzzy_prefix_lookup_handles_dense_prefix_sets(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
