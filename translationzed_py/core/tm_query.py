@@ -8,6 +8,9 @@ from .tm_store import TMMatch
 _MIN_SCORE = 5
 _DEFAULT_SCORE = 50
 _MAX_SCORE = 100
+_HIGH_RECALL_SCORE = 10
+_MEDIUM_RECALL_SCORE = 20
+_LOW_RECALL_SCORE = 40
 
 TMQueryKey = tuple[str, str, str, int, bool, bool]
 
@@ -23,6 +26,18 @@ class TMQueryPolicy:
 
 def normalize_min_score(value: int) -> int:
     return max(_MIN_SCORE, min(_MAX_SCORE, int(value)))
+
+
+def suggestion_limit_for(min_score: int) -> int:
+    """Scale result-list depth by requested recall."""
+    score = normalize_min_score(min_score)
+    if score <= _HIGH_RECALL_SCORE:
+        return 200
+    if score <= _MEDIUM_RECALL_SCORE:
+        return 120
+    if score <= _LOW_RECALL_SCORE:
+        return 60
+    return 30
 
 
 def has_enabled_origins(policy: TMQueryPolicy) -> bool:

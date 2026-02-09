@@ -190,6 +190,9 @@ from translationzed_py.core.tm_query import (
 from translationzed_py.core.tm_query import (
     origins_for as _tm_origins_for,
 )
+from translationzed_py.core.tm_query import (
+    suggestion_limit_for as _tm_suggestion_limit_for,
+)
 from translationzed_py.core.tm_rebuild import (
     TMRebuildResult,
 )
@@ -4274,7 +4277,7 @@ class MainWindow(QMainWindow):
             min_score=self._tm_min_score,
             origin_project=self._tm_origin_project,
             origin_import=self._tm_origin_import,
-            limit=12,
+            limit=_tm_suggestion_limit_for(self._tm_min_score),
         )
 
     def _on_tm_filters_changed(self) -> None:
@@ -4382,13 +4385,14 @@ class MainWindow(QMainWindow):
                 origin_import=origin_import,
             )
         )
+        limit = _tm_suggestion_limit_for(min_score)
         self._tm_query_future = self._tm_query_pool.submit(
             TMStore.query_path,
             self._tm_store.db_path,
             source_text,
             source_locale=source_locale,
             target_locale=target_locale,
-            limit=12,
+            limit=limit,
             min_score=min_score,
             origins=origins,
         )

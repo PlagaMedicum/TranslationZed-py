@@ -6,6 +6,7 @@ from translationzed_py.core.tm_query import (
     make_cache_key,
     normalize_min_score,
     origins_for,
+    suggestion_limit_for,
 )
 from translationzed_py.core.tm_store import TMMatch
 
@@ -59,3 +60,11 @@ def test_tm_query_min_score_normalization_range() -> None:
 
 def test_tm_query_default_min_score_is_precision_first() -> None:
     assert TMQueryPolicy().min_score == 50
+
+
+def test_tm_query_suggestion_limit_scales_with_min_score() -> None:
+    assert suggestion_limit_for(5) == 200
+    assert suggestion_limit_for(10) == 200
+    assert suggestion_limit_for(15) == 120
+    assert suggestion_limit_for(30) == 60
+    assert suggestion_limit_for(50) == 30
