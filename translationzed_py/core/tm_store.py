@@ -19,6 +19,9 @@ _IMPORT_ORIGIN = "import"
 _MIN_FUZZY_SCORE = 5
 _MAX_FUZZY_CANDIDATES = 1200
 _FUZZY_RESERVED_SLOTS = 3
+_SHORT_QUERY_LEN = 4
+_SHORT_QUERY_RESERVED_SLOTS = 6
+_SHORT_QUERY_MAX_CANDIDATES = 5000
 _MAX_FUZZY_SOURCE_LEN = 5000
 _IMPORT_VISIBLE_SQL = """
 origin != 'import'
@@ -818,7 +821,12 @@ class TMStore:
         ).fetchall()
         matches: list[TMMatch] = []
         seen: set[tuple[str, str, str, str | None]] = set()
-        max_exact = max(1, limit - _FUZZY_RESERVED_SLOTS)
+        fuzzy_reserved = (
+            _SHORT_QUERY_RESERVED_SLOTS
+            if len(norm) <= _SHORT_QUERY_LEN
+            else _FUZZY_RESERVED_SLOTS
+        )
+        max_exact = max(1, limit - fuzzy_reserved)
         for row in exact_rows:
             key = (
                 row["source_text"],
@@ -910,50 +918,101 @@ class TMStore:
         length = len(norm)
         min_len = max(1, int(length * 0.6))
         max_len = int(length * 1.4) if length > 5 else length + 10
-        rows = conn.execute(
-            f"""
-                SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
-                     , tm_name, tm_path
-                FROM tm_entries
-                WHERE source_locale = ? AND target_locale = ? AND source_prefix = ?
-                  AND source_len BETWEEN ? AND ?
-                  AND ({_IMPORT_VISIBLE_SQL})
-                  AND {origin_clause}
-                ORDER BY updated_at DESC
-            LIMIT ?
-            """,
-            (
-                source_locale,
-                target_locale,
-                prefix,
-                min_len,
-                max_len,
-                *origin_params,
-                _MAX_FUZZY_CANDIDATES,
-            ),
-        ).fetchall()
-        if not rows:
-            rows = conn.execute(
+        max_candidates = _MAX_FUZZY_CANDIDATES
+        if length <= _SHORT_QUERY_LEN:
+            min_len = 1
+            max_len = max(max_len, 40)
+            max_candidates = _SHORT_QUERY_MAX_CANDIDATES
+        rows: list[sqlite3.Row] = []
+        seen_rows: set[tuple[object, ...]] = set()
+
+        def _select_rows(
+            where_sql: str,
+            order_sql: str,
+            params: tuple[object, ...],
+        ) -> list[sqlite3.Row]:
+            return conn.execute(
                 f"""
                 SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
                      , tm_name, tm_path
                 FROM tm_entries
                 WHERE source_locale = ? AND target_locale = ?
-                  AND source_len BETWEEN ? AND ?
+                  AND {where_sql}
                   AND ({_IMPORT_VISIBLE_SQL})
                   AND {origin_clause}
-                ORDER BY updated_at DESC
+                ORDER BY {order_sql}
                 LIMIT ?
                 """,
                 (
                     source_locale,
                     target_locale,
-                    min_len,
-                    max_len,
+                    *params,
                     *origin_params,
-                    _MAX_FUZZY_CANDIDATES,
+                    max_candidates,
                 ),
             ).fetchall()
+
+        def _append_unique(candidates: list[sqlite3.Row]) -> None:
+            for row in candidates:
+                row_key = (
+                    row["source_text"],
+                    row["target_text"],
+                    row["origin"],
+                    row["tm_name"],
+                    row["tm_path"],
+                    row["file_path"],
+                    row["key"],
+                )
+                if row_key in seen_rows:
+                    continue
+                seen_rows.add(row_key)
+                rows.append(row)
+                if len(rows) >= max_candidates:
+                    return
+
+        prefix_rows = _select_rows(
+            "source_prefix = ? AND source_len BETWEEN ? AND ?",
+            "ABS(source_len - ?) ASC, updated_at DESC",
+            (prefix, min_len, max_len, length),
+        )
+        fallback_rows = _select_rows(
+            "source_len BETWEEN ? AND ?",
+            "ABS(source_len - ?) ASC, updated_at DESC",
+            (min_len, max_len, length),
+        )
+        if length <= _SHORT_QUERY_LEN:
+            # For tiny queries, prefix-only retrieval is too strict
+            # (e.g. "all" vs "apply all").
+            # Seed token-containing rows first to keep close phrase neighbors visible.
+            if len(query_tokens) == 1:
+                token = next(iter(query_tokens))
+                token_rows = _select_rows(
+                    "instr(source_norm, ?) > 0 AND source_len BETWEEN ? AND ?",
+                    (
+                        "CASE WHEN source_norm = ? THEN 0 "
+                        "WHEN source_norm LIKE ? THEN 1 "
+                        "WHEN source_norm LIKE ? THEN 2 "
+                        "WHEN source_norm LIKE ? THEN 3 "
+                        "ELSE 4 END, ABS(source_len - ?) ASC, updated_at DESC"
+                    ),
+                    (
+                        token,
+                        min_len,
+                        max_len,
+                        token,
+                        f"{token} %",
+                        f"% {token} %",
+                        f"% {token}",
+                        length,
+                    ),
+                )
+                _append_unique(token_rows)
+            if len(rows) < max_candidates:
+                _append_unique(prefix_rows)
+            if len(rows) < max_candidates:
+                _append_unique(fallback_rows)
+        else:
+            rows = prefix_rows or fallback_rows
         scored: list[tuple[sqlite3.Row, int]] = []
         for row in rows:
             cand_norm = row["source_norm"]
@@ -963,7 +1022,7 @@ class TMStore:
                 cand_tokens = set(_query_tokens(cand_norm))
                 if cand_tokens:
                     overlap = _soft_token_overlap(query_tokens, cand_tokens)
-                    ratio_gate = 0.65 if len(query_tokens) == 1 else 0.75
+                    ratio_gate = 0.45 if len(query_tokens) == 1 else 0.75
                     if overlap < 0.5 and ratio < ratio_gate and not composed:
                         continue
             score = int(round(ratio * 100))

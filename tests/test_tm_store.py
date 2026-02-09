@@ -238,6 +238,46 @@ def test_tm_store_keeps_fuzzy_neighbors_when_exact_pool_is_large(
     store.close()
 
 
+def test_tm_store_short_query_includes_phrase_neighbors(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = [
+        ("k_all", "All", "Усе"),
+        ("k_apply_all", "Apply all", "Прымяніць усё"),
+    ]
+    rows.extend(
+        (
+            f"noise_{i}",
+            f"All token {i:04d}",
+            f"Шум {i:04d}",
+        )
+        for i in range(2200)
+    )
+    store.upsert_project_entries(
+        rows,
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+        updated_at=1,
+    )
+
+    fuzzy = store.query(
+        "All",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=5,
+    )
+
+    match = next((item for item in fuzzy if item.source_text == "Apply all"), None)
+    assert match is not None
+    assert match.score >= 40
+    store.close()
+
+
 def test_tm_store_fuzzy_prefix_lookup_handles_dense_prefix_sets(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
