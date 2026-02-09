@@ -226,7 +226,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  1 | SYS switches the left panel stack to the selected mode. |
 |  2 | SYS preserves side-panel visibility and width preference. |
 |  3 | If TM mode is selected, SYS refreshes TM suggestions for current row context. |
-|  4 | Search side-panel tab is currently a placeholder; search execution is handled by toolbar search controls. |
+|  4 | If Search mode is selected, SYS shows a minimal results list produced by toolbar search execution; selecting an item jumps to file/row. |
 
 ### UC-13b  TM Suggestions Query
 | Field | Value |
@@ -309,9 +309,18 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  3 | User may queue TMX imports, remove selected imported TM files, or toggle ready files on/off. |
 |  4 | Before removals are applied, SYS asks for explicit confirmation that selected TM files will be deleted from disk. |
 |  5 | On confirmation, SYS applies removals/toggles and imports queued files into managed TM folder. |
-|  6 | User may run TM operations directly from this tab: **Resolve Pending**, **Export TMX…**, **Rebuild TM**. |
+|  6 | User may run TM operations directly from this tab: **Resolve Pending**, **Export TMX…**, **Rebuild TM**, **Diagnostics**. |
 |  7 | SYS re-syncs imported TMs and refreshes TM suggestions when TM panel is active. |
 | **Post-condition** | Imported TM set and enable-state match preferences changes; disabled TMs are ignored by suggestions. |
+
+### UC-13k  TM Diagnostics
+| **Trigger** | *General ▸ Preferences ▸ TM tab ▸ Diagnostics* |
+| **Flow** |
+|  1 | SYS validates TM store availability. |
+|  2 | SYS reports current query policy (`min score`, origin toggles, suggestion limit) and import registry health (`ready`, `enabled`, `pending/error`). |
+|  3 | If a row is selected, SYS reports visible match counts for current locale/query context. |
+|  4 | SYS shows diagnostics in a copyable text window (Copy + Close). |
+| **Post-condition** | User gets immediate TM-state diagnostics without mutating TM data. |
 
 ---
 ## 4  GUI Wireframe (ASCII)

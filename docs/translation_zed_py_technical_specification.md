@@ -417,6 +417,8 @@ if dirty_files and not prompt_save():
 - Regex help: a small **“?”** button opens Python `re` docs in the browser.
 - Search execution is explicit (Enter / next / previous); typing only updates controls,
   it does not auto-run search.
+- Left Search side panel shows a minimal match list generated from current toolbar query/scope;
+  each item is `<relative path>:<row>` and click navigates to that match.
 - Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b.
 
 ### 5.9.1  UI Guidelines (GNOME + KDE)
@@ -569,10 +571,13 @@ UNTOUCHED).
   - Sync summary reports imported/unresolved/failed files; zero-segment imports are surfaced as warnings.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
     new imports, with per-file segment counts and raw locale-tag metadata display.
-  - Preferences TM tab shows explicit format/storage hints (`TMX .tmx`, `.tzp/config/tm.sqlite`,
-    `.tzp/tms`) to reduce import/export ambiguity.
+  - Preferences TM tab shows explicit `Supported now`/`Planned later` format matrix plus
+    storage paths (`TMX .tmx`, `.tzp/config/tm.sqlite`, `.tzp/tms`) to reduce import/export ambiguity.
   - TM operational commands (resolve pending imports, export TMX, rebuild TM) are executed from
     Preferences TM tab; top menu does not duplicate these commands.
+  - Preferences TM tab includes a `Diagnostics` command that reports active policy and
+    import-registry/query visibility metrics in a copyable text dialog (`Copy` + `Close`),
+    without mutating TM state.
   - Rebuild is also available as an icon-only button inside the TM side panel filter row.
   - `core.tm_preferences` applies preference actions (queue-import copy, remove, enable/disable)
     without Qt dependencies; GUI owns confirmations/dialog presentation.
@@ -583,7 +588,7 @@ UNTOUCHED).
    - Auto‑bootstrap runs once per session on first TM-panel activation for selected locales
      (even if DB already has entries), to prevent stale/partial project-index behavior.
    - Rebuild/bootstrapping runs asynchronously (background worker).
-- Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j.
+- Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j, UC-13k.
 
 ---
 

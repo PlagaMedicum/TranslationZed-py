@@ -538,6 +538,9 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TM preferences action orchestration extracted into `core.tm_preferences` (Qt-free apply pipeline).
      - [✓] Integration tests added for Preferences TM deletion-confirmation flow (cancel keeps file; confirm deletes).
      - [✓] TM rebuild orchestration extracted into `core.tm_rebuild` (locale selection + rebuild worker + status formatter).
+     - [✓] Search side panel now exposes minimal clickable results list (`<path>:<row>`) wired to toolbar search scope/query.
+     - [✓] Preferences TM tab now exposes a dedicated **Diagnostics** action with copyable report window (policy + import/query summary).
+     - [✓] Preferences TM tab format hints now use explicit **Supported now / Planned later** matrix text.
    - **Deferred**: LanguageTool API (post‑v0.2).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.
