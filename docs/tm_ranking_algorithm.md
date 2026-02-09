@@ -146,8 +146,11 @@ Regression tests cover:
 - multi-token non-prefix neighbor retrieval,
 - substring-noise suppression for one-token queries,
 - affix/prefix token matching visibility.
+- deterministic corpus acceptance scenarios loaded from
+  `tests/fixtures/tm_ranking/corpus.json` and executed by
+  `tests/test_tm_ranking_corpus.py`.
 
-See `tests/test_tm_store.py` for executable examples.
+See `tests/test_tm_store.py` and `tests/test_tm_ranking_corpus.py` for executable examples.
 
 ## 10) Scope Limits (Current)
 

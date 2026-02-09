@@ -148,6 +148,9 @@ They include:
   one-token substring-noise suppression.
 - TM ranking diagnostics and locale-scoped morphology: verify ranked-vs-raw score exposure
   and that EN affix stemming is enabled for EN source locale only.
+- TM relevance acceptance corpus: deterministic fixture
+  `tests/fixtures/tm_ranking/corpus.json` validated by `tests/test_tm_ranking_corpus.py`
+  in the default `make test` / `make verify` pipeline.
 - TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
   (`core.tm_import_sync` unit tests).
 - TM query/policy service: cache-key construction and score/origin filtering semantics.
