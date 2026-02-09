@@ -312,6 +312,71 @@ def test_tm_store_multi_token_query_includes_non_prefix_neighbors(
     store.close()
 
 
+def test_tm_store_project_origin_keeps_fuzzy_neighbors(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k1", "Drop all", "Пакінуць усё"),
+            ("k2", "Drop one", "Скінуць шт."),
+            ("k3", "Drop-all", "Пакід. усё"),
+            ("k4", "Drop", "Скінуць"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    fuzzy = store.query(
+        "Drop all",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=5,
+        origins=["project"],
+    )
+
+    sources = {match.source_text for match in fuzzy}
+    assert "Drop one" in sources
+    assert "Drop-all" in sources
+    store.close()
+
+
+def test_tm_store_import_origin_keeps_fuzzy_neighbors(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    store.insert_import_pairs(
+        [
+            ("Drop all", "Пакінуць усё"),
+            ("Drop one", "Скінуць шт."),
+            ("Drop-all", "Пакід. усё"),
+            ("Drop", "Скінуць"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        tm_name="import_pack",
+        tm_path=str(root / ".tzp" / "tms" / "import_pack.tmx"),
+    )
+
+    fuzzy = store.query(
+        "Drop all",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=5,
+        origins=["import"],
+    )
+
+    sources = {match.source_text for match in fuzzy}
+    assert "Drop one" in sources
+    assert "Drop-all" in sources
+    store.close()
+
+
 def test_tm_store_multi_token_query_handles_single_char_token_typos(
     tmp_path: Path,
 ) -> None:

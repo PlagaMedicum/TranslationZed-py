@@ -1025,8 +1025,9 @@ class TMStore:
         def _select_rows(
             where_sql: str,
             order_sql: str,
-            params: tuple[object, ...],
+            where_params: tuple[object, ...],
             *,
+            order_params: tuple[object, ...] = (),
             limit: int,
         ) -> list[sqlite3.Row]:
             return conn.execute(
@@ -1044,8 +1045,9 @@ class TMStore:
                 (
                     source_locale,
                     target_locale,
-                    *params,
+                    *where_params,
                     *origin_params,
+                    *order_params,
                     limit,
                 ),
             ).fetchall()
@@ -1071,13 +1073,15 @@ class TMStore:
         prefix_rows = _select_rows(
             "source_prefix = ? AND source_len BETWEEN ? AND ?",
             "ABS(source_len - ?) ASC, updated_at DESC",
-            (prefix, min_len, max_len, length),
+            (prefix, min_len, max_len),
+            order_params=(length,),
             limit=bucket_candidates,
         )
         fallback_rows = _select_rows(
             "source_len BETWEEN ? AND ?",
             "ABS(source_len - ?) ASC, updated_at DESC",
-            (min_len, max_len, length),
+            (min_len, max_len),
+            order_params=(length,),
             limit=bucket_candidates,
         )
         token_rows: list[sqlite3.Row] = []
@@ -1099,6 +1103,8 @@ class TMStore:
                         token,
                         min_len,
                         max_len,
+                    ),
+                    order_params=(
                         token,
                         f"{token} %",
                         f"% {token} %",
