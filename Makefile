@@ -3,7 +3,7 @@ PY      ?= python            # override on CLI:  make PY=python3.12 venv
 VENV    ?= .venv
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt lint typecheck test check verify verify-core verify-fast run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win
+.PHONY: venv install precommit fmt lint typecheck test check verify verify-core verify-fast release-check run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win
 
 ## create .venv and populate dev deps (one-off)
 venv:
@@ -40,6 +40,10 @@ verify-fast: check
 
 ## full verification (core gate + perf scenarios)
 verify: verify-core perf-scenarios
+
+## validate release tag/version/changelog alignment
+release-check:
+	TAG=$(TAG) VENV=$(VENV) bash scripts/release_check.sh $(ARGS)
 
 ## run perf scenarios against fixture translation files
 perf-scenarios:
