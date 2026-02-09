@@ -1,9 +1,9 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-08_
+_Last updated: 2026-02-09_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
-explicit dependencies, and acceptance criteria. v0.1 is shipped; this plan now
-anchors v0.2 preparation and subsequent expansion.
+explicit dependencies, and acceptance criteria. v0.5.0 is shipped; this plan now
+anchors v0.6.0 preparation and subsequent expansion.
 
 Legend:
 - [✓] done
@@ -344,7 +344,20 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 
 ---
 
-## 4) v0.2 Focus Plan (draft, ordered)
+## 4) v0.6 Focus Plan (draft, ordered)
+
+Release target: **v0.6.0**
+
+v0.6.0 exit criteria (must all be true):
+- [ ] `A0`, `A7`, and `C1` are completed (no `[→]`/`[ ]` for their v0.6 scope).
+- [ ] Cross-platform CI (`linux`, `windows`, `macos`) is green on release branch.
+- [ ] `make verify` and `make release-check TAG=v0.6.0` pass before tagging.
+- [ ] Packaging smoke checks pass for Linux/Windows/macOS release workflow.
+
+Out of scope for v0.6.0:
+- LanguageTool integration.
+- Cross-locale TM suggestions.
+- Full QA suite beyond the first opt-in checks.
 
 Priority A — **Core workflow completeness** (ordered, status)
 A0 [→] **Main-window declutter + explicit application layer (Clean architecture)**
@@ -370,6 +383,7 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        3) file open/save/cache write,
        4) conflict orchestration,
        5) search/replace scope execution.
+       6) TM sidebar presentation flow (list/preview/apply wiring).
      - [ ] Keep GUI methods as adapters only (signal wiring + rendering state).
      - [ ] Add integration tests per extracted service boundary before each next extraction.
    - **Implemented slices so far**:
@@ -496,8 +510,20 @@ A7 [→] **UI latency stabilization (scroll + paint)**
      - [✓] Render‑cost heuristic (max entry length) to auto‑enter large‑file mode
        and enable table previews when row/size thresholds are not exceeded.
      - [→] Reduce lazy prefetch window for very long rows to cut decode spikes on scroll.
+     - [ ] Add automated perf assertion for row-resize burst behavior (no long single resize pass).
+     - [ ] Add automated GUI regression for large-file scroll/selection stability on SurvivalGuide/Recorded_Media fixtures.
    - **Acceptance**: large single‑string files (News/Recorded_Media) open and scroll without jank;
      column resize/side‑panel toggles are smooth; no tooltip‑related freezes.
+
+A8 [→] **Cross-platform CI/release hardening**
+   - **Problem**: Linux was stable, but macOS/Windows exposed path/EOL edge regressions close to release.
+   - **Target**: keep CI green across all desktop runners with deterministic fixture behavior.
+   - **Tasks**:
+     - [✓] Add release metadata preflight (`make release-check`) and enforce in release workflow.
+     - [✓] Fix path/EOL-sensitive tests for Windows/macOS.
+     - [ ] Add explicit CI step for `make release-check TAG=<tag>` in pre-tag local checklist runbook.
+     - [ ] Add one platform-specific regression test per known class (path canonicalization, EOL normalization, invalid filename chars).
+   - **Acceptance**: no OS-specific flaky failures in two consecutive tagged release dry-runs.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
@@ -554,7 +580,11 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Search side panel now exposes minimal clickable results list (`<path>:<row>`) wired to toolbar search scope/query.
      - [✓] Preferences TM tab now exposes a dedicated **Diagnostics** action with copyable report window (policy + import/query summary).
      - [✓] Preferences TM tab format hints now use explicit **Supported now / Planned later** matrix text.
-   - **Deferred**: LanguageTool API (post‑v0.2).
+     - [ ] Add TM diagnostics snapshot assertions for recall quality (`visible`, `fuzzy`, `unique_sources`, `recall_density`) on production-like data slices.
+     - [ ] Add larger imported-TM stress fixture (100k+ entries synthetic) with query latency budget checks.
+     - [ ] Add short-query ranking acceptance cases for additional pairs (`Run/Rest`, `Make item/Make new item`) with low threshold guarantees.
+     - [ ] Add preferences-side inline warning banner for zero-segment imported TMs (beside existing marker in list rows).
+   - **Deferred**: LanguageTool API (post‑v0.6).
 C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.
    - **Target**: opt‑in QA panel with per‑check toggles; non‑blocking warnings by default.
@@ -564,7 +594,7 @@ C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
 
 ## 5) Decisions (recorded)
 
-- **v0.2 priority order**: confirmed (Priority A/B/C as listed).
+- **v0.6 priority order**: confirmed (Priority A/B/C as listed).
 - **Replace‑all confirmation**: modal dialog now; future sidebar is acceptable (VSCode‑style).
 - **Pool scope**: Pool = currently opened locales only (not entire root).
 - **Cache hash width**: **u64** key hashes (implemented).
