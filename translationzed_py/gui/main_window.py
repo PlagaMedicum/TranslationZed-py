@@ -4473,8 +4473,11 @@ class MainWindow(QMainWindow):
             source_name = "Project TM"
         source_preview = self._truncate_text(match.source_text, 60)
         target_preview = self._truncate_text(match.target_text, 80)
+        score_label = f"{match.score:>3}%"
+        if match.raw_score is not None and match.raw_score != match.score:
+            score_label = f"{score_label} (raw {match.raw_score}%)"
         return (
-            f"{match.score:>3}% · {origin} · {source_name}\n"
+            f"{score_label} · {origin} · {source_name}\n"
             f"S: {source_preview}\n"
             f"T: {target_preview}"
         )
@@ -4482,9 +4485,11 @@ class MainWindow(QMainWindow):
     def _tm_tooltip_html(self, match: TMMatch) -> str:
         source = html.escape(match.source_text)
         target = html.escape(match.target_text)
+        raw = match.raw_score if match.raw_score is not None else match.score
         return (
             '<span style="white-space: pre-wrap;">'
-            f"<b>Source</b><br>{source}<br><br><b>Translation</b><br>{target}"
+            f"<b>Score</b> {match.score}% (raw {raw}%)"
+            f"<br><b>Source</b><br>{source}<br><br><b>Translation</b><br>{target}"
             "</span>"
         )
 

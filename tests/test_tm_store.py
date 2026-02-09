@@ -312,6 +312,38 @@ def test_tm_store_multi_token_query_includes_non_prefix_neighbors(
     store.close()
 
 
+def test_tm_store_multi_token_query_handles_single_char_token_typos(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k1", "Drop one", "Скінуць шт."),
+            ("k2", "Drap all", "Пакінуць усё"),
+            ("k3", "Drop", "Скінуць"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    fuzzy = store.query(
+        "Drop one",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=5,
+    )
+
+    sources = {match.source_text for match in fuzzy}
+    assert "Drap all" in sources
+    store.close()
+
+
 def test_tm_store_single_token_query_filters_substring_noise(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()

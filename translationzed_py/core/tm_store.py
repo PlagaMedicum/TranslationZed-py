@@ -53,6 +53,7 @@ class TMMatch:
     file_path: str | None
     key: str | None
     updated_at: int
+    raw_score: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +115,19 @@ def _token_matches(query_token: str, candidate_token: str) -> bool:
     candidate_stem = _stem_token(candidate_token)
     if len(query_stem) >= 3 and query_stem == candidate_stem:
         return True
+    if len(query_token) == len(candidate_token) and len(query_token) >= 4:
+        if query_token[:2] != candidate_token[:2]:
+            return False
+        if query_token[-1] != candidate_token[-1]:
+            return False
+        mismatches = 0
+        for q_char, c_char in zip(query_token, candidate_token, strict=False):
+            if q_char != c_char:
+                mismatches += 1
+                if mismatches > 1:
+                    break
+        if mismatches == 1:
+            return True
     shorter, longer = (
         (query_token, candidate_token)
         if len(query_token) <= len(candidate_token)
@@ -898,6 +912,7 @@ class TMStore:
                     file_path=row["file_path"],
                     key=row["key"],
                     updated_at=row["updated_at"],
+                    raw_score=100,
                 )
             )
             if len(matches) >= max_exact:
@@ -911,7 +926,7 @@ class TMStore:
             target_locale,
             origin_list,
         )
-        for cand, score in candidates:
+        for cand, score, raw_score in candidates:
             if cand["source_norm"] == norm:
                 continue
             key = (
@@ -936,6 +951,7 @@ class TMStore:
                     file_path=cand["file_path"],
                     key=cand["key"],
                     updated_at=cand["updated_at"],
+                    raw_score=raw_score,
                 )
             )
             if len(matches) >= limit:
@@ -949,7 +965,7 @@ class TMStore:
         source_locale: str,
         target_locale: str,
         origins: Iterable[str],
-    ) -> list[tuple[sqlite3.Row, int]]:
+    ) -> list[tuple[sqlite3.Row, int, int]]:
         from difflib import SequenceMatcher
 
         query_tokens = set(_query_tokens(norm))
@@ -1079,15 +1095,17 @@ class TMStore:
                 _append_unique(token_rows)
             if len(rows) < max_candidates:
                 _append_unique(fallback_rows)
-        scored: list[tuple[sqlite3.Row, int]] = []
+        scored: list[tuple[sqlite3.Row, int, int, int]] = []
         for row in rows:
             cand_norm = row["source_norm"]
             ratio = SequenceMatcher(None, norm, cand_norm, autojunk=False).ratio()
             composed = _contains_composed_phrase(cand_norm, norm)
             overlap = 0.0
             exact_overlap = 0.0
+            token_count_delta = 999
             if query_tokens:
                 cand_tokens = set(_query_tokens(cand_norm))
+                token_count_delta = abs(len(cand_tokens) - len(query_tokens))
                 if cand_tokens:
                     overlap = _soft_token_overlap(query_tokens, cand_tokens)
                     exact_overlap = _exact_token_overlap(query_tokens, cand_tokens)
@@ -1098,20 +1116,32 @@ class TMStore:
                         continue
                 elif not composed:
                     continue
-            score = int(round(ratio * 100))
+            raw_score = int(round(ratio * 100))
+            score = raw_score
             token_bonus = int(round((overlap * 6.0) + (exact_overlap * 4.0)))
             score = min(100, score + token_bonus)
             if composed:
                 score = max(score, 90 if len(query_tokens) > 1 else 85)
             if score >= 100 and cand_norm != norm:
                 score = 99
-            scored.append((row, score))
-        scored.sort(
-            key=lambda item: (
-                -item[1],
-                abs(len(item[0]["source_norm"]) - length),
-                0 if item[0]["origin"] == _PROJECT_ORIGIN else 1,
-                -item[0]["updated_at"],
+            scored.append((row, score, raw_score, token_count_delta))
+        if len(query_tokens) > 1:
+            scored.sort(
+                key=lambda item: (
+                    item[3],
+                    -item[1],
+                    abs(len(item[0]["source_norm"]) - length),
+                    0 if item[0]["origin"] == _PROJECT_ORIGIN else 1,
+                    -item[0]["updated_at"],
+                )
             )
-        )
-        return scored
+        else:
+            scored.sort(
+                key=lambda item: (
+                    -item[1],
+                    abs(len(item[0]["source_norm"]) - length),
+                    0 if item[0]["origin"] == _PROJECT_ORIGIN else 1,
+                    -item[0]["updated_at"],
+                )
+            )
+        return [(row, score, raw_score) for row, score, raw_score, _delta in scored]
