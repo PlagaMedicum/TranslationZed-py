@@ -239,6 +239,76 @@ def test_tm_bootstrap_rebuild_runs_even_when_store_has_entries(
     assert called == [(["BE"], False, False)]
 
 
+def test_rebuild_tm_selected_initializes_tm_store(tmp_path, qtbot, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    called: list[str] = []
+
+    def _ensure() -> bool:
+        called.append("ensure")
+        win._tm_store = object()  # type: ignore[assignment]
+        return True
+
+    rebuild_calls: list[tuple[list[str], bool, bool]] = []
+
+    def _start(locales, *, interactive: bool, force: bool) -> None:
+        rebuild_calls.append((list(locales), interactive, force))
+
+    monkeypatch.setattr(win, "_ensure_tm_store", _ensure)
+    monkeypatch.setattr(win, "_start_tm_rebuild", _start)
+    win._rebuild_tm_selected()
+
+    assert called == ["ensure"]
+    assert rebuild_calls == [(["BE"], True, True)]
+
+
+def test_apply_preferences_runs_tm_actions_from_tm_tab(tmp_path, qtbot, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    monkeypatch.setattr(win, "_apply_tm_preferences_actions", lambda _values: None)
+    monkeypatch.setattr(win, "_persist_preferences", lambda: None)
+    called: list[str] = []
+    monkeypatch.setattr(win, "_resolve_pending_tmx", lambda: called.append("resolve"))
+    monkeypatch.setattr(win, "_export_tmx", lambda: called.append("export"))
+    monkeypatch.setattr(win, "_rebuild_tm_selected", lambda: called.append("rebuild"))
+
+    win._apply_preferences(
+        {
+            "prompt_write_on_exit": True,
+            "wrap_text": win._wrap_text_user,
+            "large_text_optimizations": win._large_text_optimizations,
+            "visual_highlight": win._visual_highlight,
+            "visual_whitespace": win._visual_whitespace,
+            "default_root": win._default_root,
+            "tm_import_dir": win._tm_import_dir,
+            "search_scope": win._search_scope,
+            "replace_scope": win._replace_scope,
+            "tm_resolve_pending": True,
+            "tm_export_tmx": True,
+            "tm_rebuild": True,
+        }
+    )
+    assert called == ["resolve", "export", "rebuild"]
+
+
+def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {"tm_import_dir": str(root / ".tzp" / "tms")}, tm_files=[]
+    )
+    qtbot.addWidget(dialog)
+
+    dialog._request_tm_resolve_pending()
+    values = dialog.values()
+    assert values["tm_resolve_pending"] is True
+    assert values["tm_export_tmx"] is False
+    assert values["tm_rebuild"] is False
+
+
 def test_preferences_tm_list_shows_segment_count_and_zero_warning(
     tmp_path, qtbot, monkeypatch
 ):

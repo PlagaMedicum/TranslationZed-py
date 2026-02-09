@@ -808,7 +808,6 @@ class MainWindow(QMainWindow):
         self.menu_general = menubar.addMenu("General")
         self.menu_edit = menubar.addMenu("Edit")
         self.menu_view = menubar.addMenu("View")
-        self.menu_tm = menubar.addMenu("TM")
         self.menu_help = menubar.addMenu("Help")
 
         # ── left pane: side panel (Files / TM / Search) ─────────────────────
@@ -1092,20 +1091,6 @@ class MainWindow(QMainWindow):
         self.menu_general.addAction(act_prefs)
         self.menu_general.addSeparator()
         self.menu_general.addAction(act_exit)
-
-        act_import_tmx = QAction("Import TMX…", self)
-        act_import_tmx.triggered.connect(self._import_tmx)
-        self.menu_tm.addAction(act_import_tmx)
-        act_resolve_tmx = QAction("Resolve Pending Imported TMs…", self)
-        act_resolve_tmx.triggered.connect(self._resolve_pending_tmx)
-        self.menu_tm.addAction(act_resolve_tmx)
-        act_export_tmx = QAction("Export TMX…", self)
-        act_export_tmx.triggered.connect(self._export_tmx)
-        self.menu_tm.addAction(act_export_tmx)
-        self.menu_tm.addSeparator()
-        act_rebuild_tm = QAction("Rebuild Project TM (Selected Locales)", self)
-        act_rebuild_tm.triggered.connect(self._rebuild_tm_selected)
-        self.menu_tm.addAction(act_rebuild_tm)
 
         act_copy = QAction("&Copy", self)
         act_copy.setShortcut(QKeySequence.StandardKey.Copy)
@@ -1964,7 +1949,7 @@ class MainWindow(QMainWindow):
         )
 
     def _rebuild_tm_selected(self) -> None:
-        if not self._tm_store:
+        if not self._ensure_tm_store():
             QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
             return
         locales = [loc for loc in self._selected_locales if loc != "EN"]
@@ -2123,7 +2108,16 @@ class MainWindow(QMainWindow):
             if self.search_edit.text():
                 self._schedule_search()
         self._replace_scope = replace_scope
+        tm_resolve_pending = bool(values.get("tm_resolve_pending", False))
+        tm_export_tmx = bool(values.get("tm_export_tmx", False))
+        tm_rebuild = bool(values.get("tm_rebuild", False))
         self._persist_preferences()
+        if tm_resolve_pending:
+            self._resolve_pending_tmx()
+        if tm_export_tmx:
+            self._export_tmx()
+        if tm_rebuild:
+            self._rebuild_tm_selected()
         if self._left_stack.currentIndex() == 1:
             self._sync_tm_import_folder(interactive=True, show_summary=False)
             self._schedule_tm_update()

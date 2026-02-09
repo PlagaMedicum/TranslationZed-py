@@ -47,6 +47,9 @@ class PreferencesDialog(QDialog):
         self._tm_initial_enabled: dict[str, bool] = {}
         self._tm_remove_paths: set[str] = set()
         self._tm_import_paths: list[str] = []
+        self._tm_resolve_pending = False
+        self._tm_export_tmx = False
+        self._tm_rebuild = False
 
         tabs = QTabWidget(self)
         tabs.addTab(self._build_general_tab(), "General")
@@ -84,6 +87,9 @@ class PreferencesDialog(QDialog):
             "tm_enabled": changed_tm_enabled,
             "tm_remove_paths": sorted(self._tm_remove_paths),
             "tm_import_paths": list(self._tm_import_paths),
+            "tm_resolve_pending": self._tm_resolve_pending,
+            "tm_export_tmx": self._tm_export_tmx,
+            "tm_rebuild": self._tm_rebuild,
         }
 
     def _build_general_tab(self) -> QWidget:
@@ -197,6 +203,21 @@ class PreferencesDialog(QDialog):
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
+        ops_row = QHBoxLayout()
+        ops_row.setContentsMargins(0, 0, 0, 0)
+        ops_row.setSpacing(6)
+        resolve_btn = QPushButton("Resolve Pending", widget)
+        resolve_btn.clicked.connect(self._request_tm_resolve_pending)
+        export_btn = QPushButton("Export TMX…", widget)
+        export_btn.clicked.connect(self._request_tm_export)
+        rebuild_btn = QPushButton("Rebuild TM", widget)
+        rebuild_btn.clicked.connect(self._request_tm_rebuild)
+        ops_row.addWidget(resolve_btn)
+        ops_row.addWidget(export_btn)
+        ops_row.addWidget(rebuild_btn)
+        ops_row.addStretch(1)
+        layout.addLayout(ops_row)
+
         for row in self._tm_files:
             self._add_tm_file_item(row)
         return widget
@@ -292,6 +313,18 @@ class PreferencesDialog(QDialog):
         if not (item.flags() & Qt.ItemIsUserCheckable):
             return
         self._tm_enabled[tm_path] = item.checkState() == Qt.Checked
+
+    def _request_tm_resolve_pending(self) -> None:
+        self._tm_resolve_pending = True
+        self.accept()
+
+    def _request_tm_export(self) -> None:
+        self._tm_export_tmx = True
+        self.accept()
+
+    def _request_tm_rebuild(self) -> None:
+        self._tm_rebuild = True
+        self.accept()
 
     def _browse_root(self) -> None:
         start_dir = self._default_root_edit.text().strip()
