@@ -91,6 +91,21 @@ def test_tm_ranking_corpus(tmp_path: Path) -> None:
             )
             sources = [match.source_text for match in matches]
             indices = _first_index_by_source(matches)
+            unique_sources = set(sources)
+
+            expect_min_results = case.get("expect_min_results")
+            if expect_min_results is not None:
+                assert len(matches) >= int(expect_min_results), (
+                    f"{case_label}: expected at least {expect_min_results} results, "
+                    f"got {len(matches)}"
+                )
+
+            expect_min_unique_sources = case.get("expect_min_unique_sources")
+            if expect_min_unique_sources is not None:
+                assert len(unique_sources) >= int(expect_min_unique_sources), (
+                    f"{case_label}: expected at least {expect_min_unique_sources} unique "
+                    f"sources, got {len(unique_sources)}"
+                )
 
             expect_top = case.get("expect_top")
             if expect_top:

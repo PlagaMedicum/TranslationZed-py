@@ -143,7 +143,8 @@ They include:
 - TM import metadata: per-file import registry, replace/delete lifecycle, TM source-name propagation,
   and query gating for `enabled`/`ready` import files.
 - TM ranking regressions: short-query neighbors (`All` -> `Apply all`), multi-token non-prefix
-  neighbors (`Drop one` -> `Drop all`/`Drop-all`), affix/prefix token variants
+  neighbors in both directions (`Drop one` -> `Drop all`/`Drop-all`, `Drop all` -> `Drop one`),
+  affix/prefix token variants
   (`Run` -> `Running`/`Runner`), single-char typo neighbors (`Drop` -> `Drap`), and
   one-token substring-noise suppression.
 - TM origin-filter regressions: fuzzy recall remains intact for `project`-only and
@@ -154,6 +155,8 @@ They include:
   `tests/fixtures/tm_ranking/corpus.json` validated by `tests/test_tm_ranking_corpus.py`
   in the default `make test` / `make verify` pipeline, with profile-level coverage
   (`synthetic_core` + `pz_fixture_like`) enforced in CI.
+  Corpus includes minimum-recall density checks at low thresholds to prevent
+  exact-only collapse in fuzzy mode.
 - TM bootstrap behavior: opening TM panel triggers one-time project bootstrap
   for selected locales even when DB already has stale partial entries
   (`tests/test_gui_tm_preferences.py`).

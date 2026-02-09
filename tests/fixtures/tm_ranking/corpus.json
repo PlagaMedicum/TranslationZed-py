@@ -10,6 +10,8 @@
       "query": "Drop one",
       "min_score": 5,
       "limit": 12,
+      "expect_min_results": 4,
+      "expect_min_unique_sources": 4,
       "entries": [
         {"origin": "project", "key": "k1", "source": "Drop one", "target": "drop-one tr", "updated_at": 1},
         {"origin": "project", "key": "k2", "source": "Drop all", "target": "drop-all tr", "updated_at": 2},
@@ -26,6 +28,35 @@
       ],
       "expect_order": [
         ["Drop all", "Drop"],
+        ["Drop-all", "Drop"]
+      ]
+    },
+    {
+      "id": "drop_neighbors_reverse_multi_token",
+      "profile": "synthetic_core",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "Drop all",
+      "min_score": 5,
+      "limit": 12,
+      "expect_min_results": 4,
+      "expect_min_unique_sources": 4,
+      "entries": [
+        {"origin": "project", "key": "k1", "source": "Drop all", "target": "drop-all tr", "updated_at": 1},
+        {"origin": "project", "key": "k2", "source": "Drop one", "target": "drop-one tr", "updated_at": 2},
+        {"origin": "project", "key": "k3", "source": "Drop-all", "target": "drop-all-hyphen tr", "updated_at": 3},
+        {"origin": "project", "key": "k4", "source": "Drop", "target": "drop tr", "updated_at": 4},
+        {"origin": "project", "key": "k5", "source": "Drap all", "target": "typo tr", "updated_at": 5},
+        {"origin": "project", "key": "k6", "source": "Drink all", "target": "drink-all tr", "updated_at": 6}
+      ],
+      "expect_top": "Drop all",
+      "expect_present": [
+        {"source": "Drop one", "min_score": 60},
+        {"source": "Drop-all", "min_score": 60},
+        {"source": "Drap all", "min_score": 40}
+      ],
+      "expect_order": [
+        ["Drop one", "Drop"],
         ["Drop-all", "Drop"]
       ]
     },

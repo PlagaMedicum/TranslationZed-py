@@ -141,9 +141,12 @@ Suggestions are sorted by:
 
 The algorithm must satisfy:
 - `Drop one` can surface `Drop-all`/`Drop all` at low thresholds (for example 25%).
+- `Drop all` can surface `Drop one` at low thresholds (for example 5%).
 - `All` can surface `Apply all` at low thresholds.
 - `All` should not surface substring-only noise like `Small crate`.
 - Prefix/affix neighbors (`Run`, `Running`, `Runner`) remain query-visible.
+- In low-threshold mode (`min_score <= 10`), short action phrases must return
+  multiple fuzzy neighbors (not only exact + one fallback) in dense candidate pools.
 
 ## 9) Test Contract
 
@@ -158,6 +161,9 @@ Regression tests cover:
   The corpus is split into multiple profiles and CI enforces at least two:
   - `synthetic_core`: targeted algorithm edge-cases and tie-break contracts.
   - `pz_fixture_like`: PZ-style tagged/phrase patterns and dense phrase pools.
+- Corpus assertions also enforce minimum-recall density for key low-threshold
+  scenarios (`expect_min_results`, `expect_min_unique_sources`) so regressions
+  that collapse to exact-only behavior fail CI.
 
 See `tests/test_tm_store.py` and `tests/test_tm_ranking_corpus.py` for executable examples.
 
