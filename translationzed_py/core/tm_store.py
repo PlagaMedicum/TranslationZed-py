@@ -99,6 +99,36 @@ def _contains_composed_phrase(text: str, query: str) -> bool:
     return True
 
 
+def _soft_token_overlap(
+    query_tokens: set[str],
+    candidate_tokens: set[str],
+) -> float:
+    if not query_tokens or not candidate_tokens:
+        return 0.0
+
+    def _token_matches(query_token: str, candidate_token: str) -> bool:
+        if query_token == candidate_token:
+            return True
+        shorter, longer = (
+            (query_token, candidate_token)
+            if len(query_token) <= len(candidate_token)
+            else (candidate_token, query_token)
+        )
+        if len(shorter) < 4:
+            return False
+        if longer.startswith(shorter):
+            return (len(shorter) / len(longer)) >= 0.75
+        if shorter in longer:
+            return (len(shorter) / len(longer)) >= 0.80
+        return False
+
+    matched = 0
+    for query_token in query_tokens:
+        if any(_token_matches(query_token, cand) for cand in candidate_tokens):
+            matched += 1
+    return matched / max(1, len(query_tokens))
+
+
 def _normalize_locale(locale: str) -> str:
     return locale.strip().upper()
 
@@ -927,17 +957,17 @@ class TMStore:
         scored: list[tuple[sqlite3.Row, int]] = []
         for row in rows:
             cand_norm = row["source_norm"]
+            ratio = SequenceMatcher(None, norm, cand_norm, autojunk=False).ratio()
+            composed = _contains_composed_phrase(cand_norm, norm)
             if query_tokens:
                 cand_tokens = set(_query_tokens(cand_norm))
                 if cand_tokens:
-                    overlap = len(query_tokens & cand_tokens) / max(
-                        1, len(query_tokens)
-                    )
-                    if overlap < 0.5:
+                    overlap = _soft_token_overlap(query_tokens, cand_tokens)
+                    ratio_gate = 0.65 if len(query_tokens) == 1 else 0.75
+                    if overlap < 0.5 and ratio < ratio_gate and not composed:
                         continue
-            ratio = SequenceMatcher(None, norm, cand_norm, autojunk=False).ratio()
             score = int(round(ratio * 100))
-            if _contains_composed_phrase(cand_norm, norm):
+            if composed:
                 score = max(score, 90)
             scored.append((row, score))
         scored.sort(

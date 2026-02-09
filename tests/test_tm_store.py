@@ -95,6 +95,39 @@ def test_tm_store_filters_low_token_overlap_candidates(tmp_path: Path) -> None:
     store.close()
 
 
+def test_tm_store_plural_neighbor_is_returned_for_single_token_query(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k_favorite", "Favorite", "Улюбёнае"),
+            ("k_favorites", "Favorites", "Улюбёныя"),
+            ("k_factory", "Factory", "Завод"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    matches = store.query(
+        "Favorite",
+        source_locale="EN",
+        target_locale="BE",
+        limit=10,
+        min_score=20,
+    )
+
+    assert any(match.source_text == "Favorites" for match in matches)
+    favorites = next(match for match in matches if match.source_text == "Favorites")
+    assert favorites.score >= 90
+    store.close()
+
+
 def test_tm_store_tagged_query_matches_phrase_candidate(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
