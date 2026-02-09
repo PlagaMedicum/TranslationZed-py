@@ -360,6 +360,23 @@ Out of scope for v0.6.0:
 - Full QA suite beyond the first opt-in checks.
 
 Priority A — **Core workflow completeness** (ordered, status)
+A‑P0 [→] **Encoding integrity conflicts + no-write-on-open guarantee** (**highest priority**)
+   - **Problem**: opening locales appears to change some files/encodings even without user edits.
+   - **Impact**: silent data corruption risk, trust loss, noisy diffs, and release blockers.
+   - **Target**: opening/reading must be strictly non-mutating; encoding is preserved unless user explicitly saves edited content.
+   - **Tasks**:
+     - [ ] Add explicit open-path guard: no writer/saver/cache-to-original path can run during read/open flows.
+     - [✓] Add cross-encoding integration tests for open -> close -> byte-identical result:
+       UTF-8, CP1251, UTF-16 LE/BE, UTF-16 BOM-less (only when `language.txt` allows).
+     - [✓] Add regression tests for line-ending preservation (`LF`/`CRLF`) when no edit is applied.
+     - [✓] Add regression test for locale switch + auto-open path to ensure no implicit writes.
+     - [ ] Add diagnostics command/log output that reports detected encoding mismatches/conflicts (read-only report).
+     - [ ] Add CI gate for encoding-integrity suite before release tag pipeline.
+   - **Acceptance**:
+     - [ ] Zero file-byte deltas after open/switch/close without edits on all supported encodings.
+     - [ ] `git status` stays clean after read-only workflows on fixture corpora.
+     - [ ] No auto-conversion of encoding/BOM/EOL unless explicit save with changed content.
+
 A0 [→] **Main-window declutter + explicit application layer (Clean architecture)**
    - **Problem**: orchestration is concentrated in `gui/main_window.py`, blending UI,
      file/session orchestration, persistence, conflict logic, TM flows, and perf controls.
@@ -523,7 +540,11 @@ A8 [→] **Cross-platform CI/release hardening**
      - [✓] Fix path/EOL-sensitive tests for Windows/macOS.
      - [ ] Add explicit CI step for `make release-check TAG=<tag>` in pre-tag local checklist runbook.
      - [ ] Add one platform-specific regression test per known class (path canonicalization, EOL normalization, invalid filename chars).
-   - **Acceptance**: no OS-specific flaky failures in two consecutive tagged release dry-runs.
+   - **Dry-run definition**:
+     - [ ] `make verify` + `make release-check TAG=v0.6.0-rcX` pass locally on the release branch.
+     - [ ] CI matrix (`linux`, `windows`, `macos`) is fully green for the same `v0.6.0-rcX` commit.
+     - [ ] Release workflow artifacts build successfully from that commit (without publishing final tag).
+   - **Acceptance**: no OS-specific flaky failures in two consecutive dry-runs (`rc1`, `rc2`) from different commits.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
@@ -581,14 +602,25 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Preferences TM tab now exposes a dedicated **Diagnostics** action with copyable report window (policy + import/query summary).
      - [✓] Preferences TM tab format hints now use explicit **Supported now / Planned later** matrix text.
      - [ ] Add TM diagnostics snapshot assertions for recall quality (`visible`, `fuzzy`, `unique_sources`, `recall_density`) on production-like data slices.
-     - [ ] Add larger imported-TM stress fixture (100k+ entries synthetic) with query latency budget checks.
+     - [ ] Add larger imported-TM stress fixture sized to **production maximum segment count**
+       (derive baseline from largest real TMX corpus used in production).
      - [ ] Add short-query ranking acceptance cases for additional pairs (`Run/Rest`, `Make item/Make new item`) with low threshold guarantees.
      - [ ] Add preferences-side inline warning banner for zero-segment imported TMs (beside existing marker in list rows).
    - **Deferred**: LanguageTool API (post‑v0.6).
-C2 [≈] **Translation QA checks (post‑TM import/export)** (Step 30).
-   - **Problem**: mechanical mismatches (trailing chars, newlines, escapes) are easy to miss.
-   - **Target**: opt‑in QA panel with per‑check toggles; non‑blocking warnings by default.
-   - **Dependency**: start only after TM import/export is complete.
+C2 [→] **Translation QA checks (v0.6 MVP)** (Step 30).
+   - **Problem**: mechanical mismatches (trailing chars, newlines, escapes, placeholders) are easy to miss.
+   - **Target**: opt‑in QA panel with per-check toggles; non-blocking warnings by default.
+   - **v0.6 MVP scope**:
+     - [ ] Missing trailing characters.
+     - [ ] Missing/extra newlines.
+     - [ ] Missing escape sequences / code blocks / placeholders.
+     - [ ] Translation equals Source.
+   - **Out of MVP**:
+     - Advanced QA rule sets and per-project custom rules.
+   - **Acceptance**:
+     - [ ] QA checks run without blocking editing.
+     - [ ] Per-check toggles persist in Preferences.
+     - [ ] Warnings are visible and navigable from UI.
 
 ---
 

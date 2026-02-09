@@ -5,10 +5,12 @@ _Last updated: 2026-02-09_
 
 ## 1) Priorities
 
-1) **Saver correctness + structure preservation** (bytes, comments, spacing, concat chains).
-2) **Encoding preservation per locale** (no implicit transcoding on save).
-3) **GUI smoke + integration** second (Qt event wiring).
-4) Keep tests deterministic and runnable headless.
+1) **Read-only integrity + no-write-on-open** (open/switch/close without edits must keep file bytes identical).
+2) **Saver correctness + structure preservation** (bytes, comments, spacing, concat chains).
+3) **Encoding preservation per locale** (no implicit transcoding on save).
+4) **Cross-platform path/EOL invariance** (Linux/macOS/Windows behave identically on fixtures).
+5) **GUI smoke + integration** second (Qt event wiring).
+6) Keep tests deterministic and runnable headless.
 
 ---
 
@@ -30,6 +32,7 @@ _Last updated: 2026-02-09_
 - Open project, select locale, load table.
 - Edit + save path writes file + cache.
 - Save preserves original file bytes outside literal spans.
+- Open/switch/close without edits keeps file bytes identical across UTF-8/CP1251/UTF-16 + EOL styles.
 - EN hash change dialog (implemented).
 
 ### 2.3 GUI Smoke Tests
@@ -137,6 +140,8 @@ They include:
 - GUI smoke: open, table fill, search navigation, edit/save, undo/redo.
 - GUI save prompts: cache‑only vs write‑to‑original.
 - GUI save encoding: cp1251 + UTF‑16 write‑back via locale `language.txt`.
+- GUI read-only integrity: open/switch without edits preserves bytes across
+  UTF‑8/CP1251/UTF‑16 and LF/CRLF cases.
 - GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
 - TM: SQLite store round‑trip, exact/fuzzy query, TMX import/export.
@@ -147,6 +152,8 @@ They include:
   affix/prefix token variants
   (`Run` -> `Running`/`Runner`), single-char typo neighbors (`Drop` -> `Drap`), and
   one-token substring-noise suppression.
+- TM query perf regression at auto-derived production baseline size
+  (max entry count from committed `tests/fixtures/perf_root/BE/*.txt`).
 - TM origin-filter regressions: fuzzy recall remains intact for `project`-only and
   `import`-only modes (no exact-only collapse).
 - TM ranking diagnostics and locale-scoped morphology: verify ranked-vs-raw score exposure
@@ -190,9 +197,11 @@ They include:
 - `search`: invalid regex returns no matches; empty query returns no matches.
 - `atomic_io`: atomic replace semantics + directory fsync attempt; temp file cleanup on failure.
 - `tm_store`: corpus-scale ranking drift tests (mixed-domain noise with many short tokens)
-  and query latency profiling under larger imported TM sets.
+  and query latency profiling under larger imported TM sets sized to production maximum segment count.
 
 **Integration gaps**
+- Open-path write guard: prove saver/write paths are unreachable during read-only workflows.
+- Read-only encoding conflict diagnostics: verify report output without mutating files.
 - GUI warning flow for **malformed/missing `language.txt`**: locale is skipped and other locales open.
 - Orphan cache warning: dialog appears for selected locales; **purge** removes caches, **dismiss** keeps them.
 - Save is **blocked** while conflicts exist; conflict resolution unblocks save.
