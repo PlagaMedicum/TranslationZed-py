@@ -29,6 +29,11 @@ changes should be propagated to keep docs coherent.
   - Test strategy and coverage policy.
   - Owns: test layers, gaps, perf budgets, fixture strategy, verification policy.
 
+- `docs/tm_ranking_algorithm.md`
+  - Normative TM retrieval/ranking contract.
+  - Owns: candidate-retrieval stages, relevance gates, scoring formula, tie-break rules.
+  - Must stay aligned with `core.tm_store` implementation and TM-related tests.
+
 - `docs/flows.md`
   - Compact sequence-flow reference.
   - Owns: concise lifecycle diagrams for startup/open/save/conflicts.
@@ -54,7 +59,8 @@ changes should be propagated to keep docs coherent.
 - Product behavior changes:
   1) Update `technical_spec` and/or `use_case_ux_spec` first.
   2) Update `implementation_plan` status and ordered tasks.
-  3) Update `testing_strategy` if tests/budgets/scenarios change.
+  3) Update `tm_ranking_algorithm` if TM retrieval/scoring rules changed.
+  4) Update `testing_strategy` if tests/budgets/scenarios change.
 
 - Do not copy full sections across docs.
   - Use short references to canonical sections instead.

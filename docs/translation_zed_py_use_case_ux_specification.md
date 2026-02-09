@@ -236,8 +236,10 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Main Success Scenario** |
 |  1 | SYS extracts Source text and target locale from current row/file. |
 |  2 | SYS runs asynchronous TM query (source locale → target locale). |
-|  3 | SYS shows ranked matches in TM list, including TM source name for each occurrence; stale async responses are ignored. |
-|  4 | SYS shows clear empty/error states: no context, no matches, filtered-out, query failure. |
+|  3 | SYS ranks suggestions with exact-first and fuzzy scoring that accounts for token overlap, prefix/affix variants, and phrase composition; stale async responses are ignored. |
+|  4 | SYS keeps near neighbors visible even when prefixes differ (for example, `Drop one` can surface `Drop all` at low thresholds). |
+|  5 | SYS suppresses substring-only one-token noise (for example, `all` should not match `small` only by substring). |
+|  6 | SYS shows clear empty/error states: no context, no matches, filtered-out, query failure. |
 | **Post-condition** | TM list reflects current row and active filters without blocking the UI thread. |
 
 ### UC-13c  Apply TM Suggestion
@@ -295,7 +297,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  1 | SYS persists filter values in preferences. |
 |  2 | SYS re-runs/refines TM suggestions using active filters. |
 |  3 | SYS shows explicit states when filters exclude all matches. |
-| **Post-condition** | TM list reflects persisted filter policy and current row context. Minimum score supports 5..100 (default 50). |
+| **Post-condition** | TM list reflects persisted filter policy and current row context. Minimum score supports 5..100 (default 50) and threshold changes are immediately reflected in visible suggestions. |
 
 ### UC-13j  Manage Imported TMs in Preferences
 | **Trigger** | *General ▸ Preferences ▸ TM tab* |

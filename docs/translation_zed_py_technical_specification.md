@@ -520,17 +520,24 @@ UNTOUCHED).
 - Indices:
   - `tm_project_key` unique on `(origin, source_locale, target_locale, file_path, key)` for project TM.
   - `tm_import_unique` unique on `(origin, source_locale, target_locale, source_norm, target_text)` for imports.
-  - `tm_exact_lookup` + `tm_prefix_lookup` for matching.
+  - `tm_exact_lookup`, `tm_prefix_lookup`, and `tm_len_lookup` for matching.
 - Matching:
   - `core.tm_query` owns query-policy helpers (origin toggles, min-score normalization,
     cache-key construction, post-query filtering), used by GUI adapter.
   - Exact match returns score **100**.
-  - Fuzzy match uses `SequenceMatcher` on a bounded candidate set; keeps scores at/above configured min score (5..100, default 50).
-  - Query reserves room for fuzzy neighbors even when many exact duplicates exist, so related strings (e.g., `Rest`/`Run`) remain visible.
+  - Fuzzy match uses bounded candidate pools (prefix/token/fallback), token-aware relevance
+    gates, and weighted scoring on top of `SequenceMatcher`; keeps scores at/above configured
+    min score (5..100, default 50).
+  - Fuzzy scores are capped below exact score (`<= 99`) so score `100` remains exact-only.
+  - Query reserves room for fuzzy neighbors even when many exact duplicates exist, so related
+    strings (for example, `Drop one`/`Drop all` and `Rest`/`Run`) remain visible.
+  - Prefix/affix token variants are matched via lightweight stemming and token-relation rules;
+    substring-only noise is suppressed for one-token queries.
   - Project TM outranks imported TM.
   - TM suggestions include source name (`tm_name`); when missing, UI falls back to TM file path.
   - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.
   - Imported rows are query-visible only when the import record is **enabled** and in **ready** state.
+  - Detailed algorithm contract is defined in `docs/tm_ranking_algorithm.md`.
 - TMX import/export:
   - `core.tmx_io.iter_tmx_pairs` streams `<tu>`/`<tuv>` pairs for a **source+target locale**.
   - TMX locale matching accepts BCP47-style region variants (e.g. `en-US` matches `EN`,

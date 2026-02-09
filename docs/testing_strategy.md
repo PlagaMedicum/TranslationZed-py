@@ -142,6 +142,9 @@ They include:
 - TM: SQLite store round‑trip, exact/fuzzy query, TMX import/export.
 - TM import metadata: per-file import registry, replace/delete lifecycle, TM source-name propagation,
   and query gating for `enabled`/`ready` import files.
+- TM ranking regressions: short-query neighbors (`All` -> `Apply all`), multi-token non-prefix
+  neighbors (`Drop one` -> `Drop all`/`Drop-all`), affix/prefix token variants
+  (`Run` -> `Running`/`Runner`), and one-token substring-noise suppression.
 - TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
   (`core.tm_import_sync` unit tests).
 - TM query/policy service: cache-key construction and score/origin filtering semantics.
@@ -171,7 +174,8 @@ They include:
 - `preferences`: load/save round‑trip incl. extras, `SEARCH_SCOPE`, `REPLACE_SCOPE`, and unknown keys.
 - `search`: invalid regex returns no matches; empty query returns no matches.
 - `atomic_io`: atomic replace semantics + directory fsync attempt; temp file cleanup on failure.
-- `tm_store`: SQLite schema, exact + fuzzy query ranking, TMX import/export paths.
+- `tm_store`: corpus-scale ranking drift tests (mixed-domain noise with many short tokens)
+  and query latency profiling under larger imported TM sets.
 
 **Integration gaps**
 - GUI warning flow for **malformed/missing `language.txt`**: locale is skipped and other locales open.

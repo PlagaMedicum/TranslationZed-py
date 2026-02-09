@@ -525,6 +525,9 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] TM panel now shows full Source/Translation text for selected suggestion (not preview-only).
      - [✓] TM minimum score default set to **50%** (user-adjustable from 5% to 100%).
      - [✓] TM fuzzy query keeps neighboring suggestions visible even when many exact duplicates exist.
+     - [✓] TM fuzzy ranking upgraded to token/prefix/affix-aware retrieval with explicit
+       single-token noise suppression (`all` should not match `small` by substring only).
+     - [✓] Dedicated ranking contract documented in `docs/tm_ranking_algorithm.md`.
      - [✓] Menu action to resolve pending imported TMs with manual locale mapping.
      - [✓] Imported TM visibility policy: only `ready + enabled` imports are considered in TM query results.
      - [✓] Preferences TM tab supports queued import, remove, enable/disable per imported TM file, plus segment-count visibility and zero-segment warning marker.
