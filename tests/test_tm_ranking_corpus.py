@@ -60,10 +60,14 @@ def test_tm_ranking_corpus(tmp_path: Path) -> None:
     corpus = _load_corpus()
     cases = corpus.get("cases", [])
     assert isinstance(cases, list) and cases
+    profiles = {str(case.get("profile", "synthetic_core")) for case in cases}
+    assert len(profiles) >= 2
 
     for case in cases:
+        profile = str(case.get("profile", "synthetic_core"))
         case_id = str(case.get("id", "unknown"))
-        root = tmp_path / case_id
+        case_label = f"{profile}:{case_id}"
+        root = tmp_path / case_label
         root.mkdir(parents=True, exist_ok=True)
         store = TMStore(root)
         try:
@@ -90,10 +94,11 @@ def test_tm_ranking_corpus(tmp_path: Path) -> None:
 
             expect_top = case.get("expect_top")
             if expect_top:
-                assert matches, f"{case_id}: expected top match {expect_top}"
-                assert (
-                    matches[0].source_text == expect_top
-                ), f"{case_id}: top was {matches[0].source_text}, expected {expect_top}"
+                assert matches, f"{case_label}: expected top match {expect_top}"
+                assert matches[0].source_text == expect_top, (
+                    f"{case_label}: top was {matches[0].source_text}, "
+                    f"expected {expect_top}"
+                )
 
             for expected in case.get("expect_present", []):
                 if isinstance(expected, str):
@@ -102,25 +107,28 @@ def test_tm_ranking_corpus(tmp_path: Path) -> None:
                 else:
                     src = str(expected["source"])
                     min_score = expected.get("min_score")
-                assert src in indices, f"{case_id}: missing expected source '{src}'"
+                assert src in indices, f"{case_label}: missing expected source '{src}'"
                 if min_score is not None:
                     match = next(item for item in matches if item.source_text == src)
-                    assert match.score >= int(
-                        min_score
-                    ), f"{case_id}: score {match.score} < {min_score} for '{src}'"
+                    assert match.score >= int(min_score), (
+                        f"{case_label}: score {match.score} "
+                        f"< {min_score} for '{src}'"
+                    )
 
             for src in case.get("expect_absent", []):
-                assert str(src) not in sources, f"{case_id}: unexpected source '{src}'"
+                assert (
+                    str(src) not in sources
+                ), f"{case_label}: unexpected source '{src}'"
 
             for before_src, after_src in case.get("expect_order", []):
                 assert (
                     before_src in indices
-                ), f"{case_id}: missing ordering source '{before_src}'"
+                ), f"{case_label}: missing ordering source '{before_src}'"
                 assert (
                     after_src in indices
-                ), f"{case_id}: missing ordering source '{after_src}'"
+                ), f"{case_label}: missing ordering source '{after_src}'"
                 assert (
                     indices[before_src] < indices[after_src]
-                ), f"{case_id}: expected '{before_src}' before '{after_src}'"
+                ), f"{case_label}: expected '{before_src}' before '{after_src}'"
         finally:
             store.close()

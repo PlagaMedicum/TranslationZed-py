@@ -4,6 +4,7 @@
   "cases": [
     {
       "id": "drop_neighbors_multi_token",
+      "profile": "synthetic_core",
       "source_locale": "EN",
       "target_locale": "BE",
       "query": "Drop one",
@@ -30,6 +31,7 @@
     },
     {
       "id": "single_token_noise_control",
+      "profile": "synthetic_core",
       "source_locale": "EN",
       "target_locale": "BE",
       "query": "All",
@@ -50,6 +52,7 @@
     },
     {
       "id": "en_affix_matching",
+      "profile": "synthetic_core",
       "source_locale": "EN",
       "target_locale": "BE",
       "query": "Favorite",
@@ -66,6 +69,7 @@
     },
     {
       "id": "non_en_affix_scope",
+      "profile": "synthetic_core",
       "source_locale": "FR",
       "target_locale": "BE",
       "query": "Run",
@@ -84,6 +88,7 @@
     },
     {
       "id": "exact_pool_still_shows_neighbor",
+      "profile": "synthetic_core",
       "source_locale": "EN",
       "target_locale": "BE",
       "query": "Official: Rest",
@@ -101,6 +106,61 @@
       ],
       "expect_present": [
         {"source": "Official: Run", "min_score": 70}
+      ]
+    },
+    {
+      "id": "pz_drop_neighbors_dense_pool",
+      "profile": "pz_fixture_like",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "Drop one",
+      "min_score": 5,
+      "limit": 12,
+      "entries": [
+        {"origin": "project", "key": "k1", "source": "Drop one", "target": "drop-one tr", "updated_at": 1},
+        {"origin": "project", "key": "k2", "source": "Drop all", "target": "drop-all tr", "updated_at": 2},
+        {"origin": "project", "key": "k3", "source": "Drop-all", "target": "drop-all-hyphen tr", "updated_at": 3},
+        {"origin": "project", "key": "k4", "source": "Drop", "target": "drop tr", "updated_at": 4},
+        {"origin": "project", "key": "k5", "source": "Drap all", "target": "drop typo tr", "updated_at": 5},
+        {"origin": "project", "key": "k6", "source": "Drop item", "target": "drop item tr", "updated_at": 6},
+        {"origin": "project", "key": "k7", "source": "Drop stack", "target": "drop stack tr", "updated_at": 7},
+        {"origin": "project", "key": "k8", "source": "Drop crate", "target": "drop crate tr", "updated_at": 8},
+        {"origin": "project", "key": "k9", "source": "Drop inventory", "target": "drop inventory tr", "updated_at": 9},
+        {"origin": "project", "key": "k10", "source": "Drop selected", "target": "drop selected tr", "updated_at": 10},
+        {"origin": "project", "key": "k11", "source": "Pack all", "target": "pack all tr", "updated_at": 11},
+        {"origin": "project", "key": "k12", "source": "Pick one", "target": "pick one tr", "updated_at": 12},
+        {"origin": "project", "key": "k13", "source": "Official: Rest", "target": "rest tr", "updated_at": 13},
+        {"origin": "project", "key": "k14", "source": "Official: Run", "target": "run tr", "updated_at": 14}
+      ],
+      "expect_top": "Drop one",
+      "expect_present": [
+        {"source": "Drop all", "min_score": 60},
+        {"source": "Drop-all", "min_score": 50}
+      ],
+      "expect_order": [
+        ["Drop all", "Drop"],
+        ["Drop-all", "Drop"]
+      ]
+    },
+    {
+      "id": "pz_survivalguide_tagged_neighbors",
+      "profile": "pz_fixture_like",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "SurvivalGuide entry 1500 <LINE> <BR> Sample text with tags.",
+      "min_score": 50,
+      "limit": 12,
+      "entries": [
+        {"origin": "project", "key": "k1", "source": "SurvivalGuide entry 1499 <LINE> <BR> Sample text with tags.", "target": "sg1499 tr", "updated_at": 1},
+        {"origin": "project", "key": "k2", "source": "SurvivalGuide entry 1500 <LINE> <BR> Sample text with tags.", "target": "sg1500 tr", "updated_at": 2},
+        {"origin": "project", "key": "k3", "source": "SurvivalGuide entry 1501 <LINE> <BR> Sample text with tags.", "target": "sg1501 tr", "updated_at": 3},
+        {"origin": "project", "key": "k4", "source": "SurvivalGuide entry 1502 <LINE> <BR> Sample text with tags.", "target": "sg1502 tr", "updated_at": 4},
+        {"origin": "project", "key": "k5", "source": "Recorded_Media entry 1950 <CENTRE> <LINE> Lorem ipsum dolor sit amet.", "target": "rm1950 tr", "updated_at": 5}
+      ],
+      "expect_top": "SurvivalGuide entry 1500 <LINE> <BR> Sample text with tags.",
+      "expect_present": [
+        {"source": "SurvivalGuide entry 1499 <LINE> <BR> Sample text with tags.", "min_score": 95},
+        {"source": "SurvivalGuide entry 1501 <LINE> <BR> Sample text with tags.", "min_score": 95}
       ]
     }
   ]
