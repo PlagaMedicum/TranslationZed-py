@@ -2045,13 +2045,20 @@ class MainWindow(QMainWindow):
             project_count = sum(1 for match in matches if match.origin == "project")
             import_count = len(matches) - project_count
             top_score = matches[0].score if matches else 0
+            unique_sources = len({match.source_text for match in matches})
+            fuzzy_count = sum(1 for match in matches if match.score < 100)
+            recall_density = (
+                float(unique_sources) / float(len(matches)) if matches else 0.0
+            )
             lines.append(
                 f"Current row: locale={target_locale} query_len={len(source_text)}"
             )
             lines.append(
                 "Matches: "
                 f"visible={len(matches)} top_score={top_score}% "
-                f"project={project_count} import={import_count}"
+                f"project={project_count} import={import_count} "
+                f"fuzzy={fuzzy_count} unique_sources={unique_sources} "
+                f"recall_density={recall_density:.2f}"
             )
         self._show_copyable_report("TM diagnostics", "\n".join(lines))
 

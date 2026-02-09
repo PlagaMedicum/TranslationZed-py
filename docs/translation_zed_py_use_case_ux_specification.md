@@ -318,7 +318,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Flow** |
 |  1 | SYS validates TM store availability. |
 |  2 | SYS reports current query policy (`min score`, origin toggles, suggestion limit) and import registry health (`ready`, `enabled`, `pending/error`). |
-|  3 | If a row is selected, SYS reports visible match counts for current locale/query context. |
+|  3 | If a row is selected, SYS reports visible match metrics for current locale/query context (`visible`, `project/import split`, `fuzzy`, `unique sources`, `recall density`). |
 |  4 | SYS shows diagnostics in a copyable text window (Copy + Close). |
 | **Post-condition** | User gets immediate TM-state diagnostics without mutating TM data. |
 

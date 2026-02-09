@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -346,6 +347,80 @@ def test_tm_diagnostics_uses_copyable_report(tmp_path, qtbot, monkeypatch):
     assert title == "TM diagnostics"
     assert "TM DB:" in text
     assert "Policy:" in text
+
+
+def test_tm_diagnostics_reports_match_density_and_origin_counts(
+    tmp_path, qtbot, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    (root / "EN" / "ui.txt").write_text('UI_KEY = "Drop all"\n', encoding="utf-8")
+    (root / "BE" / "ui.txt").write_text('UI_KEY = ""\n', encoding="utf-8")
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    assert win._ensure_tm_store()
+    win._test_mode = False
+
+    tm_path = root / ".tzp" / "tms" / "diag_import.tmx"
+    _register_imported_tm(win, tm_path)
+    win._tm_store.insert_import_pairs(
+        [("Drop one", "Скінуць шт.")],
+        source_locale="EN",
+        target_locale="BE",
+        tm_name="diag_import",
+        tm_path=str(tm_path),
+    )
+    win._tm_store.upsert_project_entries(
+        [
+            ("k1", "Drop all", "Пакінуць усё"),
+            ("k2", "Drop one", "Скінуць шт."),
+            ("k3", "Drop-all", "Пакід. усё"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(root / "BE" / "ui.txt"),
+        updated_at=1,
+    )
+
+    win._tm_score_spin.setValue(5)
+    ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    model = win.table.model()
+    win.table.setCurrentIndex(model.index(0, 2))
+
+    captured: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        win,
+        "_show_copyable_report",
+        lambda title, text: captured.append((title, text)),
+    )
+
+    win._show_tm_diagnostics()
+
+    assert captured
+    title, text = captured[0]
+    assert title == "TM diagnostics"
+    assert "Policy: min=5%" in text
+    assert "Matches: visible=" in text
+    assert "recall_density=" in text
+
+    match_line = next(
+        line for line in text.splitlines() if line.startswith("Matches: visible=")
+    )
+
+    def _read_int(metric: str) -> int:
+        m = re.search(rf"{metric}=(\d+)", match_line)
+        assert m is not None
+        return int(m.group(1))
+
+    visible = _read_int("visible")
+    project = _read_int("project")
+    imported = _read_int("import")
+    unique_sources = _read_int("unique_sources")
+    assert visible >= 3
+    assert project >= 1
+    assert imported >= 1
+    assert unique_sources >= 2
 
 
 def test_preferences_tm_tab_shows_format_and_storage_description(tmp_path, qtbot):

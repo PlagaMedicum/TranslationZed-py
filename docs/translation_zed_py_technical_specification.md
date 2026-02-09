@@ -582,7 +582,8 @@ UNTOUCHED).
   - TM operational commands (resolve pending imports, export TMX, rebuild TM) are executed from
     Preferences TM tab; top menu does not duplicate these commands.
   - Preferences TM tab includes a `Diagnostics` command that reports active policy and
-    import-registry/query visibility metrics in a copyable text dialog (`Copy` + `Close`),
+    import-registry/query visibility metrics (`visible`, `project/import`, `fuzzy`,
+    `unique_sources`, `recall_density`) in a copyable text dialog (`Copy` + `Close`),
     without mutating TM state.
   - Rebuild is also available as an icon-only button inside the TM side panel filter row.
   - `core.tm_preferences` applies preference actions (queue-import copy, remove, enable/disable)
