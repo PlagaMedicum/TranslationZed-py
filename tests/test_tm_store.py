@@ -406,6 +406,68 @@ def test_tm_store_token_matching_supports_common_affixes(tmp_path: Path) -> None
     store.close()
 
 
+def test_tm_store_affix_stemming_is_scoped_to_en_source_locale(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k1", "Run", "Бег"),
+            ("k2", "Running", "Бегчы"),
+        ],
+        source_locale="FR",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    fuzzy = store.query(
+        "Run",
+        source_locale="FR",
+        target_locale="BE",
+        limit=12,
+        min_score=5,
+    )
+
+    sources = {match.source_text for match in fuzzy}
+    assert "Run" in sources
+    assert "Running" not in sources
+    store.close()
+
+
+def test_tm_store_exposes_ranked_and_raw_scores_for_diagnostics(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k1", "Drop one", "Скінуць шт."),
+            ("k2", "Drop all", "Пакінуць усё"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    fuzzy = store.query(
+        "Drop one",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=5,
+    )
+
+    exact = next(match for match in fuzzy if match.source_text == "Drop one")
+    neighbor = next(match for match in fuzzy if match.source_text == "Drop all")
+    assert exact.raw_score == 100
+    assert neighbor.raw_score is not None
+    assert neighbor.raw_score <= neighbor.score
+    store.close()
+
+
 def test_tm_store_fuzzy_prefix_lookup_handles_dense_prefix_sets(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()

@@ -108,13 +108,19 @@ def _stem_token(token: str) -> str:
     return token
 
 
-def _token_matches(query_token: str, candidate_token: str) -> bool:
+def _token_matches(
+    query_token: str,
+    candidate_token: str,
+    *,
+    use_en_stemming: bool,
+) -> bool:
     if query_token == candidate_token:
         return True
-    query_stem = _stem_token(query_token)
-    candidate_stem = _stem_token(candidate_token)
-    if len(query_stem) >= 3 and query_stem == candidate_stem:
-        return True
+    if use_en_stemming:
+        query_stem = _stem_token(query_token)
+        candidate_stem = _stem_token(candidate_token)
+        if len(query_stem) >= 3 and query_stem == candidate_stem:
+            return True
     if len(query_token) == len(candidate_token) and len(query_token) >= 4:
         if query_token[:2] != candidate_token[:2]:
             return False
@@ -143,7 +149,12 @@ def _token_matches(query_token: str, candidate_token: str) -> bool:
     return False
 
 
-def _contains_composed_phrase(text: str, query: str) -> bool:
+def _contains_composed_phrase(
+    text: str,
+    query: str,
+    *,
+    use_en_stemming: bool,
+) -> bool:
     parts = _query_tokens(query)
     if not parts:
         return False
@@ -152,12 +163,19 @@ def _contains_composed_phrase(text: str, query: str) -> bool:
         return False
     if len(parts) == 1:
         token = parts[0]
-        return any(_token_matches(token, cand) for cand in text_tokens)
+        return any(
+            _token_matches(token, cand, use_en_stemming=use_en_stemming)
+            for cand in text_tokens
+        )
     pos = 0
     for part in parts:
         found = False
         while pos < len(text_tokens):
-            if _token_matches(part, text_tokens[pos]):
+            if _token_matches(
+                part,
+                text_tokens[pos],
+                use_en_stemming=use_en_stemming,
+            ):
                 found = True
                 pos += 1
                 break
@@ -170,12 +188,21 @@ def _contains_composed_phrase(text: str, query: str) -> bool:
 def _soft_token_overlap(
     query_tokens: set[str],
     candidate_tokens: set[str],
+    *,
+    use_en_stemming: bool,
 ) -> float:
     if not query_tokens or not candidate_tokens:
         return 0.0
     matched = 0
     for query_token in query_tokens:
-        if any(_token_matches(query_token, cand) for cand in candidate_tokens):
+        if any(
+            _token_matches(
+                query_token,
+                cand,
+                use_en_stemming=use_en_stemming,
+            )
+            for cand in candidate_tokens
+        ):
             matched += 1
     return matched / max(1, len(query_tokens))
 
@@ -969,6 +996,7 @@ class TMStore:
         from difflib import SequenceMatcher
 
         query_tokens = set(_query_tokens(norm))
+        use_en_stemming = source_locale == "EN"
         origin_list = _normalize_origins(origins)
         if not origin_list:
             return []
@@ -1099,7 +1127,11 @@ class TMStore:
         for row in rows:
             cand_norm = row["source_norm"]
             ratio = SequenceMatcher(None, norm, cand_norm, autojunk=False).ratio()
-            composed = _contains_composed_phrase(cand_norm, norm)
+            composed = _contains_composed_phrase(
+                cand_norm,
+                norm,
+                use_en_stemming=use_en_stemming,
+            )
             overlap = 0.0
             exact_overlap = 0.0
             token_count_delta = 999
@@ -1107,7 +1139,11 @@ class TMStore:
                 cand_tokens = set(_query_tokens(cand_norm))
                 token_count_delta = abs(len(cand_tokens) - len(query_tokens))
                 if cand_tokens:
-                    overlap = _soft_token_overlap(query_tokens, cand_tokens)
+                    overlap = _soft_token_overlap(
+                        query_tokens,
+                        cand_tokens,
+                        use_en_stemming=use_en_stemming,
+                    )
                     exact_overlap = _exact_token_overlap(query_tokens, cand_tokens)
                     if len(query_tokens) == 1:
                         if overlap < 0.5 and not composed:
