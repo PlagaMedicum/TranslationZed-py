@@ -284,7 +284,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  3 | SYS writes TMX stream from project TM for selected pair and reports exported unit count. |
 
 ### UC-13h  Rebuild Project TM (Selected Locales)
-| **Trigger** | Toolbar **Rebuild TM** button or *General ▸ Preferences ▸ TM tab ▸ Rebuild TM* |
+| **Trigger** | TM side panel glyph button (hover tooltip: *Rebuild project TM for selected locales*) or *General ▸ Preferences ▸ TM tab ▸ Rebuild TM* |
 | **Flow** |
 |  1 | SYS validates selected non-EN locales. |
 |  2 | SYS starts background rebuild worker that pairs EN source with target translations. |

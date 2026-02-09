@@ -563,6 +563,7 @@ UNTOUCHED).
     new imports, with per-file segment counts and raw locale-tag metadata display.
   - TM operational commands (resolve pending imports, export TMX, rebuild TM) are executed from
     Preferences TM tab; top menu does not duplicate these commands.
+  - Rebuild is also available as an icon-only button inside the TM side panel filter row.
   - `core.tm_preferences` applies preference actions (queue-import copy, remove, enable/disable)
     without Qt dependencies; GUI owns confirmations/dialog presentation.
   - Removing imported TMs requires explicit confirmation that files will be deleted from disk.
