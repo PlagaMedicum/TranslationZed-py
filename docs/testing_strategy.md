@@ -146,6 +146,8 @@ They include:
   neighbors (`Drop one` -> `Drop all`/`Drop-all`), affix/prefix token variants
   (`Run` -> `Running`/`Runner`), single-char typo neighbors (`Drop` -> `Drap`), and
   one-token substring-noise suppression.
+- TM origin-filter regressions: fuzzy recall remains intact for `project`-only and
+  `import`-only modes (no exact-only collapse).
 - TM ranking diagnostics and locale-scoped morphology: verify ranked-vs-raw score exposure
   and that EN affix stemming is enabled for EN source locale only.
 - TM relevance acceptance corpus: deterministic fixture

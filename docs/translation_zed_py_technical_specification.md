@@ -539,6 +539,8 @@ UNTOUCHED).
   - Project TM outranks imported TM.
   - TM suggestions include source name (`tm_name`); when missing, UI falls back to TM file path.
   - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.
+  - TM suggestion fetch depth scales with min-score to support high-recall review:
+    very low thresholds return deeper candidate lists.
   - Imported rows are query-visible only when the import record is **enabled** and in **ready** state.
   - Detailed algorithm contract is defined in `docs/tm_ranking_algorithm.md`.
 - TMX import/export:

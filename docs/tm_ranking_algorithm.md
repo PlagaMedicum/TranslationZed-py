@@ -20,7 +20,11 @@ Goals:
 - `source_locale`, `target_locale`: locale pair.
 - `min_score`: integer threshold `5..100` (default UI value `50`).
 - `origins`: `project`, `import`, or both.
-- `limit`: max suggestions returned to UI.
+- `limit`: max suggestions returned to UI; scaled by `min_score` for high-recall mode:
+  - `<=10`: 200
+  - `<=20`: 120
+  - `<=40`: 60
+  - `>40`: 30
 
 ## 3) Normalization And Tokens
 
@@ -121,6 +125,8 @@ Diagnostics:
 Notes:
 - Exact matches stay fixed at `100`.
 - `min_score` is applied after scoring.
+- Origin filters (`project` only / `import` only / both) use identical fuzzy candidate
+  retrieval logic; fuzzy recall must not collapse when one origin is disabled.
 
 ## 7) Ordering (Tie-Break)
 
