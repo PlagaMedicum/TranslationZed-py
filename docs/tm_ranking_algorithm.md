@@ -41,6 +41,8 @@ Two tokens are considered matching when one of the rules holds:
 - exact equality;
 - common lightweight stem equality (`ies`, `ing`, `ed`, `ers`, `er`, `es`, `s`, `ly`,
   with doubled-consonant normalization like `running` -> `run`);
+- one-character substitution tolerance for token length >= 4 (for typo-neighbors like
+  `drop` vs `drap`);
 - prefix/suffix relation for token length >= 4 with ratio guard
   (`len(shorter) / len(longer) >= 0.50`);
 - contained-substring relation for token length >= 4 with stricter ratio guard
@@ -107,6 +109,10 @@ For each accepted fuzzy candidate:
 - non-exact fuzzy cap:
   - fuzzy candidates are capped to `99` even if bonus would push to `100`.
 
+Diagnostics:
+- UI displays `score` (ranked) and `raw_score` (base character similarity) for
+  diagnostics.
+
 Notes:
 - Exact matches stay fixed at `100`.
 - `min_score` is applied after scoring.
@@ -114,10 +120,11 @@ Notes:
 ## 7) Ordering (Tie-Break)
 
 Suggestions are sorted by:
-1. score descending,
-2. absolute source-length delta ascending (closer lengths first),
-3. origin preference (`project` before `import`),
-4. `updated_at` descending.
+1. for multi-token queries, token-count delta to query ascending,
+2. score descending,
+3. absolute source-length delta ascending (closer lengths first),
+4. origin preference (`project` before `import`),
+5. `updated_at` descending.
 
 ## 8) Behavioral Guarantees
 

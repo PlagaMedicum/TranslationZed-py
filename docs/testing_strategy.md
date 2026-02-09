@@ -144,7 +144,8 @@ They include:
   and query gating for `enabled`/`ready` import files.
 - TM ranking regressions: short-query neighbors (`All` -> `Apply all`), multi-token non-prefix
   neighbors (`Drop one` -> `Drop all`/`Drop-all`), affix/prefix token variants
-  (`Run` -> `Running`/`Runner`), and one-token substring-noise suppression.
+  (`Run` -> `Running`/`Runner`), single-char typo neighbors (`Drop` -> `Drap`), and
+  one-token substring-noise suppression.
 - TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
   (`core.tm_import_sync` unit tests).
 - TM query/policy service: cache-key construction and score/origin filtering semantics.

@@ -533,6 +533,8 @@ UNTOUCHED).
     strings (for example, `Drop one`/`Drop all` and `Rest`/`Run`) remain visible.
   - Prefix/affix token variants are matched via lightweight stemming and token-relation rules;
     substring-only noise is suppressed for one-token queries.
+  - Single-character token typos (length >= 4) are tolerated in fuzzy token matching.
+  - TM suggestion diagnostics expose both ranked score and raw similarity score.
   - Project TM outranks imported TM.
   - TM suggestions include source name (`tm_name`); when missing, UI falls back to TM file path.
   - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.

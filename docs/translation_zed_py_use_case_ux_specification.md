@@ -236,10 +236,11 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Main Success Scenario** |
 |  1 | SYS extracts Source text and target locale from current row/file. |
 |  2 | SYS runs asynchronous TM query (source locale → target locale). |
-|  3 | SYS ranks suggestions with exact-first and fuzzy scoring that accounts for token overlap, prefix/affix variants, and phrase composition; stale async responses are ignored. |
+|  3 | SYS ranks suggestions with exact-first and fuzzy scoring that accounts for token overlap, prefix/affix variants, typo-neighbors, and phrase composition; stale async responses are ignored. |
 |  4 | SYS keeps near neighbors visible even when prefixes differ (for example, `Drop one` can surface `Drop all` at low thresholds). |
 |  5 | SYS suppresses substring-only one-token noise (for example, `all` should not match `small` only by substring). |
-|  6 | SYS shows clear empty/error states: no context, no matches, filtered-out, query failure. |
+|  6 | SYS shows diagnostics with ranked score and raw similarity score for each selected suggestion. |
+|  7 | SYS shows clear empty/error states: no context, no matches, filtered-out, query failure. |
 | **Post-condition** | TM list reflects current row and active filters without blocking the UI thread. |
 
 ### UC-13c  Apply TM Suggestion
