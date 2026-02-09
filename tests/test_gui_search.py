@@ -119,3 +119,38 @@ def test_search_case_toggle_controls_literal_matching(qtbot, tmp_path: Path):
 
     win.search_case_btn.setChecked(False)
     assert win._search_from_anchor(direction=1, anchor_row=-1, wrap=False) is True
+
+
+def test_search_side_panel_lists_results_and_navigates(qtbot, tmp_path: Path):
+    dst = tmp_path / "proj"
+    dst.mkdir()
+    for loc in ("EN", "BE"):
+        (dst / loc).mkdir()
+        (dst / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n", encoding="utf-8"
+        )
+    (dst / "BE" / "first.txt").write_text('UI_FIRST = "One"\n')
+    (dst / "BE" / "second.txt").write_text('UI_SECOND = "Two"\n')
+    win = MainWindow(str(dst), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix_first = win.fs_model.index_for_path(dst / "BE" / "first.txt")
+    ix_second = win.fs_model.index_for_path(dst / "BE" / "second.txt")
+    win._file_chosen(ix_first)
+    win._search_scope = "POOL"
+    win.search_edit.setText("Two")
+    win._trigger_search()
+
+    qtbot.waitUntil(lambda: win._search_results_list.count() == 1, timeout=1000)
+    item = win._search_results_list.item(0)
+    assert item is not None
+    assert "second.txt:1" in item.text()
+
+    win._file_chosen(ix_first)
+    win._open_search_result_item(item)
+    qtbot.waitUntil(
+        lambda: win._current_pf and win._current_pf.path == dst / "BE" / "second.txt",
+        timeout=1000,
+    )
+    tree_path = win.tree.currentIndex().data(Qt.UserRole)
+    assert tree_path == str(dst / "BE" / "second.txt")
+    assert ix_second.isValid()

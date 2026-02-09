@@ -275,6 +275,9 @@ def test_apply_preferences_runs_tm_actions_from_tm_tab(tmp_path, qtbot, monkeypa
     monkeypatch.setattr(win, "_resolve_pending_tmx", lambda: called.append("resolve"))
     monkeypatch.setattr(win, "_export_tmx", lambda: called.append("export"))
     monkeypatch.setattr(win, "_rebuild_tm_selected", lambda: called.append("rebuild"))
+    monkeypatch.setattr(
+        win, "_show_tm_diagnostics", lambda: called.append("diagnostics")
+    )
 
     win._apply_preferences(
         {
@@ -290,9 +293,10 @@ def test_apply_preferences_runs_tm_actions_from_tm_tab(tmp_path, qtbot, monkeypa
             "tm_resolve_pending": True,
             "tm_export_tmx": True,
             "tm_rebuild": True,
+            "tm_show_diagnostics": True,
         }
     )
-    assert called == ["resolve", "export", "rebuild"]
+    assert called == ["resolve", "export", "rebuild", "diagnostics"]
 
 
 def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
@@ -307,6 +311,41 @@ def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
     assert values["tm_resolve_pending"] is True
     assert values["tm_export_tmx"] is False
     assert values["tm_rebuild"] is False
+    assert values["tm_show_diagnostics"] is False
+
+
+def test_preferences_tm_diagnostics_button_sets_flag(tmp_path, qtbot):
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {"tm_import_dir": str(root / ".tzp" / "tms")}, tm_files=[]
+    )
+    qtbot.addWidget(dialog)
+
+    dialog._request_tm_diagnostics()
+    values = dialog.values()
+    assert values["tm_show_diagnostics"] is True
+    assert values["tm_resolve_pending"] is False
+
+
+def test_tm_diagnostics_uses_copyable_report(tmp_path, qtbot, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    captured: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        win,
+        "_show_copyable_report",
+        lambda title, text: captured.append((title, text)),
+    )
+
+    win._show_tm_diagnostics()
+
+    assert captured
+    title, text = captured[0]
+    assert title == "TM diagnostics"
+    assert "TM DB:" in text
+    assert "Policy:" in text
 
 
 def test_preferences_tm_tab_shows_format_and_storage_description(tmp_path, qtbot):
@@ -317,6 +356,8 @@ def test_preferences_tm_tab_shows_format_and_storage_description(tmp_path, qtbot
     qtbot.addWidget(dialog)
 
     text = dialog._tm_formats_label.text()
+    assert "Supported now" in text
+    assert "Planned later" in text
     assert "TMX" in text
     assert ".tzp/config/tm.sqlite" in text
     assert ".tzp/tms" in text

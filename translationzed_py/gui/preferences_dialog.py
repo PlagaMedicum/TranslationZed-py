@@ -51,6 +51,7 @@ class PreferencesDialog(QDialog):
         self._tm_resolve_pending = False
         self._tm_export_tmx = False
         self._tm_rebuild = False
+        self._tm_show_diagnostics = False
         self._tm_resolve_btn: QPushButton | None = None
 
         tabs = QTabWidget(self)
@@ -92,6 +93,7 @@ class PreferencesDialog(QDialog):
             "tm_resolve_pending": self._tm_resolve_pending,
             "tm_export_tmx": self._tm_export_tmx,
             "tm_rebuild": self._tm_rebuild,
+            "tm_show_diagnostics": self._tm_show_diagnostics,
         }
 
     def _build_general_tab(self) -> QWidget:
@@ -190,9 +192,14 @@ class PreferencesDialog(QDialog):
         label.setWordWrap(True)
         layout.addWidget(label)
         self._tm_formats_label = QLabel(
-            "Formats: import/export TMX (.tmx, TMX 1.4). "
-            "Runtime TM index: .tzp/config/tm.sqlite. "
-            "Managed imported TM folder: .tzp/tms.",
+            "Supported now:\n"
+            "- Import: TMX (.tmx, TMX 1.4)\n"
+            "- Export: TMX (.tmx, TMX 1.4)\n"
+            "- Runtime store: .tzp/config/tm.sqlite\n"
+            "- Managed imported folder: .tzp/tms\n"
+            "\n"
+            "Planned later:\n"
+            "- Additional exchange formats (deferred).",
             widget,
         )
         self._tm_formats_label.setWordWrap(True)
@@ -232,9 +239,13 @@ class PreferencesDialog(QDialog):
         rebuild_btn = QPushButton("Rebuild TM", widget)
         rebuild_btn.setToolTip("Rebuild project TM from selected locale files")
         rebuild_btn.clicked.connect(self._request_tm_rebuild)
+        diagnostics_btn = QPushButton("Diagnostics", widget)
+        diagnostics_btn.setToolTip("Show TM diagnostics for current filters and row")
+        diagnostics_btn.clicked.connect(self._request_tm_diagnostics)
         ops_row.addWidget(self._tm_resolve_btn)
         ops_row.addWidget(export_btn)
         ops_row.addWidget(rebuild_btn)
+        ops_row.addWidget(diagnostics_btn)
         ops_row.addStretch(1)
         layout.addLayout(ops_row)
 
@@ -366,6 +377,10 @@ class PreferencesDialog(QDialog):
 
     def _request_tm_rebuild(self) -> None:
         self._tm_rebuild = True
+        self.accept()
+
+    def _request_tm_diagnostics(self) -> None:
+        self._tm_show_diagnostics = True
         self.accept()
 
     def _browse_root(self) -> None:

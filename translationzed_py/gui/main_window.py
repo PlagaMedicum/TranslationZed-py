@@ -44,6 +44,8 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
@@ -122,6 +124,7 @@ from translationzed_py.core.saver import save
 from translationzed_py.core.search import Match as _SearchMatch
 from translationzed_py.core.search import SearchField as _SearchField
 from translationzed_py.core.search import SearchRow as _SearchRow
+from translationzed_py.core.search import iter_matches as _iter_search_matches
 from translationzed_py.core.search_replace_service import (
     SearchReplaceService as _SearchReplaceService,
 )
@@ -726,6 +729,7 @@ class MainWindow(QMainWindow):
         ] = OrderedDict()
         self._search_cache_max = 64
         self._search_cache_row_limit = 5000
+        self._search_panel_result_limit = 200
         self._replace_visible = False
         self._search_progress_text = ""
         self._row_resize_timer = QTimer(self)
@@ -933,7 +937,17 @@ class MainWindow(QMainWindow):
         search_layout = QVBoxLayout(self._search_panel)
         search_layout.setContentsMargins(6, 0, 6, 6)
         search_layout.setSpacing(6)
-        search_layout.addWidget(QLabel("Search results list not implemented yet."))
+        self._search_status_label = QLabel(
+            "Press Enter in the search box to populate results.",
+            self._search_panel,
+        )
+        self._search_status_label.setWordWrap(True)
+        self._search_results_list = QListWidget(self._search_panel)
+        self._search_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._search_results_list.itemActivated.connect(self._open_search_result_item)
+        self._search_results_list.itemClicked.connect(self._open_search_result_item)
+        search_layout.addWidget(self._search_status_label)
+        search_layout.addWidget(self._search_results_list)
         self._left_stack.addWidget(self._search_panel)
 
         self._left_files_btn.setChecked(True)
@@ -1966,6 +1980,81 @@ class MainWindow(QMainWindow):
             return
         self._start_tm_rebuild(locales, interactive=True, force=True)
 
+    def _show_copyable_report(self, title: str, text: str) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.resize(760, 460)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        editor = QPlainTextEdit(dialog)
+        editor.setReadOnly(True)
+        editor.setLineWrapMode(QPlainTextEdit.NoWrap)
+        editor.setPlainText(text)
+        layout.addWidget(editor)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close, dialog)
+        copy_btn = buttons.addButton("Copy", QDialogButtonBox.ActionRole)
+        copy_btn.clicked.connect(
+            lambda: QGuiApplication.clipboard().setText(editor.toPlainText())
+        )
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.exec()
+
+    def _show_tm_diagnostics(self) -> None:
+        if not self._ensure_tm_store():
+            QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
+            return
+        assert self._tm_store is not None
+        policy = self._tm_query_policy()
+        import_files = self._tm_store.list_import_files()
+        ready_imports = sum(1 for rec in import_files if rec.status == "ready")
+        enabled_imports = sum(
+            1 for rec in import_files if rec.status == "ready" and rec.enabled
+        )
+        pending_imports = len(import_files) - ready_imports
+        lines = [
+            f"TM DB: {self._tm_store.db_path}",
+            (
+                "Policy: "
+                f"min={policy.min_score}% limit={policy.limit} "
+                f"origins(project={policy.origin_project}, import={policy.origin_import})"
+            ),
+            (
+                "Imported files: "
+                f"total={len(import_files)} ready={ready_imports} "
+                f"enabled={enabled_imports} pending_or_error={pending_imports}"
+            ),
+        ]
+        lookup = self._current_tm_lookup()
+        if lookup is None:
+            lines.append("Current row: no source text selected.")
+        else:
+            source_text, target_locale = lookup
+            origins = _tm_origins_for(policy)
+            matches = self._tm_store.query(
+                source_text,
+                source_locale=policy.source_locale,
+                target_locale=target_locale,
+                limit=policy.limit,
+                min_score=policy.min_score,
+                origins=origins,
+            )
+            project_count = sum(1 for match in matches if match.origin == "project")
+            import_count = len(matches) - project_count
+            top_score = matches[0].score if matches else 0
+            lines.append(
+                f"Current row: locale={target_locale} query_len={len(source_text)}"
+            )
+            lines.append(
+                "Matches: "
+                f"visible={len(matches)} top_score={top_score}% "
+                f"project={project_count} import={import_count}"
+            )
+        self._show_copyable_report("TM diagnostics", "\n".join(lines))
+
     def _maybe_bootstrap_tm(self) -> None:
         if self._test_mode or not self._ensure_tm_store():
             return
@@ -2119,6 +2208,7 @@ class MainWindow(QMainWindow):
         tm_resolve_pending = bool(values.get("tm_resolve_pending", False))
         tm_export_tmx = bool(values.get("tm_export_tmx", False))
         tm_rebuild = bool(values.get("tm_rebuild", False))
+        tm_show_diagnostics = bool(values.get("tm_show_diagnostics", False))
         self._persist_preferences()
         if tm_resolve_pending:
             self._resolve_pending_tmx()
@@ -2126,6 +2216,8 @@ class MainWindow(QMainWindow):
             self._export_tmx()
         if tm_rebuild:
             self._rebuild_tm_selected()
+        if tm_show_diagnostics:
+            self._show_tm_diagnostics()
         if self._left_stack.currentIndex() == 1:
             self._sync_tm_import_folder(interactive=True, show_summary=False)
             self._schedule_tm_update()
@@ -2612,6 +2704,8 @@ class MainWindow(QMainWindow):
                 self._tm_bootstrap_pending = False
                 self._maybe_bootstrap_tm()
             self._schedule_tm_update()
+        if idx == 2:
+            self._refresh_search_panel_results()
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         if obj is self.table.viewport():
@@ -3036,6 +3130,9 @@ class MainWindow(QMainWindow):
         self._update_status_bar()
         if self._search_timer.isActive():
             self._search_timer.stop()
+        self._set_search_panel_message(
+            "Press Enter in the search box to populate results."
+        )
 
     def _update_case_toggle_ui(self) -> None:
         if not hasattr(self, "search_case_btn") or self.search_case_btn is None:
@@ -3943,7 +4040,16 @@ class MainWindow(QMainWindow):
         field, include_source, include_value = _sr_search_spec_for_column(column)
         files = self._search_files_for_scope()
         if not files:
+            self._set_search_panel_message("No files in current search scope.")
             return False
+        self._refresh_search_panel_results(
+            query=query,
+            use_regex=use_regex,
+            field=field,
+            include_source=include_source,
+            include_value=include_value,
+            files=files,
+        )
         if anchor_path is None:
             anchor_path = self._current_pf.path if self._current_pf else files[0]
         if anchor_row is None:
@@ -3970,6 +4076,118 @@ class MainWindow(QMainWindow):
             find_in_file=_find_in_file,
         )
         return bool(match and self._select_match(match))
+
+    def _set_search_panel_message(self, text: str) -> None:
+        if (
+            hasattr(self, "_search_status_label")
+            and self._search_status_label is not None
+        ):
+            self._search_status_label.setText(text)
+        if (
+            hasattr(self, "_search_results_list")
+            and self._search_results_list is not None
+        ):
+            self._search_results_list.clear()
+
+    def _search_result_label(self, match: _SearchMatch) -> str:
+        try:
+            rel = str(match.file.relative_to(self._root))
+        except ValueError:
+            rel = str(match.file)
+        return f"{rel}:{match.row + 1}"
+
+    def _refresh_search_panel_results(
+        self,
+        *,
+        query: str | None = None,
+        use_regex: bool | None = None,
+        field: _SearchField | None = None,
+        include_source: bool | None = None,
+        include_value: bool | None = None,
+        files: list[Path] | None = None,
+    ) -> None:
+        if (
+            not hasattr(self, "_search_results_list")
+            or self._search_results_list is None
+        ):
+            return
+        query_text = (query if query is not None else self.search_edit.text()).strip()
+        if not query_text:
+            self._set_search_panel_message(
+                "Press Enter in the search box to populate results."
+            )
+            return
+        if use_regex is None:
+            use_regex = bool(self.regex_check.isChecked())
+        if field is None or include_source is None or include_value is None:
+            column = int(self.search_mode.currentData())
+            field, include_source, include_value = _sr_search_spec_for_column(column)
+        if files is None:
+            files = self._search_files_for_scope()
+        if not files:
+            self._set_search_panel_message("No files in current search scope.")
+            return
+
+        self._search_results_list.clear()
+        results_count = 0
+        truncated = False
+        for path in files:
+            locale = self._locale_for_path(path)
+            if not locale:
+                continue
+            if (
+                self._current_pf
+                and self._current_model
+                and path == self._current_pf.path
+            ):
+                rows = self._rows_from_model(
+                    include_source=include_source,
+                    include_value=include_value,
+                )
+            else:
+                rows = self._cached_rows_from_file(
+                    path,
+                    locale,
+                    include_source=include_source,
+                    include_value=include_value,
+                )
+            for match in _iter_search_matches(
+                rows,
+                query_text,
+                field,
+                use_regex,
+                case_sensitive=self._search_case_sensitive,
+            ):
+                item = QListWidgetItem(self._search_result_label(match))
+                item.setData(Qt.UserRole, (str(match.file), int(match.row)))
+                self._search_results_list.addItem(item)
+                results_count += 1
+                if results_count >= self._search_panel_result_limit:
+                    truncated = True
+                    break
+            if truncated:
+                break
+
+        if results_count == 0:
+            self._search_status_label.setText("No matches in current scope.")
+            return
+        if truncated:
+            self._search_status_label.setText(
+                f"Showing first {results_count} matches (limit {self._search_panel_result_limit})."
+            )
+            return
+        self._search_status_label.setText(f"{results_count} matches in current scope.")
+
+    def _open_search_result_item(self, item: QListWidgetItem) -> None:
+        payload = item.data(Qt.UserRole)
+        if not isinstance(payload, tuple) or len(payload) != 2:
+            return
+        raw_path, raw_row = payload
+        try:
+            match = _SearchMatch(Path(str(raw_path)), int(raw_row))
+        except Exception:
+            return
+        self._select_match(match)
 
     def _run_search(self) -> None:
         self._search_from_anchor(direction=1, anchor_row=-1)
