@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.5.0] - Unreleased
+## [0.5.0] - 2026-02-09
 
 ### Added
 - Translation Memory (TM) subsystem:
@@ -50,7 +50,7 @@ All notable changes to this project will be documented in this file.
 - Use-case/spec/plan synchronization improved, including TM diagnostics and ranking behavior.
 - Added targeted UI tests for TM diagnostics output and extended TM ranking corpus assertions.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-01-30
 
 ### Added
 - Initial GUI with file tree, translation table, and status tracking.
@@ -64,4 +64,4 @@ All notable changes to this project will be documented in this file.
 
 ### Known limitations
 - No installers yet (folder bundles only).
-- Dark mode follows system style only; no custom theme.
+- No support for dark/light theme mode.
