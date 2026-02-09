@@ -19,7 +19,8 @@ def _run_case(
     dest.write_bytes(src.read_bytes())
     pf = parse(dest, encoding="utf-8")
     save(pf, updates, encoding="utf-8")
-    assert dest.read_bytes() == expected_path.read_bytes()
+    # Keep assertions stable across platform-specific checkout EOL settings.
+    assert dest.read_text(encoding="utf-8") == expected_path.read_text(encoding="utf-8")
 
 
 def test_structure_recorded_media_slice(tmp_path: Path) -> None:

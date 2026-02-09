@@ -56,6 +56,10 @@ def _first_index_by_source(matches) -> dict[str, int]:
     return out
 
 
+def _safe_case_label(label: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in {"_", "-", "."} else "_" for ch in label)
+
+
 def test_tm_ranking_corpus(tmp_path: Path) -> None:
     corpus = _load_corpus()
     cases = corpus.get("cases", [])
@@ -67,7 +71,7 @@ def test_tm_ranking_corpus(tmp_path: Path) -> None:
         profile = str(case.get("profile", "synthetic_core"))
         case_id = str(case.get("id", "unknown"))
         case_label = f"{profile}:{case_id}"
-        root = tmp_path / case_label
+        root = tmp_path / _safe_case_label(case_label)
         root.mkdir(parents=True, exist_ok=True)
         store = TMStore(root)
         try:

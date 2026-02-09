@@ -35,7 +35,7 @@ def test_gui_save_preserves_cp1251(tmp_path, qtbot):
     win._save_current()
     data = path.read_bytes()
     assert data[:2] != b"\xff\xfe"
-    assert data.decode("cp1251") == 'UI_OK = "Привет"\n'
+    assert data.decode("cp1251").replace("\r\n", "\n") == 'UI_OK = "Привет"\n'
 
 
 def test_gui_save_preserves_utf16(tmp_path, qtbot):
@@ -50,4 +50,4 @@ def test_gui_save_preserves_utf16(tmp_path, qtbot):
     win._save_current()
     data = path.read_bytes()
     assert data[:2] in {b"\xff\xfe", b"\xfe\xff"}
-    assert data.decode("utf-16") == 'UI_OK = "테스트2"\n'
+    assert data.decode("utf-16").replace("\r\n", "\n") == 'UI_OK = "테스트2"\n'

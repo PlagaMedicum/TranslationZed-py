@@ -60,7 +60,7 @@ def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
     assert prefs["prompt_write_on_exit"] is True
     assert prefs["search_scope"] == "FILE"
     assert prefs["replace_scope"] == "FILE"
-    assert prefs["tm_import_dir"] == "/tmp/custom_tm_import"
+    assert prefs["tm_import_dir"] == str(Path("/tmp/custom_tm_import").resolve())
     assert prefs["__extras__"]["CUSTOM_FLAG"] == "1"
 
     path = tmp_path / ".tzp" / "config" / "settings.env"
@@ -69,7 +69,7 @@ def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
     assert "WRAP_TEXT=true" in raw
     assert "SEARCH_SCOPE=FILE" in raw
     assert "REPLACE_SCOPE=FILE" in raw
-    assert "TM_IMPORT_DIR=/tmp/custom_tm_import" in raw
+    assert f"TM_IMPORT_DIR={Path('/tmp/custom_tm_import').resolve()}" in raw
     assert "CUSTOM_FLAG=1" in raw
 
 
