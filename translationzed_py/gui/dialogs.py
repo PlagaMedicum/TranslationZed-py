@@ -334,9 +334,13 @@ class AboutDialog(QDialog):
         self.setWindowTitle("About TranslationZed-Py")
         self.setModal(True)
         self.setMinimumWidth(520)
-        self.setMinimumHeight(420)
+        self.setMinimumHeight(280)
+        self.resize(640, 420)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+        layout.setAlignment(Qt.AlignTop)
         layout.addWidget(QLabel(f"<b>TranslationZed-Py</b> v{__version__}", self))
         desc = QLabel(
             "CAT tool for Project Zomboid translators, by translators. Created with Python.",
@@ -372,6 +376,7 @@ class AboutDialog(QDialog):
         self._license_text.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self._license_text.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._license_text.setPlainText(self._read_license())
+        self._license_text.setMaximumHeight(250)
         self._license_text.setVisible(False)
         layout.addWidget(self._license_text)
 
@@ -384,6 +389,7 @@ class AboutDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
         buttons.rejected.connect(self.reject)
         buttons.accepted.connect(self.accept)
+        layout.addStretch(1)
         layout.addWidget(buttons)
 
     def _read_license(self) -> str:
