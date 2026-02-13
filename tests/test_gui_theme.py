@@ -22,9 +22,30 @@ def test_normalize_theme_mode_accepts_supported_values() -> None:
 
 
 def test_apply_theme_dark_then_system_updates_stylesheet(qapp) -> None:
+    color_scheme = getattr(Qt, "ColorScheme", None)
     assert apply_theme(qapp, "dark") == THEME_DARK
     assert "QToolTip" in qapp.styleSheet()
-    assert apply_theme(qapp, "system") == THEME_SYSTEM
+    if color_scheme is None:
+        assert apply_theme(qapp, "system", style_hints=object()) == THEME_SYSTEM
+        assert qapp.styleSheet() == ""
+        return
+
+    class _Hints:
+        def __init__(self, scheme):
+            self._scheme = scheme
+
+        def colorScheme(self):
+            return self._scheme
+
+    assert (
+        apply_theme(qapp, "system", style_hints=_Hints(color_scheme.Dark))
+        == THEME_SYSTEM
+    )
+    assert "QToolTip" in qapp.styleSheet()
+    assert (
+        apply_theme(qapp, "system", style_hints=_Hints(color_scheme.Light))
+        == THEME_SYSTEM
+    )
     assert qapp.styleSheet() == ""
 
 

@@ -45,7 +45,7 @@ def system_theme_from_qt_scheme(scheme: object) -> str | None:
 def detect_system_theme_mode(
     app: QApplication, *, style_hints: object | None = None
 ) -> str | None:
-    """Best-effort system theme detection (future hook; not auto-applied yet)."""
+    """Best-effort system theme detection from Qt style hints."""
     hints = style_hints if style_hints is not None else app.styleHints()
     if hints is None:
         return None
@@ -120,13 +120,22 @@ def _apply_dark(app: QApplication) -> None:
     app.setStyleSheet(_DARK_TOOLTIP_QSS)
 
 
-def apply_theme(app: QApplication, mode: object) -> str:
+def apply_theme(
+    app: QApplication,
+    mode: object,
+    *,
+    style_hints: object | None = None,
+) -> str:
     normalized = normalize_theme_mode(mode)
+    if normalized == THEME_SYSTEM:
+        system_mode = detect_system_theme_mode(app, style_hints=style_hints)
+        if system_mode == THEME_DARK:
+            _apply_dark(app)
+        else:
+            _apply_light_or_system(app)
+        return normalized
     if normalized == THEME_DARK:
         _apply_dark(app)
     else:
-        # NOTE: SYSTEM currently keeps native/light standard palette behavior.
-        # OS dark-mode auto-follow is intentionally deferred; use
-        # detect_system_theme_mode(...) as the integration hook later.
         _apply_light_or_system(app)
     return normalized

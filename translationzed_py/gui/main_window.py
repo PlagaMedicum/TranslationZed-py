@@ -538,6 +538,8 @@ class MainWindow(QMainWindow):
             self._prefs_extras.get("UI_THEME_MODE"), default=_THEME_SYSTEM
         )
         self._apply_theme_mode(self._theme_mode, persist=False)
+        self._system_theme_sync_connected = False
+        self._connect_system_theme_sync()
         self._search_case_sensitive = _bool_from_pref(
             self._prefs_extras.get("SEARCH_CASE_SENSITIVE"), False
         )
@@ -2195,6 +2197,39 @@ class MainWindow(QMainWindow):
     def _show_about(self) -> None:
         dialog = AboutDialog(self)
         dialog.exec()
+
+    def _connect_system_theme_sync(self) -> None:
+        if self._system_theme_sync_connected:
+            return
+        app = QApplication.instance()
+        if app is None:
+            return
+        hints = app.styleHints()
+        signal = getattr(hints, "colorSchemeChanged", None)
+        if signal is None or not hasattr(signal, "connect"):
+            return
+        with contextlib.suppress(Exception):
+            signal.connect(self._on_system_color_scheme_changed)
+            self._system_theme_sync_connected = True
+
+    def _disconnect_system_theme_sync(self) -> None:
+        if not self._system_theme_sync_connected:
+            return
+        app = QApplication.instance()
+        if app is None:
+            self._system_theme_sync_connected = False
+            return
+        hints = app.styleHints()
+        signal = getattr(hints, "colorSchemeChanged", None)
+        if signal is not None and hasattr(signal, "disconnect"):
+            with contextlib.suppress(Exception):
+                signal.disconnect(self._on_system_color_scheme_changed)
+        self._system_theme_sync_connected = False
+
+    def _on_system_color_scheme_changed(self, *_args) -> None:
+        if self._theme_mode != _THEME_SYSTEM:
+            return
+        self._apply_theme_mode(_THEME_SYSTEM, persist=False)
 
     def _apply_theme_mode(self, mode: object, *, persist: bool) -> None:
         normalized = _normalize_theme_mode(mode, default=_THEME_SYSTEM)
@@ -5089,6 +5124,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self._stop_timers()
+        self._disconnect_system_theme_sync()
         with contextlib.suppress(Exception):
             self._flush_tm_updates()
         self._shutdown_tm_workers()

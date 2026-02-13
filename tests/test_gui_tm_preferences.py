@@ -168,6 +168,29 @@ def test_theme_mode_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
     assert "UI_THEME_MODE" not in extras
 
 
+def test_system_theme_change_reapplies_only_for_system_mode(
+    tmp_path, qtbot, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[tuple[str, bool]] = []
+
+    def _capture(mode, *, persist):
+        calls.append((str(mode), bool(persist)))
+
+    monkeypatch.setattr(win, "_apply_theme_mode", _capture)
+    win._theme_mode = "DARK"
+    win._on_system_color_scheme_changed()
+    assert calls == []
+
+    win._theme_mode = "SYSTEM"
+    win._on_system_color_scheme_changed()
+    assert calls == [("SYSTEM", False)]
+
+
 def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
