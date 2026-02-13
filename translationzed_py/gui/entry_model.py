@@ -8,7 +8,8 @@ from PySide6.QtCore import (
     QPersistentModelIndex,
     Qt,
 )
-from PySide6.QtGui import QColor, QUndoStack
+from PySide6.QtGui import QColor, QPalette, QUndoStack
+from PySide6.QtWidgets import QApplication
 
 from translationzed_py.core import Entry, Status
 from translationzed_py.core.model import ParsedFile
@@ -16,12 +17,20 @@ from translationzed_py.core.search import SearchRow
 from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 
 _HEADERS = ("Key", "Source", "Translation", "Status")
-_BG_STATUS = {
+_BG_STATUS_LIGHT = {
     Status.TRANSLATED: QColor("#ccffcc"),
     Status.PROOFREAD: QColor("#cce5ff"),
     Status.FOR_REVIEW: QColor("#ffd8a8"),
 }
-_BG_MISSING = QColor("#ffcccc")
+_BG_STATUS_DARK = {
+    Status.TRANSLATED: QColor("#2b5736"),
+    Status.PROOFREAD: QColor("#2c4969"),
+    Status.FOR_REVIEW: QColor("#6a4a22"),
+}
+_BG_MISSING_LIGHT = QColor("#ffcccc")
+_BG_MISSING_DARK = QColor("#7a2f2f")
+_FG_LIGHT_BG = QColor("#111111")
+_FG_DARK_BG = QColor("#f1f1f1")
 _TOOLTIP_LIMIT = 800
 _TOOLTIP_LIMIT_LARGE = 200
 _TOOLTIP_LARGE_THRESHOLD = 5000
@@ -56,6 +65,43 @@ class TranslationModel(QAbstractTableModel):
         self.undo_stack = QUndoStack()
 
     # ---------------------------------------------------------------- helpers
+    def _dark_palette_active(self) -> bool:
+        app = QApplication.instance()
+        if app is None:
+            return False
+        palette = app.palette()
+        base = palette.color(QPalette.Base)
+        text = palette.color(QPalette.Text)
+        return text.lightness() > base.lightness()
+
+    def _status_background_color(self, status: Status) -> QColor | None:
+        if self._dark_palette_active():
+            return _BG_STATUS_DARK.get(status)
+        return _BG_STATUS_LIGHT.get(status)
+
+    def _missing_background_color(self) -> QColor:
+        if self._dark_palette_active():
+            return _BG_MISSING_DARK
+        return _BG_MISSING_LIGHT
+
+    def _foreground_for_background(self, background: QColor) -> QColor:
+        # Keep readable text regardless of status color brightness.
+        return _FG_LIGHT_BG if background.lightness() >= 145 else _FG_DARK_BG
+
+    def _cell_background(self, row: int, column: int, entry: Entry) -> QColor | None:
+        if column == 0 and not (entry.key or ""):
+            return self._missing_background_color()
+        if column == 1:
+            if self._source_by_row is not None and row < len(self._source_by_row):
+                source_text = self._source_by_row[row]
+            else:
+                source_text = self._source_values.get(entry.key, "")
+            if not (source_text or ""):
+                return self._missing_background_color()
+        if column == 2 and not (entry.value or ""):
+            return self._missing_background_color()
+        return self._status_background_color(entry.status)
+
     def _replace_entry(self, row: int, entry: Entry, *, value_changed: bool) -> None:
         """Called by EditValueCommand to swap immutable Entry objects."""
         self._entries[row] = entry
@@ -416,21 +462,13 @@ class TranslationModel(QAbstractTableModel):
 
         # --- background highlights -------------------------------------------
         if role == Qt.BackgroundRole:
-            if index.column() == 0 and not (e.key or ""):
-                return _BG_MISSING
-            if index.column() == 1:
-                source_text = None
-                if self._source_by_row is not None and index.row() < len(
-                    self._source_by_row
-                ):
-                    source_text = self._source_by_row[index.row()]
-                else:
-                    source_text = self._source_values.get(e.key, "")
-                if not (source_text or ""):
-                    return _BG_MISSING
-            if index.column() == 2 and not (e.value or ""):
-                return _BG_MISSING
-            return _BG_STATUS.get(e.status)
+            return self._cell_background(index.row(), index.column(), e)
+
+        if role == Qt.ForegroundRole:
+            background = self._cell_background(index.row(), index.column(), e)
+            if background is None:
+                return None
+            return self._foreground_for_background(background)
 
         return None
 
