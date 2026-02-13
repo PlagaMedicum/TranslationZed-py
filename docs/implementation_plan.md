@@ -733,8 +733,8 @@ A7 [→] **UI latency stabilization (scroll + paint)**
      - [✓] Render‑cost heuristic (max entry length) to auto‑enter large‑file mode
        and enable table previews when row/size thresholds are not exceeded.
      - [→] Reduce lazy prefetch window for very long rows to cut decode spikes on scroll.
-     - [ ] Add automated perf assertion for row-resize burst behavior (no long single resize pass).
-     - [ ] Add automated GUI regression for large-file scroll/selection stability on SurvivalGuide/Recorded_Media fixtures.
+     - [✓] Add automated perf assertion for row-resize burst behavior (no long single resize pass).
+     - [✓] Add automated GUI regression for large-file scroll/selection stability on SurvivalGuide/Recorded_Media fixtures.
    - **Acceptance**: large single‑string files (News/Recorded_Media) open and scroll without jank;
      column resize/side‑panel toggles are smooth; no tooltip‑related freezes.
 

@@ -69,6 +69,10 @@ _Last updated: 2026-02-11_
   - session last-opened cache scan,
   - lazy preview and max‑value length scans.
   (All env‑tunable.)
+- `tests/test_gui_perf_regressions.py` enforces GUI latency regressions for:
+  - row-resize burst slicing (single pass must stay budgeted, no long monolithic resize),
+  - large-file scroll/selection stability on `SurvivalGuide_BE.txt` and
+    `Recorded_Media_BE.txt`.
 - pytest always prints a **Performance** summary in terminal output,
   including `make verify`, to keep regressions visible.
 
@@ -270,7 +274,6 @@ They include:
 
 **System / functional / regression / smoke gaps**
 - End‑to‑end cache lifecycle: edit → cache write → reopen → conflict detect → resolve → save → cache cleared.
-- Large‑string UI regression: open News/Recorded_Media single‑string files; scroll + selection remain responsive.
 - Cross‑encoding regression: GUI edits + saves for cp1251/UTF‑16 + BOM‑less UTF‑16 with `language.txt`.
 - Makefile `verify` non‑destructive fixture cache rule (clean_cache whitelist) as a script‑level regression.
 - Explicit encoding gate target: `make test-encoding-integrity` + diagnostics
