@@ -366,13 +366,13 @@ Algorithm:
 
 - Theme mode is configured in Preferences → View.
 - Supported modes:
-  - `SYSTEM` (default): use platform/native style + standard palette.
+  - `SYSTEM` (default): follow OS light/dark scheme via Qt style hints.
   - `LIGHT`: explicit light palette using native base style.
   - `DARK`: explicit dark palette for app surfaces and tooltips.
 - Setting is persisted via extras key `UI_THEME_MODE`; selecting `SYSTEM`
   clears the override key.
-- A detection hook (`gui.theme.detect_system_theme_mode`) is present for future
-  OS dark-mode auto-follow, but it is not auto-applied yet in `SYSTEM` mode.
+- Runtime sync uses `QStyleHints.colorSchemeChanged` when available and
+  re-applies `SYSTEM` mode without persisting extra overrides.
 
 #### 5.6.5  Save/exit orchestration boundary
 
@@ -829,8 +829,6 @@ The stack is **per-file** and cleared on successful save or file reload.
 - Clean-architecture boundary ownership needs stricter package-level enforcement; add a dependency
   matrix and keep adapter-delegation tests mandatory for new workflow slices
   (deferred enforcement-gate automation in post-v0.6 work).
-- `SYSTEM` theme currently keeps standard palette semantics; OS dark-mode
-  auto-follow is deferred and should be wired through the existing detection hook.
 - Module-level structure map is still shallow for some areas: add explicit responsibility + boundary
   notes for `core.lazy_entries`, `core.en_hash_cache`, `core.parse_utils`, and `gui.perf_trace`.
 - Derived docs (`flows`, `checklists`, `technical_notes_current_state`) must be kept synced to

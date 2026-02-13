@@ -94,8 +94,6 @@ Scope:
 
 - LanguageTool integration (explicitly deferred).
 - Extended translation QA checks (after TM import/export maturity and stabilization).
-- OS dark-mode auto-follow for `SYSTEM` theme mode (detection hook is present;
-  runtime auto-apply wiring is deferred).
 - Optional low-level acceleration layer (C or Rust) for hot paths if Python-side
   optimizations no longer meet responsiveness goals.
 

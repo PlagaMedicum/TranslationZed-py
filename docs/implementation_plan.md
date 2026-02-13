@@ -250,8 +250,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Theme changes apply immediately and affect the whole app
   - Selected mode persists in `settings.env` extras (`UI_THEME_MODE`)
   - `System` mode remains the default when no override is stored
-  - Dark-system auto-follow is deferred; code-level detection hooks are present
-    and should be wired in a later slice.
+  - `System` mode follows OS color-scheme changes at runtime via Qt
+    `colorSchemeChanged` sync wiring.
 
 ### Step 23 — License compliance UI [✓]
 - Touchpoints: `gui/main_window.py`, `gui/dialogs.py`

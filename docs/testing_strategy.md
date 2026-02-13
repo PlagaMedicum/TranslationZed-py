@@ -155,9 +155,9 @@ They include:
   mismatches, and UTF‑16 BOM-less fallback usage.
 - GUI theme mode: normalize/apply (`System|Light|Dark`) and settings persistence
   via `UI_THEME_MODE` extra key.
-- Theme groundwork: system-color-scheme mapping and detection hook behavior
-  (`system_theme_from_qt_scheme`, `detect_system_theme_mode`) are covered
-  without forcing runtime auto-follow yet.
+- Theme system-sync: system-color-scheme mapping and detection hook behavior
+  (`system_theme_from_qt_scheme`, `detect_system_theme_mode`) plus
+  runtime `SYSTEM` re-apply callback behavior.
 - Detail editor telemetry: bottom-right Source/Translation char counter and live
   Translation delta updates while editing.
 - GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
