@@ -6,6 +6,10 @@ from pathlib import Path
 from translationzed_py.core import SearchField, SearchRow, parse, parse_lazy, search
 from translationzed_py.core.model import Entry, Status
 from translationzed_py.core.parse_utils import _hash_key_u64
+from translationzed_py.core.project_session import (
+    collect_draft_files,
+    find_last_opened_file,
+)
 from translationzed_py.core.status_cache import (
     read as read_cache,
 )
@@ -280,3 +284,87 @@ def test_perf_hash_index(tmp_path: Path, perf_recorder) -> None:
     assert index
     perf_recorder("hash index", elapsed_ms, budget_ms, f"entries={count}")
     _assert_budget("hash index", elapsed_ms, budget_ms)
+
+
+def test_perf_session_collect_draft_files(tmp_path: Path, perf_recorder) -> None:
+    files = int(os.getenv("TZP_PERF_SESSION_DRAFT_FILES", "2000"))
+    budget_ms = _budget_ms("TZP_PERF_SESSION_DRAFT_MS", 1200.0)
+    root = tmp_path / "root"
+    locales = ("BE", "RU")
+    for locale in locales:
+        (root / locale).mkdir(parents=True, exist_ok=True)
+        (root / ".tzp" / "cache" / locale).mkdir(parents=True, exist_ok=True)
+    draft_paths: set[Path] = set()
+    for idx in range(files):
+        locale = locales[idx % len(locales)]
+        original = root / locale / f"file_{idx:05d}.txt"
+        cache_path = root / ".tzp" / "cache" / locale / f"file_{idx:05d}.bin"
+        original.write_text('K = "V"\n', encoding="utf-8")
+        cache_path.write_bytes(b"cache")
+        if idx % 3 != 0:
+            draft_paths.add(cache_path)
+
+    gc.collect()
+    start = time.perf_counter()
+    out = collect_draft_files(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        has_drafts=lambda cache_path: cache_path in draft_paths,
+        locales=list(locales),
+    )
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    assert len(out) == len(draft_paths)
+    perf_recorder(
+        "session collect drafts",
+        elapsed_ms,
+        budget_ms,
+        f"files={files} drafts={len(draft_paths)}",
+    )
+    _assert_budget("session collect drafts", elapsed_ms, budget_ms)
+
+
+def test_perf_session_find_last_opened(tmp_path: Path, perf_recorder) -> None:
+    files = int(os.getenv("TZP_PERF_SESSION_LAST_OPENED_FILES", "2000"))
+    budget_ms = _budget_ms("TZP_PERF_SESSION_LAST_OPENED_MS", 1200.0)
+    root = tmp_path / "root"
+    locales = ("BE", "RU")
+    for locale in locales:
+        (root / locale).mkdir(parents=True, exist_ok=True)
+        (root / ".tzp" / "cache" / locale).mkdir(parents=True, exist_ok=True)
+    timestamps: dict[Path, int] = {}
+    expected_best: Path | None = None
+    expected_ts = 0
+    for idx in range(files):
+        locale = locales[idx % len(locales)]
+        original = root / locale / f"file_{idx:05d}.txt"
+        cache_path = root / ".tzp" / "cache" / locale / f"file_{idx:05d}.bin"
+        original.write_text('K = "V"\n', encoding="utf-8")
+        cache_path.write_bytes(b"cache")
+        ts = idx + 1
+        timestamps[cache_path] = ts
+        if ts > expected_ts:
+            expected_ts = ts
+            expected_best = original
+
+    gc.collect()
+    start = time.perf_counter()
+    best_path, scanned = find_last_opened_file(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        selected_locales=list(locales),
+        read_last_opened=lambda cache_path: timestamps.get(cache_path, 0),
+    )
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    assert scanned == files
+    assert best_path == expected_best
+    perf_recorder(
+        "session find last-opened",
+        elapsed_ms,
+        budget_ms,
+        f"files={files}",
+    )
+    _assert_budget("session find last-opened", elapsed_ms, budget_ms)

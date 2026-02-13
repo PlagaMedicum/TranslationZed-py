@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListWidget,
+    QListWidgetItem,
     QPlainTextEdit,
     QScrollArea,
     QToolButton,
@@ -99,16 +100,33 @@ class SaveFilesDialog(QDialog):
         self.setWindowTitle("Write original files")
         self.setModal(True)
         self._choice = "cancel"
+        self._list = QListWidget(self)
 
         main_layout = QVBoxLayout(self)
-        main_layout.addWidget(QLabel("The following files will be written:"))
+        main_layout.addWidget(
+            QLabel("Choose files to write to originals (checked = will be written):")
+        )
 
-        list_widget = QListWidget(self)
-        list_widget.setSelectionMode(QAbstractItemView.NoSelection)
+        self._list.setSelectionMode(QAbstractItemView.NoSelection)
         for item in files:
-            list_widget.addItem(item)
-        list_widget.setMaximumHeight(220)
-        main_layout.addWidget(list_widget)
+            row = QListWidgetItem(item)
+            row.setFlags(row.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            row.setCheckState(Qt.CheckState.Checked)
+            self._list.addItem(row)
+        self._list.setMaximumHeight(260)
+        main_layout.addWidget(self._list)
+
+        toggles_layout = QHBoxLayout()
+        select_all = QToolButton(self)
+        select_all.setText("All")
+        select_all.clicked.connect(self._select_all)
+        select_none = QToolButton(self)
+        select_none.setText("None")
+        select_none.clicked.connect(self._select_none)
+        toggles_layout.addWidget(select_all)
+        toggles_layout.addWidget(select_none)
+        toggles_layout.addStretch(1)
+        main_layout.addLayout(toggles_layout)
 
         buttons = QDialogButtonBox(self)
         btn_write = buttons.addButton("Write", QDialogButtonBox.AcceptRole)
@@ -125,6 +143,24 @@ class SaveFilesDialog(QDialog):
 
     def choice(self) -> str:
         return self._choice
+
+    def selected_files(self) -> list[str]:
+        selected: list[str] = []
+        for idx in range(self._list.count()):
+            item = self._list.item(idx)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected.append(item.text())
+        return selected
+
+    def _select_all(self) -> None:
+        self._set_all_checks(Qt.CheckState.Checked)
+
+    def _select_none(self) -> None:
+        self._set_all_checks(Qt.CheckState.Unchecked)
+
+    def _set_all_checks(self, state: Qt.CheckState) -> None:
+        for idx in range(self._list.count()):
+            self._list.item(idx).setCheckState(state)
 
 
 class TmLanguageDialog(QDialog):

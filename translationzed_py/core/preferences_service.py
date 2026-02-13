@@ -37,6 +37,9 @@ class LoadedPreferences:
 
 @dataclass(frozen=True, slots=True)
 class PreferencesService:
+    def normalize_scope(self, value: object, *, default: str = "FILE") -> str:
+        return normalize_scope(value, default=default)
+
     def resolve_startup_root(
         self, *, project_root: str | None
     ) -> StartupRootResolution:

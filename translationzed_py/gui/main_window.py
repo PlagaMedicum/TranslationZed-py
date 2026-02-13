@@ -9,7 +9,7 @@ import sys
 import time
 import traceback
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Literal
@@ -90,10 +90,13 @@ from translationzed_py.core.conflict_service import (
     ConflictMergeRow as _ConflictMergeRow,
 )
 from translationzed_py.core.conflict_service import (
-    ConflictWorkflowService as _ConflictWorkflowService,
+    ConflictPersistCallbacks as _ConflictPersistCallbacks,
 )
 from translationzed_py.core.conflict_service import (
-    build_merge_rows as _conflict_build_merge_rows,
+    ConflictResolution as _ConflictResolution,
+)
+from translationzed_py.core.conflict_service import (
+    ConflictWorkflowService as _ConflictWorkflowService,
 )
 from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
@@ -101,24 +104,45 @@ from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
 from translationzed_py.core.file_workflow import (
     FileWorkflowService as _FileWorkflowService,
 )
+from translationzed_py.core.file_workflow import (
+    OpenFileCallbacks as _OpenFileCallbacks,
+)
+from translationzed_py.core.file_workflow import (
+    SaveCurrentCallbacks as _SaveCurrentCallbacks,
+)
+from translationzed_py.core.file_workflow import (
+    SaveFromCacheCallbacks as _SaveFromCacheCallbacks,
+)
+from translationzed_py.core.file_workflow import (
+    SaveFromCacheParseError as _SaveFromCacheParseError,
+)
 from translationzed_py.core.model import STATUS_ORDER, Status
 from translationzed_py.core.preferences_service import (
     PreferencesService as _PreferencesService,
 )
-from translationzed_py.core.preferences_service import (
-    normalize_scope as _prefs_normalize_scope,
+from translationzed_py.core.project_session import (
+    CacheMigrationBatchCallbacks as _CacheMigrationBatchCallbacks,
+)
+from translationzed_py.core.project_session import (
+    CacheMigrationScheduleCallbacks as _CacheMigrationScheduleCallbacks,
+)
+from translationzed_py.core.project_session import (
+    LocaleResetPlan as _LocaleResetPlan,
+)
+from translationzed_py.core.project_session import (
+    PostLocaleStartupPlan as _PostLocaleStartupPlan,
 )
 from translationzed_py.core.project_session import (
     ProjectSessionService as _ProjectSessionService,
+)
+from translationzed_py.core.project_session import (
+    TreeRebuildPlan as _TreeRebuildPlan,
 )
 from translationzed_py.core.render_workflow_service import (
     RenderWorkflowService as _RenderWorkflowService,
 )
 from translationzed_py.core.save_exit_flow import (
-    apply_write_original_flow as _apply_write_original_flow,
-)
-from translationzed_py.core.save_exit_flow import (
-    should_accept_close as _should_accept_close,
+    SaveExitFlowService as _SaveExitFlowService,
 )
 from translationzed_py.core.saver import save
 from translationzed_py.core.search import Match as _SearchMatch
@@ -126,25 +150,37 @@ from translationzed_py.core.search import SearchField as _SearchField
 from translationzed_py.core.search import SearchRow as _SearchRow
 from translationzed_py.core.search import iter_matches as _iter_search_matches
 from translationzed_py.core.search_replace_service import (
+    ReplaceAllFileApplyCallbacks as _ReplaceAllFileApplyCallbacks,
+)
+from translationzed_py.core.search_replace_service import (
+    ReplaceAllFileCountCallbacks as _ReplaceAllFileCountCallbacks,
+)
+from translationzed_py.core.search_replace_service import (
+    ReplaceAllFileParseError as _ReplaceAllFileParseError,
+)
+from translationzed_py.core.search_replace_service import (
+    ReplaceAllRowsCallbacks as _ReplaceAllRowsCallbacks,
+)
+from translationzed_py.core.search_replace_service import (
+    ReplaceCurrentRowCallbacks as _ReplaceCurrentRowCallbacks,
+)
+from translationzed_py.core.search_replace_service import (
+    ReplaceRequest as _ReplaceRequest,
+)
+from translationzed_py.core.search_replace_service import (
+    ReplaceRequestError as _ReplaceRequestError,
+)
+from translationzed_py.core.search_replace_service import (
     SearchReplaceService as _SearchReplaceService,
 )
 from translationzed_py.core.search_replace_service import (
-    anchor_row as _sr_anchor_row,
+    SearchRowsCacheStamp as _SearchRowsCacheStamp,
 )
 from translationzed_py.core.search_replace_service import (
-    find_match_in_rows as _sr_find_match_in_rows,
+    SearchRowsCacheStampCallbacks as _SearchRowsCacheStampCallbacks,
 )
 from translationzed_py.core.search_replace_service import (
-    replace_text as _sr_replace_text,
-)
-from translationzed_py.core.search_replace_service import (
-    scope_files as _sr_scope_files,
-)
-from translationzed_py.core.search_replace_service import (
-    scope_label as _sr_scope_label,
-)
-from translationzed_py.core.search_replace_service import (
-    search_spec_for_column as _sr_search_spec_for_column,
+    SearchRowsFileCallbacks as _SearchRowsFileCallbacks,
 )
 from translationzed_py.core.status_cache import (
     CacheEntry,
@@ -174,41 +210,17 @@ from translationzed_py.core.status_cache import write as _write_status_cache
 from translationzed_py.core.tm_import_sync import (
     TMImportSyncReport,
 )
-from translationzed_py.core.tm_import_sync import (
-    sync_import_folder as _sync_tm_import_folder_core,
-)
-from translationzed_py.core.tm_preferences import (
-    actions_from_values as _tm_pref_actions_from_values,
-)
-from translationzed_py.core.tm_preferences import (
-    apply_actions as _apply_tm_pref_actions_core,
-)
 from translationzed_py.core.tm_query import (
     TMQueryKey,
     TMQueryPolicy,
 )
-from translationzed_py.core.tm_query import (
-    normalize_min_score as _tm_normalize_min_score,
-)
-from translationzed_py.core.tm_query import (
-    origins_for as _tm_origins_for,
-)
-from translationzed_py.core.tm_query import (
-    suggestion_limit_for as _tm_suggestion_limit_for,
-)
 from translationzed_py.core.tm_rebuild import (
     TMRebuildResult,
 )
-from translationzed_py.core.tm_rebuild import (
-    collect_rebuild_locales as _tm_collect_rebuild_locales,
-)
-from translationzed_py.core.tm_rebuild import (
-    format_rebuild_status as _tm_format_rebuild_status,
-)
-from translationzed_py.core.tm_rebuild import (
-    rebuild_project_tm as _tm_rebuild_project_tm,
-)
 from translationzed_py.core.tm_store import TMMatch, TMStore
+from translationzed_py.core.tm_workflow_service import (
+    TMSelectionPlan as _TMSelectionPlan,
+)
 from translationzed_py.core.tm_workflow_service import (
     TMWorkflowService as _TMWorkflowService,
 )
@@ -471,15 +483,17 @@ class MainWindow(QMainWindow):
         self._file_workflow_service = _FileWorkflowService()
         self._conflict_workflow_service = _ConflictWorkflowService()
         self._search_replace_service = _SearchReplaceService()
+        self._save_exit_flow_service = _SaveExitFlowService()
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
         self._opened_files: set[Path] = set()
-        self._cache_map: dict[int, CacheEntry] = {}
+        self._cache_map: Mapping[int, CacheEntry] = {}
         self._conflict_files: dict[Path, dict[str, str]] = {}
         self._conflict_sources: dict[Path, dict[str, str]] = {}
         self._conflict_notified: set[Path] = set()
         self._skip_conflict_check = False
         self._skip_cache_write = False
+        self._open_flow_depth = 0
         self._files_by_locale: dict[str, list[Path]] = {}
         self._en_cache: dict[Path, ParsedFile] = {}
         self._child_windows: list[MainWindow] = []
@@ -549,6 +563,8 @@ class MainWindow(QMainWindow):
         self._detail_dirty = False
         self._detail_pending_row: int | None = None
         self._detail_pending_active = False
+        self._detail_source_chars: int | None = None
+        self._detail_translation_chars: int | None = None
         self._large_file_mode = False
         self._render_heavy = False
         self._preview_limit = 800
@@ -567,6 +583,7 @@ class MainWindow(QMainWindow):
         self._migration_timer: QTimer | None = None
         self._migration_batch_size = 25
         self._migration_count = 0
+        self._pending_post_locale_plan: _PostLocaleStartupPlan | None = None
         self._post_locale_timer = QTimer(self)
         self._post_locale_timer.setSingleShot(True)
         self._post_locale_timer.setInterval(0)
@@ -732,7 +749,7 @@ class MainWindow(QMainWindow):
         self._search_column = 0
         self._last_saved_text = ""
         self._search_rows_cache: OrderedDict[
-            tuple[Path, bool, bool], tuple[tuple[int, int, int], list[_SearchRow]]
+            tuple[Path, bool, bool], tuple[_SearchRowsCacheStamp, list[_SearchRow]]
         ] = OrderedDict()
         self._search_cache_max = 64
         self._search_cache_row_limit = 5000
@@ -853,24 +870,14 @@ class MainWindow(QMainWindow):
         if not self._selected_locales:
             self._startup_aborted = True
             return
-        lazy_tree = len(self._selected_locales) > 1
-        self.fs_model = FsModel(
-            self._root,
-            [self._locales[c] for c in self._selected_locales],
-            lazy=lazy_tree,
+        tree_plan = self._project_session_service.build_tree_rebuild_plan(
+            selected_locales=self._selected_locales,
+            resize_splitter=False,
         )
-        self.tree.setModel(self.fs_model)
+        self._rebuild_tree_for_selected_locales(tree_plan=tree_plan)
         self.tree.expanded.connect(self._on_tree_expanded)
         # prevent in-place renaming on double-click; we use double-click to open
         self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        if self.fs_model.is_lazy():
-            if len(self._selected_locales) == 1:
-                idx = self.fs_model.index(0, 0)
-                if idx.isValid():
-                    self.fs_model.ensure_loaded_for_index(idx)
-                    self.tree.expand(idx)
-        else:
-            self.tree.expandAll()
         self._schedule_post_locale_tasks()
         self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
         self.tree.doubleClicked.connect(self._file_chosen)
@@ -1067,24 +1074,35 @@ class MainWindow(QMainWindow):
             self._on_detail_translation_changed
         )
         detail_layout.addWidget(self._detail_translation)
+        detail_counter_row = QHBoxLayout()
+        detail_counter_row.setContentsMargins(0, 0, 0, 0)
+        detail_counter_row.setSpacing(4)
+        detail_counter_row.addStretch(1)
+        self._detail_counter_label = QLabel("", self._detail_panel)
+        self._detail_counter_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        detail_counter_row.addWidget(self._detail_counter_label)
+        detail_layout.addLayout(detail_counter_row)
+        self._set_detail_char_counts(None, None)
         margins = detail_layout.contentsMargins()
         label_total = (
             self._detail_source_label.sizeHint().height()
             + self._detail_translation_label.sizeHint().height()
         )
+        counter_height = self._detail_counter_label.sizeHint().height()
         self._detail_min_height = (
             margins.top()
             + margins.bottom()
             + label_total
+            + counter_height
             + min_line_height * 2
-            + detail_layout.spacing() * 3
+            + detail_layout.spacing() * 4
         )
         self._detail_panel.setVisible(False)
         self._main_splitter.addWidget(self._detail_panel)
         self._main_splitter.setStretchFactor(0, 1)
         self._main_splitter.setStretchFactor(1, 0)
 
-        tree_width = self._initial_tree_width(lazy_tree)
+        tree_width = self._initial_tree_width(tree_plan.lazy_tree)
         self._content_splitter.setSizes([tree_width, 980])
         self._main_splitter.setSizes([1, 0])
         self.resize(1200, 800)
@@ -1310,6 +1328,34 @@ class MainWindow(QMainWindow):
         if self._detail_syncing:
             return
         self._detail_dirty = True
+        self._refresh_detail_translation_count()
+
+    def _set_detail_char_counts(
+        self,
+        source_chars: int | None,
+        translation_chars: int | None,
+    ) -> None:
+        self._detail_source_chars = source_chars
+        self._detail_translation_chars = translation_chars
+        if source_chars is None and translation_chars is None:
+            self._detail_counter_label.setText("")
+            return
+        source_text = "—" if source_chars is None else str(max(0, source_chars))
+        translation_text = (
+            "—" if translation_chars is None else str(max(0, translation_chars))
+        )
+        delta_text = "n/a"
+        if source_chars is not None and translation_chars is not None:
+            delta_text = f"{translation_chars - source_chars:+d}"
+        self._detail_counter_label.setText(
+            f"S: {source_text} | T: {translation_text} | Delta: {delta_text}"
+        )
+
+    def _refresh_detail_translation_count(self) -> None:
+        translation_chars = max(
+            0, self._detail_translation.document().characterCount() - 1
+        )
+        self._set_detail_char_counts(self._detail_source_chars, translation_chars)
 
     def _commit_detail_translation(self, index=None) -> None:
         if not self._detail_dirty or not self._current_model:
@@ -1359,9 +1405,14 @@ class MainWindow(QMainWindow):
         self._detail_dirty = False
         self._detail_pending_row = None
         self._detail_pending_active = False
+        self._set_detail_char_counts(len(source_text), len(value_text))
         self._apply_detail_whitespace_options()
 
     def _set_detail_pending(self, row: int) -> None:
+        source_len: int | None = None
+        value_len: int | None = None
+        if self._current_model:
+            source_len, value_len = self._current_model.text_lengths(row)
         self._detail_pending_row = row
         self._detail_pending_active = True
         self._detail_syncing = True
@@ -1379,6 +1430,7 @@ class MainWindow(QMainWindow):
         finally:
             self._detail_syncing = False
         self._detail_dirty = False
+        self._set_detail_char_counts(source_len, value_len)
         if self._detail_source.hasFocus() or self._detail_translation.hasFocus():
             self._load_pending_detail_text()
 
@@ -1398,6 +1450,7 @@ class MainWindow(QMainWindow):
                 finally:
                     self._detail_syncing = False
                 self._detail_dirty = False
+                self._set_detail_char_counts(None, None)
                 return
             idx = self.table.currentIndex()
             if not idx.isValid():
@@ -1410,6 +1463,7 @@ class MainWindow(QMainWindow):
                 finally:
                     self._detail_syncing = False
                 self._detail_dirty = False
+                self._set_detail_char_counts(None, None)
                 return
             # Length check avoids forcing lazy decode for huge strings on selection.
             source_len, value_len = self._current_model.text_lengths(idx.row())
@@ -1434,6 +1488,7 @@ class MainWindow(QMainWindow):
             finally:
                 self._detail_syncing = False
             self._detail_dirty = False
+            self._set_detail_char_counts(len(source_text), len(value_text))
             self._apply_detail_whitespace_options()
         finally:
             perf_trace.stop("detail_sync", perf_start, items=1, unit="events")
@@ -1479,13 +1534,12 @@ class MainWindow(QMainWindow):
             self._selected_locales = []
             return
 
-        if selected_locales is None and self._smoke:
-            if self._last_locales:
-                selected_locales = list(self._last_locales)
-            elif selectable:
-                selected_locales = [next(iter(selectable.keys()))]
-            else:
-                selected_locales = []
+        selected_locales = self._project_session_service.resolve_requested_locales(
+            requested_locales=selected_locales,
+            last_locales=self._last_locales,
+            available_locales=self._locales.keys(),
+            smoke_mode=self._smoke,
+        )
         if selected_locales is None:
             dialog = LocaleChooserDialog(
                 selectable.values(), self, preselected=self._last_locales
@@ -1494,8 +1548,14 @@ class MainWindow(QMainWindow):
                 self._selected_locales = []
                 return
             selected_locales = dialog.selected_codes()
-
-        self._selected_locales = [c for c in selected_locales if c in selectable]
+        plan = self._project_session_service.build_locale_selection_plan(
+            requested_locales=selected_locales,
+            available_locales=self._locales.keys(),
+        )
+        if plan is None:
+            self._selected_locales = []
+            return
+        self._selected_locales = list(plan.selected_locales)
         self._tm_bootstrap_pending = bool(self._selected_locales)
         QTimer.singleShot(0, self._warn_orphan_caches)
         self._schedule_post_locale_tasks()
@@ -1606,9 +1666,9 @@ class MainWindow(QMainWindow):
                     f"TM import folder unavailable: {exc}", 5000
                 )
             return
-        report = _sync_tm_import_folder_core(
-            self._tm_store,
-            tm_dir,
+        report = self._tm_workflow.sync_import_folder(
+            store=self._tm_store,
+            tm_dir=tm_dir,
             resolve_locales=lambda path, langs: self._pick_tmx_locales(
                 path,
                 langs,
@@ -2016,58 +2076,13 @@ class MainWindow(QMainWindow):
             return
         assert self._tm_store is not None
         policy = self._tm_query_policy()
-        import_files = self._tm_store.list_import_files()
-        ready_imports = sum(1 for rec in import_files if rec.status == "ready")
-        enabled_imports = sum(
-            1 for rec in import_files if rec.status == "ready" and rec.enabled
-        )
-        pending_imports = len(import_files) - ready_imports
-        lines = [
-            f"TM DB: {self._tm_store.db_path}",
-            (
-                "Policy: "
-                f"min={policy.min_score}% limit={policy.limit} "
-                f"origins(project={policy.origin_project}, import={policy.origin_import})"
-            ),
-            (
-                "Imported files: "
-                f"total={len(import_files)} ready={ready_imports} "
-                f"enabled={enabled_imports} pending_or_error={pending_imports}"
-            ),
-        ]
         lookup = self._current_tm_lookup()
-        if lookup is None:
-            lines.append("Current row: no source text selected.")
-        else:
-            source_text, target_locale = lookup
-            origins = _tm_origins_for(policy)
-            matches = self._tm_store.query(
-                source_text,
-                source_locale=policy.source_locale,
-                target_locale=target_locale,
-                limit=policy.limit,
-                min_score=policy.min_score,
-                origins=origins,
-            )
-            project_count = sum(1 for match in matches if match.origin == "project")
-            import_count = len(matches) - project_count
-            top_score = matches[0].score if matches else 0
-            unique_sources = len({match.source_text for match in matches})
-            fuzzy_count = sum(1 for match in matches if match.score < 100)
-            recall_density = (
-                float(unique_sources) / float(len(matches)) if matches else 0.0
-            )
-            lines.append(
-                f"Current row: locale={target_locale} query_len={len(source_text)}"
-            )
-            lines.append(
-                "Matches: "
-                f"visible={len(matches)} top_score={top_score}% "
-                f"project={project_count} import={import_count} "
-                f"fuzzy={fuzzy_count} unique_sources={unique_sources} "
-                f"recall_density={recall_density:.2f}"
-            )
-        self._show_copyable_report("TM diagnostics", "\n".join(lines))
+        report = self._tm_workflow.diagnostics_report_for_store(
+            store=self._tm_store,
+            policy=policy,
+            lookup=lookup,
+        )
+        self._show_copyable_report("TM diagnostics", report)
 
     def _maybe_bootstrap_tm(self) -> None:
         if self._test_mode or not self._ensure_tm_store():
@@ -2087,9 +2102,9 @@ class MainWindow(QMainWindow):
         if self._tm_rebuild_future is not None and not self._tm_rebuild_future.done():
             self.statusBar().showMessage("TM rebuild already running.", 3000)
             return
-        locale_specs, en_encoding = _tm_collect_rebuild_locales(
-            self._locales,
-            list(locales),
+        locale_specs, en_encoding = self._tm_workflow.collect_rebuild_locales(
+            locale_map=self._locales,
+            selected_locales=list(locales),
         )
         if not locale_specs:
             if interactive:
@@ -2105,7 +2120,7 @@ class MainWindow(QMainWindow):
         prefix = "Rebuilding TM" if force else "Bootstrapping TM"
         self.statusBar().showMessage(f"{prefix} for {label}…", 0)
         self._tm_rebuild_future = self._tm_rebuild_pool.submit(
-            _tm_rebuild_project_tm,
+            self._tm_workflow.rebuild_project_tm,
             self._root,
             locale_specs,
             source_locale=self._tm_source_locale,
@@ -2136,7 +2151,7 @@ class MainWindow(QMainWindow):
 
     def _finish_tm_rebuild(self, result: TMRebuildResult) -> None:
         self._tm_workflow.clear_cache()
-        message = _tm_format_rebuild_status(result)
+        message = self._tm_workflow.format_rebuild_status(result)
         self.statusBar().showMessage(message, 8000)
         if self._left_stack.currentIndex() == 1:
             self._update_tm_suggestions()
@@ -2231,8 +2246,12 @@ class MainWindow(QMainWindow):
         tm_import_dir = str(values.get("tm_import_dir", "")).strip()
         self._tm_import_dir = tm_import_dir or str(self._default_tm_import_dir())
         self._apply_tm_preferences_actions(values)
-        search_scope = _prefs_normalize_scope(values.get("search_scope", "FILE"))
-        replace_scope = _prefs_normalize_scope(values.get("replace_scope", "FILE"))
+        search_scope = self._preferences_service.normalize_scope(
+            values.get("search_scope", "FILE")
+        )
+        replace_scope = self._preferences_service.normalize_scope(
+            values.get("replace_scope", "FILE")
+        )
         if search_scope != self._search_scope:
             self._search_scope = search_scope
             if self.search_edit.text():
@@ -2258,7 +2277,7 @@ class MainWindow(QMainWindow):
         self._update_status_bar()
 
     def _apply_tm_preferences_actions(self, values: dict) -> None:
-        actions = _tm_pref_actions_from_values(values)
+        actions = self._tm_workflow.build_preferences_actions(values)
         if actions.is_empty():
             return
         if not self._ensure_tm_store():
@@ -2267,9 +2286,9 @@ class MainWindow(QMainWindow):
             actions.remove_paths
         ):
             actions.remove_paths.clear()
-        report = _apply_tm_pref_actions_core(
-            self._tm_store,
-            actions,
+        report = self._tm_workflow.apply_preferences_actions(
+            store=self._tm_store,
+            actions=actions,
             copy_to_import_dir=self._copy_tmx_to_import_dir,
         )
         if report.sync_paths:
@@ -2310,43 +2329,65 @@ class MainWindow(QMainWindow):
         )
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
-        selected = [c for c in dialog.selected_codes() if c in selectable]
-        if not selected:
+        plan = self._project_session_service.build_locale_switch_plan(
+            requested_locales=dialog.selected_codes(),
+            available_locales=self._locales.keys(),
+            current_locales=self._selected_locales,
+        )
+        if plan is None or not plan.should_apply:
             return
-        self._selected_locales = selected
-        self._files_by_locale.clear()
-        self._opened_files.clear()
-        self._conflict_files.clear()
-        self._conflict_sources.clear()
-        self._conflict_notified.clear()
-        self._current_pf = None
-        self._current_model = None
-        self.table.setModel(None)
-        self._set_status_combo(None)
-        lazy_tree = len(self._selected_locales) > 1
+        self._selected_locales = list(plan.selected_locales)
+        if plan.reset_session_state:
+            reset_plan = self._project_session_service.build_locale_reset_plan()
+            self._apply_locale_reset_plan(reset_plan)
+        tree_plan = self._project_session_service.build_tree_rebuild_plan(
+            selected_locales=self._selected_locales,
+            resize_splitter=True,
+        )
+        self._rebuild_tree_for_selected_locales(tree_plan=tree_plan)
+        self._tm_bootstrap_pending = plan.tm_bootstrap_pending
+        if plan.schedule_post_locale_tasks:
+            self._schedule_post_locale_tasks()
+
+    def _apply_locale_reset_plan(self, plan: _LocaleResetPlan) -> None:
+        self._project_session_service.apply_locale_reset_plan(
+            plan=plan,
+            clear_files_by_locale=self._files_by_locale.clear,
+            clear_opened_files=self._opened_files.clear,
+            clear_conflict_files=self._conflict_files.clear,
+            clear_conflict_sources=self._conflict_sources.clear,
+            clear_conflict_notified=self._conflict_notified.clear,
+            clear_current_file=lambda: setattr(self, "_current_pf", None),
+            clear_current_model=lambda: setattr(self, "_current_model", None),
+            clear_table_model=lambda: self.table.setModel(None),
+            clear_status_combo=lambda: self._set_status_combo(None),
+        )
+
+    def _rebuild_tree_for_selected_locales(
+        self, *, tree_plan: _TreeRebuildPlan
+    ) -> None:
         self.fs_model = FsModel(
             self._root,
             [self._locales[c] for c in self._selected_locales],
-            lazy=lazy_tree,
+            lazy=tree_plan.lazy_tree,
         )
         self.tree.setModel(self.fs_model)
-        if self.fs_model.is_lazy():
-            if len(self._selected_locales) == 1:
-                idx = self.fs_model.index(0, 0)
-                if idx.isValid():
-                    self.fs_model.ensure_loaded_for_index(idx)
-                    self.tree.expand(idx)
-        else:
+        if tree_plan.preload_single_root:
+            idx = self.fs_model.index(0, 0)
+            if idx.isValid():
+                self.fs_model.ensure_loaded_for_index(idx)
+                self.tree.expand(idx)
+        if tree_plan.expand_all:
             self.tree.expandAll()
-        tree_width = self._initial_tree_width(lazy_tree)
+        if not tree_plan.resize_splitter:
+            return
+        tree_width = self._initial_tree_width(tree_plan.lazy_tree)
         sizes = self._content_splitter.sizes()
         total = max(0, self._content_splitter.width())
         if total <= 0 and sizes:
             total = sum(sizes)
         if total > 0:
             self._content_splitter.setSizes([tree_width, max(100, total - tree_width)])
-        self._tm_bootstrap_pending = bool(self._selected_locales)
-        self._schedule_post_locale_tasks()
 
     def _file_chosen(self, index) -> None:
         """Populate table when user activates a translation file."""
@@ -2366,134 +2407,151 @@ class MainWindow(QMainWindow):
         else:
             if not self._write_cache_current():
                 return
-        locale = self._locale_for_path(path)
-        encoding = self._locales.get(
-            locale, LocaleMeta("", Path(), "", "utf-8")
-        ).charset
-        try:
-            if self._should_parse_lazy(path):
-                pf = parse_lazy(path, encoding=encoding)
-            else:
-                pf = parse(path, encoding=encoding)
-        except Exception as exc:
-            self._report_parse_error(path, exc)
-            return
-
-        self._current_encoding = encoding
-        try:
-            self._current_file_size = path.stat().st_size
-        except OSError:
-            self._current_file_size = 0
-
-        source_lookup = self._load_en_source(path, locale, target_entries=pf.entries)
-        self._cache_map = _read_status_cache(self._root, path)
-        _touch_last_opened(self._root, path, int(time.time()))
-        overlay = self._file_workflow_service.apply_cache_overlay(
-            pf.entries,
-            self._cache_map,
-            hash_for_entry=lambda entry: self._hash_for_cache(entry, self._cache_map),
-        )
-        changed_keys = overlay.changed_keys
-        baseline_by_row = overlay.baseline_by_row
-        conflict_originals = overlay.conflict_originals
-        original_values = overlay.original_values
-        self._current_pf = pf
-        self._opened_files.add(path)
-        if self._current_model:
+        with self._open_flow_guard():
+            locale = self._locale_for_path(path)
+            encoding = self._locales.get(
+                locale, LocaleMeta("", Path(), "", "utf-8")
+            ).charset
+            callbacks = _OpenFileCallbacks(
+                parse_eager=lambda file_path, enc: parse(file_path, encoding=enc),
+                parse_lazy=lambda file_path, enc: parse_lazy(file_path, encoding=enc),
+                read_cache=lambda file_path: _read_status_cache(self._root, file_path),
+                touch_last_opened=lambda file_path, ts: _touch_last_opened(
+                    self._root, file_path, ts
+                ),
+                now_ts=lambda: int(time.time()),
+            )
             try:
-                self._current_model.dataChanged.disconnect(self._on_model_changed)
-                self._current_model.dataChanged.disconnect(self._on_model_data_changed)
-            except (TypeError, RuntimeError):
-                pass
-        self._current_model = TranslationModel(
-            pf,
-            baseline_by_row=baseline_by_row,
-            source_values=source_lookup,
-            source_by_row=source_lookup.by_row,
-        )
-        self._current_model.dataChanged.connect(self._on_model_changed)
-        self._current_model.dataChanged.connect(self._on_model_data_changed)
-        if not self._user_resized_columns:
-            self._source_translation_ratio = 0.5
-        self._table_layout_guard = True
-        self.table.setModel(self._current_model)
-        self._clear_row_height_cache()
-        self._apply_table_layout()
-        self._table_layout_guard = False
-        self._update_render_cost_flags()
-        self._update_large_file_mode()
-        self.table.selectionModel().currentChanged.connect(self._on_selection_changed)
-        self._update_status_combo_from_selection()
-        self._update_replace_enabled()
-        self._sync_detail_editors()
-        self._update_status_bar()
-        if not self._last_saved_text:
-            self._last_saved_text = "Ready"
-            self._update_status_bar()
-        if self._should_defer_post_open():
-            self._schedule_post_open_tasks(path)
-        else:
-            self._prefetch_visible_rows()
-            if self._wrap_text:
-                self._schedule_row_resize()
-        if changed_keys:
-            self.fs_model.set_dirty(self._current_pf.path, True)
-        if not self._skip_conflict_check:
-            if conflict_originals:
-                conflict_sources = {
-                    key: source_lookup.get(key, "") for key in conflict_originals
-                }
-                self._register_conflicts(path, conflict_originals, conflict_sources)
-            else:
-                self._clear_conflicts(path)
-        else:
-            self._skip_conflict_check = False
-
-        if self._cache_map and getattr(self._cache_map, "hash_bits", 64) == 16:
-            try:
-                _write_status_cache(
-                    self._root,
+                open_result = self._file_workflow_service.prepare_open_file(
                     path,
-                    pf.entries,
-                    changed_keys=changed_keys,
-                    original_values=original_values,
-                    last_opened=int(time.time()),
+                    encoding,
+                    use_lazy_parser=self._should_parse_lazy(path),
+                    callbacks=callbacks,
+                    hash_for_entry=lambda entry, cache_map: self._hash_for_cache(
+                        entry, cache_map
+                    ),
                 )
             except Exception as exc:
-                QMessageBox.warning(self, "Cache migration failed", str(exc))
+                self._report_parse_error(path, exc)
+                return
+            pf = open_result.parsed_file
 
-        # (re)create undo/redo actions bound to this file’s stack
-        for action in list(self.menu_edit.actions()):
-            text = action.text().replace("&", "").strip()
-            if text.startswith("Undo") or text.startswith("Redo"):
-                self.menu_edit.removeAction(action)
-        for old in (self.act_undo, self.act_redo):
-            if old and isValid(old):
+            self._current_encoding = encoding
+            try:
+                self._current_file_size = path.stat().st_size
+            except OSError:
+                self._current_file_size = 0
+
+            source_lookup = self._load_en_source(
+                path, locale, target_entries=pf.entries
+            )
+            self._cache_map = open_result.cache_map
+            overlay = open_result.overlay
+            changed_keys = overlay.changed_keys
+            baseline_by_row = overlay.baseline_by_row
+            conflict_originals = overlay.conflict_originals
+            original_values = overlay.original_values
+            self._current_pf = pf
+            self._opened_files.add(path)
+            if self._current_model:
                 try:
-                    if old in self.menu_edit.actions():
-                        self.menu_edit.removeAction(old)
-                    self.removeAction(old)
-                    old.deleteLater()
-                except RuntimeError:
+                    self._current_model.dataChanged.disconnect(self._on_model_changed)
+                    self._current_model.dataChanged.disconnect(
+                        self._on_model_data_changed
+                    )
+                except (TypeError, RuntimeError):
                     pass
-        self.act_undo = None
-        self.act_redo = None
-        stack = self._current_model.undo_stack
-        self.act_undo = stack.createUndoAction(self, "&Undo")
-        self.act_redo = stack.createRedoAction(self, "&Redo")
-        self.act_undo.setShortcut(QKeySequence.StandardKey.Undo)
-        self.act_redo.setShortcut(QKeySequence("Ctrl+Y"))
-        self.act_undo.setShortcutContext(Qt.ApplicationShortcut)
-        self.act_redo.setShortcutContext(Qt.ApplicationShortcut)
-        for a in (self.act_undo, self.act_redo):
-            self.addAction(a)
-        if self.menu_edit.actions():
-            first = self.menu_edit.actions()[0]
-            self.menu_edit.insertAction(first, self.act_redo)
-            self.menu_edit.insertAction(first, self.act_undo)
-        else:
-            self.menu_edit.addAction(self.act_undo)
-            self.menu_edit.addAction(self.act_redo)
+            self._current_model = TranslationModel(
+                pf,
+                baseline_by_row=baseline_by_row,
+                source_values=source_lookup,
+                source_by_row=source_lookup.by_row,
+            )
+            self._current_model.dataChanged.connect(self._on_model_changed)
+            self._current_model.dataChanged.connect(self._on_model_data_changed)
+            if not self._user_resized_columns:
+                self._source_translation_ratio = 0.5
+            self._table_layout_guard = True
+            self.table.setModel(self._current_model)
+            self._clear_row_height_cache()
+            self._apply_table_layout()
+            self._table_layout_guard = False
+            self._update_render_cost_flags()
+            self._update_large_file_mode()
+            self.table.selectionModel().currentChanged.connect(
+                self._on_selection_changed
+            )
+            self._update_status_combo_from_selection()
+            self._update_replace_enabled()
+            self._sync_detail_editors()
+            self._update_status_bar()
+            if not self._last_saved_text:
+                self._last_saved_text = "Ready"
+                self._update_status_bar()
+            if self._should_defer_post_open():
+                self._schedule_post_open_tasks(path)
+            else:
+                self._prefetch_visible_rows()
+                if self._wrap_text:
+                    self._schedule_row_resize()
+            if changed_keys:
+                self.fs_model.set_dirty(self._current_pf.path, True)
+            if not self._skip_conflict_check:
+                if conflict_originals:
+                    conflict_sources = {
+                        key: source_lookup.get(key, "") for key in conflict_originals
+                    }
+                    self._register_conflicts(path, conflict_originals, conflict_sources)
+                else:
+                    self._clear_conflicts(path)
+            else:
+                self._skip_conflict_check = False
+
+            if self._cache_map and getattr(self._cache_map, "hash_bits", 64) == 16:
+                try:
+                    _write_status_cache(
+                        self._root,
+                        path,
+                        pf.entries,
+                        changed_keys=changed_keys,
+                        original_values=original_values,
+                        last_opened=int(time.time()),
+                    )
+                except Exception as exc:
+                    QMessageBox.warning(self, "Cache migration failed", str(exc))
+
+            # (re)create undo/redo actions bound to this file's stack
+            for action in list(self.menu_edit.actions()):
+                text = action.text().replace("&", "").strip()
+                if text.startswith("Undo") or text.startswith("Redo"):
+                    self.menu_edit.removeAction(action)
+            for old in (self.act_undo, self.act_redo):
+                if old and isValid(old):
+                    try:
+                        if old in self.menu_edit.actions():
+                            self.menu_edit.removeAction(old)
+                        self.removeAction(old)
+                        old.deleteLater()
+                    except RuntimeError:
+                        pass
+            self.act_undo = None
+            self.act_redo = None
+            stack = self._current_model.undo_stack
+            self.act_undo = stack.createUndoAction(self, "&Undo")
+            self.act_redo = stack.createRedoAction(self, "&Redo")
+            self.act_undo.setShortcut(QKeySequence.StandardKey.Undo)
+            self.act_redo.setShortcut(QKeySequence("Ctrl+Y"))
+            self.act_undo.setShortcutContext(Qt.ApplicationShortcut)
+            self.act_redo.setShortcutContext(Qt.ApplicationShortcut)
+            for action in (self.act_undo, self.act_redo):
+                self.addAction(action)
+            if self.menu_edit.actions():
+                first = self.menu_edit.actions()[0]
+                self.menu_edit.insertAction(first, self.act_redo)
+                self.menu_edit.insertAction(first, self.act_undo)
+            else:
+                self.menu_edit.addAction(self.act_undo)
+                self.menu_edit.addAction(self.act_redo)
 
     def _apply_table_layout(self) -> None:
         if not self.table.model():
@@ -2741,9 +2799,16 @@ class MainWindow(QMainWindow):
             self._refresh_search_panel_results()
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
-        if obj is self.table.viewport():
+        table = getattr(self, "table", None)
+        if table is None:
+            return super().eventFilter(obj, event)
+        try:
+            viewport = table.viewport()
+        except RuntimeError:
+            return super().eventFilter(obj, event)
+        if obj is viewport:
             if event.type() == QEvent.MouseMove:
-                idx = self.table.indexAt(event.pos())
+                idx = table.indexAt(event.pos())
                 if not idx.isValid():
                     self._tooltip_timer.stop()
                     self._tooltip_index = QModelIndex()
@@ -2839,27 +2904,49 @@ class MainWindow(QMainWindow):
 
     def _save_current(self) -> bool:
         """Patch file on disk if there are unsaved value edits."""
-        if not (self._current_pf and self._current_model):
-            return True
-        if not self._ensure_conflicts_resolved(self._current_pf.path):
+        if not self._can_write_originals("save current file"):
             return False
-        if not self._current_model.changed_keys():
-            return True
-
+        conflicts_resolved = bool(
+            self._current_pf
+            and self._current_model
+            and self._ensure_conflicts_resolved(self._current_pf.path)
+        )
+        plan = self._file_workflow_service.build_save_current_run_plan(
+            has_current_file=self._current_pf is not None,
+            has_current_model=self._current_model is not None,
+            conflicts_resolved=conflicts_resolved,
+            has_changed_keys=bool(
+                self._current_model and self._current_model.changed_keys()
+            ),
+        )
+        if plan.immediate_result is not None:
+            return plan.immediate_result
+        if not plan.run_save:
+            return False
+        assert self._current_pf is not None
+        assert self._current_model is not None
         changed = self._current_model.changed_values()
-        try:
-            if changed:
-                save(self._current_pf, changed, encoding=self._current_encoding)
-
-            # persist cache for this file only (statuses + draft values)
-            _write_status_cache(
+        callbacks = _SaveCurrentCallbacks(
+            save_file=lambda pf, changed_values, enc: save(
+                pf, changed_values, encoding=enc
+            ),
+            write_cache=lambda path, entries, last_opened: _write_status_cache(
                 self._root,
-                self._current_pf.path,
-                self._current_pf.entries,
+                path,
+                entries,
                 changed_keys=set(),
-                last_opened=int(time.time()),
+                last_opened=last_opened,
+            ),
+            now_ts=lambda: int(time.time()),
+        )
+        try:
+            self._file_workflow_service.persist_current_save(
+                path=self._current_pf.path,
+                parsed_file=self._current_pf,
+                changed_values=changed,
+                encoding=self._current_encoding,
+                callbacks=callbacks,
             )
-
             self._current_model.reset_baseline()
             self.fs_model.set_dirty(self._current_pf.path, False)
             self._set_saved_status()
@@ -2868,8 +2955,28 @@ class MainWindow(QMainWindow):
             return False
         return True
 
+    @contextlib.contextmanager
+    def _open_flow_guard(self):
+        self._open_flow_depth += 1
+        try:
+            yield
+        finally:
+            self._open_flow_depth = max(0, self._open_flow_depth - 1)
+
+    def _can_write_originals(self, action: str) -> bool:
+        if self._open_flow_depth <= 0:
+            return True
+        QMessageBox.warning(
+            self,
+            "Operation blocked",
+            f"Cannot {action} while file open/read flow is active.",
+        )
+        return False
+
     def _request_write_original(self) -> None:
-        _apply_write_original_flow(
+        if not self._can_write_originals("write original files"):
+            return
+        self._save_exit_flow_service.apply_write_original_flow(
             write_cache=self._write_cache_current,
             list_draft_files=self._draft_files,
             choose_action=self._show_save_files_dialog,
@@ -2881,15 +2988,34 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Nothing to write", "No draft changes to write.")
 
     def _show_save_files_dialog(self, files: list[Path]) -> str:
-        rel_files = [str(p.relative_to(self._root)) for p in files]
+        rel_files = list(
+            self._save_exit_flow_service.build_save_dialog_labels(
+                files,
+                root=self._root,
+            )
+        )
         dialog = SaveFilesDialog(rel_files, self)
         dialog.exec()
-        return dialog.choice()
+        decision = dialog.choice()
+        if decision != "write":
+            return decision
+        selected_rel: list[str] | None = None
+        selected_files = getattr(dialog, "selected_files", None)
+        if callable(selected_files):
+            selected_rel = selected_files()
+        files[:] = list(
+            self._save_exit_flow_service.apply_save_dialog_selection(
+                files=files,
+                labels=rel_files,
+                selected_labels=selected_rel,
+            )
+        )
+        return decision
 
     def _draft_files(self) -> list[Path]:
         return self._project_session_service.collect_draft_files(
             root=self._root,
-            opened_files=self._opened_files,
+            locales=self._selected_locales,
         )
 
     def _all_draft_files(self, locales: Iterable[str] | None = None) -> list[Path]:
@@ -2907,18 +3033,36 @@ class MainWindow(QMainWindow):
         perf_trace.stop("cache_scan", perf_start, items=len(paths), unit="files")
 
     def _schedule_post_locale_tasks(self) -> None:
+        plan = self._project_session_service.build_post_locale_startup_plan(
+            selected_locales=self._selected_locales
+        )
+        self._pending_post_locale_plan = plan
+        if not plan.should_schedule:
+            return
         if self._post_locale_timer.isActive():
             self._post_locale_timer.stop()
         self._post_locale_timer.start()
 
     def _run_post_locale_tasks(self) -> None:
+        plan = self._pending_post_locale_plan
+        self._pending_post_locale_plan = None
+        if plan is None:
+            plan = self._project_session_service.build_post_locale_startup_plan(
+                selected_locales=self._selected_locales
+            )
+        if not plan.should_schedule:
+            return
         perf_trace = PERF_TRACE
         perf_start = perf_trace.start("startup")
+        executed = 0
         try:
-            self._mark_cached_dirty()
-            self._auto_open_last_file()
+            executed = self._project_session_service.run_post_locale_startup_tasks(
+                plan=plan,
+                run_cache_scan=self._mark_cached_dirty,
+                run_auto_open=self._auto_open_last_file,
+            )
         finally:
-            perf_trace.stop("startup", perf_start, items=1, unit="tasks")
+            perf_trace.stop("startup", perf_start, items=executed, unit="tasks")
 
     def _hash_for_cache(
         self, key: str | Entry, cache_map: dict[int, CacheEntry]
@@ -2954,44 +3098,58 @@ class MainWindow(QMainWindow):
 
     def _schedule_cache_migration(self) -> None:
         legacy_paths = _legacy_cache_paths(self._root)
-        if not legacy_paths:
-            return
-        if len(legacy_paths) <= self._migration_batch_size:
-            try:
-                migrated = _migrate_status_caches(self._root, self._locales)
-            except Exception as exc:
-                QMessageBox.warning(self, "Cache migration failed", str(exc))
-                return
-            if migrated:
-                self._migration_count += migrated
-            return
-        self._pending_cache_migrations = list(legacy_paths)
-        self._migration_count = 0
+        callbacks = _CacheMigrationScheduleCallbacks(
+            migrate_all=lambda: _migrate_status_caches(self._root, self._locales),
+            warn=lambda message: QMessageBox.warning(
+                self,
+                "Cache migration failed",
+                message,
+            ),
+            start_timer=self._start_cache_migration_timer,
+        )
+        execution = self._project_session_service.execute_cache_migration_schedule(
+            legacy_paths=legacy_paths,
+            batch_size=self._migration_batch_size,
+            migrated_count=self._migration_count,
+            callbacks=callbacks,
+        )
+        self._pending_cache_migrations = list(execution.pending_paths)
+        self._migration_count = execution.migrated_count
+
+    def _run_cache_migration_batch(self) -> None:
+        callbacks = _CacheMigrationBatchCallbacks(
+            migrate_paths=lambda paths: _migrate_status_cache_paths(
+                self._root,
+                self._locales,
+                list(paths),
+            ),
+            warn=lambda message: QMessageBox.warning(
+                self,
+                "Cache migration failed",
+                message,
+            ),
+            stop_timer=self._stop_cache_migration_timer,
+            show_status=lambda message: self.statusBar().showMessage(message, 5000),
+        )
+        execution = self._project_session_service.execute_cache_migration_batch(
+            pending_paths=self._pending_cache_migrations,
+            batch_size=self._migration_batch_size,
+            migrated_count=self._migration_count,
+            callbacks=callbacks,
+        )
+        self._pending_cache_migrations = list(execution.remaining_paths)
+        self._migration_count = execution.migrated_count
+
+    def _start_cache_migration_timer(self) -> None:
         if self._migration_timer is None:
             self._migration_timer = QTimer(self)
             self._migration_timer.timeout.connect(self._run_cache_migration_batch)
         if not self._migration_timer.isActive():
             self._migration_timer.start(0)
 
-    def _run_cache_migration_batch(self) -> None:
-        if not self._pending_cache_migrations:
-            if self._migration_timer is not None:
-                self._migration_timer.stop()
-            if self._migration_count:
-                self.statusBar().showMessage(
-                    f"Migrated {self._migration_count} cache file(s).", 5000
-                )
-            return
-        batch = self._pending_cache_migrations[: self._migration_batch_size]
-        del self._pending_cache_migrations[: self._migration_batch_size]
-        try:
-            migrated = _migrate_status_cache_paths(self._root, self._locales, batch)
-        except Exception as exc:
-            if self._migration_timer is not None:
-                self._migration_timer.stop()
-            QMessageBox.warning(self, "Cache migration failed", str(exc))
-            return
-        self._migration_count += migrated
+    def _stop_cache_migration_timer(self) -> None:
+        if self._migration_timer is not None and self._migration_timer.isActive():
+            self._migration_timer.stop()
 
     def _warn_orphan_caches(self) -> None:
         missing_by_locale = self._project_session_service.collect_orphan_cache_paths(
@@ -3001,80 +3159,93 @@ class MainWindow(QMainWindow):
         )
         for locale, missing in missing_by_locale.items():
             self._orphan_cache_warned_locales.add(locale)
-            rels = []
-            for path in missing:
-                try:
-                    rel = path.relative_to(self._root)
-                except ValueError:
-                    rel = path
-                rels.append(str(rel))
-            preview = "\n".join(rels[:20])
-            if len(rels) > 20:
-                preview = f"{preview}\n... ({len(rels) - 20} more)"
+            warning = self._project_session_service.build_orphan_cache_warning(
+                locale=locale,
+                orphan_paths=missing,
+                root=self._root,
+                preview_limit=20,
+            )
             msg = QMessageBox(self)
             msg.setIcon(QMessageBox.Warning)
-            msg.setWindowTitle("Orphan cache files")
-            msg.setText(f"Locale {locale} has cache files without source files.")
-            msg.setInformativeText(
-                "Purge deletes those cache files. Dismiss keeps them."
-            )
-            msg.setDetailedText(preview)
+            msg.setWindowTitle(warning.window_title)
+            msg.setText(warning.text)
+            msg.setInformativeText(warning.informative_text)
+            msg.setDetailedText(warning.detailed_text)
             purge = msg.addButton("Purge", QMessageBox.AcceptRole)
             msg.addButton("Dismiss", QMessageBox.RejectRole)
             msg.exec()
             if msg.clickedButton() is purge:
-                for path in missing:
+                for path in warning.orphan_paths:
                     try:
                         path.unlink()
                     except OSError:
                         continue
 
     def _save_all_files(self, files: list[Path]) -> None:
-        if not files:
+        if not self._can_write_originals("write original files"):
             return
-        remaining = list(files)
-        if self._current_pf and self._current_pf.path in remaining:
-            if not self._save_current():
-                return
-            remaining.remove(self._current_pf.path)
-        failures: list[Path] = []
-        for path in remaining:
-            if not self._save_file_from_cache(path):
-                failures.append(path)
-        if failures:
-            rel = "\n".join(str(p.relative_to(self._root)) for p in failures)
+        outcome = self._save_exit_flow_service.run_save_batch_flow(
+            files=files,
+            current_file=self._current_pf.path if self._current_pf else None,
+            save_current=self._save_current,
+            save_from_cache=self._save_file_from_cache,
+        )
+        plan = self._save_exit_flow_service.build_save_batch_render_plan(
+            outcome=outcome,
+            root=self._root,
+        )
+        if plan.aborted:
+            return
+        if plan.warning_message:
             QMessageBox.warning(
                 self,
                 "Save incomplete",
-                f"Some files could not be written:\n{rel}",
+                f"Some files could not be written:\n{plan.warning_message}",
             )
-        else:
+        elif plan.set_saved_status:
             self._set_saved_status()
 
     def _save_file_from_cache(self, path: Path) -> bool:
+        if not self._can_write_originals(f"write {path.name}"):
+            return False
         if not self._ensure_conflicts_resolved(path):
             return False
         cached = _read_status_cache(self._root, path)
-        if not any(entry.value is not None for entry in cached.values()):
-            return True
         locale = self._locale_for_path(path)
         encoding = self._locales.get(
             locale, LocaleMeta("", Path(), "", "utf-8")
         ).charset
-        try:
-            pf = parse(path, encoding=encoding)
-        except Exception as exc:
-            self._report_parse_error(path, exc)
-            return False
-        save_overlay = self._file_workflow_service.apply_cache_for_write(
-            pf.entries,
-            cached,
-            hash_for_entry=lambda entry: self._hash_for_cache(entry, cached),
+        callbacks = _SaveFromCacheCallbacks(
+            parse_file=lambda file_path, enc: parse(file_path, encoding=enc),
+            save_file=lambda pf, changed_values, enc: save(
+                pf, changed_values, encoding=enc
+            ),
+            write_cache=lambda file_path, entries: _write_status_cache(
+                self._root,
+                file_path,
+                entries,
+                changed_keys=set(),
+            ),
         )
-        pf.entries = save_overlay.entries
-        if save_overlay.changed_values:
-            save(pf, save_overlay.changed_values, encoding=encoding)
-        _write_status_cache(self._root, path, pf.entries, changed_keys=set())
+        try:
+            result = self._file_workflow_service.write_from_cache(
+                path,
+                encoding,
+                cache_map=cached,
+                callbacks=callbacks,
+                hash_for_entry=lambda entry: self._hash_for_cache(
+                    entry,
+                    cached,
+                ),
+            )
+        except _SaveFromCacheParseError as exc:
+            self._report_parse_error(path, exc.original)
+            return False
+        except Exception as exc:
+            QMessageBox.warning(self, "Save failed", str(exc))
+            return False
+        if not result.had_drafts:
+            return True
         self.fs_model.set_dirty(path, False)
         return True
 
@@ -3226,37 +3397,27 @@ class MainWindow(QMainWindow):
         for widget in (self.replace_edit, self.replace_btn, self.replace_all_btn):
             widget.setEnabled(enabled)
 
-    def _prepare_replace_pattern(
-        self,
-    ) -> tuple[re.Pattern[str] | None, str, bool, bool, bool]:
+    def _prepare_replace_request(self) -> _ReplaceRequest | None:
         query = self.search_edit.text()
-        if not query:
-            return None, "", False, False, False
-        use_regex = self.regex_check.isChecked()
-        flags = re.MULTILINE
-        if not self._search_case_sensitive:
-            flags |= re.IGNORECASE
-        try:
-            if use_regex:
-                pattern = re.compile(query, flags)
-            else:
-                pattern = re.compile(re.escape(query), flags)
-        except re.error:
-            QMessageBox.warning(self, "Invalid regex", "Regex pattern is invalid.")
-            return None, "", False, False, False
         replacement = self.replace_edit.text()
-        matches_empty = bool(pattern.match(""))
-        has_group_ref = bool(
-            use_regex and re.search(r"\$(\d+)|\\g<\\d+>|\\[1-9]", replacement)
-        )
-        return pattern, replacement, use_regex, matches_empty, has_group_ref
+        use_regex = self.regex_check.isChecked()
+        try:
+            return self._search_replace_service.build_replace_request(
+                query=query,
+                replacement=replacement,
+                use_regex=use_regex,
+                case_sensitive=self._search_case_sensitive,
+            )
+        except _ReplaceRequestError:
+            QMessageBox.warning(self, "Invalid regex", "Regex pattern is invalid.")
+            return None
 
     def _files_for_scope(self, scope: str) -> list[Path]:
         current_path = self._current_pf.path if self._current_pf else None
         current_locale = (
             self._locale_for_path(current_path) if current_path is not None else None
         )
-        return _sr_scope_files(
+        return self._search_replace_service.scope_files(
             scope=scope,
             current_file=current_path,
             current_locale=current_locale,
@@ -3278,57 +3439,31 @@ class MainWindow(QMainWindow):
     def _replace_current(self) -> None:
         if not self._current_model:
             return
-        pattern, replacement, use_regex, matches_empty, has_group_ref = (
-            self._prepare_replace_pattern()
-        )
-        if pattern is None:
+        request = self._prepare_replace_request()
+        if request is None:
             return
         current = self.table.currentIndex()
         if not current.isValid():
             return
+        model = self._current_model
         row = current.row()
-        idx = self._current_model.index(row, 2)
-        text = idx.data(Qt.EditRole)
-        text = "" if text is None else str(text)
+        callbacks = _ReplaceCurrentRowCallbacks(
+            read_text=lambda row_idx: model.index(row_idx, 2).data(Qt.EditRole),
+            write_text=lambda row_idx, text: model.setData(
+                model.index(row_idx, 2), text, Qt.EditRole
+            ),
+        )
         try:
-            changed, new_text = _sr_replace_text(
-                text,
-                pattern=pattern,
-                replacement=replacement,
-                use_regex=use_regex,
-                matches_empty=matches_empty,
-                has_group_ref=has_group_ref,
-                mode="single",
+            changed = self._search_replace_service.apply_replace_in_row(
+                row=row,
+                request=request,
+                callbacks=callbacks,
             )
         except re.error as exc:
             QMessageBox.warning(self, "Replace failed", str(exc))
             return
         if changed:
-            self._current_model.setData(idx, new_text, Qt.EditRole)
             self._schedule_search()
-
-    def _replace_all_text(
-        self,
-        text: str,
-        pattern: re.Pattern[str],
-        replacement: str,
-        use_regex: bool,
-        matches_empty: bool,
-        has_group_ref: bool,
-    ) -> tuple[bool, str] | None:
-        try:
-            return _sr_replace_text(
-                text,
-                pattern=pattern,
-                replacement=replacement,
-                use_regex=use_regex,
-                matches_empty=matches_empty,
-                has_group_ref=has_group_ref,
-                mode="all",
-            )
-        except re.error as exc:
-            QMessageBox.warning(self, "Replace failed", str(exc))
-            return None
 
     def _replace_all_count_in_model(
         self,
@@ -3340,20 +3475,24 @@ class MainWindow(QMainWindow):
     ) -> int | None:
         if not self._current_model:
             return 0
-        count = 0
-        for row in range(self._current_model.rowCount()):
-            idx = self._current_model.index(row, 2)
-            text = idx.data(Qt.EditRole)
-            text = "" if text is None else str(text)
-            result = self._replace_all_text(
-                text, pattern, replacement, use_regex, matches_empty, has_group_ref
+        model = self._current_model
+        callbacks = _ReplaceAllRowsCallbacks(
+            row_count=model.rowCount,
+            read_text=lambda row: model.index(row, 2).data(Qt.EditRole),
+            write_text=lambda _row, _text: None,
+        )
+        try:
+            return self._search_replace_service.count_replace_all_in_rows(
+                pattern=pattern,
+                replacement=replacement,
+                use_regex=use_regex,
+                matches_empty=matches_empty,
+                has_group_ref=has_group_ref,
+                callbacks=callbacks,
             )
-            if result is None:
-                return None
-            changed, _new_text = result
-            if changed:
-                count += 1
-        return count
+        except re.error as exc:
+            QMessageBox.warning(self, "Replace failed", str(exc))
+            return None
 
     def _replace_all_count_in_file(
         self,
@@ -3368,79 +3507,81 @@ class MainWindow(QMainWindow):
         encoding = self._locales.get(
             locale, LocaleMeta("", Path(), "", "utf-8")
         ).charset
+        callbacks = _ReplaceAllFileCountCallbacks(
+            parse_file=lambda file_path: parse(file_path, encoding=encoding),
+            read_cache=lambda file_path: _read_status_cache(self._root, file_path),
+        )
         try:
-            pf = parse(path, encoding=encoding)
-        except Exception as exc:
-            self._report_parse_error(path, exc)
-            return None
-        cache_map = _read_status_cache(self._root, path)
-        count = 0
-        for entry in pf.entries:
-            key_hash = self._hash_for_cache(entry, cache_map)
-            cache = cache_map.get(key_hash)
-            value = cache.value if cache and cache.value is not None else entry.value
-            text = "" if value is None else str(value)
-            result = self._replace_all_text(
-                text, pattern, replacement, use_regex, matches_empty, has_group_ref
+            return self._search_replace_service.count_replace_all_in_file(
+                path,
+                pattern=pattern,
+                replacement=replacement,
+                use_regex=use_regex,
+                matches_empty=matches_empty,
+                has_group_ref=has_group_ref,
+                callbacks=callbacks,
+                hash_for_entry=lambda entry, cache_map: self._hash_for_cache(
+                    entry, cache_map
+                ),
             )
-            if result is None:
-                return None
-            changed, _new_text = result
-            if changed:
-                count += 1
-        return count
+        except _ReplaceAllFileParseError as exc:
+            self._report_parse_error(exc.path, exc.original)
+            return None
+        except re.error as exc:
+            QMessageBox.warning(self, "Replace failed", str(exc))
+            return None
 
     def _replace_all(self) -> None:
         if not self._current_model:
             return
-        pattern, replacement, use_regex, matches_empty, has_group_ref = (
-            self._prepare_replace_pattern()
-        )
-        if pattern is None:
+        request = self._prepare_replace_request()
+        if request is None:
             return
         scope = self._replace_scope
         files = self._files_for_scope(scope)
         if not files:
             return
         current_path = self._current_pf.path if self._current_pf else None
-        if scope != "FILE" and len(files) > 1:
-            locale = (
-                self._locale_for_path(current_path)
-                if current_path is not None
-                else None
-            )
-            scope_label = _sr_scope_label(
-                scope=scope,
-                current_locale=locale,
-                selected_locale_count=len(self._selected_locales),
-            )
+        locale = (
+            self._locale_for_path(current_path) if current_path is not None else None
+        )
 
-            def _display_name(path: Path) -> str:
-                with contextlib.suppress(ValueError):
-                    return str(path.relative_to(self._root))
-                return str(path)
+        def _display_name(path: Path) -> str:
+            with contextlib.suppress(ValueError):
+                return str(path.relative_to(self._root))
+            return str(path)
 
-            plan = self._search_replace_service.build_replace_all_plan(
-                files=files,
-                current_file=current_path,
-                display_name=_display_name,
-                count_in_current=lambda: self._replace_all_count_in_model(
-                    pattern, replacement, use_regex, matches_empty, has_group_ref
-                ),
-                count_in_file=lambda path: self._replace_all_count_in_file(
-                    path,
-                    pattern,
-                    replacement,
-                    use_regex,
-                    matches_empty,
-                    has_group_ref,
-                ),
+        run_plan = self._search_replace_service.build_replace_all_run_plan(
+            scope=scope,
+            current_locale=locale,
+            selected_locale_count=len(self._selected_locales),
+            files=files,
+            current_file=current_path,
+            display_name=_display_name,
+            count_in_current=lambda: self._replace_all_count_in_model(
+                request.pattern,
+                request.replacement,
+                request.use_regex,
+                request.matches_empty,
+                request.has_group_ref,
+            ),
+            count_in_file=lambda path: self._replace_all_count_in_file(
+                path,
+                request.pattern,
+                request.replacement,
+                request.use_regex,
+                request.matches_empty,
+                request.has_group_ref,
+            ),
+        )
+        if run_plan is None:
+            return
+        if not run_plan.run_replace:
+            return
+        if run_plan.show_confirmation:
+            dialog = ReplaceFilesDialog(
+                list(run_plan.counts), run_plan.scope_label, self
             )
-            if plan is None:
-                return
-            if plan.total == 0:
-                return
-            dialog = ReplaceFilesDialog(plan.counts, scope_label, self)
             dialog.exec()
             if not dialog.confirmed():
                 return
@@ -3448,15 +3589,19 @@ class MainWindow(QMainWindow):
             files=files,
             current_file=current_path,
             apply_in_current=lambda: self._replace_all_in_model(
-                pattern, replacement, use_regex, matches_empty, has_group_ref
+                request.pattern,
+                request.replacement,
+                request.use_regex,
+                request.matches_empty,
+                request.has_group_ref,
             ),
             apply_in_file=lambda path: self._replace_all_in_file(
                 path,
-                pattern,
-                replacement,
-                use_regex,
-                matches_empty,
-                has_group_ref,
+                request.pattern,
+                request.replacement,
+                request.use_regex,
+                request.matches_empty,
+                request.has_group_ref,
             ),
         )
         if not applied:
@@ -3473,18 +3618,26 @@ class MainWindow(QMainWindow):
     ) -> bool:
         if not self._current_model:
             return True
-        for row in range(self._current_model.rowCount()):
-            idx = self._current_model.index(row, 2)
-            text = idx.data(Qt.EditRole)
-            text = "" if text is None else str(text)
-            result = self._replace_all_text(
-                text, pattern, replacement, use_regex, matches_empty, has_group_ref
+        model = self._current_model
+        callbacks = _ReplaceAllRowsCallbacks(
+            row_count=model.rowCount,
+            read_text=lambda row: model.index(row, 2).data(Qt.EditRole),
+            write_text=lambda row, text: model.setData(
+                model.index(row, 2), text, Qt.EditRole
+            ),
+        )
+        try:
+            self._search_replace_service.apply_replace_all_in_rows(
+                pattern=pattern,
+                replacement=replacement,
+                use_regex=use_regex,
+                matches_empty=matches_empty,
+                has_group_ref=has_group_ref,
+                callbacks=callbacks,
             )
-            if result is None:
-                return False
-            changed, new_text = result
-            if changed:
-                self._current_model.setData(idx, new_text, Qt.EditRole)
+        except re.error as exc:
+            QMessageBox.warning(self, "Replace failed", str(exc))
+            return False
         return True
 
     def _replace_all_in_file(
@@ -3500,52 +3653,40 @@ class MainWindow(QMainWindow):
         encoding = self._locales.get(
             locale, LocaleMeta("", Path(), "", "utf-8")
         ).charset
-        try:
-            pf = parse(path, encoding=encoding)
-        except Exception as exc:
-            self._report_parse_error(path, exc)
-            return False
-        cache_map = _read_status_cache(self._root, path)
-        changed_keys: set[str] = set()
-        original_values: dict[str, str] = {}
-        new_entries = []
-        for entry in pf.entries:
-            key_hash = self._hash_for_cache(entry, cache_map)
-            cache = cache_map.get(key_hash)
-            value = cache.value if cache and cache.value is not None else entry.value
-            status = cache.status if cache else entry.status
-            text = "" if value is None else str(value)
-            result = self._replace_all_text(
-                text, pattern, replacement, use_regex, matches_empty, has_group_ref
-            )
-            if result is None:
-                return False
-            _changed, new_value = result
-            if new_value != text:
-                status = Status.TRANSLATED
-                changed_keys.add(entry.key)
-                original_values[entry.key] = text
-            if new_value != entry.value or status != entry.status:
-                entry = type(entry)(
-                    entry.key,
-                    new_value,
-                    status,
-                    entry.span,
-                    entry.segments,
-                    entry.gaps,
-                    entry.raw,
-                    getattr(entry, "key_hash", None),
+        callbacks = _ReplaceAllFileApplyCallbacks(
+            parse_file=lambda file_path: parse(file_path, encoding=encoding),
+            read_cache=lambda file_path: _read_status_cache(self._root, file_path),
+            write_cache=lambda file_path, entries, changed_keys, original_values: (
+                _write_status_cache(
+                    self._root,
+                    file_path,
+                    entries,
+                    changed_keys=changed_keys,
+                    original_values=dict(original_values),
+                    force_original=set(original_values),
                 )
-            new_entries.append(entry)
-        _write_status_cache(
-            self._root,
-            path,
-            new_entries,
-            changed_keys=changed_keys,
-            original_values=original_values,
-            force_original=set(original_values),
+            ),
         )
-        if changed_keys:
+        try:
+            result = self._search_replace_service.apply_replace_all_in_file(
+                path,
+                pattern=pattern,
+                replacement=replacement,
+                use_regex=use_regex,
+                matches_empty=matches_empty,
+                has_group_ref=has_group_ref,
+                callbacks=callbacks,
+                hash_for_entry=lambda entry, cache_map: self._hash_for_cache(
+                    entry, cache_map
+                ),
+            )
+        except _ReplaceAllFileParseError as exc:
+            self._report_parse_error(exc.path, exc.original)
+            return False
+        except re.error as exc:
+            QMessageBox.warning(self, "Replace failed", str(exc))
+            return False
+        if result.changed_any:
             self.fs_model.set_dirty(path, True)
         return True
 
@@ -3577,23 +3718,23 @@ class MainWindow(QMainWindow):
         return bool(self._conflict_files.get(path))
 
     def _prompt_conflicts(self, path: Path, *, for_save: bool = False) -> bool:
-        if not self._has_conflicts(path):
-            return True
-        if not self._current_pf or self._current_pf.path != path:
-            return not for_save
+        prompt_plan = self._conflict_workflow_service.build_prompt_plan(
+            has_conflicts=self._has_conflicts(path),
+            is_current_file=bool(self._current_pf and self._current_pf.path == path),
+            for_save=for_save,
+        )
+        if prompt_plan.immediate_result is not None:
+            return prompt_plan.immediate_result
+        assert prompt_plan.require_dialog
         rel = str(path.relative_to(self._root))
         dialog = ConflictChoiceDialog(rel, len(self._conflict_files[path]), self)
         dialog.exec()
-        choice = dialog.choice()
-        if choice is None:
-            return False
-        if choice == "drop_cache":
-            return self._resolve_conflicts_drop_cache(path)
-        if choice == "drop_original":
-            return self._resolve_conflicts_drop_original(path)
-        if choice == "merge":
-            return self._resolve_conflicts_merge(path)
-        return False
+        return self._conflict_workflow_service.execute_choice(
+            dialog.choice(),
+            on_drop_cache=lambda: self._resolve_conflicts_drop_cache(path),
+            on_drop_original=lambda: self._resolve_conflicts_drop_original(path),
+            on_merge=lambda: self._resolve_conflicts_merge(path),
+        )
 
     def _ensure_conflicts_resolved(self, path: Path) -> bool:
         if not self._has_conflicts(path):
@@ -3609,92 +3750,98 @@ class MainWindow(QMainWindow):
         self._file_chosen(index)
 
     def _resolve_conflicts_drop_cache(self, path: Path) -> bool:
-        if not (self._current_pf and self._current_model):
+        plan = self._conflict_workflow_service.build_resolution_run_plan(
+            action="drop_cache",
+            has_current_file=self._current_pf is not None,
+            has_current_model=self._current_model is not None,
+            is_current_file=bool(self._current_pf and self._current_pf.path == path),
+            conflict_count=len(self._conflict_files.get(path, {})),
+        )
+        if plan.immediate_result is not None:
+            return plan.immediate_result
+        if not plan.run_resolution:
             return False
-        if self._current_pf.path != path:
-            return False
+        assert self._current_model is not None
         resolution = self._conflict_workflow_service.resolve_drop_cache(
             changed_keys=self._current_model.changed_keys(),
             baseline_values=self._current_model.baseline_values(),
             conflict_originals=self._conflict_files.get(path, {}),
         )
-        _write_status_cache(
-            self._root,
-            path,
-            self._current_pf.entries,
-            changed_keys=set(resolution.changed_keys),
-            original_values=resolution.original_values,
-            force_original=set(resolution.force_original),
-        )
-        if not resolution.changed_keys:
-            self.fs_model.set_dirty(path, False)
-        self._clear_conflicts(path)
-        self._reload_file(path)
-        return True
+        return self._persist_conflict_resolution(path, resolution)
 
     def _resolve_conflicts_drop_original(self, path: Path) -> bool:
-        if not (self._current_pf and self._current_model):
+        plan = self._conflict_workflow_service.build_resolution_run_plan(
+            action="drop_original",
+            has_current_file=self._current_pf is not None,
+            has_current_model=self._current_model is not None,
+            is_current_file=bool(self._current_pf and self._current_pf.path == path),
+            conflict_count=len(self._conflict_files.get(path, {})),
+        )
+        if plan.immediate_result is not None:
+            return plan.immediate_result
+        if not plan.run_resolution:
             return False
-        if self._current_pf.path != path:
-            return False
+        assert self._current_model is not None
         resolution = self._conflict_workflow_service.resolve_drop_original(
             changed_keys=self._current_model.changed_keys(),
             baseline_values=self._current_model.baseline_values(),
             conflict_originals=self._conflict_files.get(path, {}),
         )
-        _write_status_cache(
-            self._root,
-            path,
-            self._current_pf.entries,
-            changed_keys=set(resolution.changed_keys),
-            original_values=resolution.original_values,
-            force_original=set(resolution.force_original),
+        return self._persist_conflict_resolution(path, resolution)
+
+    def _persist_conflict_resolution(
+        self,
+        path: Path,
+        resolution: _ConflictResolution,
+    ) -> bool:
+        if not self._current_pf:
+            return False
+        return self._conflict_workflow_service.execute_persist_resolution(
+            resolution=resolution,
+            callbacks=_ConflictPersistCallbacks(
+                write_cache=lambda plan: _write_status_cache(
+                    self._root,
+                    path,
+                    self._current_pf.entries,
+                    changed_keys=set(plan.changed_keys),
+                    original_values=plan.original_values,
+                    force_original=set(plan.force_original),
+                ),
+                mark_file_clean=lambda: self.fs_model.set_dirty(path, False),
+                clear_conflicts=lambda: self._clear_conflicts(path),
+                reload_current_file=lambda: self._reload_file(path),
+            ),
         )
-        self._clear_conflicts(path)
-        self._reload_file(path)
-        return True
 
     def _resolve_conflicts_merge(self, path: Path) -> bool:
-        if not (self._current_pf and self._current_model):
-            return False
-        if self._current_pf.path != path:
-            return False
-        conflict_originals = self._conflict_files.get(path, {})
-        if not conflict_originals:
-            return True
-        sources = self._conflict_sources.get(path, {})
-        rows, cache_values = _conflict_build_merge_rows(
-            self._current_pf.entries,
-            conflict_originals,
-            sources,
+        plan = self._conflict_workflow_service.build_resolution_run_plan(
+            action="merge",
+            has_current_file=self._current_pf is not None,
+            has_current_model=self._current_model is not None,
+            is_current_file=bool(self._current_pf and self._current_pf.path == path),
+            conflict_count=len(self._conflict_files.get(path, {})),
         )
-        resolutions = self._run_merge_ui(path, rows)
-        if not resolutions:
+        if plan.immediate_result is not None:
+            return plan.immediate_result
+        if not plan.run_resolution:
             return False
-        resolution = self._conflict_workflow_service.resolve_merge(
+        assert self._current_pf is not None
+        assert self._current_model is not None
+        conflict_originals = self._conflict_files.get(path, {})
+        sources = self._conflict_sources.get(path, {})
+        execution = self._conflict_workflow_service.execute_merge_resolution(
+            entries=self._current_pf.entries,
             changed_keys=self._current_model.changed_keys(),
             baseline_values=self._current_model.baseline_values(),
             conflict_originals=conflict_originals,
-            cache_values=cache_values,
-            resolutions=resolutions,
+            sources=sources,
+            request_resolutions=lambda rows: self._run_merge_ui(path, rows),
         )
-        self._conflict_workflow_service.apply_resolution(
-            self._current_pf.entries,
-            resolution=resolution,
-        )
-        _write_status_cache(
-            self._root,
-            path,
-            self._current_pf.entries,
-            changed_keys=set(resolution.changed_keys),
-            original_values=resolution.original_values,
-            force_original=set(resolution.force_original),
-        )
-        if not resolution.changed_keys:
-            self.fs_model.set_dirty(path, False)
-        self._clear_conflicts(path)
-        self._reload_file(path)
-        return True
+        if execution.immediate_result is not None:
+            return execution.immediate_result
+        if not execution.resolved or execution.resolution is None:
+            return False
+        return self._persist_conflict_resolution(path, execution.resolution)
 
     def _run_merge_ui(
         self, path: Path, rows: list[_ConflictMergeRow]
@@ -3865,51 +4012,42 @@ class MainWindow(QMainWindow):
     ) -> tuple[Iterable[_SearchRow], int]:
         meta = self._locales.get(locale)
         encoding = meta.charset if meta else "utf-8"
-        try:
-            if self._should_parse_lazy(path):
-                pf = parse_lazy(path, encoding=encoding)
-            else:
-                pf = parse(path, encoding=encoding)
-        except Exception:
-            return (), 0
-        cache_map = _read_status_cache(self._root, path) if include_value else {}
-        use_cache = include_value and bool(cache_map)
-        source_lookup = (
-            self._load_en_source(path, locale, target_entries=pf.entries)
-            if include_source
-            else _SourceLookup(by_key={})
+        result = self._search_replace_service.load_search_rows_from_file(
+            path=path,
+            encoding=encoding,
+            use_lazy_parser=self._should_parse_lazy(path),
+            include_source=include_source,
+            include_value=include_value,
+            cache_row_limit=self._search_cache_row_limit,
+            callbacks=_SearchRowsFileCallbacks(
+                parse_eager=lambda file_path, enc: parse(file_path, encoding=enc),
+                parse_lazy=lambda file_path, enc: parse_lazy(file_path, encoding=enc),
+                read_cache=lambda file_path: _read_status_cache(self._root, file_path),
+                load_source_lookup=lambda parsed_file: (
+                    self._source_lookup_for_rows(
+                        path=path,
+                        locale=locale,
+                        entries=parsed_file.entries,
+                    )
+                ),
+            ),
+            hash_for_entry=lambda entry, cache_map: self._hash_for_cache(
+                entry, cache_map
+            ),
         )
-        source_by_row = source_lookup.by_row
-        entry_count = len(pf.entries)
+        if result is None:
+            return (), 0
+        return result.rows, result.entry_count
 
-        def _iter_rows() -> Iterable[_SearchRow]:
-            for idx, entry in enumerate(pf.entries):
-                key = entry.key
-                value = ""
-                if include_value:
-                    if use_cache:
-                        key_hash = self._hash_for_cache(entry, cache_map)
-                        rec = cache_map.get(key_hash)
-                        value = (
-                            rec.value if rec and rec.value is not None else entry.value
-                        )
-                    else:
-                        value = entry.value
-                yield _SearchRow(
-                    file=path,
-                    row=idx,
-                    key=key,
-                    source=(
-                        source_by_row[idx]
-                        if source_by_row is not None and idx < len(source_by_row)
-                        else source_lookup.get(key, "")
-                    ),
-                    value="" if value is None else str(value),
-                )
-
-        if entry_count <= self._search_cache_row_limit:
-            return list(_iter_rows()), entry_count
-        return _iter_rows(), entry_count
+    def _source_lookup_for_rows(
+        self,
+        *,
+        path: Path,
+        locale: str,
+        entries: Sequence[Entry],
+    ) -> tuple[Sequence[str] | None, Callable[[str], str]]:
+        source_lookup = self._load_en_source(path, locale, target_entries=entries)
+        return source_lookup.by_row, lambda key: source_lookup.get(key, "")
 
     def _cached_rows_from_file(
         self,
@@ -3919,33 +4057,38 @@ class MainWindow(QMainWindow):
         include_source: bool,
         include_value: bool,
     ) -> Iterable[_SearchRow]:
-        try:
-            file_mtime = path.stat().st_mtime_ns
-        except OSError:
+        stamp = self._search_replace_service.collect_rows_cache_stamp(
+            path=path,
+            include_source=include_source,
+            include_value=include_value,
+            callbacks=_SearchRowsCacheStampCallbacks(
+                file_mtime_ns=self._file_mtime_for_rows,
+                cache_mtime_ns=self._cache_mtime_for_rows,
+                source_mtime_ns=lambda file_path: self._source_mtime_for_rows(
+                    file_path, locale
+                ),
+            ),
+        )
+        if stamp is None:
             return []
-        cache_mtime = 0
-        source_mtime = 0
-        if include_value:
-            try:
-                rel = path.relative_to(self._root)
-            except ValueError:
-                rel = None
-            if rel is not None:
-                cache_path = (
-                    self._root / self._app_config.cache_dir / rel
-                ).with_suffix(self._app_config.cache_ext)
-                with contextlib.suppress(OSError):
-                    cache_mtime = cache_path.stat().st_mtime_ns
-        if include_source:
-            en_path = self._en_path_for(path, locale)
-            if en_path:
-                with contextlib.suppress(OSError):
-                    source_mtime = en_path.stat().st_mtime_ns
-        stamp = (file_mtime, cache_mtime, source_mtime)
         key = (path, include_source, include_value)
         cached = self._search_rows_cache.get(key)
-        if cached and cached[0] == stamp:
-            self._search_rows_cache.move_to_end(key)
+        lookup_plan = self._search_replace_service.build_rows_cache_lookup_plan(
+            path=path,
+            include_source=include_source,
+            include_value=include_value,
+            file_mtime_ns=stamp.file_mtime_ns,
+            cache_mtime_ns=stamp.cache_mtime_ns,
+            source_mtime_ns=stamp.source_mtime_ns,
+            cached_stamp=cached[0] if cached else None,
+        )
+        cache_key = (
+            lookup_plan.key.path,
+            lookup_plan.key.include_source,
+            lookup_plan.key.include_value,
+        )
+        if lookup_plan.use_cached_rows and cached:
+            self._search_rows_cache.move_to_end(cache_key)
             return cached[1]
         rows, entry_count = self._rows_from_file(
             path,
@@ -3953,20 +4096,46 @@ class MainWindow(QMainWindow):
             include_source=include_source,
             include_value=include_value,
         )
-        if isinstance(rows, list) and entry_count <= self._search_cache_row_limit:
-            self._search_rows_cache[key] = (stamp, rows)
-            self._search_rows_cache.move_to_end(key)
+        store_plan = self._search_replace_service.build_rows_cache_store_plan(
+            rows_materialized=isinstance(rows, list),
+            entry_count=entry_count,
+            cache_row_limit=self._search_cache_row_limit,
+        )
+        if store_plan.should_store_rows and isinstance(rows, list):
+            self._search_rows_cache[cache_key] = (lookup_plan.stamp, rows)
+            self._search_rows_cache.move_to_end(cache_key)
             if len(self._search_rows_cache) > self._search_cache_max:
                 self._search_rows_cache.popitem(last=False)
         return rows
 
+    def _file_mtime_for_rows(self, path: Path) -> int | None:
+        try:
+            return path.stat().st_mtime_ns
+        except OSError:
+            return None
+
+    def _cache_mtime_for_rows(self, path: Path) -> int:
+        try:
+            rel = path.relative_to(self._root)
+        except ValueError:
+            return 0
+        cache_path = (self._root / self._app_config.cache_dir / rel).with_suffix(
+            self._app_config.cache_ext
+        )
+        with contextlib.suppress(OSError):
+            return cache_path.stat().st_mtime_ns
+        return 0
+
+    def _source_mtime_for_rows(self, path: Path, locale: str) -> int:
+        en_path = self._en_path_for(path, locale)
+        if not en_path:
+            return 0
+        with contextlib.suppress(OSError):
+            return en_path.stat().st_mtime_ns
+        return 0
+
     def _search_files_for_scope(self) -> list[Path]:
         return list(self._files_for_scope(self._search_scope))
-
-    def _search_anchor_row(self, direction: int) -> int:
-        current = self.table.currentIndex()
-        row = current.row() if current.isValid() else None
-        return _sr_anchor_row(row, direction)
 
     def _find_match_in_rows(
         self,
@@ -3979,7 +4148,7 @@ class MainWindow(QMainWindow):
         direction: int,
         case_sensitive: bool,
     ) -> _SearchMatch | None:
-        return _sr_find_match_in_rows(
+        return self._search_replace_service.find_match_in_rows(
             rows,
             query,
             field,
@@ -4001,20 +4170,11 @@ class MainWindow(QMainWindow):
         start_row: int,
         direction: int,
     ) -> _SearchMatch | None:
-        locale = self._locale_for_path(path)
-        if not locale:
-            return None
-        if self._current_pf and self._current_model and path == self._current_pf.path:
-            rows = self._rows_from_model(
-                include_source=include_source, include_value=include_value
-            )
-        else:
-            rows = self._cached_rows_from_file(
-                path,
-                locale,
-                include_source=include_source,
-                include_value=include_value,
-            )
+        rows = self._search_rows_for_file(
+            path,
+            include_source=include_source,
+            include_value=include_value,
+        )
         return self._find_match_in_rows(
             rows,
             query,
@@ -4025,28 +4185,67 @@ class MainWindow(QMainWindow):
             case_sensitive=self._search_case_sensitive,
         )
 
+    def _search_rows_for_file(
+        self,
+        path: Path,
+        *,
+        include_source: bool,
+        include_value: bool,
+    ) -> Iterable[_SearchRow]:
+        locale = self._locale_for_path(path)
+        is_current = bool(self._current_pf and path == self._current_pf.path)
+        plan = self._search_replace_service.build_rows_source_plan(
+            locale_known=bool(locale),
+            is_current_file=is_current,
+            has_current_model=bool(self._current_model),
+        )
+        if not plan.has_rows:
+            return ()
+        if plan.use_active_model_rows:
+            return self._rows_from_model(
+                include_source=include_source,
+                include_value=include_value,
+            )
+        assert locale is not None
+        return self._cached_rows_from_file(
+            path,
+            locale,
+            include_source=include_source,
+            include_value=include_value,
+        )
+
     def _select_match(self, match: _SearchMatch) -> bool:
-        if not match:
-            return False
-        if not self._current_pf or match.file != self._current_pf.path:
-            index = self.fs_model.index_for_path(match.file)
+        open_plan = self._search_replace_service.build_match_open_plan(
+            has_match=bool(match),
+            match_file=(match.file if match else None),
+            current_file=(self._current_pf.path if self._current_pf else None),
+        )
+        if open_plan.open_target_file and open_plan.target_file is not None:
+            index = self.fs_model.index_for_path(open_plan.target_file)
             if not index.isValid():
                 return False
             self._file_chosen(index)
-            if self._current_pf and self._current_pf.path == match.file:
+            if self._current_pf and self._current_pf.path == open_plan.target_file:
                 self.tree.selectionModel().setCurrentIndex(
                     index,
                     QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
                 )
                 self.tree.scrollTo(index, QAbstractItemView.PositionAtCenter)
-        if not self._current_model or not self._current_pf:
+        apply_plan = self._search_replace_service.build_match_apply_plan(
+            has_match=bool(match),
+            match_file=(match.file if match else None),
+            current_file=(self._current_pf.path if self._current_pf else None),
+            has_current_model=bool(self._current_model),
+            match_row=(match.row if match else -1),
+            row_count=(self._current_model.rowCount() if self._current_model else 0),
+            column=self._search_column,
+        )
+        if not apply_plan.select_in_table:
             return False
-        if match.file != self._current_pf.path:
-            return False
-        if match.row < 0 or match.row >= self._current_model.rowCount():
-            return False
-        column = self._search_column
-        model_index = self._current_model.index(match.row, column)
+        assert self._current_model is not None
+        model_index = self._current_model.index(
+            apply_plan.target_row, apply_plan.target_column
+        )
         self.table.selectionModel().setCurrentIndex(
             model_index,
             QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
@@ -4062,48 +4261,59 @@ class MainWindow(QMainWindow):
         anchor_path: Path | None = None,
         wrap: bool = True,
     ) -> bool:
-        query = self.search_edit.text().strip()
         self._search_progress_text = ""
         self._update_status_bar()
-        if not query:
-            return False
         column = int(self.search_mode.currentData())
         self._search_column = column
-        use_regex = self.regex_check.isChecked()
-        field, include_source, include_value = _sr_search_spec_for_column(column)
         files = self._search_files_for_scope()
-        if not files:
-            self._set_search_panel_message("No files in current search scope.")
-            return False
-        self._refresh_search_panel_results(
-            query=query,
-            use_regex=use_regex,
-            field=field,
-            include_source=include_source,
-            include_value=include_value,
+        current_row = None if anchor_row is None else anchor_row
+        if current_row is None:
+            current = self.table.currentIndex()
+            if current.isValid():
+                current_row = current.row()
+        plan = self._search_replace_service.build_search_run_plan(
+            query_text=self.search_edit.text(),
+            column=column,
+            use_regex=bool(self.regex_check.isChecked()),
             files=files,
+            current_file=(
+                anchor_path
+                if anchor_path is not None
+                else (self._current_pf.path if self._current_pf else None)
+            ),
+            current_row=current_row,
+            direction=direction,
         )
-        if anchor_path is None:
-            anchor_path = self._current_pf.path if self._current_pf else files[0]
-        if anchor_row is None:
-            anchor_row = self._search_anchor_row(direction)
+        if not plan.run_search:
+            if plan.status_message:
+                self._set_search_panel_message(plan.status_message)
+            return False
+        assert plan.field is not None
+        self._refresh_search_panel_results(
+            query=plan.query,
+            use_regex=plan.use_regex,
+            field=plan.field,
+            include_source=plan.include_source,
+            include_value=plan.include_value,
+            files=list(plan.files),
+        )
 
         def _find_in_file(path: Path, start_row: int) -> _SearchMatch | None:
             return self._find_match_in_file(
                 path,
-                query=query,
-                field=field,
-                use_regex=use_regex,
-                include_source=include_source,
-                include_value=include_value,
+                query=plan.query,
+                field=plan.field,
+                use_regex=plan.use_regex,
+                include_source=plan.include_source,
+                include_value=plan.include_value,
                 start_row=start_row,
                 direction=direction,
             )
 
         match = self._search_replace_service.search_across_files(
-            files=files,
-            anchor_path=anchor_path,
-            anchor_row=anchor_row,
+            files=list(plan.files),
+            anchor_path=plan.anchor_path,
+            anchor_row=plan.anchor_row,
             direction=direction,
             wrap=wrap,
             find_in_file=_find_in_file,
@@ -4121,17 +4331,6 @@ class MainWindow(QMainWindow):
             and self._search_results_list is not None
         ):
             self._search_results_list.clear()
-
-    def _search_result_label(self, match: _SearchMatch) -> str:
-        try:
-            rel = str(match.file.relative_to(self._root))
-        except ValueError:
-            rel = str(match.file)
-        base = f"{rel}:{match.row + 1}"
-        preview = str(getattr(match, "preview", "")).strip()
-        if not preview:
-            return base
-        return f"{base} · {preview}"
 
     def _refresh_search_panel_results(
         self,
@@ -4158,37 +4357,22 @@ class MainWindow(QMainWindow):
             use_regex = bool(self.regex_check.isChecked())
         if field is None or include_source is None or include_value is None:
             column = int(self.search_mode.currentData())
-            field, include_source, include_value = _sr_search_spec_for_column(column)
+            field, include_source, include_value = (
+                self._search_replace_service.search_spec_for_column(column)
+            )
         if files is None:
             files = self._search_files_for_scope()
         if not files:
             self._set_search_panel_message("No files in current search scope.")
             return
 
-        self._search_results_list.clear()
-        results_count = 0
-        truncated = False
-        for path in files:
-            locale = self._locale_for_path(path)
-            if not locale:
-                continue
-            if (
-                self._current_pf
-                and self._current_model
-                and path == self._current_pf.path
-            ):
-                rows = self._rows_from_model(
-                    include_source=include_source,
-                    include_value=include_value,
-                )
-            else:
-                rows = self._cached_rows_from_file(
-                    path,
-                    locale,
-                    include_source=include_source,
-                    include_value=include_value,
-                )
-            for match in _iter_search_matches(
+        def _iter_matches_for_file(path: Path) -> Iterable[_SearchMatch]:
+            rows = self._search_rows_for_file(
+                path,
+                include_source=include_source,
+                include_value=include_value,
+            )
+            return _iter_search_matches(
                 rows,
                 query_text,
                 field,
@@ -4196,26 +4380,20 @@ class MainWindow(QMainWindow):
                 case_sensitive=self._search_case_sensitive,
                 include_preview=True,
                 preview_chars=96,
-            ):
-                item = QListWidgetItem(self._search_result_label(match))
-                item.setData(Qt.UserRole, (str(match.file), int(match.row)))
-                self._search_results_list.addItem(item)
-                results_count += 1
-                if results_count >= self._search_panel_result_limit:
-                    truncated = True
-                    break
-            if truncated:
-                break
-
-        if results_count == 0:
-            self._search_status_label.setText("No matches in current scope.")
-            return
-        if truncated:
-            self._search_status_label.setText(
-                f"Showing first {results_count} matches (limit {self._search_panel_result_limit})."
             )
-            return
-        self._search_status_label.setText(f"{results_count} matches in current scope.")
+
+        plan = self._search_replace_service.build_search_panel_plan(
+            files=files,
+            root=self._root,
+            result_limit=self._search_panel_result_limit,
+            iter_matches_for_file=_iter_matches_for_file,
+        )
+        self._search_results_list.clear()
+        for row in plan.items:
+            item = QListWidgetItem(row.label)
+            item.setData(Qt.UserRole, (str(row.file), int(row.row)))
+            self._search_results_list.addItem(item)
+        self._search_status_label.setText(plan.status_message)
 
     def _open_search_result_item(self, item: QListWidgetItem) -> None:
         payload = item.data(Qt.UserRole)
@@ -4458,46 +4636,42 @@ class MainWindow(QMainWindow):
             perf_trace.stop("selection", perf_start, items=1, unit="events")
 
     def _schedule_tm_update(self) -> None:
-        if not self._tm_store:
+        plan = self._tm_workflow.build_update_plan(
+            has_store=self._tm_store is not None,
+            panel_index=self._left_stack.currentIndex(),
+            timer_active=self._tm_update_timer.isActive(),
+            tm_panel_index=1,
+        )
+        if not plan.run_update:
             return
-        if self._left_stack.currentIndex() != 1:
-            return
-        if self._tm_update_timer.isActive():
+        if plan.stop_timer:
             self._tm_update_timer.stop()
-        self._tm_update_timer.start()
+        if plan.start_timer:
+            self._tm_update_timer.start()
 
     def _update_tm_apply_state(self) -> None:
         items = self._tm_list.selectedItems()
-        self._tm_apply_btn.setEnabled(bool(items))
         match = items[0].data(Qt.UserRole) if items else None
-        self._set_tm_preview(match if isinstance(match, TMMatch) else None)
+        plan = self._tm_workflow.build_selection_plan(
+            match=match if isinstance(match, TMMatch) else None,
+            lookup=self._current_tm_lookup(),
+        )
+        self._tm_apply_btn.setEnabled(plan.apply_enabled)
+        self._set_tm_preview(plan)
 
-    def _set_tm_preview(self, match: TMMatch | None) -> None:
-        if match is None:
+    def _set_tm_preview(self, plan: _TMSelectionPlan) -> None:
+        if not plan.apply_enabled:
             self._tm_source_preview.clear()
             self._tm_target_preview.clear()
             self._tm_source_preview.setExtraSelections([])
             self._tm_target_preview.setExtraSelections([])
             return
-        self._tm_source_preview.setPlainText(match.source_text)
-        self._tm_target_preview.setPlainText(match.target_text)
-        terms = self._tm_query_terms()
+        self._tm_source_preview.setPlainText(plan.source_preview)
+        self._tm_target_preview.setPlainText(plan.target_preview)
+        terms = list(plan.query_terms)
         with contextlib.suppress(Exception):
             self._highlight_tm_preview(self._tm_source_preview, terms)
             self._highlight_tm_preview(self._tm_target_preview, terms)
-
-    def _tm_query_terms(self) -> list[str]:
-        lookup = self._current_tm_lookup()
-        if lookup is None:
-            return []
-        source_text, _locale = lookup
-        out: list[str] = []
-        for raw in re.split(r"\s+", source_text.lower()):
-            token = raw.strip(".,;:!?\"'()[]{}<>")
-            if len(token) < 2 or token in out:
-                continue
-            out.append(token)
-        return out
 
     def _highlight_tm_preview(self, editor: QPlainTextEdit, terms: list[str]) -> None:
         if not terms:
@@ -4531,36 +4705,47 @@ class MainWindow(QMainWindow):
         editor.setExtraSelections(selections)
 
     def _tm_query_policy(self) -> TMQueryPolicy:
-        return TMQueryPolicy(
+        return self._tm_workflow.build_filter_plan(
             source_locale=self._tm_source_locale,
             min_score=self._tm_min_score,
             origin_project=self._tm_origin_project,
             origin_import=self._tm_origin_import,
-            limit=_tm_suggestion_limit_for(self._tm_min_score),
-        )
+        ).policy
 
-    def _on_tm_filters_changed(self) -> None:
-        self._tm_min_score = _tm_normalize_min_score(int(self._tm_score_spin.value()))
+    def _tm_apply_filter_plan(self, plan) -> None:
+        self._tm_min_score = plan.policy.min_score
+        self._tm_origin_project = plan.policy.origin_project
+        self._tm_origin_import = plan.policy.origin_import
+        self._prefs_extras.update(plan.prefs_extras)
         if self._tm_score_spin.value() != self._tm_min_score:
             self._tm_score_spin.blockSignals(True)
             try:
                 self._tm_score_spin.setValue(self._tm_min_score)
             finally:
                 self._tm_score_spin.blockSignals(False)
-        self._tm_origin_project = bool(self._tm_origin_project_cb.isChecked())
-        self._tm_origin_import = bool(self._tm_origin_import_cb.isChecked())
-        self._prefs_extras["TM_MIN_SCORE"] = str(self._tm_min_score)
-        self._prefs_extras["TM_ORIGIN_PROJECT"] = (
-            "true" if self._tm_origin_project else "false"
+        if self._tm_origin_project_cb.isChecked() != self._tm_origin_project:
+            self._tm_origin_project_cb.blockSignals(True)
+            try:
+                self._tm_origin_project_cb.setChecked(self._tm_origin_project)
+            finally:
+                self._tm_origin_project_cb.blockSignals(False)
+        if self._tm_origin_import_cb.isChecked() != self._tm_origin_import:
+            self._tm_origin_import_cb.blockSignals(True)
+            try:
+                self._tm_origin_import_cb.setChecked(self._tm_origin_import)
+            finally:
+                self._tm_origin_import_cb.blockSignals(False)
+
+    def _on_tm_filters_changed(self) -> None:
+        plan = self._tm_workflow.build_filter_plan(
+            source_locale=self._tm_source_locale,
+            min_score=int(self._tm_score_spin.value()),
+            origin_project=bool(self._tm_origin_project_cb.isChecked()),
+            origin_import=bool(self._tm_origin_import_cb.isChecked()),
         )
-        self._prefs_extras["TM_ORIGIN_IMPORT"] = (
-            "true" if self._tm_origin_import else "false"
-        )
+        self._tm_apply_filter_plan(plan)
         self._persist_preferences()
         self._update_tm_suggestions()
-
-    def _filter_tm_matches(self, matches: list[TMMatch]) -> list[TMMatch]:
-        return self._tm_workflow.filter_matches(matches, policy=self._tm_query_policy())
 
     def _current_tm_lookup(self) -> tuple[str, str] | None:
         if not (self._current_model and self._current_pf):
@@ -4570,12 +4755,11 @@ class MainWindow(QMainWindow):
             return None
         source_index = self._current_model.index(current.row(), 1)
         source_text = str(source_index.data(Qt.EditRole) or "")
-        if not source_text.strip():
-            return None
         locale = self._locale_for_path(self._current_pf.path)
-        if not locale:
-            return None
-        return source_text, locale
+        return self._tm_workflow.build_lookup(
+            source_text=source_text,
+            target_locale=locale,
+        )
 
     def _apply_tm_selection(self) -> None:
         if not (self._current_model and self._current_pf):
@@ -4584,37 +4768,48 @@ class MainWindow(QMainWindow):
         if not items:
             return
         match = items[0].data(Qt.UserRole)
-        if not isinstance(match, TMMatch):
+        plan = self._tm_workflow.build_apply_plan(
+            match if isinstance(match, TMMatch) else None
+        )
+        if plan is None:
             return
         current = self.table.currentIndex()
         if not current.isValid():
             return
         value_index = self._current_model.index(current.row(), 2)
-        self._current_model.setData(value_index, match.target_text, Qt.EditRole)
-        status_index = self._current_model.index(current.row(), 3)
-        self._current_model.setData(status_index, Status.FOR_REVIEW, Qt.EditRole)
+        self._current_model.setData(value_index, plan.target_text, Qt.EditRole)
+        if plan.mark_for_review:
+            status_index = self._current_model.index(current.row(), 3)
+            self._current_model.setData(status_index, Status.FOR_REVIEW, Qt.EditRole)
         self._update_status_combo_from_selection()
 
     def _update_tm_suggestions(self) -> None:
-        if not self._tm_store:
-            return
-        if self._left_stack.currentIndex() != 1:
-            return
         policy = self._tm_query_policy()
         lookup = self._current_tm_lookup()
-        if self._current_pf:
-            self._flush_tm_updates(paths=[self._current_pf.path])
-        plan = self._tm_workflow.plan_query(
+        refresh = self._tm_workflow.build_refresh_plan(
+            has_store=self._tm_store is not None,
+            panel_index=self._left_stack.currentIndex(),
             lookup=lookup,
             policy=policy,
+            has_current_file=self._current_pf is not None,
+            tm_panel_index=1,
         )
+        if not refresh.run_update:
+            return
+        assert self._tm_store is not None
+        if refresh.flush_current_file and self._current_pf:
+            self._flush_tm_updates(paths=[self._current_pf.path])
+        assert refresh.query_plan is not None
+        plan = refresh.query_plan
         if plan.mode == "cached" and plan.matches is not None:
             self._show_tm_matches(plan.matches)
             return
         self._tm_status_label.setText(plan.message)
         self._tm_list.clear()
         self._tm_apply_btn.setEnabled(False)
-        self._set_tm_preview(None)
+        self._set_tm_preview(
+            self._tm_workflow.build_selection_plan(match=None, lookup=None)
+        )
         if plan.mode == "query" and plan.cache_key is not None:
             self._start_tm_query(plan.cache_key)
 
@@ -4628,32 +4823,16 @@ class MainWindow(QMainWindow):
         ):
             return
         self._tm_query_key = cache_key
-        (
-            source_text,
-            source_locale,
-            target_locale,
-            min_score,
-            origin_project,
-            origin_import,
-        ) = cache_key
-        origins = _tm_origins_for(
-            TMQueryPolicy(
-                source_locale=source_locale,
-                min_score=min_score,
-                origin_project=origin_project,
-                origin_import=origin_import,
-            )
-        )
-        limit = _tm_suggestion_limit_for(min_score)
+        request = self._tm_workflow.build_query_request(cache_key)
         self._tm_query_future = self._tm_query_pool.submit(
             TMStore.query_path,
             self._tm_store.db_path,
-            source_text,
-            source_locale=source_locale,
-            target_locale=target_locale,
-            limit=limit,
-            min_score=min_score,
-            origins=origins,
+            request.source_text,
+            source_locale=request.source_locale,
+            target_locale=request.target_locale,
+            limit=request.limit,
+            min_score=request.min_score,
+            origins=request.origins,
         )
         if not self._tm_query_timer.isActive():
             self._tm_query_timer.start()
@@ -4690,65 +4869,31 @@ class MainWindow(QMainWindow):
 
     def _show_tm_matches(self, matches: list[TMMatch]) -> None:
         self._tm_list.clear()
-        if not matches:
-            self._tm_status_label.setText("No TM matches found.")
+        view = self._tm_workflow.build_suggestions_view(
+            matches=matches,
+            policy=self._tm_query_policy(),
+            source_preview_limit=60,
+            target_preview_limit=80,
+        )
+        self._tm_status_label.setText(view.message)
+        if not view.items:
             self._tm_apply_btn.setEnabled(False)
-            self._set_tm_preview(None)
+            self._set_tm_preview(
+                self._tm_workflow.build_selection_plan(match=None, lookup=None)
+            )
             return
-        filtered = self._filter_tm_matches(matches)
-        if not filtered:
-            self._tm_status_label.setText("No TM matches (filtered).")
-            self._tm_apply_btn.setEnabled(False)
-            self._set_tm_preview(None)
-            return
-        self._tm_status_label.setText("TM suggestions")
-        for match in filtered:
-            item = QListWidgetItem(self._format_tm_item(match))
-            item.setData(Qt.UserRole, match)
-            item.setToolTip(self._tm_tooltip_html(match))
+        for view_item in view.items:
+            item = QListWidgetItem(view_item.label)
+            item.setData(Qt.UserRole, view_item.match)
+            item.setToolTip(view_item.tooltip_html)
             self._tm_list.addItem(item)
         if self._tm_list.count():
             self._tm_list.setCurrentRow(0)
         else:
-            self._set_tm_preview(None)
+            self._set_tm_preview(
+                self._tm_workflow.build_selection_plan(match=None, lookup=None)
+            )
             self._tm_apply_btn.setEnabled(False)
-
-    def _format_tm_item(self, match: TMMatch) -> str:
-        origin = "project" if match.origin == "project" else "import"
-        if match.tm_name:
-            source_name = match.tm_name
-        elif match.tm_path:
-            source_name = match.tm_path
-        elif match.file_path:
-            source_name = Path(match.file_path).name
-        else:
-            source_name = "Project TM"
-        source_preview = self._truncate_text(match.source_text, 60)
-        target_preview = self._truncate_text(match.target_text, 80)
-        score_label = f"{match.score:>3}%"
-        if match.raw_score is not None and match.raw_score != match.score:
-            score_label = f"{score_label} (raw {match.raw_score}%)"
-        return (
-            f"{score_label} · {origin} · {source_name}\n"
-            f"S: {source_preview}\n"
-            f"T: {target_preview}"
-        )
-
-    def _tm_tooltip_html(self, match: TMMatch) -> str:
-        source = html.escape(match.source_text)
-        target = html.escape(match.target_text)
-        raw = match.raw_score if match.raw_score is not None else match.score
-        return (
-            '<span style="white-space: pre-wrap;">'
-            f"<b>Score</b> {match.score}% (raw {raw}%)"
-            f"<br><b>Source</b><br>{source}<br><br><b>Translation</b><br>{target}"
-            "</span>"
-        )
-
-    def _truncate_text(self, text: str, limit: int) -> str:
-        if len(text) <= limit:
-            return text
-        return text[: max(0, limit - 1)] + "…"
 
     def _tooltip_html(self, text: str) -> str:
         escaped = html.escape(text)
@@ -4934,7 +5079,7 @@ class MainWindow(QMainWindow):
         if self._merge_active:
             event.ignore()
             return
-        if not _should_accept_close(
+        if not self._save_exit_flow_service.should_accept_close(
             prompt_write_on_exit=self._prompt_write_on_exit,
             write_cache=self._write_cache_current,
             list_draft_files=self._draft_files,

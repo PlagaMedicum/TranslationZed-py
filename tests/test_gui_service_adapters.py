@@ -1,0 +1,1555 @@
+import re
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("PySide6")
+
+from PySide6.QtCore import Qt
+
+from translationzed_py.core.conflict_service import (
+    ConflictMergeExecution,
+    ConflictPromptPlan,
+    ConflictResolution,
+)
+from translationzed_py.core.save_exit_flow import SaveBatchOutcome
+from translationzed_py.core.search import Match
+from translationzed_py.core.search_replace_service import (
+    ReplaceAllFileApplyResult,
+    ReplaceAllRowsApplyResult,
+    ReplaceRequest,
+    SearchMatchApplyPlan,
+    SearchMatchOpenPlan,
+    SearchRowsBuildResult,
+    SearchRowsCacheKey,
+    SearchRowsCacheLookupPlan,
+    SearchRowsCacheStamp,
+    SearchRowsCacheStorePlan,
+    SearchRowsSourcePlan,
+    SearchRunPlan,
+)
+from translationzed_py.core.tm_import_sync import TMImportSyncReport
+from translationzed_py.core.tm_preferences import TMPreferencesApplyReport
+from translationzed_py.core.tm_rebuild import TMRebuildResult
+from translationzed_py.gui import MainWindow
+from translationzed_py.gui import main_window as mw
+
+
+def _make_project(tmp_path: Path) -> Path:
+    root = tmp_path / "proj"
+    root.mkdir()
+    for locale, text in (
+        ("EN", "English"),
+        ("BE", "Belarusian"),
+        ("RU", "Russian"),
+    ):
+        (root / locale).mkdir()
+        (root / locale / "language.txt").write_text(
+            f"text = {text},\ncharset = UTF-8,\n", encoding="utf-8"
+        )
+    (root / "EN" / "ui.txt").write_text('UI_OK = "OK"\n', encoding="utf-8")
+    (root / "BE" / "ui.txt").write_text('UI_OK = "Добра"\n', encoding="utf-8")
+    (root / "RU" / "ui.txt").write_text('UI_OK = "Хорошо"\n', encoding="utf-8")
+    return root
+
+
+def test_open_file_delegates_to_file_workflow_service(qtbot, tmp_path, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+
+    calls: list[tuple[Path, str]] = []
+    delegate = win._file_workflow_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def prepare_open_file(self, path: Path, encoding: str, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append((path, encoding))
+            return delegate.prepare_open_file(path, encoding, **kwargs)
+
+    monkeypatch.setattr(win, "_file_workflow_service", _SpyService())
+    win._file_chosen(index)
+    assert calls == [(target, "UTF-8")]
+
+
+def test_switch_locales_delegates_to_project_session_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    class _FakeDialog:
+        class DialogCode:
+            Accepted = 1
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def exec(self) -> int:
+            return self.DialogCode.Accepted
+
+        def selected_codes(self) -> list[str]:
+            return ["RU"]
+
+    calls: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
+    delegate = win._project_session_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_locale_switch_plan(
+            self,
+            *,
+            requested_locales,
+            available_locales,
+            current_locales,
+        ):  # type: ignore[no-untyped-def]
+            calls.append((tuple(requested_locales), tuple(current_locales)))
+            return delegate.build_locale_switch_plan(
+                requested_locales=requested_locales,
+                available_locales=available_locales,
+                current_locales=current_locales,
+            )
+
+    monkeypatch.setattr(mw, "LocaleChooserDialog", _FakeDialog)
+    monkeypatch.setattr(win, "_project_session_service", _SpyService())
+    assert win._selected_locales == ["BE"]
+    win._switch_locales()
+    assert calls == [(("RU",), ("BE",))]
+    assert win._selected_locales == ["RU"]
+
+
+def test_warn_orphan_caches_delegates_warning_plan_to_project_session(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    orphan = root / ".tzp" / "cache" / "BE" / "ghost.bin"
+
+    calls: list[tuple[str, tuple[Path, ...], Path, int]] = []
+    delegate = win._project_session_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def collect_orphan_cache_paths(
+            self,
+            *,
+            root,
+            selected_locales,
+            warned_locales,
+        ):  # type: ignore[no-untyped-def]
+            return {"BE": [orphan]}
+
+        def build_orphan_cache_warning(
+            self,
+            *,
+            locale,
+            orphan_paths,
+            root,
+            preview_limit=20,
+        ):  # type: ignore[no-untyped-def]
+            calls.append((locale, tuple(orphan_paths), root, preview_limit))
+            return delegate.build_orphan_cache_warning(
+                locale=locale,
+                orphan_paths=orphan_paths,
+                root=root,
+                preview_limit=preview_limit,
+            )
+
+    class _FakeMessageBox:
+        Warning = 1
+        AcceptRole = 2
+        RejectRole = 3
+        _instances: list["_FakeMessageBox"] = []
+
+        def __init__(self, *_args, **_kwargs):
+            self._title = ""
+            self._text = ""
+            self._info = ""
+            self._detail = ""
+            self._clicked = None
+            _FakeMessageBox._instances.append(self)
+
+        def setIcon(self, _icon):
+            return None
+
+        def setWindowTitle(self, title):
+            self._title = title
+
+        def setText(self, text):
+            self._text = text
+
+        def setInformativeText(self, text):
+            self._info = text
+
+        def setDetailedText(self, text):
+            self._detail = text
+
+        def addButton(self, _label, _role):
+            btn = object()
+            self._clicked = btn
+            return btn
+
+        def exec(self):
+            return None
+
+        def clickedButton(self):
+            return self._clicked
+
+    monkeypatch.setattr(win, "_project_session_service", _SpyService())
+    monkeypatch.setattr(mw, "QMessageBox", _FakeMessageBox)
+    win._warn_orphan_caches()
+
+    assert calls == [("BE", (orphan,), root, 20)]
+    assert _FakeMessageBox._instances
+    assert _FakeMessageBox._instances[0]._title == "Orphan cache files"
+    assert _FakeMessageBox._instances[0]._text.startswith("Locale BE has cache files")
+
+
+def test_schedule_cache_migration_delegates_execution_to_project_session(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    legacy = root / ".tzp-cache" / "BE" / "legacy.bin"
+
+    calls: list[tuple[tuple[Path, ...], int, int]] = []
+    delegate = win._project_session_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def execute_cache_migration_schedule(
+            self,
+            *,
+            legacy_paths,
+            batch_size,
+            migrated_count,
+            callbacks,
+        ):  # type: ignore[no-untyped-def]
+            calls.append((tuple(legacy_paths), batch_size, migrated_count))
+            return delegate.execute_cache_migration_schedule(
+                legacy_paths=legacy_paths,
+                batch_size=batch_size,
+                migrated_count=migrated_count,
+                callbacks=callbacks,
+            )
+
+    monkeypatch.setattr(win, "_project_session_service", _SpyService())
+    monkeypatch.setattr(mw, "_legacy_cache_paths", lambda _root: [legacy])
+    monkeypatch.setattr(mw, "_migrate_status_caches", lambda _root, _locales: 0)
+    win._schedule_cache_migration()
+
+    assert calls == [((legacy,), win._migration_batch_size, 0)]
+
+
+def test_run_cache_migration_batch_delegates_execution_to_project_session(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    pending = root / ".tzp-cache" / "BE" / "legacy.bin"
+    win._pending_cache_migrations = [pending]
+    win._migration_count = 1
+
+    calls: list[tuple[tuple[Path, ...], int, int]] = []
+    delegate = win._project_session_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def execute_cache_migration_batch(
+            self,
+            *,
+            pending_paths,
+            batch_size,
+            migrated_count,
+            callbacks,
+        ):  # type: ignore[no-untyped-def]
+            calls.append((tuple(pending_paths), batch_size, migrated_count))
+            return delegate.execute_cache_migration_batch(
+                pending_paths=pending_paths,
+                batch_size=batch_size,
+                migrated_count=migrated_count,
+                callbacks=callbacks,
+            )
+
+    monkeypatch.setattr(win, "_project_session_service", _SpyService())
+    monkeypatch.setattr(
+        mw,
+        "_migrate_status_cache_paths",
+        lambda _root, _locales, paths: len(paths),
+    )
+    win._run_cache_migration_batch()
+
+    assert calls == [((pending,), win._migration_batch_size, 1)]
+
+
+def test_save_all_files_delegates_to_save_batch_flow(qtbot, tmp_path, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    calls: dict[str, object] = {}
+    saved_status: list[bool] = []
+    delegate = win._save_exit_flow_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def run_save_batch_flow(
+            self,
+            *,
+            files,
+            current_file,
+            save_current,
+            save_from_cache,
+        ):  # type: ignore[no-untyped-def]
+            calls["files"] = tuple(files)
+            calls["current_file"] = current_file
+            calls["save_current"] = save_current
+            calls["save_from_cache"] = save_from_cache
+            return SaveBatchOutcome(aborted=False, failures=(), saved_any=True)
+
+    monkeypatch.setattr(win, "_save_exit_flow_service", _SpyService())
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(win, "_set_saved_status", lambda: saved_status.append(True))
+
+    win._save_all_files([target])
+    assert calls["files"] == (target,)
+    assert calls["save_current"] == win._save_current
+    assert calls["save_from_cache"] == win._save_file_from_cache
+    assert saved_status == [True]
+
+
+def test_request_write_original_delegates_to_save_exit_flow_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[dict[str, object]] = []
+    delegate = win._save_exit_flow_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def apply_write_original_flow(self, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return None
+
+    monkeypatch.setattr(win, "_save_exit_flow_service", _SpyService())
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: True)
+    win._request_write_original()
+    assert calls
+    assert calls[0]["write_cache"] == win._write_cache_current
+    assert calls[0]["save_all"] == win._save_all_files
+
+
+def test_apply_preferences_delegates_scope_normalization_to_preferences_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[tuple[object, str]] = []
+    delegate = win._preferences_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def normalize_scope(self, value: object, *, default: str = "FILE") -> str:
+            calls.append((value, default))
+            if str(value).lower() == "locale":
+                return "LOCALE"
+            return "POOL"
+
+    monkeypatch.setattr(win, "_preferences_service", _SpyService())
+    monkeypatch.setattr(win, "_apply_tm_preferences_actions", lambda _values: None)
+    monkeypatch.setattr(win, "_persist_preferences", lambda: None)
+    monkeypatch.setattr(win, "_update_replace_enabled", lambda: None)
+    monkeypatch.setattr(win, "_update_status_bar", lambda: None)
+
+    win._apply_preferences(
+        {
+            "search_scope": "locale",
+            "replace_scope": "pool",
+            "default_root": "",
+            "tm_import_dir": "",
+        }
+    )
+
+    assert calls == [("locale", "FILE"), ("pool", "FILE")]
+    assert win._search_scope == "LOCALE"
+    assert win._replace_scope == "POOL"
+
+
+def test_apply_tm_preferences_actions_delegates_to_tm_workflow_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    class _Actions:
+        remove_paths: set[str] = set()
+
+        @staticmethod
+        def is_empty() -> bool:
+            return False
+
+    calls: dict[str, object] = {}
+    delegate = win._tm_workflow
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_preferences_actions(self, values):  # type: ignore[no-untyped-def]
+            calls["values"] = values
+            return _Actions()
+
+        def apply_preferences_actions(  # type: ignore[no-untyped-def]
+            self,
+            *,
+            store,
+            actions,
+            copy_to_import_dir,
+        ):
+            calls["store"] = store
+            calls["actions"] = actions
+            calls["copy_to_import_dir"] = copy_to_import_dir
+            return TMPreferencesApplyReport(sync_paths=(), failures=())
+
+    monkeypatch.setattr(win, "_tm_workflow", _SpyService())
+    monkeypatch.setattr(win, "_ensure_tm_store", lambda: True)
+    win._tm_store = object()  # type: ignore[assignment]
+
+    win._apply_tm_preferences_actions({"tm_import_paths": ["/tmp/sample.tmx"]})
+
+    assert calls["values"] == {"tm_import_paths": ["/tmp/sample.tmx"]}
+    assert calls["store"] is win._tm_store
+    assert calls["actions"].is_empty() is False
+    assert callable(calls["copy_to_import_dir"])
+
+
+def test_sync_tm_import_folder_delegates_to_tm_workflow_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    tm_dir = tmp_path / "tm-imports"
+    calls: dict[str, object] = {}
+    applied: list[tuple[TMImportSyncReport, bool, bool]] = []
+    delegate = win._tm_workflow
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def sync_import_folder(  # type: ignore[no-untyped-def]
+            self,
+            *,
+            store,
+            tm_dir,
+            resolve_locales,
+            only_paths=None,
+            pending_only=False,
+        ):
+            calls["store"] = store
+            calls["tm_dir"] = tm_dir
+            calls["resolve_locales"] = resolve_locales
+            calls["only_paths"] = only_paths
+            calls["pending_only"] = pending_only
+            return TMImportSyncReport(
+                imported_segments=0,
+                imported_files=(),
+                unresolved_files=(),
+                zero_segment_files=(),
+                failures=(),
+                checked_files=(),
+                changed=False,
+            )
+
+    monkeypatch.setattr(win, "_tm_workflow", _SpyService())
+    monkeypatch.setattr(win, "_ensure_tm_store", lambda: True)
+    monkeypatch.setattr(win, "_tm_import_dir_path", lambda: tm_dir)
+    monkeypatch.setattr(
+        win,
+        "_apply_tm_sync_report",
+        lambda report, *, interactive, show_summary: applied.append(
+            (report, interactive, show_summary)
+        ),
+    )
+    win._tm_store = object()  # type: ignore[assignment]
+    only = {tmp_path / "sample.tmx"}
+
+    win._sync_tm_import_folder(
+        interactive=False,
+        only_paths=only,
+        pending_only=True,
+        show_summary=True,
+    )
+
+    assert calls["store"] is win._tm_store
+    assert calls["tm_dir"] == tm_dir
+    assert calls["only_paths"] == only
+    assert calls["pending_only"] is True
+    assert callable(calls["resolve_locales"])
+    assert len(applied) == 1
+    assert applied[0][1:] == (False, True)
+
+
+def test_start_tm_rebuild_delegates_collect_locales_to_tm_workflow_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._tm_store = object()  # type: ignore[assignment]
+
+    calls: list[tuple[object, object]] = []
+    delegate = win._tm_workflow
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def collect_rebuild_locales(  # type: ignore[no-untyped-def]
+            self, *, locale_map, selected_locales
+        ):
+            calls.append((locale_map, selected_locales))
+            return ([], "utf-8")
+
+    monkeypatch.setattr(win, "_tm_workflow", _SpyService())
+    win._start_tm_rebuild(["BE"], interactive=False, force=False)
+
+    assert len(calls) == 1
+    assert calls[0][0] is win._locales
+    assert calls[0][1] == ["BE"]
+
+
+def test_start_tm_rebuild_submits_tm_rebuild_via_tm_workflow_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._tm_store = object()  # type: ignore[assignment]
+
+    class _Spec:
+        locale = "BE"
+
+    submitted: dict[str, object] = {}
+
+    class _FakeFuture:
+        def done(self) -> bool:
+            return False
+
+    class _FakePool:
+        def submit(self, fn, *args, **kwargs):  # type: ignore[no-untyped-def]
+            submitted["fn"] = fn
+            submitted["args"] = args
+            submitted["kwargs"] = kwargs
+            return _FakeFuture()
+
+    delegate = win._tm_workflow
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def collect_rebuild_locales(  # type: ignore[no-untyped-def]
+            self, *, locale_map, selected_locales
+        ):
+            _ = locale_map
+            _ = selected_locales
+            return ([_Spec()], "utf-8")
+
+        def rebuild_project_tm(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            _ = args
+            _ = kwargs
+            return None
+
+    monkeypatch.setattr(win, "_tm_workflow", _SpyService())
+    win._tm_rebuild_pool = _FakePool()  # type: ignore[assignment]
+    win._start_tm_rebuild(["BE"], interactive=False, force=False)
+
+    assert submitted["fn"] == win._tm_workflow.rebuild_project_tm
+    assert submitted["args"][0] == win._root
+    assert submitted["kwargs"]["source_locale"] == win._tm_source_locale
+    assert submitted["kwargs"]["en_encoding"] == "utf-8"
+
+
+def test_finish_tm_rebuild_delegates_status_formatting_to_tm_workflow_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[tuple[str, object]] = []
+    delegate = win._tm_workflow
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def clear_cache(self) -> None:
+            calls.append(("clear_cache", None))
+
+        def format_rebuild_status(self, result: TMRebuildResult) -> str:
+            calls.append(("format", result))
+            return "rebuilt"
+
+    shown: list[tuple[str, int]] = []
+    monkeypatch.setattr(win, "_tm_workflow", _SpyService())
+    monkeypatch.setattr(
+        win.statusBar(),
+        "showMessage",
+        lambda text, ms=0: shown.append((text, ms)),
+    )
+    result = TMRebuildResult(files=1, entries=2)
+    win._finish_tm_rebuild(result)
+
+    assert calls == [("clear_cache", None), ("format", result)]
+    assert shown == [("rebuilt", 8000)]
+
+
+def test_save_all_files_delegates_to_save_batch_render_plan(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    rendered: dict[str, object] = {}
+    saved_status: list[bool] = []
+    delegate = win._save_exit_flow_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def run_save_batch_flow(
+            self,
+            *,
+            files,
+            current_file,
+            save_current,
+            save_from_cache,
+        ):  # type: ignore[no-untyped-def]
+            return SaveBatchOutcome(aborted=False, failures=(), saved_any=True)
+
+        def build_save_batch_render_plan(
+            self,
+            *,
+            outcome,
+            root,
+        ):  # type: ignore[no-untyped-def]
+            rendered["outcome"] = outcome
+            rendered["root"] = root
+
+            class _Plan:
+                aborted = False
+                warning_message = None
+                set_saved_status = True
+
+            return _Plan()
+
+    monkeypatch.setattr(win, "_save_exit_flow_service", _SpyService())
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(win, "_set_saved_status", lambda: saved_status.append(True))
+
+    win._save_all_files([target])
+
+    assert isinstance(rendered["outcome"], SaveBatchOutcome)
+    assert rendered["root"] == root
+    assert saved_status == [True]
+
+
+def test_save_file_from_cache_delegates_to_file_workflow_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    calls: dict[str, object] = {}
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def write_from_cache(
+            self,
+            path: Path,
+            encoding: str,
+            *,
+            cache_map,
+            callbacks,
+            hash_for_entry,
+        ):  # type: ignore[no-untyped-def]
+            calls["path"] = path
+            calls["encoding"] = encoding
+            calls["cache_map"] = cache_map
+            calls["callbacks"] = callbacks
+            calls["hash_for_entry"] = hash_for_entry
+            return delegate.write_from_cache(
+                path,
+                encoding,
+                cache_map=cache_map,
+                callbacks=callbacks,
+                hash_for_entry=hash_for_entry,
+            )
+
+    delegate = win._file_workflow_service
+    monkeypatch.setattr(win, "_file_workflow_service", _SpyService())
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(win, "_ensure_conflicts_resolved", lambda *_args: True)
+    assert win._save_file_from_cache(target) is True
+    assert calls["path"] == target
+    assert calls["encoding"] == "UTF-8"
+    assert "callbacks" in calls
+
+
+def test_save_current_delegates_to_file_workflow_service(qtbot, tmp_path, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    assert win._current_model is not None
+    value_idx = win._current_model.index(0, 2)
+    win._current_model.setData(value_idx, "New value", Qt.EditRole)
+
+    run_calls: list[tuple[bool, bool]] = []
+    persist_calls: list[Path] = []
+    delegate = win._file_workflow_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_save_current_run_plan(
+            self,
+            *,
+            has_current_file: bool,
+            has_current_model: bool,
+            conflicts_resolved: bool,
+            has_changed_keys: bool,
+        ):  # type: ignore[no-untyped-def]
+            run_calls.append((conflicts_resolved, has_changed_keys))
+            return delegate.build_save_current_run_plan(
+                has_current_file=has_current_file,
+                has_current_model=has_current_model,
+                conflicts_resolved=conflicts_resolved,
+                has_changed_keys=has_changed_keys,
+            )
+
+        def persist_current_save(
+            self,
+            *,
+            path: Path,
+            parsed_file,
+            changed_values,
+            encoding: str,
+            callbacks,
+        ):  # type: ignore[no-untyped-def]
+            _ = parsed_file
+            _ = changed_values
+            _ = encoding
+            _ = callbacks
+            persist_calls.append(path)
+            return delegate.persist_current_save(
+                path=path,
+                parsed_file=win._current_pf,
+                changed_values=win._current_model.changed_values(),  # type: ignore[arg-type]
+                encoding=win._current_encoding,
+                callbacks=callbacks,
+            )
+
+    monkeypatch.setattr(win, "_file_workflow_service", _SpyService())
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(win, "_ensure_conflicts_resolved", lambda *_args: True)
+    assert win._save_current() is True
+    assert run_calls
+    assert run_calls[0][0] is True
+    assert run_calls[0][1] is True
+    assert persist_calls == [target]
+
+
+def test_prompt_conflicts_delegates_to_conflict_service(qtbot, tmp_path, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    win._conflict_files[target] = {"UI_OK": "original"}
+
+    calls: list[tuple[bool, bool, bool]] = []
+    delegate = win._conflict_workflow_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_prompt_plan(
+            self,
+            *,
+            has_conflicts: bool,
+            is_current_file: bool,
+            for_save: bool,
+        ) -> ConflictPromptPlan:
+            calls.append((has_conflicts, is_current_file, for_save))
+            return ConflictPromptPlan(require_dialog=False, immediate_result=True)
+
+    monkeypatch.setattr(win, "_conflict_workflow_service", _SpyService())
+    assert win._prompt_conflicts(target) is True
+    assert calls == [(True, False, False)]
+
+
+def test_prompt_conflicts_dialog_path_delegates_choice_execution(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    win._conflict_files[target] = {"UI_OK": "original"}
+
+    class _FakeDialog:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def exec(self) -> int:
+            return 0
+
+        def choice(self) -> str:
+            return "merge"
+
+    calls: list[str | None] = []
+    delegate = win._conflict_workflow_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def execute_choice(
+            self,
+            choice: str | None,
+            *,
+            on_drop_cache,
+            on_drop_original,
+            on_merge,
+        ):  # type: ignore[no-untyped-def]
+            calls.append(choice)
+            return on_merge()
+
+    monkeypatch.setattr(mw, "ConflictChoiceDialog", _FakeDialog)
+    monkeypatch.setattr(win, "_conflict_workflow_service", _SpyService())
+    monkeypatch.setattr(win, "_resolve_conflicts_merge", lambda _path: True)
+    assert win._prompt_conflicts(target) is True
+    assert calls == ["merge"]
+
+
+def test_resolve_conflicts_drop_cache_delegates_persist_execution(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    win._conflict_files[target] = {"UI_OK": "orig"}
+
+    persist_calls: list[ConflictResolution] = []
+    run_plan_calls: list[tuple[str, int]] = []
+    delegate = win._conflict_workflow_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_resolution_run_plan(
+            self,
+            *,
+            action: str,
+            has_current_file: bool,
+            has_current_model: bool,
+            is_current_file: bool,
+            conflict_count: int,
+        ):  # type: ignore[no-untyped-def]
+            run_plan_calls.append((action, conflict_count))
+            return delegate.build_resolution_run_plan(
+                action=action,
+                has_current_file=has_current_file,
+                has_current_model=has_current_model,
+                is_current_file=is_current_file,
+                conflict_count=conflict_count,
+            )
+
+        def execute_persist_resolution(
+            self,
+            *,
+            resolution: ConflictResolution,
+            callbacks,
+        ):  # type: ignore[no-untyped-def]
+            _ = callbacks
+            persist_calls.append(resolution)
+            return True
+
+    monkeypatch.setattr(win, "_conflict_workflow_service", _SpyService())
+    monkeypatch.setattr(win, "_reload_file", lambda _path: None)
+    assert win._resolve_conflicts_drop_cache(target) is True
+    assert run_plan_calls == [("drop_cache", 1)]
+    assert len(persist_calls) == 1
+
+
+def test_resolve_conflicts_merge_delegates_merge_execution(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    win._conflict_files[target] = {"UI_OK": "orig"}
+    win._conflict_sources[target] = {"UI_OK": "src"}
+
+    calls: list[int] = []
+    delegate = win._conflict_workflow_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def execute_merge_resolution(
+            self,
+            *,
+            entries,
+            changed_keys,
+            baseline_values,
+            conflict_originals,
+            sources,
+            request_resolutions,
+        ):  # type: ignore[no-untyped-def]
+            _ = entries
+            _ = changed_keys
+            _ = baseline_values
+            _ = sources
+            _ = request_resolutions
+            calls.append(len(conflict_originals))
+            return ConflictMergeExecution(
+                resolved=False,
+                immediate_result=False,
+                resolution=None,
+            )
+
+    monkeypatch.setattr(win, "_conflict_workflow_service", _SpyService())
+    assert win._resolve_conflicts_merge(target) is False
+    assert calls == [1]
+
+
+def test_search_from_anchor_delegates_to_search_replace_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    index = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(index)
+
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_search_run_plan(self, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return SearchRunPlan(
+                run_search=False,
+                query="",
+                use_regex=False,
+                field=None,
+                include_source=False,
+                include_value=False,
+                files=(),
+                anchor_path=None,
+                anchor_row=-1,
+                status_message="No query.",
+            )
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    win.search_edit.setText("")
+    assert win._search_from_anchor(direction=1) is False
+    assert calls
+    assert calls[0]["query_text"] == ""
+    assert calls[0]["current_file"] == root / "BE" / "ui.txt"
+    assert win._search_status_label.text() == "No query."
+
+
+def test_files_for_scope_delegates_to_search_replace_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    index = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(index)
+
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def scope_files(self, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return [root / "BE" / "ui.txt"]
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    files = win._files_for_scope("FILE")
+    assert files == [root / "BE" / "ui.txt"]
+    assert calls and calls[0]["scope"] == "FILE"
+
+
+def test_find_match_in_rows_delegates_to_search_replace_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    rows = [
+        mw._SearchRow(file=root / "BE" / "ui.txt", row=0, key="K", source="", value="V")
+    ]
+
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def find_match_in_rows(
+            self,
+            rows,
+            query,
+            field,
+            use_regex,
+            *,
+            start_row,
+            direction,
+            case_sensitive,
+        ):  # type: ignore[no-untyped-def]
+            calls.append(
+                {
+                    "rows": list(rows),
+                    "query": query,
+                    "field": field,
+                    "use_regex": use_regex,
+                    "start_row": start_row,
+                    "direction": direction,
+                    "case_sensitive": case_sensitive,
+                }
+            )
+            return None
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    assert (
+        win._find_match_in_rows(
+            rows,
+            "needle",
+            mw._SearchField.TRANSLATION,
+            False,
+            start_row=-1,
+            direction=1,
+            case_sensitive=False,
+        )
+        is None
+    )
+    assert calls and calls[0]["query"] == "needle"
+
+
+def test_refresh_search_panel_delegates_search_spec_to_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[int] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def search_spec_for_column(self, column: int):  # type: ignore[no-untyped-def]
+            calls.append(column)
+            return mw._SearchField.KEY, False, False
+
+        def build_search_panel_plan(self, **kwargs):  # type: ignore[no-untyped-def]
+            return delegate.build_search_panel_plan(**kwargs)
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    win.search_edit.setText("needle")
+    win._refresh_search_panel_results()
+    assert calls
+
+
+def test_replace_all_count_in_file_delegates_to_search_replace_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    calls: list[Path] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def count_replace_all_in_file(self, path: Path, **_kwargs) -> int:  # type: ignore[no-untyped-def]
+            calls.append(path)
+            return 7
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    count = win._replace_all_count_in_file(
+        target,
+        pattern=re.compile("UI"),
+        replacement="ZZ",
+        use_regex=False,
+        matches_empty=False,
+        has_group_ref=False,
+    )
+    assert count == 7
+    assert calls == [target]
+
+
+def test_replace_all_count_in_model_delegates_to_search_replace_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    index = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(index)
+
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def count_replace_all_in_rows(self, **kwargs) -> int:  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return 3
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    count = win._replace_all_count_in_model(
+        pattern=re.compile("UI"),
+        replacement="ZZ",
+        use_regex=False,
+        matches_empty=False,
+        has_group_ref=False,
+    )
+    assert count == 3
+    assert calls
+
+
+def test_replace_all_in_file_delegates_to_search_replace_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    calls: list[Path] = []
+    dirty_calls: list[tuple[Path, bool]] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def apply_replace_all_in_file(
+            self, path: Path, **_kwargs
+        ) -> ReplaceAllFileApplyResult:  # type: ignore[no-untyped-def]
+            calls.append(path)
+            return ReplaceAllFileApplyResult(changed_keys={"UI_OK"}, changed_any=True)
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    monkeypatch.setattr(
+        win.fs_model,
+        "set_dirty",
+        lambda path, dirty: dirty_calls.append((path, dirty)),
+    )
+    ok = win._replace_all_in_file(
+        target,
+        pattern=re.compile("UI"),
+        replacement="ZZ",
+        use_regex=False,
+        matches_empty=False,
+        has_group_ref=False,
+    )
+    assert ok is True
+    assert calls == [target]
+    assert dirty_calls == [(target, True)]
+
+
+def test_replace_all_in_model_delegates_to_search_replace_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    index = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(index)
+
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def apply_replace_all_in_rows(
+            self, **kwargs
+        ) -> ReplaceAllRowsApplyResult:  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return ReplaceAllRowsApplyResult(changed_rows=1)
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    ok = win._replace_all_in_model(
+        pattern=re.compile("UI"),
+        replacement="ZZ",
+        use_regex=False,
+        matches_empty=False,
+        has_group_ref=False,
+    )
+    assert ok is True
+    assert calls
+
+
+def test_replace_current_delegates_to_search_replace_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    index = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(index)
+    current = win.table.currentIndex()
+    if not current.isValid():
+        current = win._current_model.index(0, 2)  # type: ignore[union-attr]
+        win.table.setCurrentIndex(current)
+
+    request = ReplaceRequest(
+        pattern=re.compile("UI"),
+        replacement="ZZ",
+        use_regex=False,
+        matches_empty=False,
+        has_group_ref=False,
+    )
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_replace_request(self, **_kwargs):  # type: ignore[no-untyped-def]
+            return request
+
+        def apply_replace_in_row(self, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return True
+
+    scheduled: list[bool] = []
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    monkeypatch.setattr(win, "_schedule_search", lambda: scheduled.append(True))
+    win._replace_current()
+    assert calls
+    assert calls[0]["row"] == current.row()
+    assert calls[0]["request"] == request
+    assert scheduled == [True]
+
+
+def test_cached_rows_from_file_delegates_cache_plans(qtbot, tmp_path, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    cached_rows = [mw._SearchRow(file=target, row=0, key="K", source="", value="V")]
+    stamp = SearchRowsCacheStamp(file_mtime_ns=1, cache_mtime_ns=0, source_mtime_ns=0)
+    key = (target, False, False)
+    win._search_rows_cache[key] = (stamp, cached_rows)
+
+    calls: list[str] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_rows_cache_lookup_plan(
+            self, **kwargs
+        ) -> SearchRowsCacheLookupPlan:  # type: ignore[no-untyped-def]
+            calls.append("lookup")
+            return SearchRowsCacheLookupPlan(
+                key=SearchRowsCacheKey(
+                    path=target,
+                    include_source=False,
+                    include_value=False,
+                ),
+                stamp=stamp,
+                use_cached_rows=True,
+            )
+
+        def build_rows_cache_store_plan(
+            self, **_kwargs
+        ) -> SearchRowsCacheStorePlan:  # type: ignore[no-untyped-def]
+            calls.append("store")
+            return SearchRowsCacheStorePlan(should_store_rows=False)
+
+    def _fail_rows_loader(*_args, **_kwargs):
+        raise AssertionError("rows loader should not run on cache hit")
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    monkeypatch.setattr(win, "_rows_from_file", _fail_rows_loader)
+    rows = list(
+        win._cached_rows_from_file(
+            target,
+            "BE",
+            include_source=False,
+            include_value=False,
+        )
+    )
+    assert rows == cached_rows
+    assert calls == ["lookup"]
+
+
+def test_cached_rows_from_file_delegates_stamp_collection_to_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    calls: list[str] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def collect_rows_cache_stamp(self, **_kwargs):  # type: ignore[no-untyped-def]
+            calls.append("stamp")
+            return None
+
+        def build_rows_cache_lookup_plan(
+            self, **_kwargs
+        ):  # type: ignore[no-untyped-def]
+            raise AssertionError("lookup should not run when stamp is missing")
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    rows = list(
+        win._cached_rows_from_file(
+            target,
+            "BE",
+            include_source=True,
+            include_value=True,
+        )
+    )
+    assert rows == []
+    assert calls == ["stamp"]
+
+
+def test_search_rows_for_file_delegates_rows_source_plan_current_model(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+    current_rows = [mw._SearchRow(file=target, row=0, key="K", source="", value="V")]
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_rows_source_plan(
+            self, **kwargs
+        ) -> SearchRowsSourcePlan:  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return SearchRowsSourcePlan(has_rows=True, use_active_model_rows=True)
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    monkeypatch.setattr(win, "_rows_from_model", lambda **_kwargs: current_rows)
+    monkeypatch.setattr(
+        win,
+        "_cached_rows_from_file",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("cached rows should not be used for current-model plan")
+        ),
+    )
+    rows = list(
+        win._search_rows_for_file(
+            target,
+            include_source=False,
+            include_value=False,
+        )
+    )
+    assert rows == current_rows
+    assert calls and calls[0]["is_current_file"] is True
+
+
+def test_search_rows_for_file_delegates_rows_source_plan_cached_file(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+    cached_rows = [mw._SearchRow(file=target, row=0, key="K", source="", value="V")]
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_rows_source_plan(
+            self, **kwargs
+        ) -> SearchRowsSourcePlan:  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return SearchRowsSourcePlan(has_rows=True, use_active_model_rows=False)
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    monkeypatch.setattr(
+        win, "_cached_rows_from_file", lambda *_args, **_kwargs: cached_rows
+    )
+    rows = list(
+        win._search_rows_for_file(
+            target,
+            include_source=False,
+            include_value=False,
+        )
+    )
+    assert rows == cached_rows
+    assert calls and calls[0]["is_current_file"] is False
+
+
+def test_rows_from_file_delegates_file_row_load_to_service(
+    qtbot, tmp_path, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    expected_rows = [
+        mw._SearchRow(file=target, row=0, key="UI_OK", source="", value="x")
+    ]
+
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def load_search_rows_from_file(
+            self, **kwargs
+        ) -> SearchRowsBuildResult:  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return SearchRowsBuildResult(rows=expected_rows, entry_count=1)
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    rows, count = win._rows_from_file(
+        target,
+        "BE",
+        include_source=False,
+        include_value=False,
+    )
+    assert list(rows) == expected_rows
+    assert count == 1
+    assert calls
+    assert calls[0]["path"] == target
+    assert calls[0]["encoding"] == "UTF-8"
+
+
+def test_select_match_delegates_match_selection_plans(qtbot, tmp_path, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    win._search_column = 2
+    match = Match(target, 0)
+
+    calls: list[str] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_match_open_plan(self, **_kwargs):  # type: ignore[no-untyped-def]
+            calls.append("open")
+            return SearchMatchOpenPlan(open_target_file=False, target_file=target)
+
+        def build_match_apply_plan(self, **_kwargs):  # type: ignore[no-untyped-def]
+            calls.append("apply")
+            return SearchMatchApplyPlan(
+                select_in_table=True,
+                target_row=0,
+                target_column=2,
+            )
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    assert win._select_match(match) is True
+    assert calls == ["open", "apply"]

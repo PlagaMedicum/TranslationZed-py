@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .model import Entry, EntrySequence
 from .status_cache import CacheEntry
+
+if TYPE_CHECKING:
+    from .model import ParsedFile
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,7 +27,80 @@ class CacheWriteOverlay:
 
 
 @dataclass(frozen=True, slots=True)
+class OpenFileCallbacks:
+    parse_eager: Callable[[Path, str], ParsedFile]
+    parse_lazy: Callable[[Path, str], ParsedFile]
+    read_cache: Callable[[Path], Mapping[int, CacheEntry]]
+    touch_last_opened: Callable[[Path, int], object]
+    now_ts: Callable[[], int]
+
+
+@dataclass(frozen=True, slots=True)
+class OpenFileResult:
+    parsed_file: ParsedFile
+    cache_map: Mapping[int, CacheEntry]
+    overlay: CacheOverlayResult
+
+
+@dataclass(frozen=True, slots=True)
+class SaveCurrentRunPlan:
+    run_save: bool
+    immediate_result: bool | None
+
+
+@dataclass(frozen=True, slots=True)
+class SaveCurrentCallbacks:
+    save_file: Callable[[ParsedFile, Mapping[str, str], str], object]
+    write_cache: Callable[[Path, Iterable[Entry], int], object]
+    now_ts: Callable[[], int]
+
+
+@dataclass(frozen=True, slots=True)
+class SaveCurrentResult:
+    wrote_original: bool
+    wrote_cache: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SaveFromCacheCallbacks:
+    parse_file: Callable[[Path, str], ParsedFile]
+    save_file: Callable[[ParsedFile, Mapping[str, str], str], object]
+    write_cache: Callable[[Path, Iterable[Entry]], object]
+
+
+@dataclass(frozen=True, slots=True)
+class SaveFromCacheResult:
+    had_drafts: bool
+    wrote_original: bool
+    changed_values: Mapping[str, str]
+
+
+class SaveFromCacheParseError(Exception):
+    def __init__(self, *, path: Path, original: Exception) -> None:
+        super().__init__(str(original))
+        self.path = path
+        self.original = original
+
+
+@dataclass(frozen=True, slots=True)
 class FileWorkflowService:
+    def prepare_open_file(
+        self,
+        path: Path,
+        encoding: str,
+        *,
+        use_lazy_parser: bool,
+        callbacks: OpenFileCallbacks,
+        hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
+    ) -> OpenFileResult:
+        return prepare_open_file(
+            path,
+            encoding,
+            use_lazy_parser=use_lazy_parser,
+            callbacks=callbacks,
+            hash_for_entry=hash_for_entry,
+        )
+
     def apply_cache_overlay(
         self,
         entries: EntrySequence,
@@ -48,6 +126,78 @@ class FileWorkflowService:
             cache_map,
             hash_for_entry=hash_for_entry,
         )
+
+    def build_save_current_run_plan(
+        self,
+        *,
+        has_current_file: bool,
+        has_current_model: bool,
+        conflicts_resolved: bool,
+        has_changed_keys: bool,
+    ) -> SaveCurrentRunPlan:
+        return build_save_current_run_plan(
+            has_current_file=has_current_file,
+            has_current_model=has_current_model,
+            conflicts_resolved=conflicts_resolved,
+            has_changed_keys=has_changed_keys,
+        )
+
+    def persist_current_save(
+        self,
+        *,
+        path: Path,
+        parsed_file: ParsedFile,
+        changed_values: Mapping[str, str],
+        encoding: str,
+        callbacks: SaveCurrentCallbacks,
+    ) -> SaveCurrentResult:
+        return persist_current_save(
+            path=path,
+            parsed_file=parsed_file,
+            changed_values=changed_values,
+            encoding=encoding,
+            callbacks=callbacks,
+        )
+
+    def write_from_cache(
+        self,
+        path: Path,
+        encoding: str,
+        *,
+        cache_map: Mapping[int, CacheEntry],
+        callbacks: SaveFromCacheCallbacks,
+        hash_for_entry: Callable[[Entry], int],
+    ) -> SaveFromCacheResult:
+        return write_from_cache(
+            path,
+            encoding,
+            cache_map=cache_map,
+            callbacks=callbacks,
+            hash_for_entry=hash_for_entry,
+        )
+
+
+def prepare_open_file(
+    path: Path,
+    encoding: str,
+    *,
+    use_lazy_parser: bool,
+    callbacks: OpenFileCallbacks,
+    hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
+) -> OpenFileResult:
+    parsed = (
+        callbacks.parse_lazy(path, encoding)
+        if use_lazy_parser
+        else callbacks.parse_eager(path, encoding)
+    )
+    cache_map = callbacks.read_cache(path)
+    callbacks.touch_last_opened(path, callbacks.now_ts())
+    overlay = apply_cache_overlay(
+        parsed.entries,
+        cache_map,
+        hash_for_entry=lambda entry: hash_for_entry(entry, cache_map),
+    )
+    return OpenFileResult(parsed_file=parsed, cache_map=cache_map, overlay=overlay)
 
 
 def apply_cache_overlay(
@@ -178,3 +328,72 @@ def apply_cache_for_write(
             changed_values[next_entry.key] = rec.value
         new_entries.append(next_entry)
     return CacheWriteOverlay(entries=new_entries, changed_values=changed_values)
+
+
+def build_save_current_run_plan(
+    *,
+    has_current_file: bool,
+    has_current_model: bool,
+    conflicts_resolved: bool,
+    has_changed_keys: bool,
+) -> SaveCurrentRunPlan:
+    if not has_current_file or not has_current_model:
+        return SaveCurrentRunPlan(run_save=False, immediate_result=True)
+    if not conflicts_resolved:
+        return SaveCurrentRunPlan(run_save=False, immediate_result=False)
+    if not has_changed_keys:
+        return SaveCurrentRunPlan(run_save=False, immediate_result=True)
+    return SaveCurrentRunPlan(run_save=True, immediate_result=None)
+
+
+def persist_current_save(
+    *,
+    path: Path,
+    parsed_file: ParsedFile,
+    changed_values: Mapping[str, str],
+    encoding: str,
+    callbacks: SaveCurrentCallbacks,
+) -> SaveCurrentResult:
+    wrote_original = False
+    if changed_values:
+        callbacks.save_file(parsed_file, changed_values, encoding)
+        wrote_original = True
+    callbacks.write_cache(path, parsed_file.entries, callbacks.now_ts())
+    return SaveCurrentResult(
+        wrote_original=wrote_original,
+        wrote_cache=True,
+    )
+
+
+def write_from_cache(
+    path: Path,
+    encoding: str,
+    *,
+    cache_map: Mapping[int, CacheEntry],
+    callbacks: SaveFromCacheCallbacks,
+    hash_for_entry: Callable[[Entry], int],
+) -> SaveFromCacheResult:
+    if not any(entry.value is not None for entry in cache_map.values()):
+        return SaveFromCacheResult(
+            had_drafts=False,
+            wrote_original=False,
+            changed_values={},
+        )
+    try:
+        parsed = callbacks.parse_file(path, encoding)
+    except Exception as exc:
+        raise SaveFromCacheParseError(path=path, original=exc) from exc
+    overlay = apply_cache_for_write(
+        parsed.entries,
+        cache_map,
+        hash_for_entry=hash_for_entry,
+    )
+    parsed.entries = overlay.entries
+    if overlay.changed_values:
+        callbacks.save_file(parsed, overlay.changed_values, encoding)
+    callbacks.write_cache(path, parsed.entries)
+    return SaveFromCacheResult(
+        had_drafts=True,
+        wrote_original=bool(overlay.changed_values),
+        changed_values=overlay.changed_values,
+    )

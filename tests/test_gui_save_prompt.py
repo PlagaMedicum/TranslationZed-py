@@ -1,15 +1,18 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 pytest.importorskip("PySide6")
 
+from translationzed_py.core import parse
 from translationzed_py.core.status_cache import read as read_cache
+from translationzed_py.core.status_cache import write as write_cache
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
 
 
-def _make_project(tmp_path: Path) -> tuple[Path, Path]:
+def _make_project(tmp_path: Path) -> tuple[Path, Path, Path]:
     root = tmp_path / "proj"
     (root / "EN").mkdir(parents=True)
     (root / "BE").mkdir(parents=True)
@@ -20,9 +23,11 @@ def _make_project(tmp_path: Path) -> tuple[Path, Path]:
         "text = Belarusian,\ncharset = UTF-8,\n", encoding="utf-8"
     )
     (root / "EN" / "ui.txt").write_text('UI_YES = "Yes"\n', encoding="utf-8")
-    path = root / "BE" / "ui.txt"
-    path.write_text('UI_YES = "Так"\n', encoding="utf-8")
-    return root, path
+    ui_path = root / "BE" / "ui.txt"
+    ui_path.write_text('UI_YES = "Так"\n', encoding="utf-8")
+    menu_path = root / "BE" / "menu.txt"
+    menu_path.write_text('UI_MENU = "Меню"\n', encoding="utf-8")
+    return root, ui_path, menu_path
 
 
 def _edit_value(win: MainWindow, path: Path) -> None:
@@ -32,8 +37,15 @@ def _edit_value(win: MainWindow, path: Path) -> None:
     model.setData(model.index(0, 2), "Да")
 
 
+def _cache_draft_value(root: Path, path: Path, value: str) -> None:
+    pf = parse(path, encoding="utf-8")
+    first = pf.entries[0]
+    changed = replace(first, value=value)
+    write_cache(root, path, [changed], changed_keys={first.key})
+
+
 def test_prompt_cache_only_keeps_original(tmp_path, qtbot, monkeypatch):
-    root, path = _make_project(tmp_path)
+    root, path, _menu = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
     _edit_value(win, path)
@@ -56,7 +68,7 @@ def test_prompt_cache_only_keeps_original(tmp_path, qtbot, monkeypatch):
 
 
 def test_prompt_write_updates_original(tmp_path, qtbot, monkeypatch):
-    root, path = _make_project(tmp_path)
+    root, path, _menu = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
     _edit_value(win, path)
@@ -77,3 +89,56 @@ def test_prompt_write_updates_original(tmp_path, qtbot, monkeypatch):
     cached = read_cache(root, path)
     if cached:
         assert all(entry.value is None for entry in cached.values())
+
+
+def test_prompt_write_can_deselect_files(tmp_path, qtbot, monkeypatch):
+    root, ui_path, menu_path = _make_project(tmp_path)
+    _cache_draft_value(root, menu_path, "Супер меню")
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    _edit_value(win, ui_path)
+
+    captured_files: list[str] = []
+    selected_rel = str(menu_path.relative_to(root))
+
+    class FakeDialog:
+        def __init__(self, files, *_args, **_kwargs):
+            nonlocal captured_files
+            captured_files = list(files)
+            self._choice = "write"
+
+        def exec(self):
+            return None
+
+        def choice(self):
+            return self._choice
+
+        def selected_files(self):
+            return [selected_rel]
+
+    monkeypatch.setattr(mw, "SaveFilesDialog", FakeDialog)
+    win._request_write_original()
+
+    assert str(ui_path.relative_to(root)) in captured_files
+    assert selected_rel in captured_files
+    assert ui_path.read_text(encoding="utf-8") == 'UI_YES = "Так"\n'
+    assert menu_path.read_text(encoding="utf-8") == 'UI_MENU = "Супер меню"\n'
+
+
+def test_prompt_write_is_blocked_during_open_flow(tmp_path, qtbot, monkeypatch):
+    root, path, _menu = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    _edit_value(win, path)
+    win._open_flow_depth = 1
+
+    class FakeDialog:
+        def __init__(self, *_args, **_kwargs):
+            raise AssertionError(
+                "SaveFilesDialog should not open while read-flow guard is active"
+            )
+
+    monkeypatch.setattr(mw, "SaveFilesDialog", FakeDialog)
+    win._request_write_original()
+    assert path.read_text(encoding="utf-8") == 'UI_YES = "Так"\n'

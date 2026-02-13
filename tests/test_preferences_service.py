@@ -56,6 +56,12 @@ def test_normalize_scope_falls_back_to_file() -> None:
     assert normalize_scope("invalid") == "FILE"
 
 
+def test_preferences_service_normalize_scope_delegates_helper() -> None:
+    service = PreferencesService()
+    assert service.normalize_scope("locale") == "LOCALE"
+    assert service.normalize_scope("bad") == "FILE"
+
+
 def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
     raw = {
         "prompt_write_on_exit": True,
