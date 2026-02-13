@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import (
     QColor,
+    QPalette,
     QStaticText,
     QSyntaxHighlighter,
     QTextCharFormat,
@@ -157,21 +158,26 @@ _MAX_RENDER_LINES = 12
 MAX_VISUAL_CHARS = 100_000
 _DOC_CACHE_MAX = 256
 
-_TAG_FORMAT = QTextCharFormat()
-_TAG_FORMAT.setForeground(QColor("#2a6f97"))
-_ESCAPE_FORMAT = QTextCharFormat()
-_ESCAPE_FORMAT.setForeground(QColor("#6a4c93"))
-_WS_GLYPH_FORMAT = QTextCharFormat()
-_ws_glyph_color = QColor("#2f2f2f")
-_ws_glyph_color.setAlpha(220)
-_WS_GLYPH_FORMAT.setForeground(_ws_glyph_color)
-_WS_FORMAT = QTextCharFormat()
-_ws_repeat_color = QColor("#4a4a4a")
-_ws_repeat_color.setAlpha(220)
-_WS_FORMAT.setForeground(_ws_repeat_color)
-_ws_repeat_bg = QColor("#f0f0f0")
-_ws_repeat_bg.setAlpha(140)
-_WS_FORMAT.setBackground(_ws_repeat_bg)
+_TAG_LIGHT = QColor("#2a6f97")
+_TAG_DARK = QColor("#8bcfff")
+_TAG_SELECTED = QColor("#ffe58f")
+_ESCAPE_LIGHT = QColor("#6a4c93")
+_ESCAPE_DARK = QColor("#d7bbff")
+_ESCAPE_SELECTED = QColor("#ffd0ff")
+_WS_GLYPH_LIGHT = QColor("#5a5a5a")
+_WS_GLYPH_DARK = QColor("#aab3bf")
+_WS_GLYPH_SELECTED = QColor("#ffd48f")
+_WS_REPEAT_BG_LIGHT = QColor("#f0f0f0")
+_WS_REPEAT_BG_DARK = QColor("#ffffff")
+_WS_REPEAT_BG_SELECTED = QColor("#ffffff")
+
+
+@dataclass(frozen=True, slots=True)
+class _VisualFormats:
+    tag: QTextCharFormat
+    escape: QTextCharFormat
+    ws_glyph: QTextCharFormat
+    ws_repeat: QTextCharFormat
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +186,70 @@ class _DocCacheEntry:
     width: int
     height: int
     doc: QTextDocument
+
+
+def _is_dark_palette(palette: QPalette) -> bool:
+    base = palette.color(QPalette.Base)
+    text = palette.color(QPalette.Text)
+    return text.lightness() > base.lightness()
+
+
+def _alpha(color: QColor, value: int) -> QColor:
+    out = QColor(color)
+    out.setAlpha(value)
+    return out
+
+
+def _palette_cache_key(palette: QPalette) -> int | tuple[int, int, int, int]:
+    key_attr = getattr(palette, "cacheKey", None)
+    if callable(key_attr):
+        try:
+            return int(key_attr())
+        except Exception:
+            pass
+    return (
+        palette.color(QPalette.Base).rgba(),
+        palette.color(QPalette.Text).rgba(),
+        palette.color(QPalette.Highlight).rgba(),
+        palette.color(QPalette.HighlightedText).rgba(),
+    )
+
+
+def _build_visual_formats(
+    palette: QPalette,
+    *,
+    selected: bool,
+) -> _VisualFormats:
+    dark = _is_dark_palette(palette)
+    tag_color = _TAG_DARK if dark else _TAG_LIGHT
+    escape_color = _ESCAPE_DARK if dark else _ESCAPE_LIGHT
+    ws_color = _WS_GLYPH_DARK if dark else _WS_GLYPH_LIGHT
+    ws_repeat_bg = _WS_REPEAT_BG_DARK if dark else _WS_REPEAT_BG_LIGHT
+    if selected:
+        tag_color = _TAG_SELECTED
+        escape_color = _ESCAPE_SELECTED
+        ws_color = _WS_GLYPH_SELECTED
+        ws_repeat_bg = _WS_REPEAT_BG_SELECTED
+
+    tag_fmt = QTextCharFormat()
+    tag_fmt.setForeground(tag_color)
+
+    escape_fmt = QTextCharFormat()
+    escape_fmt.setForeground(escape_color)
+
+    ws_glyph_fmt = QTextCharFormat()
+    ws_glyph_fmt.setForeground(_alpha(ws_color, 240))
+
+    ws_repeat_fmt = QTextCharFormat()
+    ws_repeat_fmt.setForeground(_alpha(ws_color, 235))
+    ws_repeat_fmt.setBackground(_alpha(ws_repeat_bg, 70 if selected else 120))
+
+    return _VisualFormats(
+        tag=tag_fmt,
+        escape=escape_fmt,
+        ws_glyph=ws_glyph_fmt,
+        ws_repeat=ws_repeat_fmt,
+    )
 
 
 def _apply_whitespace_option(doc: QTextDocument, enabled: bool) -> None:
@@ -198,16 +268,23 @@ def _apply_whitespace_option(doc: QTextDocument, enabled: bool) -> None:
 
 
 def _apply_visual_formats(
-    doc: QTextDocument, text: str, *, highlight: bool, show_ws: bool
+    doc: QTextDocument,
+    text: str,
+    *,
+    highlight: bool,
+    show_ws: bool,
+    palette: QPalette,
+    selected: bool,
 ) -> None:
     if not text:
         return
+    formats = _build_visual_formats(palette, selected=selected)
     if show_ws:
         cursor = QTextCursor(doc)
         for match in _WS_GLYPH_RE.finditer(text):
             cursor.setPosition(match.start())
             cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
-            cursor.mergeCharFormat(_WS_GLYPH_FORMAT)
+            cursor.mergeCharFormat(formats.ws_glyph)
     if not highlight:
         return
     cursor = QTextCursor(doc)
@@ -215,15 +292,15 @@ def _apply_visual_formats(
         for match in regex.finditer(text):
             cursor.setPosition(match.start())
             cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
-            cursor.mergeCharFormat(_TAG_FORMAT)
+            cursor.mergeCharFormat(formats.tag)
     for match in _ESCAPE_RE.finditer(text):
         cursor.setPosition(match.start())
         cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
-        cursor.mergeCharFormat(_ESCAPE_FORMAT)
+        cursor.mergeCharFormat(formats.escape)
     for match in _WS_RE.finditer(text):
         cursor.setPosition(match.start())
         cursor.setPosition(match.end(), QTextCursor.KeepAnchor)
-        cursor.mergeCharFormat(_WS_FORMAT)
+        cursor.mergeCharFormat(formats.ws_repeat)
 
 
 class TextVisualHighlighter(QSyntaxHighlighter):
@@ -231,29 +308,37 @@ class TextVisualHighlighter(QSyntaxHighlighter):
         self,
         doc: QTextDocument,
         options_provider: Callable[[], tuple[bool, bool, bool]],
+        palette_provider: Callable[[], QPalette] | None = None,
     ):
         super().__init__(doc)
         self._options_provider = options_provider
+        self._palette_provider = palette_provider or QApplication.palette
 
     def highlightBlock(self, text: str) -> None:  # noqa: N802
         show_ws, highlight, optimize = self._options_provider()
         if optimize and self.document().characterCount() >= MAX_VISUAL_CHARS:
             show_ws = False
             highlight = False
+        palette = self._palette_provider()
+        formats = _build_visual_formats(palette, selected=False)
         if show_ws:
             for match in _WS_GLYPH_RE.finditer(text):
                 self.setFormat(
-                    match.start(), match.end() - match.start(), _WS_GLYPH_FORMAT
+                    match.start(), match.end() - match.start(), formats.ws_glyph
                 )
         if not highlight:
             return
         for regex in (_TAG_RE, _BRACKET_TAG_RE, _PLACEHOLDER_RE):
             for match in regex.finditer(text):
-                self.setFormat(match.start(), match.end() - match.start(), _TAG_FORMAT)
+                self.setFormat(match.start(), match.end() - match.start(), formats.tag)
         for match in _ESCAPE_RE.finditer(text):
-            self.setFormat(match.start(), match.end() - match.start(), _ESCAPE_FORMAT)
+            self.setFormat(
+                match.start(), match.end() - match.start(), formats.escape
+            )
         for match in _WS_RE.finditer(text):
-            self.setFormat(match.start(), match.end() - match.start(), _WS_FORMAT)
+            self.setFormat(
+                match.start(), match.end() - match.start(), formats.ws_repeat
+            )
 
 
 class VisualTextDelegate(MultiLineEditDelegate):
@@ -286,6 +371,7 @@ class VisualTextDelegate(MultiLineEditDelegate):
             text,
             width,
             font.key(),
+            _palette_cache_key(palette),
             show_ws,
             highlight,
             selected,
@@ -307,7 +393,14 @@ class VisualTextDelegate(MultiLineEditDelegate):
         else:
             base_format.setForeground(palette.text())
         cursor.mergeCharFormat(base_format)
-        _apply_visual_formats(doc, text, highlight=highlight, show_ws=show_ws)
+        _apply_visual_formats(
+            doc,
+            text,
+            highlight=highlight,
+            show_ws=show_ws,
+            palette=palette,
+            selected=selected,
+        )
         entry = _DocCacheEntry(
             text=text, width=width, height=int(doc.size().height()), doc=doc
         )
@@ -322,7 +415,9 @@ class VisualTextDelegate(MultiLineEditDelegate):
             show_ws, _highlight, _optimize = self._options_provider()
             _apply_whitespace_option(editor.document(), show_ws)
             editor._text_visual_highlighter = TextVisualHighlighter(  # type: ignore[attr-defined]
-                editor.document(), self._options_provider
+                editor.document(),
+                self._options_provider,
+                palette_provider=editor.palette,
             )
         return editor
 

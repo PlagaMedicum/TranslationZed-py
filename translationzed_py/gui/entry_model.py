@@ -23,9 +23,9 @@ _BG_STATUS_LIGHT = {
     Status.FOR_REVIEW: QColor("#ffd8a8"),
 }
 _BG_STATUS_DARK = {
-    Status.TRANSLATED: QColor("#2b5736"),
-    Status.PROOFREAD: QColor("#2c4969"),
-    Status.FOR_REVIEW: QColor("#6a4a22"),
+    Status.TRANSLATED: QColor("#1f4629"),
+    Status.PROOFREAD: QColor("#203a57"),
+    Status.FOR_REVIEW: QColor("#543717"),
 }
 _BG_MISSING_LIGHT = QColor("#ffcccc")
 _BG_MISSING_DARK = QColor("#7a2f2f")
