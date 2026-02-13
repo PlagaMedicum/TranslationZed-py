@@ -168,6 +168,29 @@ def test_theme_mode_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
     assert "UI_THEME_MODE" not in extras
 
 
+def test_apply_theme_mode_clears_delegate_visual_caches(tmp_path, qtbot, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        win._source_delegate,
+        "clear_visual_cache",
+        lambda: calls.append("source"),
+    )
+    monkeypatch.setattr(
+        win._value_delegate,
+        "clear_visual_cache",
+        lambda: calls.append("value"),
+    )
+
+    win._apply_theme_mode("LIGHT", persist=False)
+    assert sorted(calls) == ["source", "value"]
+
+
 def test_system_theme_change_reapplies_only_for_system_mode(
     tmp_path, qtbot, monkeypatch
 ):

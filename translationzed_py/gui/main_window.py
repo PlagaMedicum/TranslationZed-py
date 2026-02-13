@@ -1079,9 +1079,20 @@ class MainWindow(QMainWindow):
         detail_counter_row = QHBoxLayout()
         detail_counter_row.setContentsMargins(0, 0, 0, 0)
         detail_counter_row.setSpacing(4)
+        self._detail_inline_toggle = QToolButton(self._detail_panel)
+        self._detail_inline_toggle.setAutoRaise(True)
+        self._detail_inline_toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self._detail_inline_toggle.clicked.connect(
+            lambda: self.detail_toggle.setChecked(False)
+        )
+        self._detail_inline_toggle.setVisible(False)
+        detail_counter_row.addWidget(self._detail_inline_toggle)
         detail_counter_row.addStretch(1)
         self._detail_counter_label = QLabel("", self._detail_panel)
         self._detail_counter_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._detail_counter_label.setToolTip(
+            "Character counts: S = source, T = translation, Delta = T - S."
+        )
         detail_counter_row.addWidget(self._detail_counter_label)
         detail_layout.addLayout(detail_counter_row)
         self._set_detail_char_counts(None, None)
@@ -1234,16 +1245,22 @@ class MainWindow(QMainWindow):
         return widget, action, scope
 
     def _update_detail_toggle(self, visible: bool) -> None:
+        show_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
+        hide_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
         if visible:
-            self.detail_toggle.setIcon(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
-            )
+            self.detail_toggle.setIcon(hide_icon)
             self.detail_toggle.setToolTip("Hide string editor")
+            self._detail_inline_toggle.setIcon(hide_icon)
+            self._detail_inline_toggle.setToolTip("Hide string editor")
+            self._detail_inline_toggle.setVisible(True)
+            self.detail_toggle.setVisible(False)
         else:
-            self.detail_toggle.setIcon(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
-            )
+            self.detail_toggle.setIcon(show_icon)
             self.detail_toggle.setToolTip("Show string editor")
+            self._detail_inline_toggle.setIcon(show_icon)
+            self._detail_inline_toggle.setToolTip("Show string editor")
+            self._detail_inline_toggle.setVisible(False)
+            self.detail_toggle.setVisible(True)
 
     def _toggle_detail_panel(self, checked: bool) -> None:
         min_height = max(70, self._detail_min_height)
@@ -1351,6 +1368,9 @@ class MainWindow(QMainWindow):
             delta_text = f"{translation_chars - source_chars:+d}"
         self._detail_counter_label.setText(
             f"S: {source_text} | T: {translation_text} | Delta: {delta_text}"
+        )
+        self._detail_counter_label.setToolTip(
+            "Character counts: S = source, T = translation, Delta = T - S."
         )
 
     def _refresh_detail_translation_count(self) -> None:
@@ -2236,11 +2256,24 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app is not None:
             normalized = _apply_app_theme(app, normalized)
+        source_delegate = getattr(self, "_source_delegate", None)
+        value_delegate = getattr(self, "_value_delegate", None)
+        for delegate in (source_delegate, value_delegate):
+            if delegate is None:
+                continue
+            clear_cache = getattr(delegate, "clear_visual_cache", None)
+            if callable(clear_cache):
+                clear_cache()
         self._theme_mode = normalized
         if normalized == _THEME_SYSTEM:
             self._prefs_extras.pop("UI_THEME_MODE", None)
         else:
             self._prefs_extras["UI_THEME_MODE"] = normalized
+        if hasattr(self, "_detail_source") and hasattr(self, "_detail_translation"):
+            self._apply_text_visual_options()
+        table = getattr(self, "table", None)
+        if table is not None and table.viewport():
+            self.table.viewport().update()
         if persist:
             self._persist_preferences()
 

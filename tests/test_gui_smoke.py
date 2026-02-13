@@ -52,6 +52,7 @@ def test_detail_editor_shows_live_char_counts(qtbot, tmp_path: Path):
         lambda: "S: 5" in win._detail_counter_label.text(),
         timeout=1000,
     )
+    assert "S = source" in win._detail_counter_label.toolTip()
     assert "T: 2" in win._detail_counter_label.text()
     assert "Delta: -3" in win._detail_counter_label.text()
 

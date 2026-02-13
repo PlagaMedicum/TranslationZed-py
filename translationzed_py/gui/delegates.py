@@ -356,6 +356,9 @@ class VisualTextDelegate(MultiLineEditDelegate):
         self._doc = QTextDocument()
         self._doc_cache: OrderedDict[tuple, _DocCacheEntry] = OrderedDict()
 
+    def clear_visual_cache(self) -> None:
+        self._doc_cache.clear()
+
     def _get_cached_doc(
         self,
         text: str,
