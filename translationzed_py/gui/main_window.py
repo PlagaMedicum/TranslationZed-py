@@ -1076,32 +1076,12 @@ class MainWindow(QMainWindow):
             self._on_detail_translation_changed
         )
         detail_layout.addWidget(self._detail_translation)
-        detail_counter_row = QHBoxLayout()
-        detail_counter_row.setContentsMargins(0, 0, 0, 0)
-        detail_counter_row.setSpacing(4)
-        self._detail_inline_toggle = QToolButton(self._detail_panel)
-        self._detail_inline_toggle.setAutoRaise(True)
-        self._detail_inline_toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
-        self._detail_inline_toggle.clicked.connect(
-            lambda: self.detail_toggle.setChecked(False)
-        )
-        self._detail_inline_toggle.setVisible(False)
-        detail_counter_row.addWidget(self._detail_inline_toggle)
-        detail_counter_row.addStretch(1)
-        self._detail_counter_label = QLabel("", self._detail_panel)
-        self._detail_counter_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._detail_counter_label.setToolTip(
-            "Character counts: S = source, T = translation, Delta = T - S."
-        )
-        detail_counter_row.addWidget(self._detail_counter_label)
-        detail_layout.addLayout(detail_counter_row)
-        self._set_detail_char_counts(None, None)
         margins = detail_layout.contentsMargins()
         label_total = (
             self._detail_source_label.sizeHint().height()
             + self._detail_translation_label.sizeHint().height()
         )
-        counter_height = self._detail_counter_label.sizeHint().height()
+        counter_height = 0
         self._detail_min_height = (
             margins.top()
             + margins.bottom()
@@ -1206,6 +1186,12 @@ class MainWindow(QMainWindow):
         self.detail_toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
         self._update_detail_toggle(False)
         self.detail_toggle.toggled.connect(self._toggle_detail_panel)
+        self._detail_counter_label = QLabel("", self)
+        self._detail_counter_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._detail_counter_label.setToolTip(
+            "Character counts: S = source, T = translation, Delta = T - S."
+        )
+        self.statusBar().addPermanentWidget(self._detail_counter_label)
         self.statusBar().addPermanentWidget(self.detail_toggle)
         self.detail_toggle.setChecked(True)
         (
@@ -1220,6 +1206,7 @@ class MainWindow(QMainWindow):
         ) = self._build_scope_indicator("edit-find-replace", "Replace scope")
         self.statusBar().addPermanentWidget(self._search_scope_widget)
         self.statusBar().addPermanentWidget(self._replace_scope_widget)
+        self._set_detail_char_counts(None, None)
         self._update_status_bar()
         self._apply_text_visual_options()
 
@@ -1250,17 +1237,9 @@ class MainWindow(QMainWindow):
         if visible:
             self.detail_toggle.setIcon(hide_icon)
             self.detail_toggle.setToolTip("Hide string editor")
-            self._detail_inline_toggle.setIcon(hide_icon)
-            self._detail_inline_toggle.setToolTip("Hide string editor")
-            self._detail_inline_toggle.setVisible(True)
-            self.detail_toggle.setVisible(False)
         else:
             self.detail_toggle.setIcon(show_icon)
             self.detail_toggle.setToolTip("Show string editor")
-            self._detail_inline_toggle.setIcon(show_icon)
-            self._detail_inline_toggle.setToolTip("Show string editor")
-            self._detail_inline_toggle.setVisible(False)
-            self.detail_toggle.setVisible(True)
 
     def _toggle_detail_panel(self, checked: bool) -> None:
         min_height = max(70, self._detail_min_height)
