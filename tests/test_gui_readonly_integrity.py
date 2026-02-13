@@ -7,6 +7,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from translationzed_py.gui import MainWindow
+from translationzed_py.gui import main_window as mw
 
 
 def _make_project(
@@ -96,3 +97,28 @@ def test_locale_switch_without_edit_keeps_bytes_for_each_file(
 
     assert ru_path.read_bytes() == ru_before
     assert ko_path.read_bytes() == ko_before
+
+
+def test_open_flow_never_calls_original_saver(
+    tmp_path: Path, qtbot, monkeypatch
+) -> None:
+    root, file_path = _make_project(
+        tmp_path,
+        locale="BE",
+        charset="UTF-8",
+        payload='UI_OK = "Прывітанне"\n',
+    )
+    calls = {"save": 0}
+
+    def _fake_save(*_args, **_kwargs):
+        calls["save"] += 1
+        raise AssertionError("Open flow must not call saver.save")
+
+    monkeypatch.setattr(mw, "save", _fake_save)
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    index = win.fs_model.index_for_path(file_path)
+    win._file_chosen(index)
+
+    assert calls["save"] == 0

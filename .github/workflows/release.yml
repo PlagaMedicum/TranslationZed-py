@@ -24,6 +24,10 @@ jobs:
         run: |
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
+      - name: Encoding integrity suite
+        run: make test-encoding-integrity
+      - name: Encoding diagnostics (fixture corpus)
+        run: make diagnose-encoding
       - name: Verify project quality gates
         run: make verify
       - name: Validate release tag/version/changelog alignment

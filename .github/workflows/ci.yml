@@ -31,5 +31,9 @@ jobs:
         run: make lint
       - name: Typecheck
         run: make typecheck
+      - name: Encoding integrity suite
+        run: make test-encoding-integrity
+      - name: Encoding diagnostics (fixture corpus)
+        run: make diagnose-encoding
       - name: Tests
         run: make test
