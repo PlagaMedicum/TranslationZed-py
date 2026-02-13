@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-09_
+_Last updated: 2026-02-13_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.5.0 is shipped; this plan now
@@ -39,7 +39,8 @@ UI edit (value or status)
   -> file tree shows "●" if draft values exist
 
 User "Save" (write originals)
-  -> prompt Write / Cache only / Cancel (opened files only)
+  -> prompt Write / Cache only / Cancel (all draft files in selected locales)
+  -> prompt supports per-file deselection before write
   -> on Write: saver patches raw bytes, atomic replace (+fsync)
   -> cache rewritten (status only; draft values cleared)
 ```
@@ -152,10 +153,11 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 ### Step 10 — Save flows + prompts [✓]
 - Touchpoints: `gui/main_window.py`, `gui/dialogs.py`
 - Acceptance:
-  - Ctrl+S prompt shows only opened files with draft values
+  - Ctrl+S prompt shows all draft files in selected locales
+  - Prompt list is checkable; user may skip specific files per write
   - “Cache only” keeps drafts, “Write” patches originals
   - Exit prompt controlled by preference
-  - Locale switch writes cache only (no prompt)
+  - Locale switch writes **Cache only** (no prompt)
 
 ### Step 11 — Preferences + View toggles [✓]
 - Touchpoints: `core/preferences.py`, `gui/main_window.py`, `.tzp/config/settings.env`
@@ -221,6 +223,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Touchpoints: `gui/main_window.py`
 - Acceptance:
   - Optional lower pane with two large text boxes (Source read‑only, Translation editable)
+  - Bottom-right detail counter shows live Source/Translation character counts and Translation delta vs Source
   - Pane toggle placed in the **bottom bar**, default **open**
   - Table remains visible above; selection syncs into the detail editors
   - Editing in detail Translation updates the table and undo stack
@@ -364,8 +367,8 @@ Out of scope for v0.6.0:
 Execution order for v0.6.0 (strict sequence):
 1. Close `A‑P0` first: no-write-on-open guard, read-only encoding diagnostics,
    and CI gate for byte-preservation invariants.
-2. Finish `A0` extraction: complete remaining `main_window` orchestration moves,
-   then freeze service boundaries before feature expansion.
+2. Keep `A0` boundaries frozen: no new domain rules in `main_window`,
+   and require adapter tests for every new workflow touchpoint.
 3. Complete `A7` latency stabilization: remaining row-resize burst assertions and
    large-file GUI regression tests.
 4. Advance `C1` TM robustness: ranking diagnostics assertions, production-max
@@ -380,19 +383,24 @@ A‑P0 [→] **Encoding integrity conflicts + no-write-on-open guarantee** (**hi
    - **Impact**: silent data corruption risk, trust loss, noisy diffs, and release blockers.
    - **Target**: opening/reading must be strictly non-mutating; encoding is preserved unless user explicitly saves edited content.
    - **Tasks**:
-     - [ ] Add explicit open-path guard: no writer/saver/cache-to-original path can run during read/open flows.
+     - [✓] Add explicit open-path guard: no writer/saver/cache-to-original path can run during read/open flows.
      - [✓] Add cross-encoding integration tests for open -> close -> byte-identical result:
        UTF-8, CP1251, UTF-16 LE/BE, UTF-16 BOM-less (only when `language.txt` allows).
      - [✓] Add regression tests for line-ending preservation (`LF`/`CRLF`) when no edit is applied.
      - [✓] Add regression test for locale switch + auto-open path to ensure no implicit writes.
-     - [ ] Add diagnostics command/log output that reports detected encoding mismatches/conflicts (read-only report).
-     - [ ] Add CI gate for encoding-integrity suite before release tag pipeline.
+     - [✓] Add diagnostics command/log output that reports detected encoding mismatches/conflicts (read-only report):
+       `make diagnose-encoding` (fixture default, optional explicit root).
+     - [✓] Add CI gate for encoding-integrity suite before release tag pipeline:
+       explicit `make test-encoding-integrity` + `make diagnose-encoding` steps in CI/release workflows.
+     - [✓] Add repo-clean read-only guard target:
+       `make test-readonly-clean` snapshots tracked `git status`, runs read-only workflows,
+       and fails if tracked state changes.
    - **Acceptance**:
-     - [ ] Zero file-byte deltas after open/switch/close without edits on all supported encodings.
-     - [ ] `git status` stays clean after read-only workflows on fixture corpora.
-     - [ ] No auto-conversion of encoding/BOM/EOL unless explicit save with changed content.
+     - [✓] Zero file-byte deltas after open/switch/close without edits on all supported encodings.
+     - [✓] `git status` stays clean after read-only workflows on fixture corpora.
+     - [✓] No auto-conversion of encoding/BOM/EOL unless explicit save with changed content.
 
-A0 [→] **Main-window declutter + explicit application layer (Clean architecture)**
+A0 [✓] **Main-window declutter + explicit application layer (Clean architecture)**
    - **Problem**: orchestration is concentrated in `gui/main_window.py`, blending UI,
      file/session orchestration, persistence, conflict logic, TM flows, and perf controls.
    - **Impact**: fragile changes, high regression risk, slower feature delivery, and weak
@@ -400,7 +408,7 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
    - **Target**: move non-UI orchestration into explicit application services with strict
      dependency direction (GUI -> application -> core/infrastructure adapters).
    - **Mini-steps (ordered)**:
-     - [ ] Define service boundaries and dependency contracts:
+    - [✓] Define service boundaries and dependency contracts:
        - [✓] `ProjectSessionService` (open/switch locale, auto-open policy).
        - [✓] `FileWorkflowService` (parse/cache overlay/save/write conflict gate).
        - [✓] `ConflictService` (detect, merge decisions, status rules).
@@ -408,51 +416,221 @@ A0 [→] **Main-window declutter + explicit application layer (Clean architectur
        - [✓] `PreferencesService` (bootstrap/load/save and root policy).
        - [✓] `TMWorkflowService` (TM pending queue + query planning + query cache policy).
        - [✓] `RenderWorkflowService` (large-file decisions + visible/prefetch span policy).
-     - [ ] Introduce thin DTOs/interfaces so services stay Qt-free.
-     - [ ] Move one workflow at a time from `main_window` into services:
+    - [✓] Introduce thin DTOs/interfaces so services stay Qt-free.
+     - [✓] Move one workflow at a time from `main_window` into services:
        1) preferences + startup root/bootstrap,
        2) locale/session switching,
        3) file open/save/cache write,
        4) conflict orchestration,
        5) search/replace scope execution.
        6) TM sidebar presentation flow (list/preview/apply wiring).
-     - [ ] Keep GUI methods as adapters only (signal wiring + rendering state).
-     - [ ] Add integration tests per extracted service boundary before each next extraction.
+     - [✓] Keep GUI methods as adapters only (signal wiring + rendering state)
+       for the v0.6 workflow scope listed in this section.
+     - [✓] Add integration tests per extracted service boundary before each next extraction.
    - **Implemented slices so far**:
      - [✓] TM import-folder sync/query/preferences/rebuild workflows extracted into
        Qt-free `core.tm_*` services.
      - [✓] Save/exit write orchestration extracted into Qt-free
        `core.save_exit_flow` (`Write Original` + `closeEvent` decision flow).
+     - [✓] Save-batch write sequencing delegated through
+       `core.save_exit_flow.run_save_batch_flow`
+       (current-file-first, abort-on-current-failure, cache-write failure aggregation).
+     - [✓] Save dialog file-list policy delegated through
+       `core.save_exit_flow` helpers
+       (`build_save_dialog_labels`, `apply_save_dialog_selection`,
+       `format_save_failures`); GUI now only renders dialog widgets.
+     - [✓] Save-batch post-run UI plan delegated through
+       `core.save_exit_flow.build_save_batch_render_plan`
+       (abort/failure/success render intent; GUI only shows dialog/status).
+     - [✓] Save/exit helper calls routed through
+       `SaveExitFlowService` instance methods (write-original action, save-batch
+       run/render, close acceptance); `main_window` no longer imports save-exit
+       module helpers directly.
      - [✓] Conflict resolution policy extracted into Qt-free `core.conflict_service`
        (drop-cache/drop-original/merge plan computation + merge entry-update helper).
      - [✓] Session cache-scan/auto-open helpers extracted into Qt-free
        `core.project_session` (draft discovery + last-opened candidate selection).
      - [✓] Session orchestration extraction continued with `ProjectSessionService`
        (draft discovery, auto-open candidate selection, orphan-cache detection).
+     - [✓] Orphan-cache warning presentation policy delegated through
+       `ProjectSessionService.build_orphan_cache_warning`
+       (root-relative preview text + truncation policy); GUI renders dialog only.
+     - [✓] Cache-migration schedule/batch planning delegated through
+       `ProjectSessionService`
+       (`build_cache_migration_schedule_plan`, `build_cache_migration_batch_plan`);
+       GUI now executes migration callbacks and timer/status rendering only.
+     - [✓] Cache-migration execution policy delegated through
+       `ProjectSessionService`
+       (`execute_cache_migration_schedule`, `execute_cache_migration_batch`)
+       using callback DTOs for migrate/warn/timer/status side-effects.
+     - [✓] Locale/session selection policy delegated through
+       `ProjectSessionService` (startup locale-request resolution, selected-locale normalization,
+       and lazy-tree mode decision).
+     - [✓] Locale-switch planning delegated through
+       `ProjectSessionService.build_locale_selection_plan` (empty-selection reject + no-op detection).
+     - [✓] Locale-switch apply intent delegated through
+       `ProjectSessionService.build_locale_switch_plan` (`should_apply`, reset/schedule flags).
+     - [✓] Post-locale startup task planning delegated through
+       `ProjectSessionService.build_post_locale_startup_plan`
+       (schedule decision + ordered cache-scan/auto-open flags).
+     - [✓] Post-locale startup execution ordering delegated through
+       `ProjectSessionService.run_post_locale_startup_tasks`, with one-shot
+       pending-plan execution in GUI (plan built once on schedule, then applied).
+     - [✓] Tree rebuild render-intent planning delegated through
+       `ProjectSessionService.build_tree_rebuild_plan`
+       (`lazy_tree`, `expand_all`, `preload_single_root`, `resize_splitter`).
+     - [✓] Locale reset intent delegated through
+       `ProjectSessionService.build_locale_reset_plan`
+       (explicit clear/reset flags for session maps, current model/file, and status/table reset).
+     - [✓] Locale reset-plan execution delegated through
+       `ProjectSessionService.apply_locale_reset_plan`
+       (GUI now passes state-clear callbacks instead of branching on reset flags directly).
      - [✓] File workflow cache-overlay/save helpers extracted into Qt-free
        `core.file_workflow` (open-path cache apply + write-from-cache planning).
+     - [✓] Open-file parse/cache/timestamp orchestration delegated through
+       `core.file_workflow.prepare_open_file` using Qt-free callback DTO
+       (`OpenFileCallbacks`) and result DTO (`OpenFileResult`).
+     - [✓] Save-from-cache parse/overlay/write/cache sequencing delegated through
+       `core.file_workflow.write_from_cache` using Qt-free callback DTO
+       (`SaveFromCacheCallbacks`) and parse-boundary exception (`SaveFromCacheParseError`).
+     - [✓] Save-current run gating + persistence sequencing delegated through
+       `core.file_workflow.build_save_current_run_plan` +
+       `core.file_workflow.persist_current_save`
+       (conflict/check preconditions + save/write-cache callbacks in Qt-free service).
      - [✓] Main-window adapter now delegates cache-overlay and cache-for-write
        paths via `FileWorkflowService`.
      - [✓] Search/replace scope and traversal helpers extracted into Qt-free
        `core.search_replace_service` (scope resolution + replace transform helpers).
      - [✓] Cross-file search traversal is now delegated through
        `SearchReplaceService.search_across_files`.
+     - [✓] Search panel result label formatting delegated through
+       `SearchReplaceService.search_result_label` (relative path + row + one-line preview).
+     - [✓] Search panel result-list planning delegated through
+       `SearchReplaceService.build_search_panel_plan`
+       (result truncation + status-message policy).
+     - [✓] Search run request planning delegated through
+       `SearchReplaceService.build_search_run_plan`
+       (query/files/field flags/anchor-path+row setup).
+     - [✓] Search helper calls fully routed through `SearchReplaceService`
+       instance methods (`scope_files`, `search_spec_for_column`,
+       `find_match_in_rows`); GUI no longer imports module-level search helpers.
+     - [✓] GUI adapter delegation tests added for extracted boundaries:
+       open-file workflow, locale-switch plan, save-batch orchestration,
+       conflict prompt policy, and search-run planning
+       (`tests/test_gui_service_adapters.py`).
      - [✓] Replace-all counting/apply orchestration is delegated through
        `SearchReplaceService` helpers (`build_replace_all_plan` / `apply_replace_all`).
+     - [✓] Replace-all run-policy planning delegated through
+       `SearchReplaceService.build_replace_all_run_plan`
+       (scope-label + multi-file confirmation/skip decisions).
+     - [✓] File-level replace-all parse/cache/write orchestration delegated through
+       `SearchReplaceService.count_replace_all_in_file` +
+       `SearchReplaceService.apply_replace_all_in_file`
+       (cache-overlay replacement source, translated-status promotion on changed text,
+       parse-boundary exception, and cache-write callback handoff).
+     - [✓] Model-row replace-all counting/apply orchestration delegated through
+       `SearchReplaceService.count_replace_all_in_rows` +
+       `SearchReplaceService.apply_replace_all_in_rows`
+       (row iteration and row writes are callback-driven; regex error handling remains GUI-side).
+     - [✓] Single-row replace request/build and apply orchestration delegated through
+       `SearchReplaceService.build_replace_request` +
+       `SearchReplaceService.apply_replace_in_row`
+       (query compile/group-ref policy in service; GUI remains adapter for invalid-regex warning).
+     - [✓] Search row-cache lookup/store policy delegated through
+       `SearchReplaceService.build_rows_cache_lookup_plan` +
+       `SearchReplaceService.build_rows_cache_store_plan`
+       (stamp comparison, cache-hit decision, and store gating are service-owned).
+     - [✓] Search row-cache stamp collection delegated through
+       `SearchReplaceService.collect_rows_cache_stamp`
+       (file/cache/source mtime collection policy with include-source/include-value gating).
+     - [✓] Search row-source selection policy delegated through
+       `SearchReplaceService.build_rows_source_plan`
+       (locale gating + current-model-vs-cached-file row source decision).
+     - [✓] Search row materialization delegated through
+       `SearchReplaceService.build_search_rows`
+       (cache-overlay value projection + source lookup fallback + list/generator threshold).
+     - [✓] File-backed search-row load orchestration delegated through
+       `SearchReplaceService.load_search_rows_from_file`
+       (lazy/eager parser selection, source-lookup callback handoff,
+       value-cache read gating, and parse-failure fallback policy).
+     - [✓] Search match-selection policy delegated through
+       `SearchReplaceService.build_match_open_plan` +
+       `SearchReplaceService.build_match_apply_plan`
+       (target-file-open intent and final row-selection validity decisions).
      - [✓] Preferences/root-policy helpers extracted into Qt-free
        `core.preferences_service` (startup-root resolution + normalize/persist payload helpers).
      - [✓] Main-window preference I/O orchestration delegated through
        `PreferencesService` (startup resolution, defaults bootstrap, persist path).
+     - [✓] Scope normalization in preferences-apply flow delegated through
+       `PreferencesService.normalize_scope`; GUI no longer imports
+       `core.preferences_service.normalize_scope` directly.
      - [✓] Conflict action orchestration now routes through
        `ConflictWorkflowService` (drop-cache/drop-original/merge resolution + apply hook).
+     - [✓] Conflict prompt policy delegated through
+       `ConflictWorkflowService.build_prompt_plan` +
+       `ConflictWorkflowService.normalize_choice`
+       (GUI handles dialog rendering only).
+     - [✓] Conflict dialog-choice action dispatch delegated through
+       `ConflictWorkflowService.execute_choice`
+       (drop-cache/drop-original/merge callback routing; cancel handling in service).
+     - [✓] Conflict resolution precondition gating delegated through
+       `ConflictWorkflowService.build_resolution_run_plan`
+       (current-file/model/path checks + merge no-conflict immediate-result policy).
+     - [✓] Conflict merge orchestration delegated through
+       `ConflictWorkflowService.execute_merge_resolution`
+       (merge-row build, UI resolution callback handoff, merge resolution/apply pipeline).
+     - [✓] Conflict resolution persistence policy delegated through
+       `ConflictWorkflowService.execute_persist_resolution`
+       (cache-write payload + clean/reload/clear execution policy for post-resolution handling).
      - [✓] TM query/pending orchestration delegated through
-       `TMWorkflowService` (cache key planning, pending batch flush, stale result guard).
+       `TMWorkflowService` (cache key planning, pending batch flush, stale result guard,
+       query-request construction for async DB lookups, and filter-policy normalization).
+     - [✓] TM lookup/apply normalization delegated through
+       `TMWorkflowService` (`build_lookup` + `build_apply_plan`).
+     - [✓] TM sidebar presentation policy delegated through
+       `TMWorkflowService` (query-term extraction for preview highlights and
+       suggestion list view-model formatting/status messages).
+     - [✓] TM selection-preview/apply-state policy delegated through
+       `TMWorkflowService.build_selection_plan`
+       (selected match -> apply enable + source/target preview payload + query terms).
+     - [✓] TM diagnostics report composition delegated through
+       `TMWorkflowService` (`build_query_request_for_lookup` +
+       `build_diagnostics_report`) so GUI only orchestrates I/O and dialog display.
+     - [✓] TM diagnostics query execution policy delegated through
+       `TMWorkflowService.build_diagnostics_report_with_query`
+       (GUI passes `TMStore.query` callback only; service owns lookup request shaping).
+     - [✓] TM diagnostics store orchestration delegated through
+       `TMWorkflowService.diagnostics_report_for_store`
+       (GUI no longer fetches diagnostics import-file state directly).
+     - [✓] TM update debounce/activation policy delegated through
+       `TMWorkflowService.build_update_plan`
+       (service decides whether TM refresh can run and whether timer restart is needed).
+     - [✓] TM refresh orchestration delegated through
+       `TMWorkflowService.build_refresh_plan`
+       (service combines run gating + current-file flush intent + TM query-plan selection).
+     - [✓] TM-preferences action helpers are now routed through
+       `TMWorkflowService` (`build_preferences_actions` +
+       `apply_preferences_actions`), so `main_window` no longer imports
+       `core.tm_preferences` helper functions directly.
+     - [✓] TM import-folder sync orchestration now routes through
+       `TMWorkflowService.sync_import_folder`, so `main_window` no longer
+       imports `core.tm_import_sync.sync_import_folder` directly.
+     - [✓] TM rebuild-locale collection now routes through
+       `TMWorkflowService.collect_rebuild_locales`, so `main_window` no longer
+       imports `core.tm_rebuild.collect_rebuild_locales` directly.
+     - [✓] TM rebuild execution submission now routes through
+       `TMWorkflowService.rebuild_project_tm`, so `main_window` no longer
+       imports `core.tm_rebuild.rebuild_project_tm` directly.
+     - [✓] TM rebuild status-message formatting now routes through
+       `TMWorkflowService.format_rebuild_status`, so `main_window` no longer
+       imports `core.tm_rebuild.format_rebuild_status` directly.
      - [✓] Large-file/render policy calculations delegated through
        `RenderWorkflowService` (render-heavy mode, large-file detection, span math).
    - **Acceptance**:
-     - [ ] `main_window.py` no longer owns core workflow decisions directly.
-     - [ ] Service-level tests cover open/switch/save/conflict/search flows.
-     - [ ] Behavior parity confirmed by existing regression suite + perf budgets.
+     - [✓] `main_window.py` no longer owns core workflow decisions directly for
+       the extracted v0.6 workflow scope.
+     - [✓] Service-level tests cover open/switch/save/conflict/search flows.
+     - [✓] Behavior parity confirmed by existing regression suite + perf budgets.
 A1 [✓] **Search/Replace scopes**
    - **Problem**: scopes are persisted but not enforced; users expect Locale/Pool yet only File is reliable.
    - **Impact**: false confidence, missed matches, and inconsistent replace behavior.

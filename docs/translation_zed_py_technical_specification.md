@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.3.23 · 2026‑02‑08**\
+**Version 0.6.0-dev · 2026‑02‑13**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -261,7 +261,20 @@ Algorithm:
 ### 5.5.1  Search & Replace UI semantics
 
 - `core.search_replace_service` owns Qt-free scope and replace planning:
-  scope file resolution, search traversal anchors/fallbacks, and replace-text transforms.
+  scope file resolution, search traversal anchors/fallbacks, search-run request planning
+  (query/files/field flags/anchor setup), search-panel result label
+  formatting, search-panel result-list planning/status policy, replace-all run-policy
+  planning (confirmation/skip for multi-file scopes), file-level replace-all
+  parse/cache/write orchestration via callbacks, model-row replace-all
+  orchestration via row callbacks, single-row replace request/build and apply
+  orchestration, search-row cache stamp collection policy (file/cache/source mtime
+  collection with include gating), search-row cache lookup/store policy,
+  search-row source-selection policy,
+  search-row materialization policy, file-backed search-row load orchestration
+  (lazy/eager parse + source/cache callback handoff), search match-selection policy,
+  and replace-text transforms.
+- GUI adapters must use `SearchReplaceService` instance methods for these policies
+  (no direct module-level helper calls from GUI).
 - Search runs across selected locales; auto‑selects the **first match in the current file** only.
 - Cross‑file navigation is explicit via next/prev shortcuts; switching files does not auto‑jump.
 - Replace targets the **Translation** column and respects active replace scope.
@@ -278,6 +291,8 @@ Algorithm:
   (`runtime-root` = source run `cwd`, frozen build executable directory)
 - `load()` is pure read (no disk writes).
 - `ensure_defaults()` is explicit bootstrap used at startup.
+- GUI preference-apply flow must normalize scopes through
+  `PreferencesService.normalize_scope` instance methods (no direct helper imports in GUI).
 - Legacy settings fallback:
   - if canonical file is missing, load reads legacy `<runtime-root>/.tzp-config/settings.env`.
   - `ensure_defaults()` writes canonical `.tzp/config/settings.env`, preserving known values.
@@ -362,6 +377,11 @@ Algorithm:
 - `core.save_exit_flow` owns the Qt-free decision flow for:
   - **Write Original** action (`cancel` / `write` / `cache` branches).
   - **Close prompt** flow (pre-close cache write, optional save prompt, final cache guard).
+  - Save-dialog file-list policy (root-relative labels, selected-file filtering,
+    and failure-list formatting).
+  - Save-batch render policy (abort/failed/success UI intent after batch write).
+- GUI adapters should call these via `SaveExitFlowService` instance methods
+  (no direct module-level helper imports in GUI).
 - `gui.main_window` remains adapter-only for:
   - presenting save dialogs/messages,
   - supplying callbacks that perform cache writes and original-file saves.
@@ -419,11 +439,32 @@ if dirty_files and not prompt_save():
 - On startup, table opens the most recently opened file across selected locales
   (timestamp stored in cache headers). If no history exists, no file is auto-opened.
 - File tree shows a **dirty dot (●)** prefix for files with cached draft values.
-- Save/Exit prompt lists only files **opened in this session** that have draft values (scrollable list).
+- Save/Exit prompt lists draft files in selected locales and allows per-file deselection before write.
+- Detail editor bottom-right counter displays live Source/Translation char counts and Translation delta vs Source.
+- Save-batch write ordering and failure aggregation are delegated to
+  `core.save_exit_flow.run_save_batch_flow` (current-file-first policy).
 - `core.project_session` owns the Qt-free policy for draft-file discovery and
   most-recent auto-open path selection; GUI remains adapter-only for opening selected paths.
+  Startup locale-request resolution (explicit request vs smoke defaults), locale/session
+  selection normalization (exclude source locale, deduplicate while preserving user order),
+  lazy-tree mode decision, locale-switch plan/no-op detection, and locale-switch apply intent
+  flags (`should_apply`, reset/schedule), plus post-locale startup task planning
+  (`cache-scan` + `auto-open`), post-locale startup task execution order,
+  and tree-rebuild render intent
+  (`expand_all` / `preload_single_root` / `resize_splitter`) are also delegated there,
+  along with locale-reset intent and callback execution policy for GUI session-state clearing.
+  Orphan-cache warning content planning (root-relative preview + truncation) is delegated there too.
+  Legacy-cache migration schedule/batch planning is delegated there too
+  (`build_cache_migration_schedule_plan`, `build_cache_migration_batch_plan`).
+  Migration execution policy is delegated there via callback DTOs
+  (`execute_cache_migration_schedule`, `execute_cache_migration_batch`).
 - `core.file_workflow` owns Qt-free cache-overlay and cache-apply planning used by
-  file-open and write-from-cache flows; GUI remains adapter-only for parse/save IO and UI updates.
+  file-open and write-from-cache flows. Open-path parse/cache/timestamp sequencing is delegated
+  via callback/result DTOs (`OpenFileCallbacks`, `OpenFileResult`) so GUI remains adapter-only
+  for parse/save IO and rendering. Write-from-cache sequencing is delegated via
+  `SaveFromCacheCallbacks` with parse-boundary wrapping through
+  `SaveFromCacheParseError`. Save-current run gating and persistence sequencing are delegated via
+  `build_save_current_run_plan` and `persist_current_save` (`SaveCurrentCallbacks`).
 - Copy/Paste: if a **row** is selected, copy the whole row; if a **cell** is
   selected, copy that cell. Cut/Paste only applies to Translation column cells.
   Row copy is **tab-delimited**: `Key\tSource\tValue\tStatus`.
@@ -550,7 +591,18 @@ UNTOUCHED).
   - `core.tm_query` owns query-policy helpers (origin toggles, min-score normalization,
     cache-key construction, post-query filtering), used by GUI adapter.
   - `core.tm_workflow_service` owns query-cache planning, pending update batching, and stale-result
-    guards for asynchronous TM lookups.
+    guards for asynchronous TM lookups; it also owns TM sidebar suggestion view-model formatting
+    (status text, list-item labels/tooltips, and query-term tokenization for preview highlight),
+    plus query-request construction from cache keys for async DB calls and lookup/apply
+    normalization (`build_lookup` / `build_apply_plan`) and TM filter-policy normalization
+    (`build_filter_plan`) used by GUI controls. TM diagnostics report composition
+    (`build_query_request_for_lookup` / `build_diagnostics_report`) is also
+    delegated to this service to keep report semantics Qt-free. Diagnostics query
+    argument shaping is delegated via `build_diagnostics_report_with_query`
+    (GUI passes query callback only), and diagnostics store-read orchestration
+    is delegated via `diagnostics_report_for_store`. TM panel refresh/debounce
+    activation policy is delegated via `build_update_plan`, and TM refresh
+    run/flush/query orchestration is delegated via `build_refresh_plan`.
   - Exact match returns score **100**.
   - Fuzzy match uses bounded candidate pools (prefix/token/fallback), token-aware relevance
     gates, and weighted scoring on top of `SequenceMatcher`; keeps scores at/above configured
@@ -599,9 +651,25 @@ UNTOUCHED).
   - Rebuild is also available as an icon-only button inside the TM side panel filter row.
   - `core.tm_preferences` applies preference actions (queue-import copy, remove, enable/disable)
     without Qt dependencies; GUI owns confirmations/dialog presentation.
+  - GUI adapters route TM preference actions through
+    `TMWorkflowService.build_preferences_actions` +
+    `TMWorkflowService.apply_preferences_actions` (no direct `core.tm_preferences`
+    helper imports in GUI).
+  - GUI adapters route TM folder synchronization through
+    `TMWorkflowService.sync_import_folder` (no direct `core.tm_import_sync`
+    helper imports in GUI).
   - Removing imported TMs requires explicit confirmation that files will be deleted from disk.
 - Project TM rebuild:
    - `core.tm_rebuild` owns locale collection, EN mapping, batch ingestion, and status-message formatting.
+   - GUI adapters route rebuild-locale collection through
+     `TMWorkflowService.collect_rebuild_locales` (no direct
+     `core.tm_rebuild.collect_rebuild_locales` helper import in GUI).
+   - GUI adapters route rebuild execution submission through
+     `TMWorkflowService.rebuild_project_tm` (no direct
+     `core.tm_rebuild.rebuild_project_tm` helper import in GUI).
+   - GUI adapters route rebuild status text formatting through
+     `TMWorkflowService.format_rebuild_status` (no direct
+     `core.tm_rebuild.format_rebuild_status` helper import in GUI).
    - UI can rebuild project TM by scanning selected locales and pairing target entries with EN source.
    - Auto‑bootstrap runs once per session on first TM-panel activation for selected locales
      (even if DB already has entries), to prevent stale/partial project-index behavior.
@@ -614,8 +682,14 @@ UNTOUCHED).
 
 - `core.conflict_service` owns conflict policy helpers:
   - build merge rows from file/cache/source values,
+  - run merge orchestration with UI callback handoff (`execute_merge_resolution`),
   - compute cache write plans for drop-cache, drop-original, and merge outcomes,
-  - enforce status rule: choosing **Original** sets status to **For review**.
+  - compute resolution run-preconditions (`build_resolution_run_plan`) for
+    current-file/model/path gating and merge no-conflict early return,
+  - enforce status rule: choosing **Original** sets status to **For review**,
+  - prompt policy and dialog-choice dispatch (`build_prompt_plan` / `execute_choice`),
+  - persist-policy planning + execution for post-resolution cache-write payload
+    and clean/reload behavior (`execute_persist_resolution`).
 - Conflicts compare cached **original snapshots** to current file values (value-only compare).
 - If the user keeps the **cache** value, the entry status is taken from the cache.
 - If the user keeps the **original** value, the entry status is forced to **For review**.
@@ -661,6 +735,8 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 
 - **Coding style**: PEP‑8 + `ruff` autofix; 100 % type‑annotated (`mypy --strict`).
 - **Testing**: `pytest` + `pytest‑qt`; target ≥85 % coverage.
+- **Architecture guardrails**: GUI adapter tests ensure `main_window` delegates
+  open/switch/save/conflict/search orchestration to Qt-free services.
 - **Static analysis**: `bandit` (security) + `pydocstyle` (docstrings).
 - **Docs**: MkDocs site generated from `docs/`.
 
@@ -746,10 +822,10 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ## 16  Spec Gaps To Resolve
 
-- Application/use-case layer extraction is incomplete: orchestration remains concentrated in
-  `gui.main_window`; move file/session/save/conflict workflows to explicit services.
-- Clean-architecture boundary ownership is not yet codified per module package; add a strict
-  dependency matrix and enforce it in review/testing.
+- v0.6 A0 extraction scope is complete: primary workflow decisions are delegated
+  to Qt-free services and `gui.main_window` acts as adapter/orchestrator for Qt concerns.
+- Clean-architecture boundary ownership needs stricter package-level enforcement; add a dependency
+  matrix and keep adapter-delegation tests mandatory for new workflow slices.
 - Module-level structure map is still shallow for some areas: add explicit responsibility + boundary
   notes for `core.lazy_entries`, `core.en_hash_cache`, `core.parse_utils`, and `gui.perf_trace`.
 - Derived docs (`flows`, `checklists`, `technical_notes_current_state`) must be kept synced to
@@ -757,4 +833,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-08 (v0.3.23)*
+*Last updated: 2026-02-13 (v0.6.0-dev)*

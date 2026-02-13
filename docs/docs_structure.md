@@ -1,5 +1,5 @@
 # TranslationZed-Py — Documentation Structure
-_Last updated: 2026-02-08_
+_Last updated: 2026-02-11_
 
 ## 1) Purpose
 
@@ -84,3 +84,11 @@ changes should be propagated to keep docs coherent.
 
 - `docs/llm_handoff_summary.md` has been retired. Do not recreate it; place new
   information in the canonical documents defined above.
+
+## 6) Canonical Terminology
+
+- **Runtime root**: source run `cwd`; frozen build executable directory.
+- **Draft file**: file with unsaved in-app edits currently stored in cache.
+- **Write**: persist selected draft files to original translation files.
+- **Cache only**: persist selected draft files to `.tzp/cache` without modifying originals.
+- **Managed TMs folder**: `.tzp/tms` under runtime root (or explicit `TM_IMPORT_DIR`).

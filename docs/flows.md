@@ -1,5 +1,5 @@
 # TranslationZed-Py — Key Flows
-_Last updated: 2026-02-08_
+_Last updated: 2026-02-11_
 
 ---
 
@@ -64,11 +64,13 @@ User selects file in tree
 User edits cell
   -> update Entry value + status
   -> write .tzp/cache/<locale>/<rel>.bin (status + draft value)
+  -> detail editor bottom-right counter refreshes char counts (Source / Translation / delta)
   -> add dirty dot (●) in tree if value changed
 
 User: Save
   -> prompt Write / Cache only / Cancel
-  -> prompt shows a scrollable list of files to be written (opened this session)
+  -> prompt shows a scrollable, checkable list of draft files in selected locales
+  -> user may uncheck files to exclude from current write
   -> Cache only: keep drafts in cache; originals unchanged
   -> Write:
        if conflicts for current file: block save until resolved
@@ -99,4 +101,18 @@ User: Project ▸ Switch Locale(s)
   -> re-run locale chooser (checkboxes)
   -> rebuild tree (multiple roots)
   -> open most recently opened file across selected locales (if available)
+```
+
+---
+
+## 7) Search Execution + Search Panel
+
+```
+User presses Enter in search box (or F3 / Shift+F3)
+  -> build search run plan (scope + query + field + anchor)
+  -> run on-demand traversal across files in active scope
+  -> open/select first next/prev match
+  -> refresh Search side-panel list with compact labels:
+     <path>:<row> · <one-line excerpt>
+  -> selecting a Search-panel item jumps to its file/row
 ```

@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.3.23 · 2026‑02‑08_
+_version 0.6.0-dev · 2026‑02‑11_
 
 ---
 ## 1  Actors
@@ -111,9 +111,10 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | Press **Enter** in search box (`Ctrl+F`) or use `F3` / `Shift+F3`. |
 | **Parameter** | Mode (Key / Source / Translation) and Regex toggle. |
 | **Flow** |
-|  1 | SYS searches within the active scope and selects the first match (no results list). |
+|  1 | SYS searches within the active scope and selects the first match. |
 |  2 | If the current file has no matches and the scope includes other files, SYS opens the next file with a match. |
 |  3 | `F3` / `Shift+F3` moves to next/prev match across files (opening files as needed), wrapping within scope. |
+|  4 | SYS updates the Search side-panel results list (`<path>:<row> · <one-line excerpt>`) when search is executed. |
 
 ### UC-05b  Search & Replace
 | **Trigger** | Toggle **Replace** control to expand the replace row. |
@@ -193,11 +194,12 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 ### UC-10a  Save Project (Write Original)
 | **Trigger** | *Project ▸ Save* (`Ctrl+S`) |
 | **Flow** |
-|  1 | SYS prompts **Write / Cache only / Cancel** and shows a scrollable list of files to be written (only files opened in this session). |
-|  2 | On **Write**, SYS MUST call saver write flow for every dirty file. |
-|  3 | On success, `dirty` flags cleared and baseline updated. |
-|  4 | SYS writes (or updates) per‑file cache entries under `.tzp/cache/<locale>/<relative>.bin` for **edited files only** (status only; draft values cleared). |
-|  5 | Status line shows “Saved HH:MM:SS”.
+|  1 | SYS prompts **Write / Cache only / Cancel** and shows a scrollable **checkable** list of draft files in selected locales. |
+|  2 | User may deselect files; deselected files stay cached and are not written. |
+|  3 | On **Write**, SYS MUST call saver write flow for every selected draft file. |
+|  4 | On success, `dirty` flags cleared and baseline updated for written files. |
+|  5 | SYS writes (or updates) per‑file cache entries under `.tzp/cache/<locale>/<relative>.bin` for **edited files only** (status only; draft values cleared). |
+|  6 | Status line shows “Saved HH:MM:SS”.
 
 ### UC-10b  Dirty Indicator in File Tree
 | **Trigger** | Any edit that marks a file dirty. |
@@ -208,7 +210,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 ### UC-11  Exit Application
 | **Trigger** | Window close button or *Project ▸ Exit* |
 | **Flow** |
-|  1 | If ANY dirty files exist **and** `prompt_write_on_exit=true`, SYS prompts **Write / Cache only / Cancel** (only files opened in this session). |
+|  1 | If ANY draft files exist **and** `prompt_write_on_exit=true`, SYS prompts **Write / Cache only / Cancel** over all draft files in selected locales. |
 |  2 | On **Write**, UC-10a is executed. |
 |  3 | On **Cache only**, SYS persists drafts to `.tzp/cache` and exits. |
 |  4 | If `prompt_write_on_exit=false`, SYS skips the prompt and performs **Cache only**. |
@@ -255,7 +257,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | *General ▸ Preferences ▸ TM tab ▸ Import TMX…* |
 | **Flow** |
 |  1 | SYS opens TMX file picker. |
-|  2 | SYS copies selected TMX into managed TM import folder (default: `.tzp/tms` at runtime root). |
+|  2 | SYS copies selected TMX into managed TM import folder (default: `.tzp/tms` at the runtime root). |
 |  3 | SYS detects source/target locales from TMX metadata; if unresolved, SYS asks user to map locales manually. |
 |  4 | SYS imports TM units into project TM store for resolved locale pair (`origin=import`) and records TM source name. |
 |  5 | SYS reports imported unit count and unresolved/failed files when applicable; zero-segment imports are reported as warnings. |
@@ -399,6 +401,8 @@ UNTOUCHED ──────────────────────▶ 
      (≥100k chars) the detail panel defers loading until the editor is focused to keep
      the UI responsive (length checks avoid forcing lazy decode on selection). Truncation
      is allowed only in table preview and tooltips.
+    Bottom-right detail counter shows live Source/Translation character counts and
+    Translation delta versus Source for quick fit checks.
      **String editor** below the table (Poedit‑style). Source is read‑only and Translation is editable;
      table remains visible above. Toggle is placed in the **bottom bar** and defaults to **open**.
    - Status palette: **For review** = orange, **Translated** = green, **Proofread** = light‑blue (higher priority than Translated).
@@ -427,4 +431,4 @@ UNTOUCHED ──────────────────────▶ 
    translation equals Source). Implement **only after** TM import/export is complete.
 
 ---
-_Last updated: 2026‑02‑08 (v0.3.23)_
+_Last updated: 2026‑02‑11 (v0.6.0-dev)_

@@ -1,5 +1,5 @@
 # TranslationZed-Py: Technical Notes (Current State)
-_Last updated: 2026-02-08_
+_Last updated: 2026-02-13_
 
 Purpose:
 - Keep short-lived diagnostics and implementation pressure points.
@@ -64,19 +64,15 @@ Scope:
 
 ## 3) Current Pressure Points (still relevant)
 
-1) Main-window concentration:
-- `translationzed_py/gui/main_window.py` still owns too much orchestration.
-- Risk: regressions when changing unrelated features.
+1) Post-A0 boundary regression risk:
+- A0 v0.6 scope is complete, but new features can still bypass service boundaries.
+- Keep adapter-delegation tests mandatory for every new `main_window` workflow touchpoint.
 
-2) Boundary clarity:
-- Clean architecture intent is defined, but service extraction is incomplete.
-- Need explicit application-layer services and thinner GUI adapters.
-
-3) Performance regression risk:
+2) Performance regression risk:
 - Rendering-heavy files still require continuous perf guardrails.
 - Keep perf budgets + perf scenarios mandatory in `make verify`.
 
-4) Documentation drift risk:
+3) Documentation drift risk:
 - Derived docs can diverge from canonical specs without strict updates.
 - Enforce update protocol in `docs/docs_structure.md`.
 

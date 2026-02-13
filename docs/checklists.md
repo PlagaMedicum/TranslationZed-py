@@ -1,4 +1,4 @@
-_Last updated: 2026-02-09_
+_Last updated: 2026-02-11_
 
 # Checklists
 
@@ -11,7 +11,8 @@ avoid missing mandatory tasks.
   - Cleans non-fixture cache dirs (`.tzp/cache` + legacy `.tzp-cache`)
   - Cleans fixture config dirs only (`.tzp/config` + legacy `.tzp-config`);
     runtime-local user config is never auto-deleted
-  - Runs formatter, linter, typecheck, tests, and perf scenarios
+  - Runs formatter, linter, typecheck, tests, encoding-integrity gate, diagnostics,
+    read-only repo-clean gate, and perf scenarios
 - **Update docs** whenever behavior, UX, or workflows change
   - Keep specs and plan in sync with implemented features
   - Add/adjust questions when requirements are unclear or changed
@@ -21,6 +22,9 @@ avoid missing mandatory tasks.
 ## Before pushing tags / releases
 
 - **Run** `make verify`
+- **Run** `make test-encoding-integrity`
+- **Run** `make diagnose-encoding ARGS=\"<project-root>\"` for the release corpus
+- **Run** `make test-readonly-clean` to confirm read-only workflows do not mutate tracked files
 - **Confirm** `make pack` completes on your platform
 - **Run** `make release-check TAG=vX.Y.Z`
 - **Check** `CHANGELOG.md` and version string(s)
@@ -35,9 +39,11 @@ avoid missing mandatory tasks.
   - `docs/testing_strategy.md`
   - `docs/tm_ranking_algorithm.md` (if TM ranking changed)
 
-## v0.5.0 release gate (current target)
+## v0.6.0 release gate (current target)
 
 - **Feature readiness**
+  - A‑P0 encoding integrity guarantees remain green (no-write-on-open, diagnostics, readonly-clean gate).
+  - A0 clean-architecture extraction slices are reflected in docs and adapter tests.
   - TM import/sync/query path stable for project+import origins.
   - TM fuzzy ranking behavior validated against corpus + targeted regression cases.
   - Large-file editing/scroll behavior within perf budgets.

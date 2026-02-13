@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-09_
+_Last updated: 2026-02-11_
 
 ---
 
@@ -65,6 +65,8 @@ _Last updated: 2026-02-09_
   - cache header scans (draft‑flag reads),
   - lazy prefetch window decode,
   - lazy hash‑index build,
+  - session draft-file collection scan,
+  - session last-opened cache scan,
   - lazy preview and max‑value length scans.
   (All env‑tunable.)
 - pytest always prints a **Performance** summary in terminal output,
@@ -136,14 +138,25 @@ They include:
 - Saver structure preservation on edge cases (stray quotes/markup, `//` headers,
   trivia spacing, raw file replacement, and large‑file slices (Recorded_Media/News/Stash).
 - Cache: status cache read/write + last_opened header; u16→u64 migration; original snapshot fields.
+- File workflow service: open-flow parse/cache/timestamp orchestration via DTO callbacks
+  and cache overlay/write planning.
+- Project session service: locale-selection planning coverage (normalization,
+  startup request resolution, lazy-tree decision, no-op switch detection, and
+  locale-switch apply-intent flags), plus post-locale startup task plan flags
+  and post-locale startup task execution order, plus tree-rebuild render-intent
+  plan flags, plus locale-reset intent flags and locale-reset callback execution.
 - Core search: plain + regex paths.
 - GUI smoke: open, table fill, search navigation, edit/save, undo/redo.
-- GUI save prompts: cache‑only vs write‑to‑original.
+- GUI save prompts: cache‑only vs write‑to‑original, all-draft listing, and per-file deselection.
 - GUI save encoding: cp1251 + UTF‑16 write‑back via locale `language.txt`.
 - GUI read-only integrity: open/switch without edits preserves bytes across
   UTF‑8/CP1251/UTF‑16 and LF/CRLF cases.
+- Encoding diagnostics: read-only scanner reports decode errors, BOM/charset
+  mismatches, and UTF‑16 BOM-less fallback usage.
 - GUI theme mode: normalize/apply (`System|Light|Dark`) and settings persistence
   via `UI_THEME_MODE` extra key.
+- Detail editor telemetry: bottom-right Source/Translation char counter and live
+  Translation delta updates while editing.
 - GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
 - TM: SQLite store round‑trip, exact/fuzzy query, TMX import/export.
@@ -172,21 +185,59 @@ They include:
 - TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
   (`core.tm_import_sync` unit tests).
 - TM query/policy service: cache-key construction and score/origin filtering semantics.
+- TM workflow service: suggestion view-model formatting/status messages and
+  query-term tokenization used by TM preview highlighting, plus lookup/apply
+  normalization (`build_lookup` / `build_apply_plan`) and TM filter-policy
+  normalization/prefs payload generation, lookup-based query-request building,
+  TM diagnostics report composition (`build_diagnostics_report`), and diagnostics
+  query-call shaping via callback orchestration
+  (`build_diagnostics_report_with_query`), plus store-adapter diagnostics
+  orchestration (`diagnostics_report_for_store`), and TM update scheduling/debounce
+  policy (`build_update_plan`) plus TM refresh run/flush/query-plan orchestration
+  (`build_refresh_plan`), and TM selection-preview/apply-state planning
+  (`build_selection_plan`).
 - TM preferences service: action parsing + apply pipeline (copy/remove/enable-disable), plus GUI
   integration tests for deletion confirmation behavior.
 - TM rebuild service: locale collection, rebuild ingestion, and status message formatting.
 - Save/exit orchestration service: `Write Original` and close-prompt decision flow
+  plus save-batch sequencing/failure aggregation policy
   (`core.save_exit_flow` unit tests).
 - Conflict service: merge-row building, drop-cache/drop-original plans, merge outcome planning,
-  and in-memory entry update application (`core.conflict_service` unit tests).
+  in-memory entry update application, prompt-policy normalization, and
+  dialog-choice action dispatch (`execute_choice`), plus persist-policy planning
+  + execution for cache-write/clean/reload decisions (`execute_persist_resolution`),
+  plus resolution precondition run-plan
+  policy (`build_resolution_run_plan`), plus merge orchestration callback flow
+  (`execute_merge_resolution`)
+  (`core.conflict_service` unit tests).
 - Project-session service: draft-file discovery and last-opened path selection
   (`core.project_session` unit tests).
 - File-workflow service: cache overlay for open-path state reconstruction and cache-apply
-  planning for write-from-cache path (`core.file_workflow` unit tests).
+  planning for write-from-cache path, including parse-boundary wrapping and
+  callback-driven write sequencing (`core.file_workflow` unit tests), plus
+  save-current run-plan and persist sequencing coverage.
 - Search/replace service: scope file resolution, search traversal helpers, and
-  replace-text transformation rules (`core.search_replace_service` unit tests).
+  replace-text transformation rules, search-run request planning,
+  search-panel result label formatting, replace-all run-policy planning,
+  file-level replace-all parse/cache/write orchestration (count/apply with
+  parse-boundary error wrapping), model-row replace-all callback orchestration
+  (count/apply), single-row replace request/build and apply callback orchestration,
+  search-row cache stamp collection policy (file/cache/source mtime collection
+  with include-source/include-value gating),
+  search-row cache lookup/store policy (stamp comparison + cache-store gating),
+  and search-row source-selection policy (locale gate + current-model vs cached-file),
+  and search-row materialization policy (cache-overlay value projection +
+  source fallback + list/generator threshold), and file-backed search-row load
+  orchestration (lazy/eager parse selector + source/cache callback handoff +
+  parse-failure fallback), and search match-selection plans
+  (open-target intent + row-selection validity),
+  and search-panel result-list planning/status policy
+  (`core.search_replace_service` unit tests).
 - Preferences service: startup-root resolution, loaded-preference normalization,
   scope normalization, and persist-payload construction (`core.preferences_service` unit tests).
+- GUI adapter delegation: verifies `main_window` routes key orchestration to services
+  for open/switch/save/conflict/search flows, including file-level replace-all
+  delegation (`tests/test_gui_service_adapters.py`).
 
 **Not covered yet (automation gaps, by layer):**
 
@@ -219,6 +270,10 @@ They include:
 - Large‑string UI regression: open News/Recorded_Media single‑string files; scroll + selection remain responsive.
 - Cross‑encoding regression: GUI edits + saves for cp1251/UTF‑16 + BOM‑less UTF‑16 with `language.txt`.
 - Makefile `verify` non‑destructive fixture cache rule (clean_cache whitelist) as a script‑level regression.
+- Explicit encoding gate target: `make test-encoding-integrity` + diagnostics
+  command `make diagnose-encoding`.
+- Read-only cleanliness gate: `make test-readonly-clean` snapshots tracked
+  `git status` and fails on any mutation after read-only workflows.
 
 **Planned test expansions:**
 - Golden save fixtures derived from real PZ files (small slices) that include
