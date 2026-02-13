@@ -250,6 +250,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Theme changes apply immediately and affect the whole app
   - Selected mode persists in `settings.env` extras (`UI_THEME_MODE`)
   - `System` mode remains the default when no override is stored
+  - Dark-system auto-follow is deferred; code-level detection hooks are present
+    and should be wired in a later slice.
 
 ### Step 23 — License compliance UI [✓]
 - Touchpoints: `gui/main_window.py`, `gui/dialogs.py`
@@ -631,6 +633,17 @@ A0 [✓] **Main-window declutter + explicit application layer (Clean architectur
        the extracted v0.6 workflow scope.
      - [✓] Service-level tests cover open/switch/save/conflict/search flows.
      - [✓] Behavior parity confirmed by existing regression suite + perf budgets.
+
+A0.1 [ ] **Architecture enforcement gates (deferred post-v0.6)**
+   - **Problem**: without automated guardrails, new changes can reintroduce
+     direct domain/infra coupling into GUI adapters.
+   - **Target**: fail CI when `gui/main_window.py` (or other GUI modules)
+     imports prohibited core internals directly (outside approved service
+     boundaries).
+   - **Mini-steps**:
+     - [ ] Add a lightweight import-boundary check script (service-allowlist driven).
+     - [ ] Add a complexity/size watchdog for `gui/main_window.py` growth.
+     - [ ] Wire guard scripts into `make verify` and CI.
 A1 [✓] **Search/Replace scopes**
    - **Problem**: scopes are persisted but not enforced; users expect Locale/Pool yet only File is reliable.
    - **Impact**: false confidence, missed matches, and inconsistent replace behavior.

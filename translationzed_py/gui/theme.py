@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QStyleFactory
 
@@ -23,6 +24,38 @@ def normalize_theme_mode(value: object, *, default: str = THEME_SYSTEM) -> str:
     if raw in THEME_MODES:
         return raw
     return default
+
+
+def system_theme_from_qt_scheme(scheme: object) -> str | None:
+    """Map Qt color-scheme value to TZP theme mode.
+
+    This helper is intentionally side-effect free and is used as a preparation
+    hook for future "System follows OS dark mode" behavior.
+    """
+    color_scheme = getattr(Qt, "ColorScheme", None)
+    if color_scheme is None:
+        return None
+    if scheme == color_scheme.Dark:
+        return THEME_DARK
+    if scheme == color_scheme.Light:
+        return THEME_LIGHT
+    return None
+
+
+def detect_system_theme_mode(
+    app: QApplication, *, style_hints: object | None = None
+) -> str | None:
+    """Best-effort system theme detection (future hook; not auto-applied yet)."""
+    hints = style_hints if style_hints is not None else app.styleHints()
+    if hints is None:
+        return None
+    color_scheme = getattr(hints, "colorScheme", None)
+    if not callable(color_scheme):
+        return None
+    try:
+        return system_theme_from_qt_scheme(color_scheme())
+    except Exception:
+        return None
 
 
 def _style_key(name: str) -> str | None:
@@ -92,5 +125,8 @@ def apply_theme(app: QApplication, mode: object) -> str:
     if normalized == THEME_DARK:
         _apply_dark(app)
     else:
+        # NOTE: SYSTEM currently keeps native/light standard palette behavior.
+        # OS dark-mode auto-follow is intentionally deferred; use
+        # detect_system_theme_mode(...) as the integration hook later.
         _apply_light_or_system(app)
     return normalized

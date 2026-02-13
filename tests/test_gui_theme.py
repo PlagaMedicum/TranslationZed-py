@@ -1,12 +1,16 @@
 import pytest
 
 pytest.importorskip("PySide6")
+from PySide6.QtCore import Qt
 
 from translationzed_py.gui.theme import (
     THEME_DARK,
+    THEME_LIGHT,
     THEME_SYSTEM,
     apply_theme,
+    detect_system_theme_mode,
     normalize_theme_mode,
+    system_theme_from_qt_scheme,
 )
 
 
@@ -22,3 +26,42 @@ def test_apply_theme_dark_then_system_updates_stylesheet(qapp) -> None:
     assert "QToolTip" in qapp.styleSheet()
     assert apply_theme(qapp, "system") == THEME_SYSTEM
     assert qapp.styleSheet() == ""
+
+
+def test_system_theme_from_qt_scheme_maps_dark_light() -> None:
+    color_scheme = getattr(Qt, "ColorScheme", None)
+    if color_scheme is None:
+        assert system_theme_from_qt_scheme(object()) is None
+        return
+    assert system_theme_from_qt_scheme(color_scheme.Dark) == THEME_DARK
+    assert system_theme_from_qt_scheme(color_scheme.Light) == THEME_LIGHT
+    assert system_theme_from_qt_scheme(object()) is None
+
+
+def test_detect_system_theme_mode_uses_style_hints(qapp) -> None:
+    color_scheme = getattr(Qt, "ColorScheme", None)
+    if color_scheme is None:
+        assert detect_system_theme_mode(qapp, style_hints=object()) is None
+        return
+
+    class _Hints:
+        def __init__(self, scheme):
+            self._scheme = scheme
+
+        def colorScheme(self):
+            return self._scheme
+
+    assert (
+        detect_system_theme_mode(qapp, style_hints=_Hints(color_scheme.Dark))
+        == THEME_DARK
+    )
+    assert (
+        detect_system_theme_mode(qapp, style_hints=_Hints(color_scheme.Light))
+        == THEME_LIGHT
+    )
+
+    class _BrokenHints:
+        def colorScheme(self):  # pragma: no cover - exercised by call
+            raise RuntimeError("boom")
+
+    assert detect_system_theme_mode(qapp, style_hints=_BrokenHints()) is None
