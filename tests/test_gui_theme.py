@@ -2,6 +2,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPalette
 
 from translationzed_py.gui.theme import (
     THEME_DARK,
@@ -47,6 +48,16 @@ def test_apply_theme_dark_then_system_updates_stylesheet(qapp) -> None:
         == THEME_SYSTEM
     )
     assert qapp.styleSheet() == ""
+
+
+def test_apply_theme_dark_sets_readable_text_roles(qapp) -> None:
+    assert apply_theme(qapp, "dark") == THEME_DARK
+    palette = qapp.palette()
+    base = palette.color(QPalette.Base)
+    text = palette.color(QPalette.Text)
+    placeholder = palette.color(QPalette.PlaceholderText)
+    assert text.lightness() > base.lightness()
+    assert placeholder.lightness() > base.lightness()
 
 
 def test_system_theme_from_qt_scheme_maps_dark_light() -> None:
