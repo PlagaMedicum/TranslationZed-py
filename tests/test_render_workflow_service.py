@@ -63,8 +63,27 @@ def test_render_workflow_prefetch_and_resume() -> None:
         total_rows=80,
         margin=100,
         large_file_mode=True,
+        render_heavy=False,
     )
     assert prefetch == (0, 79)
+
+    heavy_prefetch = service.prefetch_span(
+        span=(20, 40),
+        total_rows=200,
+        margin=200,
+        large_file_mode=False,
+        render_heavy=True,
+    )
+    assert heavy_prefetch == (8, 52)
+
+    heavy_large_prefetch = service.prefetch_span(
+        span=(20, 40),
+        total_rows=200,
+        margin=200,
+        large_file_mode=True,
+        render_heavy=True,
+    )
+    assert heavy_large_prefetch == (12, 48)
 
     resumed = service.resume_resize_span(span=(20, 40), cursor=30)
     assert resumed == (30, 40)

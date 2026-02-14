@@ -763,6 +763,10 @@ class MainWindow(QMainWindow):
         self._row_resize_timer.setSingleShot(True)
         self._row_resize_timer.setInterval(80)
         self._row_resize_timer.timeout.connect(self._resize_visible_rows)
+        self._resize_reflow_timer = QTimer(self)
+        self._resize_reflow_timer.setSingleShot(True)
+        self._resize_reflow_timer.setInterval(140)
+        self._resize_reflow_timer.timeout.connect(self._flush_resize_reflow)
         self._scroll_idle_timer = QTimer(self)
         self._scroll_idle_timer.setSingleShot(True)
         self._scroll_idle_timer.setInterval(200)
@@ -787,6 +791,7 @@ class MainWindow(QMainWindow):
         self._large_file_bytes_threshold = 1_000_000
         self._prefetch_pending = False
         self._pending_row_span: tuple[int, int] | None = None
+        self._resize_reflow_pending = False
         self._lazy_parse_min_bytes = 1_000_000
         self._lazy_row_prefetch_margin = 200
 
@@ -1288,6 +1293,7 @@ class MainWindow(QMainWindow):
         if len(sizes) >= 2 and sizes[0] > 0:
             self._tree_last_width = max(60, sizes[0])
             self._schedule_tree_width_persist()
+        self._schedule_resize_reflow()
 
     def _schedule_tree_width_persist(self) -> None:
         if self._tree_width_timer.isActive():
@@ -1328,6 +1334,7 @@ class MainWindow(QMainWindow):
             self.tree_toggle.setToolTip("Hide side panel")
         if self.table.model():
             self._apply_table_layout()
+            self._schedule_resize_reflow()
 
     def _on_detail_translation_changed(self) -> None:
         if self._detail_syncing:
@@ -2720,6 +2727,7 @@ class MainWindow(QMainWindow):
             total_rows=self._current_model.rowCount(),
             margin=self._lazy_row_prefetch_margin,
             large_file_mode=self._is_large_file(),
+            render_heavy=self._render_heavy,
         )
         if not prefetch:
             return
@@ -2752,6 +2760,23 @@ class MainWindow(QMainWindow):
         if self._row_resize_timer.isActive():
             self._row_resize_timer.stop()
         self._row_resize_timer.start()
+
+    def _schedule_resize_reflow(self) -> None:
+        if not self._wrap_text or not self._current_model:
+            return
+        self._resize_reflow_pending = True
+        if self._resize_reflow_timer.isActive():
+            self._resize_reflow_timer.stop()
+        self._resize_reflow_timer.start()
+
+    def _flush_resize_reflow(self) -> None:
+        if not self._resize_reflow_pending:
+            return
+        self._resize_reflow_pending = False
+        if not self._wrap_text or not self._current_model:
+            return
+        self._clear_row_height_cache()
+        self._schedule_row_resize()
 
     def _row_height_cache_signature(self) -> tuple[int, ...]:
         model = self.table.model()
@@ -2921,17 +2946,13 @@ class MainWindow(QMainWindow):
             self._key_column_width = max(60, _new)
             self._prefs_extras["TABLE_KEY_WIDTH"] = str(self._key_column_width)
             self._apply_table_layout()
-            if self._wrap_text:
-                self._clear_row_height_cache()
-                self._schedule_row_resize()
+            self._schedule_resize_reflow()
             return
         if logical_index == 3:
             self._status_column_width = max(60, _new)
             self._prefs_extras["TABLE_STATUS_WIDTH"] = str(self._status_column_width)
             self._apply_table_layout()
-            if self._wrap_text:
-                self._clear_row_height_cache()
-                self._schedule_row_resize()
+            self._schedule_resize_reflow()
             return
         if logical_index not in (1, 2):
             return
@@ -2962,9 +2983,7 @@ class MainWindow(QMainWindow):
             self._prefs_extras["TABLE_SRC_RATIO"] = (
                 f"{self._source_translation_ratio:.6f}"
             )
-            if self._wrap_text:
-                self._clear_row_height_cache()
-                self._schedule_row_resize()
+            self._schedule_resize_reflow()
 
     def _save_current(self) -> bool:
         """Patch file on disk if there are unsaved value edits."""
@@ -5116,8 +5135,7 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if self.table.model():
             self._apply_table_layout()
-        if self._wrap_text and self._is_large_file():
-            self._schedule_row_resize()
+        self._schedule_resize_reflow()
         if self.replace_toolbar.isVisible():
             self._align_replace_bar()
 
@@ -5336,6 +5354,7 @@ class MainWindow(QMainWindow):
         timers = [
             self._search_timer,
             self._row_resize_timer,
+            self._resize_reflow_timer,
             self._scroll_idle_timer,
             self._tooltip_timer,
             self._tree_width_timer,

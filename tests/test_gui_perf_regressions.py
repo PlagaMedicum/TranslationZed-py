@@ -129,3 +129,105 @@ def test_large_file_scroll_and_selection_stability(
         f"file={filename} rows={rows}",
     )
     assert elapsed_ms <= budget_ms
+
+
+def test_header_resize_reflow_is_debounced(qtbot, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    root = _make_perf_project(tmp_path, files=("SurvivalGuide_BE.txt",))
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win.show()
+
+    _open_file(win, root / "BE" / "SurvivalGuide_BE.txt")
+    model = win.table.model()
+    assert model is not None
+    win._wrap_text_user = True
+    win._apply_wrap_mode()
+    win._row_resize_timer.stop()
+    win._resize_reflow_timer.stop()
+    win._resize_reflow_pending = False
+
+    clear_calls = 0
+    resize_calls = 0
+    original_clear = win._clear_row_height_cache
+    original_resize = win._schedule_row_resize
+
+    def _spy_clear(rows=None):
+        nonlocal clear_calls
+        clear_calls += 1
+        return original_clear(rows)
+
+    def _spy_resize(*, full: bool = False):
+        nonlocal resize_calls
+        resize_calls += 1
+        return original_resize(full=full)
+
+    monkeypatch.setattr(win, "_clear_row_height_cache", _spy_clear)
+    monkeypatch.setattr(win, "_schedule_row_resize", _spy_resize)
+
+    header = win.table.horizontalHeader()
+    base = header.sectionSize(1)
+    for delta in (8, 16, 24, 32):
+        win._on_header_resized(1, base, base + delta)
+
+    assert clear_calls == 0
+    assert resize_calls == 0
+    assert win._resize_reflow_pending is True
+    win._resize_reflow_timer.stop()
+    win._flush_resize_reflow()
+    assert clear_calls == 1
+    assert resize_calls == 1
+    win._flush_resize_reflow()
+    assert clear_calls == 1
+    assert resize_calls == 1
+
+
+def test_splitter_resize_reflow_is_debounced(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    root = _make_perf_project(tmp_path, files=("SurvivalGuide_BE.txt",))
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win.show()
+
+    _open_file(win, root / "BE" / "SurvivalGuide_BE.txt")
+    model = win.table.model()
+    assert model is not None
+    win._wrap_text_user = True
+    win._apply_wrap_mode()
+    win._row_resize_timer.stop()
+    win._resize_reflow_timer.stop()
+    win._resize_reflow_pending = False
+
+    clear_calls = 0
+    resize_calls = 0
+    original_clear = win._clear_row_height_cache
+    original_resize = win._schedule_row_resize
+
+    def _spy_clear(rows=None):
+        nonlocal clear_calls
+        clear_calls += 1
+        return original_clear(rows)
+
+    def _spy_resize(*, full: bool = False):
+        nonlocal resize_calls
+        resize_calls += 1
+        return original_resize(full=full)
+
+    monkeypatch.setattr(win, "_clear_row_height_cache", _spy_clear)
+    monkeypatch.setattr(win, "_schedule_row_resize", _spy_resize)
+
+    for _ in range(5):
+        win._on_content_splitter_moved(0, 0)
+
+    assert clear_calls == 0
+    assert resize_calls == 0
+    assert win._resize_reflow_pending is True
+    win._resize_reflow_timer.stop()
+    win._flush_resize_reflow()
+    assert clear_calls == 1
+    assert resize_calls == 1
+    win._flush_resize_reflow()
+    assert clear_calls == 1
+    assert resize_calls == 1

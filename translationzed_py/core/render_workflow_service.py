@@ -72,11 +72,16 @@ class RenderWorkflowService:
         total_rows: int,
         margin: int,
         large_file_mode: bool,
+        render_heavy: bool,
     ) -> tuple[int, int] | None:
         if span is None or total_rows <= 0:
             return None
         start, end = span
         effective_margin = min(margin, 50) if large_file_mode else margin
+        if render_heavy:
+            effective_margin = min(effective_margin, 12)
+        if large_file_mode and render_heavy:
+            effective_margin = min(effective_margin, 8)
         return (
             max(0, start - effective_margin),
             min(total_rows - 1, end + effective_margin),
