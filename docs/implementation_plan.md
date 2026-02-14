@@ -9,7 +9,7 @@ Legend:
 - [✓] done
 - [→] in progress
 - [ ] pending
-- [≈] deferred (agreed not to implement in v0.1)
+- [≈] deferred (agreed not to implement in current release scope)
 
 ---
 
@@ -205,10 +205,15 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Decision: **no dot** for status‑only changes until a future option allows
   writing status comments to original files.
 
-### Step 17 — Reference locale comparisons [≈ future]
-- Touchpoints: `gui/main_window.py` + new comparison view
-- Acceptance:
-  - Source can switch from EN to another locale
+### Step 17 — Reference locale comparisons [→]
+- Touchpoints: `gui/main_window.py` + comparison widgets/services
+- v0.6 scope:
+  - Read-only preview of the current key across other opened locales
+    (value + compact `U/T/FR/P` status tag per locale) in a compact side/bottom surface.
+  - Variants are ordered by current session locale order.
+  - Keep current EN-as-source editing model unchanged.
+- Deferred (post-v0.6):
+  - Full Source-column locale switching (EN -> arbitrary reference locale).
 
 ### Step 18 — Preferences window [✓]
 - Touchpoints: `gui/preferences_dialog.py` (new), `core/preferences.py`
@@ -335,7 +340,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 
 ---
 
-## 3) MVP Acceptance Checklist (v0.1)
+## 3) Baseline Acceptance Checklist (historical v0.1)
 
 [✓] Open project, select locales (EN hidden)  
 [✓] File tree + table (Key | Source | Translation | Status)  
@@ -364,7 +369,7 @@ v0.6.0 exit criteria (must all be true):
 Out of scope for v0.6.0:
 - LanguageTool integration.
 - Cross-locale TM suggestions.
-- Full QA suite beyond the first opt-in checks.
+- Translation QA checks (same-as-source, trailing/newline/escape checks).
 
 Execution order for v0.6.0 (strict sequence):
 1. Close `A‑P0` first: no-write-on-open guard, read-only encoding diagnostics,
@@ -375,7 +380,8 @@ Execution order for v0.6.0 (strict sequence):
    large-file GUI regression tests.
 4. Advance `C1` TM robustness: ranking diagnostics assertions, production-max
    stress fixtures, and short-query acceptance coverage.
-5. Deliver `C2` QA MVP: non-blocking checks + persistent toggles + navigable warnings.
+5. Deliver TM/context UX extensions: project-TM status visibility and
+   cross-locale variants preview for current key (opened locales only).
 6. Execute `A8` hardening: two consecutive cross-platform RC dry-runs with artifact builds.
 7. Final v0.6 polish: update docs/checklists/changelog only after steps 1..6 are green.
 
@@ -807,21 +813,26 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Search side panel now exposes minimal clickable results list (`<path>:<row>`) wired to toolbar search scope/query.
      - [✓] Preferences TM tab now exposes a dedicated **Diagnostics** action with copyable report window (policy + import/query summary).
      - [✓] Preferences TM tab format hints now use explicit **Supported now / Planned later** matrix text.
+     - [ ] TM suggestions should display project-TM row status for each project-origin match
+       as compact tags (`U/T/FR/P`); imported matches show no status/`n/a`.
+     - [ ] Add current-key cross-locale variants preview (other opened locales only):
+       session-order locale code/name + value + compact status tag (`U/T/FR/P`)
+       in a compact read-only panel.
      - [ ] Add TM diagnostics snapshot assertions for recall quality (`visible`, `fuzzy`, `unique_sources`, `recall_density`) on production-like data slices.
      - [ ] Add larger imported-TM stress fixture sized to **production maximum segment count**
        (derive baseline from largest real TMX corpus used in production).
      - [ ] Add short-query ranking acceptance cases for additional pairs (`Run/Rest`, `Make item/Make new item`) with low threshold guarantees.
      - [ ] Add preferences-side inline warning banner for zero-segment imported TMs (beside existing marker in list rows).
    - **Deferred**: LanguageTool API (post‑v0.6).
-C2 [→] **Translation QA checks (v0.6 MVP)** (Step 30).
+C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes, placeholders) are easy to miss.
    - **Target**: opt‑in QA panel with per-check toggles; non-blocking warnings by default.
-   - **v0.6 MVP scope**:
+   - **Planned scope**:
      - [ ] Missing trailing characters.
      - [ ] Missing/extra newlines.
      - [ ] Missing escape sequences / code blocks / placeholders.
      - [ ] Translation equals Source.
-   - **Out of MVP**:
+   - **Out of planned QA scope**:
      - Advanced QA rule sets and per-project custom rules.
    - **Acceptance**:
      - [ ] QA checks run without blocking editing.
@@ -843,9 +854,10 @@ C2 [→] **Translation QA checks (v0.6 MVP)** (Step 30).
 
 ---
 
-## 6) Deferred Items (post‑v0.1)
+## 6) Deferred Items (post‑v0.6)
 
-- Reference locale comparison window
+- Full Source-column reference-locale switching window
+  (read-only cross-locale variants preview is already in v0.6 scope)
 - Program‑generated comments (`TZP:`) with optional write‑back
 - English diff markers (NEW / REMOVED / MODIFIED)
 - Crash recovery beyond cache (if ever needed)

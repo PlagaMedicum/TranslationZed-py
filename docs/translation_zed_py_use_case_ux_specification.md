@@ -219,7 +219,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 ### UC-12  Crash Recovery (Deferred)
 | **Trigger** | Application restarts after abnormal termination. |
 | **Flow** |
-|  1 | v0.1 relies on `.tzp/cache` only; no extra recovery file is created. |
+|  1 | Current scope relies on `.tzp/cache` only; no extra recovery file is created. |
 |  2 | Future: optional recovery prompt may be added if cache is extended. |
 
 ### UC-13a  Side Panel Mode Switch
@@ -243,7 +243,8 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  4 | SYS keeps near neighbors visible even when prefixes differ (for example, `Drop one` can surface `Drop all` at low thresholds). |
 |  5 | SYS suppresses substring-only one-token noise (for example, `all` should not match `small` only by substring). |
 |  6 | SYS shows diagnostics with ranked score and raw similarity score for each selected suggestion. |
-|  7 | SYS shows clear empty/error states: no context, no matches, filtered-out, query failure. |
+|  7 | SYS shows project-row status for project-origin suggestions as compact tags (`U/T/FR/P`); imported suggestions show no status marker. |
+|  8 | SYS shows clear empty/error states: no context, no matches, filtered-out, query failure. |
 | **Post-condition** | TM list reflects current row and active filters without blocking the UI thread. |
 
 ### UC-13c  Apply TM Suggestion
@@ -324,6 +325,19 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  4 | SYS shows diagnostics in a copyable text window (Copy + Close). |
 | **Post-condition** | User gets immediate TM-state diagnostics without mutating TM data. |
 
+### UC-13l  Cross-Locale Variants Preview
+| Field | Value |
+|-------|-------|
+| **Goal** | Show how the current key is translated in other opened locales. |
+| **Primary Actor** | TR / PR |
+| **Trigger** | Row selection changes while at least two target locales are opened. |
+| **Main Success Scenario** |
+|  1 | SYS collects the current key and finds matching entries by key in other opened target locales. |
+|  2 | SYS renders a compact read-only list with locale code/name, value, and compact row-status tag (`U/T/FR/P`) in **session locale order**. |
+|  3 | SYS excludes the currently edited locale from this preview list. |
+|  4 | If no sibling locales are opened or key is missing there, SYS shows an explicit empty state. |
+| **Post-condition** | Translator can compare cross-locale phrasing without switching files/locales. |
+
 ---
 ## 4  GUI Wireframe (ASCII)
 ```
@@ -343,10 +357,12 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 ┌─Side panel: TM──────────────────────────────────────┐
 │ Min score [%] [Project] [Imported] [↻ Rebuild TM]  │
 │ Ranked suggestions list + full Source/Translation   │
+│ (project suggestions include their row status)      │
 └──────────────────────────────────────────────────────┘
 ┌─Detail editors (optional, Poedit-style)─────────────┐
 │ Source (read‑only, scrollable, multi‑line)          │
 │ Translation (editable, scrollable, multi‑line)      │
+│ Locale variants (read-only: locale/value/status)    │
 └────────────────────────────────────────────────────┘
 ┌─Status bar───────────────────────────────────────────────────────────────────┐
 │ [String editor ⌄] "Saved 12:34:56" | Row 123 / 450 | BE/sub/dir/file.txt        │
@@ -382,7 +398,7 @@ UNTOUCHED ──────────────────────▶ 
 1. **File Encoding**: Each locale *may* use a different charset.  SYS MUST read `<locale>/language.txt` for the `charset = …` setting (e.g. `Cp1251`) and decode all files accordingly.  When saving, files SHOULD be written back in the same charset; missing `charset` is a hard error for that locale and the locale cannot open until fixed (warning shown, other locales still open).
 2. **Multiline Strings**: handled via parser token concatenation; no GUI wrap concerns beyond row height.
 3. **Locale Names**: display labels are taken from `<locale>/language.txt` (`text = ...`); locale code is the directory name.
-4. **Accessibility**: basic; no screen‑reader optimisation in MVP.\
+4. **Accessibility**: basic; no screen‑reader optimisation in current scope.
 5. **Draft Cache**: SYS MUST persist entry statuses **and draft translations**
    into binary file `.bin` **in the currently selected locale folder
    only** (see Technical Spec §5.9).  Cache is loaded on project open and
@@ -431,4 +447,4 @@ UNTOUCHED ──────────────────────▶ 
    translation equals Source). Implement **only after** TM import/export is complete.
 
 ---
-_Last updated: 2026‑02‑11 (v0.6.0-dev)_
+_Last updated: 2026‑02‑13 (v0.6.0-dev)_
