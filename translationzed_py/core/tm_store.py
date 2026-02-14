@@ -12,7 +12,7 @@ from pathlib import Path
 from .app_config import LEGACY_CONFIG_DIR
 from .app_config import load as _load_app_config
 from .model import Status
-from .tmx_io import iter_tmx_pairs, write_tmx
+from .tmx_io import iter_tm_pairs, write_tmx
 
 _PROJECT_ORIGIN = "project"
 _IMPORT_ORIGIN = "import"
@@ -620,9 +620,16 @@ class TMStore:
         return count
 
     def import_tmx(self, path: Path, *, source_locale: str, target_locale: str) -> int:
+        return self.import_tm(
+            path,
+            source_locale=source_locale,
+            target_locale=target_locale,
+        )
+
+    def import_tm(self, path: Path, *, source_locale: str, target_locale: str) -> int:
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
-        pairs = iter_tmx_pairs(path, source_locale, target_locale)
+        pairs = iter_tm_pairs(path, source_locale, target_locale)
         return self.insert_import_pairs(
             pairs,
             source_locale=source_locale,
@@ -632,6 +639,25 @@ class TMStore:
         )
 
     def replace_import_tmx(
+        self,
+        path: Path,
+        *,
+        source_locale: str,
+        target_locale: str,
+        source_locale_raw: str = "",
+        target_locale_raw: str = "",
+        tm_name: str | None = None,
+    ) -> int:
+        return self.replace_import_tm(
+            path,
+            source_locale=source_locale,
+            target_locale=target_locale,
+            source_locale_raw=source_locale_raw,
+            target_locale_raw=target_locale_raw,
+            tm_name=tm_name,
+        )
+
+    def replace_import_tm(
         self,
         path: Path,
         *,
@@ -664,7 +690,7 @@ class TMStore:
             (_IMPORT_ORIGIN, path_str),
         )
         count = self.insert_import_pairs(
-            iter_tmx_pairs(path, source_locale, target_locale),
+            iter_tm_pairs(path, source_locale, target_locale),
             source_locale=source_locale,
             target_locale=target_locale,
             tm_name=name,

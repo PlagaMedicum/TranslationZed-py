@@ -5,9 +5,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .tm_store import TMImportFile, TMStore
-from .tmx_io import detect_tmx_languages
+from .tmx_io import detect_tm_languages, supported_tm_import_suffixes
 
 LocaleResolver = Callable[[Path, set[str]], tuple[tuple[str, str] | None, bool]]
+_SUPPORTED_TM_IMPORT_SUFFIXES = frozenset(supported_tm_import_suffixes())
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +35,11 @@ def sync_import_folder(
         for path in only_paths or set()
         if path.exists() and path.is_file()
     }
-    files = sorted(path.resolve() for path in tm_dir.glob("*.tmx") if path.is_file())
+    files = sorted(
+        path.resolve()
+        for path in tm_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in _SUPPORTED_TM_IMPORT_SUFFIXES
+    )
     if target_paths:
         files = [path for path in files if path in target_paths]
     records = {
@@ -74,7 +79,7 @@ def sync_import_folder(
         ):
             continue
         try:
-            langs = detect_tmx_languages(path)
+            langs = detect_tm_languages(path)
         except Exception as exc:
             failures.append(f"{path.name}: {exc}")
             store.upsert_import_file(
@@ -113,14 +118,14 @@ def sync_import_folder(
                 file_size=stat.st_size,
                 status="needs_mapping",
                 note=(
-                    "Locale pair is unresolved for this TMX file. "
+                    "Locale pair is unresolved for this TM file. "
                     "Use TM menu to resolve."
                 ),
             )
             continue
         source_locale, target_locale = pair
         try:
-            count = store.replace_import_tmx(
+            count = store.replace_import_tm(
                 path,
                 source_locale=source_locale,
                 target_locale=target_locale,

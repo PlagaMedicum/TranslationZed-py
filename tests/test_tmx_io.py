@@ -1,8 +1,11 @@
 from pathlib import Path
 
 from translationzed_py.core.tmx_io import (
+    detect_tm_languages,
     detect_tmx_languages,
+    iter_tm_pairs,
     iter_tmx_pairs,
+    supported_tm_import_suffixes,
     write_tmx,
 )
 
@@ -42,3 +45,53 @@ def test_iter_tmx_pairs_matches_bcp47_region_variants(tmp_path: Path) -> None:
     )
     parsed = list(iter_tmx_pairs(path, "EN", "BE"))
     assert parsed == [("Hello world", "Прывітанне свет")]
+
+
+def test_iter_tm_pairs_xliff_and_detect_languages(tmp_path: Path) -> None:
+    path = tmp_path / "sample.xliff"
+    path.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2">
+  <file source-language="en-US" target-language="be-BY" datatype="plaintext">
+    <body>
+      <trans-unit id="1">
+        <source>Hello world</source>
+        <target>Прывітанне свет</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>
+""",
+        encoding="utf-8",
+    )
+    parsed = list(iter_tm_pairs(path, "EN", "BE"))
+    assert parsed == [("Hello world", "Прывітанне свет")]
+    langs = detect_tm_languages(path)
+    assert "en-US" in langs
+    assert "be-BY" in langs
+
+
+def test_iter_tm_pairs_po_and_detect_languages(tmp_path: Path) -> None:
+    path = tmp_path / "sample.po"
+    path.write_text(
+        """
+msgid ""
+msgstr ""
+"Language: be\\n"
+"X-Source-Language: en\\n"
+
+msgid "Hello world"
+msgstr "Прывітанне свет"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    parsed = list(iter_tm_pairs(path, "EN", "BE"))
+    assert parsed == [("Hello world", "Прывітанне свет")]
+    langs = detect_tm_languages(path)
+    assert "en" in langs
+    assert "be" in langs
+
+
+def test_supported_tm_import_suffixes() -> None:
+    assert supported_tm_import_suffixes() == (".tmx", ".xliff", ".po")

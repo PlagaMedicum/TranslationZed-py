@@ -30,6 +30,46 @@ def _write_tmx(path: Path, source_lang: str = "EN", target_lang: str = "RU") -> 
     )
 
 
+def _write_xliff(
+    path: Path,
+    source_lang: str = "en-US",
+    target_lang: str = "ru-RU",
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"""<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2">
+  <file source-language="{source_lang}" target-language="{target_lang}" datatype="plaintext">
+    <body>
+      <trans-unit id="1">
+        <source>Hello world</source>
+        <target>Privet mir</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>
+""",
+        encoding="utf-8",
+    )
+
+
+def _write_po(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        """
+msgid ""
+msgstr ""
+"Language: ru\\n"
+"X-Source-Language: en\\n"
+
+msgid "Hello world"
+msgstr "Privet mir"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def test_sync_import_folder_imports_and_reports_changed(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()
@@ -57,6 +97,66 @@ def test_sync_import_folder_imports_and_reports_changed(tmp_path: Path) -> None:
         target_locale="RU",
         origins=["import"],
     )
+    store.close()
+
+
+def test_sync_import_folder_imports_xliff_file(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    xliff_path = tm_dir / "pack_ru.xliff"
+    _write_xliff(xliff_path)
+    store = TMStore(root)
+
+    report = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+
+    assert report.imported_segments == 1
+    assert report.imported_files == ("pack_ru.xliff (1 segment(s))",)
+    assert report.failures == ()
+    assert store.query(
+        "Hello world",
+        source_locale="EN",
+        target_locale="RU",
+        origins=["import"],
+    )
+    records = store.list_import_files()
+    assert len(records) == 1
+    assert records[0].source_locale_raw == "en-US"
+    assert records[0].target_locale_raw == "ru-RU"
+    store.close()
+
+
+def test_sync_import_folder_imports_po_file(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    po_path = tm_dir / "pack_ru.po"
+    _write_po(po_path)
+    store = TMStore(root)
+
+    report = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+
+    assert report.imported_segments == 1
+    assert report.imported_files == ("pack_ru.po (1 segment(s))",)
+    assert report.failures == ()
+    assert store.query(
+        "Hello world",
+        source_locale="EN",
+        target_locale="RU",
+        origins=["import"],
+    )
+    records = store.list_import_files()
+    assert len(records) == 1
+    assert records[0].source_locale_raw == "en"
+    assert records[0].target_locale_raw == "ru"
     store.close()
 
 
