@@ -697,6 +697,7 @@ def build_diagnostics_report(
     lookup: tuple[str, str] | None,
     matches: Iterable[TMMatch] | None = None,
 ) -> str:
+    db_display = Path(str(db_path)).as_posix()
     import_list = list(import_files)
     ready_imports = sum(1 for rec in import_list if rec.status == "ready")
     enabled_imports = sum(
@@ -704,7 +705,7 @@ def build_diagnostics_report(
     )
     pending_imports = len(import_list) - ready_imports
     lines = [
-        f"TM DB: {db_path}",
+        f"TM DB: {db_display}",
         (
             "Policy: "
             f"min={policy.min_score}% limit={policy.limit} "

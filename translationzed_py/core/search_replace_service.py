@@ -621,9 +621,9 @@ def scope_files(
 
 def search_result_label(*, match: Match, root: Path) -> str:
     try:
-        rel = str(match.file.relative_to(root))
+        rel = match.file.relative_to(root).as_posix()
     except ValueError:
-        rel = str(match.file)
+        rel = match.file.as_posix()
     base = f"{rel}:{match.row + 1}"
     preview = str(getattr(match, "preview", "")).strip()
     if not preview:

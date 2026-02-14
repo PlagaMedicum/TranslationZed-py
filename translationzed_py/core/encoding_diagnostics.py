@@ -127,7 +127,7 @@ def format_encoding_report(
     language_errors: list[str],
     issues: list[EncodingIssue],
 ) -> str:
-    lines = [f"Encoding diagnostics: {root}"]
+    lines = [f"Encoding diagnostics: {root.as_posix()}"]
     if language_errors:
         lines.append(f"Language metadata issues: {len(language_errors)}")
         for err in language_errors:
@@ -137,9 +137,9 @@ def format_encoding_report(
         for issue in issues:
             try:
                 rel = issue.path.relative_to(root)
-                rel_path = str(rel)
+                rel_path = rel.as_posix()
             except ValueError:
-                rel_path = str(issue.path)
+                rel_path = issue.path.as_posix()
             detected = f" detected={issue.detected}" if issue.detected else ""
             lines.append(
                 f"- [{issue.severity}] {issue.code}: {rel_path}"

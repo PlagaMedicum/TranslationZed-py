@@ -7,6 +7,10 @@ from translationzed_py.core.tm_store import TMImportFile, TMMatch
 from translationzed_py.core.tm_workflow_service import TMWorkflowService
 
 
+def _path_text(value: object) -> str:
+    return Path(str(value)).as_posix()
+
+
 def _match(
     *,
     source: str,
@@ -212,9 +216,9 @@ def test_tm_workflow_sync_import_folder_wrapper_delegates(monkeypatch) -> None:
     )
 
     assert report == "ok"
-    assert str(calls["tm_dir"]) == "/tmp/tm"
+    assert _path_text(calls["tm_dir"]) == "/tmp/tm"
     assert calls["pending_only"] is True
-    assert {str(p) for p in calls["only_paths"]} == {"/tmp/tm/a.tmx"}
+    assert {_path_text(p) for p in calls["only_paths"]} == {"/tmp/tm/a.tmx"}
     assert callable(calls["resolve_locales"])
 
 
@@ -264,7 +268,7 @@ def test_tm_workflow_rebuild_project_tm_wrapper_delegates(monkeypatch) -> None:
         batch_size=123,
     )
     assert result == "ok"
-    assert str(calls["root"]) == "/tmp/proj"
+    assert _path_text(calls["root"]) == "/tmp/proj"
     assert calls["locales"] == []
     assert calls["source_locale"] == "EN"
     assert calls["en_encoding"] == "utf-8"

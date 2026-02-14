@@ -481,7 +481,7 @@ def build_orphan_cache_warning(
             rel = path.relative_to(root)
         except ValueError:
             rel = path
-        rels.append(str(rel))
+        rels.append(rel.as_posix())
     preview = "\n".join(rels[:preview_limit])
     if len(rels) > preview_limit:
         preview = f"{preview}\n... ({len(rels) - preview_limit} more)"

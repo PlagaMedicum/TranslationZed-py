@@ -99,9 +99,9 @@ def build_save_dialog_labels(files: Sequence[Path], *, root: Path) -> tuple[str,
     labels: list[str] = []
     for path in files:
         try:
-            labels.append(str(path.relative_to(root)))
+            labels.append(path.relative_to(root).as_posix())
         except ValueError:
-            labels.append(str(path))
+            labels.append(path.as_posix())
     return tuple(labels)
 
 
@@ -123,9 +123,9 @@ def format_save_failures(*, failures: Sequence[Path], root: Path) -> str:
     lines: list[str] = []
     for path in failures:
         try:
-            lines.append(str(path.relative_to(root)))
+            lines.append(path.relative_to(root).as_posix())
         except ValueError:
-            lines.append(str(path))
+            lines.append(path.as_posix())
     return "\n".join(lines)
 
 
