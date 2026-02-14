@@ -631,26 +631,31 @@ UNTOUCHED).
     very low thresholds return deeper candidate lists.
   - Imported rows are query-visible only when the import record is **enabled** and in **ready** state.
   - Detailed algorithm contract is defined in `docs/tm_ranking_algorithm.md`.
-- TMX import/export:
-  - `core.tmx_io.iter_tmx_pairs` streams `<tu>`/`<tuv>` pairs for a **source+target locale**.
+- TM import/export:
+  - `core.tmx_io.iter_tm_pairs` dispatches import parsing by extension:
+    `.tmx` (TMX 1.4), `.xliff` (XLIFF), `.po` (GNU gettext PO).
   - TMX locale matching accepts BCP47-style region variants (e.g. `en-US` matches `EN`,
     `be-BY` matches `BE`) to avoid zero-unit imports for region-tagged memories.
+  - XLIFF import reads `<source>/<target>` segment pairs (1.2/2.x style structures)
+    and uses embedded locale metadata when present.
+  - PO import reads `msgid`/`msgstr` units; locale tags are detected from PO headers
+    when available (`Language`, `Source-Language`, `X-Source-Language`).
   - `core.tmx_io.write_tmx` exports current TM to TMX for a source+target locale pair.
   - `core.tm_import_sync.sync_import_folder` owns managed-folder sync decisions (new/changed/missing,
     pending mapping, error capture) without Qt dependencies.
-  - Imported TMX files are copied into and synchronized from `TM_IMPORT_DIR`; drop-in files are
+  - Imported TM files (`.tmx`, `.xliff`, `.po`) are copied into and synchronized from `TM_IMPORT_DIR`; drop-in files are
     discovered on TM panel activation (synchronization trigger).
-  - Locale mapping for imported TMX is auto-detected when reliable; unresolved files trigger an
+  - Locale mapping for imported TM files is auto-detected when reliable; unresolved files trigger an
     immediate locale-mapping dialog when TM panel is opened, with **Skip all for now** support.
   - Pending/unresolved/error imported files are excluded from TM suggestions until resolved.
   - A `ready` import record with zero import entries is treated as stale and re-imported
     on next sync, so older failed/partial imports self-heal automatically.
-  - Import registry stores normalized locales, original TMX locale tags, and last imported segment count per TM file.
+  - Import registry stores normalized locales, original source locale tags, and last imported segment count per TM file.
   - Sync summary reports imported/unresolved/failed files; zero-segment imports are surfaced as warnings.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
     new imports, with per-file segment counts and raw locale-tag metadata display.
   - Preferences TM tab shows explicit `Supported now`/`Planned later` format matrix plus
-    storage paths (`TMX .tmx`, `.tzp/config/tm.sqlite`, `.tzp/tms`) to reduce import/export ambiguity.
+    storage paths (`TMX/XLIFF/PO import`, `TMX export`, `.tzp/config/tm.sqlite`, `.tzp/tms`) to reduce import/export ambiguity.
   - TM operational commands (resolve pending imports, export TMX, rebuild TM) are executed from
     Preferences TM tab; top menu does not duplicate these commands.
   - Preferences TM tab includes a `Diagnostics` command that reports active policy and

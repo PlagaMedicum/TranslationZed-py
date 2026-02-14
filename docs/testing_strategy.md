@@ -166,7 +166,7 @@ They include:
   Translation delta updates while editing.
 - GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
-- TM: SQLite store round‑trip, exact/fuzzy query, TMX import/export.
+- TM: SQLite store round‑trip, exact/fuzzy query, TM import (TMX/XLIFF/PO), TMX export.
 - TM import metadata: per-file import registry, replace/delete lifecycle, TM source-name propagation,
   and query gating for `enabled`/`ready` import files.
 - TM ranking regressions: short-query neighbors (`All` -> `Apply all`), multi-token non-prefix

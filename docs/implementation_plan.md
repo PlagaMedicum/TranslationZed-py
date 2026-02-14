@@ -775,7 +775,7 @@ C1 [→] **Translation memory** (Step 29).
    - **Target**: local SQLite TM + TMX import/export, non‑blocking suggestions.
    - **Scope now**:
      - SQLite store under `.tzp/config/tm.sqlite` (project‑scoped).
-     - TMX import/export (external TMs) for a **source+target locale pair** only.
+     - TM import (TMX/XLIFF/PO) and TMX export for a **source+target locale pair** only.
      - TM suggestions panel (side‑panel switcher: Files / TM / Search).
      - Ranking: exact match 100%, fuzzy down to ~5% (project TM outranks imported).
      - [✓] Non‑blocking TM suggestion lookup (background worker + stale result guard).
@@ -783,7 +783,8 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Project‑TM rebuild/bootstrap for selected locales (menu action + auto‑bootstrap if empty, background worker).
      - [✓] TM filters: minimum score and origin toggles (project/import), persisted in preferences.
      - [✓] Managed TM import folder (`TM_IMPORT_DIR`) with default under runtime root; configurable in Preferences.
-     - [✓] TMX import now copies files into managed folder; drop-in `.tmx` files are discovered and synced.
+     - [✓] TM import now copies files into managed folder; drop-in supported TM files are discovered and synced.
+     - [✓] Imported TM format support extended to `.xliff` and `.po` (alongside `.tmx`); drop-in sync scans all supported import extensions.
      - [✓] Locale-pair safety for imported TMs: unresolved locale metadata is kept pending until mapped manually.
      - [✓] TM panel open triggers import-folder sync and immediate mapping dialogs; mapping dialog supports **Skip all for now**.
      - [✓] TMX import locale matching accepts region variants (`en-US`/`be-BY` -> `EN`/`BE`) to prevent zero-segment imports from locale-tag mismatch.
@@ -823,6 +824,7 @@ C1 [→] **Translation memory** (Step 29).
        (derive baseline from largest real TMX corpus used in production).
      - [✓] Add short-query ranking acceptance cases for additional pairs (`Run/Rest`, `Make item/Make new item`) with low threshold guarantees.
      - [ ] Add preferences-side inline warning banner for zero-segment imported TMs (beside existing marker in list rows).
+     - [ ] Add deferred import/export format adapters (XML, CSV, POT, MO, XLF, XLSX) behind the same import-workflow contract.
    - **Deferred**: LanguageTool API (post‑v0.6).
 C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes, placeholders) are easy to miss.
