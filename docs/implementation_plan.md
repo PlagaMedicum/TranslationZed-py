@@ -818,10 +818,10 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Add current-key cross-locale variants preview (other opened locales only):
        session-order locale code/name + value + compact status tag (`U/T/FR/P`)
        in a compact read-only panel.
-     - [ ] Add TM diagnostics snapshot assertions for recall quality (`visible`, `fuzzy`, `unique_sources`, `recall_density`) on production-like data slices.
+     - [✓] Add TM diagnostics snapshot assertions for recall quality (`visible`, `fuzzy`, `unique_sources`, `recall_density`) on production-like data slices.
      - [ ] Add larger imported-TM stress fixture sized to **production maximum segment count**
        (derive baseline from largest real TMX corpus used in production).
-     - [ ] Add short-query ranking acceptance cases for additional pairs (`Run/Rest`, `Make item/Make new item`) with low threshold guarantees.
+     - [✓] Add short-query ranking acceptance cases for additional pairs (`Run/Rest`, `Make item/Make new item`) with low threshold guarantees.
      - [ ] Add preferences-side inline warning banner for zero-segment imported TMs (beside existing marker in list rows).
    - **Deferred**: LanguageTool API (post‑v0.6).
 C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).

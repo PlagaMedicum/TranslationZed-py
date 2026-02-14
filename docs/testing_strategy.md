@@ -171,7 +171,8 @@ They include:
   and query gating for `enabled`/`ready` import files.
 - TM ranking regressions: short-query neighbors (`All` -> `Apply all`), multi-token non-prefix
   neighbors in both directions (`Drop one` -> `Drop all`/`Drop-all`, `Drop all` -> `Drop one`),
-  affix/prefix token variants
+  phrase-expansion and sibling pairs (`Make item` -> `Make new item`,
+  `Official: Run` <-> `Official: Rest`), affix/prefix token variants
   (`Run` -> `Running`/`Runner`), single-char typo neighbors (`Drop` -> `Drap`), and
   one-token substring-noise suppression.
 - TM query perf regression at auto-derived production baseline size
@@ -187,7 +188,8 @@ They include:
   in the default `make test` / `make verify` pipeline, with profile-level coverage
   (`synthetic_core` + `pz_fixture_like`) enforced in CI.
   Corpus includes minimum-recall density checks at low thresholds to prevent
-  exact-only collapse in fuzzy mode.
+  exact-only collapse in fuzzy mode, plus diagnostics snapshot minima
+  (`visible`, `fuzzy`, `unique_sources`, `recall_density`) on production-like slices.
 - TM bootstrap behavior: opening TM panel triggers one-time project bootstrap
   for selected locales even when DB already has stale partial entries
   (`tests/test_gui_tm_preferences.py`).

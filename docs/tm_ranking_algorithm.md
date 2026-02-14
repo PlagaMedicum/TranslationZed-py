@@ -143,6 +143,8 @@ The algorithm must satisfy:
 - `Drop one` can surface `Drop-all`/`Drop all` at low thresholds (for example 25%).
 - `Drop all` can surface `Drop one` at low thresholds (for example 5%).
 - `All` can surface `Apply all` at low thresholds.
+- `Official: Rest` can surface `Official: Run` and vice versa at low thresholds.
+- `Make item` can surface phrase-expansion neighbors such as `Make new item`.
 - `All` should not surface substring-only noise like `Small crate`.
 - Prefix/affix neighbors (`Run`, `Running`, `Runner`) remain query-visible.
 - In low-threshold mode (`min_score <= 10`), short action phrases must return
@@ -164,6 +166,9 @@ Regression tests cover:
 - Corpus assertions also enforce minimum-recall density for key low-threshold
   scenarios (`expect_min_results`, `expect_min_unique_sources`) so regressions
   that collapse to exact-only behavior fail CI.
+- Production-like corpus slices also assert diagnostics snapshot minima
+  (`visible`, `fuzzy`, `unique_sources`, `recall_density`) to keep recall
+  quality observable in CI.
 
 See `tests/test_tm_store.py` and `tests/test_tm_ranking_corpus.py` for executable examples.
 
