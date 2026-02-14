@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-02-14
+
+### Added
+- Dark theme support synchronized with system theme.
+- More deterministic cross-platform path normalization in diagnostics, prompts, and search labels.
+- Additional TM import formats and stronger TM relevance/ranking coverage.
+- Better save flow transparency (changed-file prompts and improved write intent visibility).
+
+### Changed
+- Main-window workflow orchestration continues to move into explicit services (`A0` refactor slices).
+- CI/release checks are stricter and include cross-platform gating before final tagging.
+
+### Fixed
+- Windows-specific path and separator regressions in tests and service outputs.
+- TM preview/query robustness and UI edge-case behavior during panel operations.
+
 ## [0.5.0] - 2026-02-09
 
 ### Added
