@@ -634,7 +634,8 @@ UNTOUCHED).
 - TM import/export:
   - `core.tmx_io.iter_tm_pairs` dispatches import parsing by extension:
     `.tmx` (TMX 1.4), `.xliff`/`.xlf` (XLIFF), `.po`/`.pot` (GNU gettext PO/POT),
-    `.csv` (two-column Source/Target CSV), `.mo` (GNU gettext MO).
+    `.csv` (two-column Source/Target CSV), `.mo` (GNU gettext MO),
+    `.xml` (generic source/target XML extraction).
   - TMX locale matching accepts BCP47-style region variants (e.g. `en-US` matches `EN`,
     `be-BY` matches `BE`) to avoid zero-unit imports for region-tagged memories.
   - XLIFF import reads `<source>/<target>` segment pairs (1.2/2.x style structures)
@@ -645,10 +646,12 @@ UNTOUCHED).
     Locale tags are optional and can be detected from `source_locale`/`target_locale` columns.
   - MO import reads gettext catalog `msgid`/`msgstr` pairs from binary `.mo` files;
     locale tags are detected from gettext metadata headers when available.
+  - XML import reads `<source>/<target>`-style structures (`tu`, `trans-unit`,
+    `segment`, `unit`, `entry`) and uses locale hints from standard XML attributes when present.
   - `core.tmx_io.write_tmx` exports current TM to TMX for a source+target locale pair.
   - `core.tm_import_sync.sync_import_folder` owns managed-folder sync decisions (new/changed/missing,
     pending mapping, error capture) without Qt dependencies.
-  - Imported TM files (`.tmx`, `.xliff`, `.xlf`, `.po`, `.pot`, `.csv`, `.mo`) are copied into and synchronized from `TM_IMPORT_DIR`; drop-in files are
+  - Imported TM files (`.tmx`, `.xliff`, `.xlf`, `.po`, `.pot`, `.csv`, `.mo`, `.xml`) are copied into and synchronized from `TM_IMPORT_DIR`; drop-in files are
     discovered on TM panel activation (synchronization trigger).
   - Locale mapping for imported TM files is auto-detected when reliable; unresolved files trigger an
     immediate locale-mapping dialog when TM panel is opened, with **Skip all for now** support.
@@ -662,7 +665,7 @@ UNTOUCHED).
   - TM Preferences tab shows an inline warning banner when one or more ready imported files have
     zero segments, so low-value imports are visible without opening per-row details.
   - Preferences TM tab shows explicit `Supported now`/`Planned later` format matrix plus
-    storage paths (`TMX/XLIFF/XLF/PO/POT/CSV/MO import`, `TMX export`, `.tzp/config/tm.sqlite`, `.tzp/tms`) to reduce import/export ambiguity.
+    storage paths (`TMX/XLIFF/XLF/PO/POT/CSV/MO/XML import`, `TMX export`, `.tzp/config/tm.sqlite`, `.tzp/tms`) to reduce import/export ambiguity.
   - TM operational commands (resolve pending imports, export TMX, rebuild TM) are executed from
     Preferences TM tab; top menu does not duplicate these commands.
   - Preferences TM tab includes a `Diagnostics` command that reports active policy and
