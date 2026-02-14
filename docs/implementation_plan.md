@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-13_
+_Last updated: 2026-02-14_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.5.0 is shipped; this plan now
@@ -318,7 +318,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - TMX import/export works for source+target locale pairs
   - Ranking keeps exact-first order and fuzzy recall down to 5% threshold
   - Imported TM visibility is controlled by ready/enabled state
-  - TM operations are centralized in Preferences -> TM tab
+  - Primary TM operations are in Preferences -> TM tab
+  - TM side panel retains rebuild as a quick-action glyph button
 
 ### Step 30 — Translation QA checks (post‑TM) [≈ future]
 - Dependency: **complete TM import/export** before starting this step.
@@ -362,9 +363,9 @@ Release target: **v0.6.0**
 
 v0.6.0 exit criteria (must all be true):
 - [✓] `A0`, `A7`, and `C1` are completed (no `[→]`/`[ ]` for their v0.6 scope).
-- [ ] Cross-platform CI (`linux`, `windows`, `macos`) is green on release branch.
+- [✓] Cross-platform CI (`linux`, `windows`, `macos`) is green on release branch.
 - [✓] `make verify` and `make release-check TAG=v0.6.0` pass before tagging.
-- [ ] Packaging smoke checks pass for Linux/Windows/macOS release workflow.
+- [✓] Packaging smoke checks pass for Linux/Windows/macOS release workflow.
 
 Out of scope for v0.6.0:
 - LanguageTool integration.
@@ -744,7 +745,7 @@ A7 [✓] **UI latency stabilization (scroll + paint)**
    - **Acceptance**: large single‑string files (News/Recorded_Media) open and scroll without jank;
      column resize/side‑panel toggles are smooth; no tooltip‑related freezes.
 
-A8 [→] **Cross-platform CI/release hardening**
+A8 [✓] **Cross-platform CI/release hardening**
    - **Problem**: Linux was stable, but macOS/Windows exposed path/EOL edge regressions close to release.
    - **Target**: keep CI green across all desktop runners with deterministic fixture behavior.
    - **Tasks**:
@@ -761,8 +762,8 @@ A8 [→] **Cross-platform CI/release hardening**
      - [✓] Prevent accidental release publishing on RC tags by excluding `v*-rc*` from `Release` workflow triggers.
    - **Dry-run definition**:
      - [✓] `make verify` + `make release-check TAG=v0.6.0-rcX` pass locally on the release branch.
-     - [ ] CI matrix (`linux`, `windows`, `macos`) is fully green for the same `v0.6.0-rcX` commit.
-     - [ ] Release workflow artifacts build successfully from that commit (without publishing final tag).
+     - [✓] CI matrix (`linux`, `windows`, `macos`) is fully green for the same `v0.6.0-rcX` commit.
+     - [✓] Release workflow artifacts build successfully from that commit (without publishing final tag).
    - **Acceptance**: no OS-specific flaky failures in two consecutive dry-runs (`rc1`, `rc2`) from different commits.
 
 Priority B — **Productivity/clarity**
