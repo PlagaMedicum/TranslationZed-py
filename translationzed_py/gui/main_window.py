@@ -1979,13 +1979,14 @@ class MainWindow(QMainWindow):
             "Import TM",
             str(self._root),
             (
-                "TM files (*.tmx *.xliff *.xlf *.po *.pot *.csv *.mo *.xml);;"
+                "TM files (*.tmx *.xliff *.xlf *.po *.pot *.csv *.mo *.xml *.xlsx);;"
                 "TMX files (*.tmx);;"
                 "XLIFF files (*.xliff *.xlf);;"
                 "PO files (*.po *.pot);;"
                 "CSV files (*.csv);;"
                 "MO files (*.mo);;"
                 "XML files (*.xml);;"
+                "XLSX files (*.xlsx);;"
                 "All files (*)"
             ),
         )

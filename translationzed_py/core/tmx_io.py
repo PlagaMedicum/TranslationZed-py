@@ -3,12 +3,14 @@ from __future__ import annotations
 import ast
 import csv
 import gettext
+import zipfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
 
 _XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
+_XML_REL_ID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
 _SUPPORTED_TM_IMPORT_SUFFIXES = (
     ".tmx",
     ".xliff",
@@ -18,6 +20,7 @@ _SUPPORTED_TM_IMPORT_SUFFIXES = (
     ".csv",
     ".mo",
     ".xml",
+    ".xlsx",
 )
 _CSV_SOURCE_HEADERS = frozenset(
     {
@@ -103,6 +106,9 @@ def iter_tm_pairs(
         return
     if suffix == ".xml":
         yield from iter_xml_pairs(path, source_locale, target_locale)
+        return
+    if suffix == ".xlsx":
+        yield from iter_xlsx_pairs(path, source_locale, target_locale)
         return
     raise ValueError(f"Unsupported TM import format: {path.suffix or '<none>'}")
 
@@ -191,6 +197,8 @@ def detect_tm_languages(path: Path, *, limit: int = 2000) -> set[str]:
         return detect_mo_languages(path)
     if suffix == ".xml":
         return detect_xml_languages(path, limit=limit)
+    if suffix == ".xlsx":
+        return detect_xlsx_languages(path, limit=limit)
     return set()
 
 
@@ -449,6 +457,57 @@ def detect_xml_languages(path: Path, *, limit: int = 2000) -> set[str]:
     return langs
 
 
+def iter_xlsx_pairs(
+    path: Path,
+    source_locale: str,
+    target_locale: str,
+) -> Iterator[tuple[str, str]]:
+    # Locale pair is resolved by import workflow; XLSX rows are source/target columns.
+    _ = source_locale, target_locale
+    with zipfile.ZipFile(path) as archive:
+        rows = _iter_xlsx_rows(archive)
+        first = next(rows, None)
+        if first is None:
+            return
+        source_idx, target_idx, has_header = _resolve_csv_column_indexes(first)
+        if not has_header:
+            source_text = _csv_value(first, source_idx)
+            target_text = _csv_value(first, target_idx)
+            if source_text and target_text:
+                yield source_text, target_text
+        for row in rows:
+            source_text = _csv_value(row, source_idx)
+            target_text = _csv_value(row, target_idx)
+            if source_text and target_text:
+                yield source_text, target_text
+
+
+def detect_xlsx_languages(path: Path, *, limit: int = 2000) -> set[str]:
+    langs: set[str] = set()
+    with zipfile.ZipFile(path) as archive:
+        rows = _iter_xlsx_rows(archive)
+        header = next(rows, None)
+        if header is None:
+            return langs
+        normalized = [_normalize_csv_header(cell) for cell in header]
+        source_idx = _find_csv_header_index(normalized, _CSV_SOURCE_LOCALE_HEADERS)
+        target_idx = _find_csv_header_index(normalized, _CSV_TARGET_LOCALE_HEADERS)
+        if source_idx is None and target_idx is None:
+            return langs
+        for count, row in enumerate(rows, start=1):
+            if source_idx is not None:
+                source_locale = _csv_value(row, source_idx)
+                if source_locale:
+                    langs.add(source_locale)
+            if target_idx is not None:
+                target_locale = _csv_value(row, target_idx)
+                if target_locale:
+                    langs.add(target_locale)
+            if len(langs) >= 32 or count >= limit:
+                break
+    return langs
+
+
 def iter_csv_pairs(
     path: Path,
     source_locale: str,
@@ -531,6 +590,120 @@ def _csv_value(row: list[str], idx: int) -> str:
     if idx < 0 or idx >= len(row):
         return ""
     return row[idx].strip()
+
+
+def _iter_xlsx_rows(archive: zipfile.ZipFile) -> Iterator[list[str]]:
+    shared_strings = _read_xlsx_shared_strings(archive)
+    sheet_path = _first_xlsx_sheet_path(archive)
+    with archive.open(sheet_path) as handle:
+        for _event, elem in ET.iterparse(handle, events=("end",)):
+            if _local_name(elem.tag) != "row":
+                continue
+            row_map: dict[int, str] = {}
+            fallback_idx = 0
+            for cell in elem:
+                if _local_name(cell.tag) != "c":
+                    continue
+                col_idx = _xlsx_col_from_ref(cell.attrib.get("r", ""))
+                if col_idx < 0:
+                    col_idx = fallback_idx
+                fallback_idx = max(fallback_idx, col_idx + 1)
+                row_map[col_idx] = _xlsx_cell_text(cell, shared_strings)
+            if row_map:
+                max_idx = max(row_map)
+                yield [row_map.get(idx, "") for idx in range(max_idx + 1)]
+            elem.clear()
+
+
+def _read_xlsx_shared_strings(archive: zipfile.ZipFile) -> list[str]:
+    if "xl/sharedStrings.xml" not in archive.namelist():
+        return []
+    values: list[str] = []
+    with archive.open("xl/sharedStrings.xml") as handle:
+        for _event, elem in ET.iterparse(handle, events=("end",)):
+            if _local_name(elem.tag) != "si":
+                continue
+            values.append(_seg_text(elem))
+            elem.clear()
+    return values
+
+
+def _first_xlsx_sheet_path(archive: zipfile.ZipFile) -> str:
+    fallback = sorted(
+        name
+        for name in archive.namelist()
+        if name.startswith("xl/worksheets/") and name.endswith(".xml")
+    )
+    if not fallback:
+        raise ValueError("XLSX has no worksheet XML files")
+    rels_path = "xl/_rels/workbook.xml.rels"
+    workbook_path = "xl/workbook.xml"
+    if rels_path not in archive.namelist() or workbook_path not in archive.namelist():
+        return fallback[0]
+    with archive.open(rels_path) as handle:
+        rels_root = ET.parse(handle).getroot()
+    rel_targets = {
+        rel.attrib.get("Id", ""): rel.attrib.get("Target", "")
+        for rel in rels_root
+        if _local_name(rel.tag) == "Relationship"
+    }
+    with archive.open(workbook_path) as handle:
+        workbook_root = ET.parse(handle).getroot()
+    first_rel_id = ""
+    for sheet in workbook_root.iter():
+        if _local_name(sheet.tag) != "sheet":
+            continue
+        first_rel_id = sheet.attrib.get(_XML_REL_ID, "") or sheet.attrib.get("r:id", "")
+        if first_rel_id:
+            break
+    target = rel_targets.get(first_rel_id, "").strip()
+    if not target:
+        return fallback[0]
+    normalized = target.lstrip("/")
+    if normalized.startswith("worksheets/") or not normalized.startswith("xl/"):
+        normalized = f"xl/{normalized}"
+    return normalized if normalized in archive.namelist() else fallback[0]
+
+
+def _xlsx_col_from_ref(cell_ref: str) -> int:
+    letters = ""
+    for char in cell_ref.strip():
+        if char.isalpha():
+            letters += char.upper()
+            continue
+        break
+    if not letters:
+        return -1
+    value = 0
+    for char in letters:
+        value = value * 26 + (ord(char) - 64)
+    return value - 1
+
+
+def _xlsx_cell_text(cell: ET.Element, shared_strings: list[str]) -> str:
+    cell_type = cell.attrib.get("t", "")
+    if cell_type == "inlineStr":
+        for child in cell:
+            if _local_name(child.tag) == "is":
+                return _seg_text(child).strip()
+        return ""
+    raw_value = ""
+    for child in cell:
+        child_name = _local_name(child.tag)
+        if child_name == "v":
+            raw_value = _seg_text(child).strip()
+            break
+        if child_name == "is":
+            return _seg_text(child).strip()
+    if cell_type == "s":
+        try:
+            index = int(raw_value)
+        except ValueError:
+            return ""
+        if 0 <= index < len(shared_strings):
+            return shared_strings[index].strip()
+        return ""
+    return raw_value
 
 
 def _xml_source_target_children(
