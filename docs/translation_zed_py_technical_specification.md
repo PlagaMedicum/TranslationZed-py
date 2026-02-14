@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.6.0-dev · 2026‑02‑13**\
+**Version 0.6.0-dev · 2026-02-14**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -304,14 +304,14 @@ Algorithm:
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
   - `DEFAULT_ROOT=<path>` (default project root in Preferences)
-  - `TM_IMPORT_DIR=<path>` (managed folder for imported TMX files)
+  - `TM_IMPORT_DIR=<path>` (managed folder for imported TM files in supported formats)
   - `SEARCH_SCOPE=FILE|LOCALE|POOL`
   - `REPLACE_SCOPE=FILE|LOCALE|POOL`
   - `UI_THEME_MODE=SYSTEM|LIGHT|DARK` (optional extra key; absent means `SYSTEM`)
 - (No last‑open metadata in settings; timestamps live in per‑file cache headers.)
 - Store: last root path, last locale(s), window geometry, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
-- **tm_import_dir**: folder scanned for imported `.tmx` files; defaults to
+- **tm_import_dir**: folder scanned for imported TM files in supported formats; defaults to
   `<runtime-root>/.tzp/tms`.
 - Legacy TM import paths (`<runtime-root>/.tzp/imported_tms` and
   `<runtime-root>/imported_tms`) are auto-migrated into
@@ -867,4 +867,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-13 (v0.6.0-dev)*
+*Last updated: 2026-02-14 (v0.6.0-dev)*
