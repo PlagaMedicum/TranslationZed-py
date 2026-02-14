@@ -103,6 +103,7 @@ def test_supported_tm_import_suffixes() -> None:
         ".pot",
         ".csv",
         ".mo",
+        ".xml",
     )
 
 
@@ -212,6 +213,30 @@ def test_iter_tm_pairs_mo_and_detect_languages(tmp_path: Path) -> None:
     langs = detect_tm_languages(path)
     assert "en" in langs
     assert "be" in langs
+
+
+def test_iter_tm_pairs_xml_and_detect_languages(tmp_path: Path) -> None:
+    path = tmp_path / "sample.xml"
+    path.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<xliff source-language="en-US" target-language="be-BY">
+  <file source-language="en-US" target-language="be-BY">
+    <body>
+      <trans-unit id="1">
+        <source>Hello world</source>
+        <target>Прывітанне свет</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>
+""",
+        encoding="utf-8",
+    )
+    parsed = list(iter_tm_pairs(path, "EN", "BE"))
+    assert parsed == [("Hello world", "Прывітанне свет")]
+    langs = detect_tm_languages(path)
+    assert "en-US" in langs
+    assert "be-BY" in langs
 
 
 def test_iter_tm_pairs_unsupported_extension_raises(tmp_path: Path) -> None:

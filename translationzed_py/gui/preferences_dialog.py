@@ -207,13 +207,14 @@ class PreferencesDialog(QDialog):
         layout.addWidget(label)
         self._tm_formats_label = QLabel(
             "Supported now:\n"
-            "- Import: TMX (.tmx), XLIFF (.xliff/.xlf), PO (.po/.pot), CSV (.csv), MO (.mo)\n"
+            "- Import: TMX (.tmx), XLIFF (.xliff/.xlf), "
+            "PO (.po/.pot), CSV (.csv), MO (.mo), XML (.xml)\n"
             "- Export: TMX (.tmx, TMX 1.4)\n"
             "- Runtime store: .tzp/config/tm.sqlite\n"
             "- Managed imported folder: .tzp/tms\n"
             "\n"
             "Planned later:\n"
-            "- XML, XLSX",
+            "- XLSX",
             widget,
         )
         self._tm_formats_label.setWordWrap(True)
@@ -232,7 +233,7 @@ class PreferencesDialog(QDialog):
         btn_row.setSpacing(6)
         import_btn = QPushButton("Import TM…", widget)
         import_btn.setToolTip(
-            "Queue TM files (.tmx/.xliff/.xlf/.po/.pot/.csv/.mo) "
+            "Queue TM files (.tmx/.xliff/.xlf/.po/.pot/.csv/.mo/.xml) "
             "for import into the managed TM folder"
         )
         import_btn.clicked.connect(self._queue_tm_imports)
@@ -330,12 +331,13 @@ class PreferencesDialog(QDialog):
             "Import TM files",
             start_dir,
             (
-                "TM files (*.tmx *.xliff *.xlf *.po *.pot *.csv *.mo);;"
+                "TM files (*.tmx *.xliff *.xlf *.po *.pot *.csv *.mo *.xml);;"
                 "TMX files (*.tmx);;"
                 "XLIFF files (*.xliff *.xlf);;"
                 "PO files (*.po *.pot);;"
                 "CSV files (*.csv);;"
                 "MO files (*.mo);;"
+                "XML files (*.xml);;"
                 "All files (*)"
             ),
         )

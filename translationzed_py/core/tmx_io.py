@@ -17,6 +17,7 @@ _SUPPORTED_TM_IMPORT_SUFFIXES = (
     ".pot",
     ".csv",
     ".mo",
+    ".xml",
 )
 _CSV_SOURCE_HEADERS = frozenset(
     {
@@ -99,6 +100,9 @@ def iter_tm_pairs(
         return
     if suffix == ".mo":
         yield from iter_mo_pairs(path, source_locale, target_locale)
+        return
+    if suffix == ".xml":
+        yield from iter_xml_pairs(path, source_locale, target_locale)
         return
     raise ValueError(f"Unsupported TM import format: {path.suffix or '<none>'}")
 
@@ -185,6 +189,8 @@ def detect_tm_languages(path: Path, *, limit: int = 2000) -> set[str]:
         return detect_csv_languages(path, limit=limit)
     if suffix == ".mo":
         return detect_mo_languages(path)
+    if suffix == ".xml":
+        return detect_xml_languages(path, limit=limit)
     return set()
 
 
@@ -373,6 +379,76 @@ def detect_mo_languages(path: Path) -> set[str]:
     return langs
 
 
+def iter_xml_pairs(
+    path: Path,
+    source_locale: str,
+    target_locale: str,
+) -> Iterator[tuple[str, str]]:
+    source_locale_norm = _normalize_locale_tag(source_locale)
+    target_locale_norm = _normalize_locale_tag(target_locale)
+    source_base = _locale_base(source_locale_norm)
+    target_base = _locale_base(target_locale_norm)
+    seen: set[tuple[str, str]] = set()
+    for _event, elem in ET.iterparse(path, events=("end",)):
+        name = _local_name(elem.tag)
+        if name in {"source", "target", "translation", "translated"}:
+            continue
+        if name not in {"tu", "trans-unit", "segment", "unit", "entry"}:
+            elem.clear()
+            continue
+        source_elem, target_elem = _xml_source_target_children(elem)
+        source_text = _seg_text(source_elem)
+        target_text = _seg_text(target_elem)
+        if source_text and target_text:
+            source_lang = (
+                _lang_value(source_elem) if source_elem is not None else ""
+            ) or _xml_lang_hint(elem, source=True)
+            target_lang = (
+                _lang_value(target_elem) if target_elem is not None else ""
+            ) or _xml_lang_hint(elem, source=False)
+            source_ok = (
+                True
+                if not source_lang
+                else _locale_matches(source_lang, source_locale_norm, source_base)
+            )
+            target_ok = (
+                True
+                if not target_lang
+                else _locale_matches(target_lang, target_locale_norm, target_base)
+            )
+            pair = (source_text, target_text)
+            if source_ok and target_ok and pair not in seen:
+                seen.add(pair)
+                yield pair
+        elem.clear()
+
+
+def detect_xml_languages(path: Path, *, limit: int = 2000) -> set[str]:
+    langs: set[str] = set()
+    for count, (_event, elem) in enumerate(
+        ET.iterparse(path, events=("start",)), start=1
+    ):
+        lang = _lang_value(elem).strip()
+        if lang:
+            langs.add(lang)
+        for key in (
+            "source-language",
+            "target-language",
+            "srcLang",
+            "trgLang",
+            "source_locale",
+            "target_locale",
+            "source_lang",
+            "target_lang",
+        ):
+            value = elem.attrib.get(key, "").strip()
+            if value:
+                langs.add(value)
+        if len(langs) >= 32 or count >= limit:
+            break
+    return langs
+
+
 def iter_csv_pairs(
     path: Path,
     source_locale: str,
@@ -455,6 +531,34 @@ def _csv_value(row: list[str], idx: int) -> str:
     if idx < 0 or idx >= len(row):
         return ""
     return row[idx].strip()
+
+
+def _xml_source_target_children(
+    elem: ET.Element,
+) -> tuple[ET.Element | None, ET.Element | None]:
+    source_elem: ET.Element | None = None
+    target_elem: ET.Element | None = None
+    for child in elem:
+        name = _local_name(child.tag)
+        if source_elem is None and name == "source":
+            source_elem = child
+            continue
+        if target_elem is None and name in {"target", "translation", "translated"}:
+            target_elem = child
+    return source_elem, target_elem
+
+
+def _xml_lang_hint(elem: ET.Element, *, source: bool) -> str:
+    key_candidates = (
+        ("source-language", "srcLang", "source_locale", "source_lang")
+        if source
+        else ("target-language", "trgLang", "target_locale", "target_lang")
+    )
+    for key in key_candidates:
+        value = elem.attrib.get(key, "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _read_mo_catalog(path: Path) -> dict[object, object]:
