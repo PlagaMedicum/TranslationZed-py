@@ -180,6 +180,8 @@ They include:
   `import`-only modes (no exact-only collapse).
 - TM ranking diagnostics and locale-scoped morphology: verify ranked-vs-raw score exposure
   and that EN affix stemming is enabled for EN source locale only.
+- TM suggestion presentation: project-origin matches expose compact row-status
+  tags (`U/T/FR/P`); imported-origin matches have no status marker.
 - TM relevance acceptance corpus: deterministic fixture
   `tests/fixtures/tm_ranking/corpus.json` validated by `tests/test_tm_ranking_corpus.py`
   in the default `make test` / `make verify` pipeline, with profile-level coverage
@@ -206,6 +208,9 @@ They include:
 - TM preferences service: action parsing + apply pipeline (copy/remove/enable-disable), plus GUI
   integration tests for deletion confirmation behavior.
 - TM rebuild service: locale collection, rebuild ingestion, and status message formatting.
+- Cross-locale variants preview: selected key shows other opened locales only
+  (locale/value/compact status tag), excludes current locale, keeps session
+  locale order, and renders explicit empty state.
 - Save/exit orchestration service: `Write Original` and close-prompt decision flow
   plus save-batch sequencing/failure aggregation policy
   (`core.save_exit_flow` unit tests).

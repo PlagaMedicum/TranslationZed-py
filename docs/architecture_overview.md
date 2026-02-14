@@ -65,7 +65,8 @@ and Qt-free:
 - `SearchReplaceService`: search scope/traversal planning, replace orchestration,
   search-row cache/source/materialization policies.
 - `PreferencesService`: startup root policy and preferences normalization/persist payload.
-- `TMWorkflowService`: TM refresh/query scheduling, selection/apply policy, diagnostics composition.
+- `TMWorkflowService`: TM refresh/query scheduling, selection/apply policy, diagnostics composition,
+  project-match status presentation metadata, and cross-locale variant preview payload shaping.
 - `RenderWorkflowService`: large-file and render-heavy policy decisions.
 
 A0 guardrail (ongoing):

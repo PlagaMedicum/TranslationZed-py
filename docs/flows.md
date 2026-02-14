@@ -1,5 +1,5 @@
 # TranslationZed-Py — Key Flows
-_Last updated: 2026-02-11_
+_Last updated: 2026-02-13_
 
 ---
 
@@ -115,4 +115,26 @@ User presses Enter in search box (or F3 / Shift+F3)
   -> refresh Search side-panel list with compact labels:
      <path>:<row> · <one-line excerpt>
   -> selecting a Search-panel item jumps to its file/row
+```
+
+---
+
+## 8) TM Query + Locale Variants Context
+
+```
+User selects row (TM panel active)
+  -> async TM query by source text + locale pair
+  -> rank results (exact first, fuzzy neighbors, token-aware gates)
+  -> render suggestions:
+       - project/import origin
+       - TM source name/path
+       - project-origin compact row status (`U/T/FR/P`)
+         (imported: no status marker)
+  -> render full Source/Translation for selected suggestion
+
+Row selection change (multiple locales opened)
+  -> collect same key in other opened locales
+  -> render read-only locale variants list:
+       session-order locale -> value + compact status tag (`U/T/FR/P`)
+  -> if none found: explicit empty-state message
 ```
