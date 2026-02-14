@@ -758,6 +758,7 @@ A8 [→] **Cross-platform CI/release hardening**
        for `vX.Y.Z-rcN` inputs and uploads artifacts only.
      - [✓] Auto-trigger the non-publishing dry-run workflow on `vX.Y.Z-rcN` tag pushes,
        with explicit RC-tag validation in preflight.
+     - [✓] Prevent accidental release publishing on RC tags by excluding `v*-rc*` from `Release` workflow triggers.
    - **Dry-run definition**:
      - [ ] `make verify` + `make release-check TAG=v0.6.0-rcX` pass locally on the release branch.
      - [ ] CI matrix (`linux`, `windows`, `macos`) is fully green for the same `v0.6.0-rcX` commit.

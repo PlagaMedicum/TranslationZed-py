@@ -27,6 +27,7 @@ avoid missing mandatory tasks.
 - **Trigger** GitHub Actions workflow **Release Dry Run** with `tag=vX.Y.Z-rcN`
   to validate matrix packaging/smoke artifacts without publishing a release
   - Alternative: push `vX.Y.Z-rcN` tag and the same dry-run workflow starts automatically
+  - Final `Release` workflow ignores RC tags (`v*-rc*`) to avoid accidental release publishing
 - **Run** `make test-encoding-integrity`
 - **Run** `make diagnose-encoding ARGS=\"<project-root>\"` for the release corpus
 - **Run** `make test-readonly-clean` to confirm read-only workflows do not mutate tracked files
