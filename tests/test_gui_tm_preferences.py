@@ -534,6 +534,8 @@ def test_preferences_tm_tab_shows_format_and_storage_description(tmp_path, qtbot
     assert "PO" in text
     assert ".tzp/config/tm.sqlite" in text
     assert ".tzp/tms" in text
+    assert dialog._tm_zero_segment_banner is not None
+    assert dialog._tm_zero_segment_banner.isHidden() is True
 
 
 def test_preferences_tm_resolve_button_enables_for_pending_items(tmp_path, qtbot):
@@ -608,3 +610,8 @@ def test_preferences_tm_list_shows_segment_count_and_zero_warning(
     assert "0 seg" in text
     assert "{en-US->be-BY}" in text
     assert "WARNING: 0 segments" in text
+    assert dialog._tm_zero_segment_banner is not None
+    assert dialog._tm_zero_segment_banner.isHidden() is False
+    banner_text = dialog._tm_zero_segment_banner.text()
+    assert "0 segments" in banner_text
+    assert "will not contribute suggestions" in banner_text

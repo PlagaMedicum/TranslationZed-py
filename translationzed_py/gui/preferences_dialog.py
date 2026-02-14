@@ -35,6 +35,7 @@ _THEME_MODES = [
 _TM_PATH_ROLE = Qt.UserRole + 1
 _TM_IS_PENDING_ROLE = Qt.UserRole + 2
 _TM_STATUS_ROLE = Qt.UserRole + 3
+_TM_SEGMENT_COUNT_ROLE = Qt.UserRole + 4
 
 
 class PreferencesDialog(QDialog):
@@ -58,6 +59,7 @@ class PreferencesDialog(QDialog):
         self._tm_rebuild = False
         self._tm_show_diagnostics = False
         self._tm_resolve_btn: QPushButton | None = None
+        self._tm_zero_segment_banner: QLabel | None = None
 
         tabs = QTabWidget(self)
         tabs.addTab(self._build_general_tab(), "General")
@@ -220,6 +222,10 @@ class PreferencesDialog(QDialog):
         self._tm_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._tm_list.itemChanged.connect(self._on_tm_item_changed)
         layout.addWidget(self._tm_list)
+        self._tm_zero_segment_banner = QLabel("", widget)
+        self._tm_zero_segment_banner.setWordWrap(True)
+        self._tm_zero_segment_banner.setVisible(False)
+        layout.addWidget(self._tm_zero_segment_banner)
 
         btn_row = QHBoxLayout()
         btn_row.setContentsMargins(0, 0, 0, 0)
@@ -307,6 +313,7 @@ class PreferencesDialog(QDialog):
         item.setData(_TM_PATH_ROLE, tm_path)
         item.setData(_TM_IS_PENDING_ROLE, False)
         item.setData(_TM_STATUS_ROLE, status)
+        item.setData(_TM_SEGMENT_COUNT_ROLE, segment_count)
         flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
         if status == "ready":
             flags |= Qt.ItemIsUserCheckable
@@ -341,6 +348,7 @@ class PreferencesDialog(QDialog):
             item.setData(_TM_PATH_ROLE, tm_path)
             item.setData(_TM_IS_PENDING_ROLE, True)
             item.setData(_TM_STATUS_ROLE, "queued")
+            item.setData(_TM_SEGMENT_COUNT_ROLE, -1)
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
         self._update_tm_action_state()
 
@@ -374,18 +382,40 @@ class PreferencesDialog(QDialog):
         if self._tm_resolve_btn is None:
             return
         has_pending = False
+        zero_segment: list[str] = []
         for idx in range(self._tm_list.count()):
             item = self._tm_list.item(idx)
             if item is None:
                 continue
             if bool(item.data(_TM_IS_PENDING_ROLE)):
                 has_pending = True
-                break
+                continue
             status = str(item.data(_TM_STATUS_ROLE) or "").strip().lower()
             if status and status != "ready":
                 has_pending = True
-                break
+            if status == "ready":
+                try:
+                    segment_count = int(item.data(_TM_SEGMENT_COUNT_ROLE) or 0)
+                except (TypeError, ValueError):
+                    segment_count = 0
+                if segment_count == 0:
+                    zero_segment.append(item.text())
         self._tm_resolve_btn.setEnabled(has_pending)
+        if self._tm_zero_segment_banner is None:
+            return
+        if not zero_segment:
+            self._tm_zero_segment_banner.clear()
+            self._tm_zero_segment_banner.setVisible(False)
+            return
+        preview = ", ".join(zero_segment[:2])
+        if len(zero_segment) > 2:
+            preview += ", ..."
+        self._tm_zero_segment_banner.setText(
+            "Warning: "
+            f"{len(zero_segment)} imported TM file(s) have 0 segments "
+            f"and will not contribute suggestions. ({preview})"
+        )
+        self._tm_zero_segment_banner.setVisible(True)
 
     def _request_tm_resolve_pending(self) -> None:
         self._tm_resolve_pending = True
