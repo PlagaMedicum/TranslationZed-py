@@ -1,4 +1,4 @@
-_Last updated: 2026-02-11_
+_Last updated: 2026-02-14_
 
 # Checklists
 
@@ -36,7 +36,7 @@ avoid missing mandatory tasks.
 - **Check** `CHANGELOG.md` and version string(s)
   - `pyproject.toml` `version`
   - `translationzed_py/version.py` `__version__`
-  - `CHANGELOG.md` release heading must match tag (for example `## [0.5.0] - YYYY-MM-DD`)
+  - `CHANGELOG.md` release heading must match tag (for example `## [X.Y.Z] - YYYY-MM-DD`)
 - **Push** tags only when CI is green
 - **Ensure** docs are synchronized for release scope
   - `docs/translation_zed_py_technical_specification.md`
@@ -46,6 +46,9 @@ avoid missing mandatory tasks.
   - `docs/tm_ranking_algorithm.md` (if TM ranking changed)
 
 ## v0.6.0 release gate (current target)
+
+- **Current baseline status (2026-02-14)**:
+  - CI matrix and RC dry-run artifact builds are green for the active v0.6 RC evidence set.
 
 - **Feature readiness**
   - A‑P0 encoding integrity guarantees remain green (no-write-on-open, diagnostics, readonly-clean gate).

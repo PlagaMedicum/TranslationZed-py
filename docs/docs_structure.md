@@ -1,5 +1,5 @@
 # TranslationZed-Py — Documentation Structure
-_Last updated: 2026-02-13_
+_Last updated: 2026-02-14_
 
 ## 1) Purpose
 
@@ -66,6 +66,8 @@ changes should be propagated to keep docs coherent.
   - Use short references to canonical sections instead.
 
 - If a statement appears in two docs, one must be marked as derived.
+- When side-panel quick actions exist, plan/spec wording must distinguish
+  **primary control surface** vs **quick action** to avoid contradictory wording.
 
 ## 4) Update Protocol
 

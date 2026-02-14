@@ -1,5 +1,5 @@
 # TranslationZed-Py: Technical Notes (Current State)
-_Last updated: 2026-02-13_
+_Last updated: 2026-02-14_
 
 Purpose:
 - Keep short-lived diagnostics and implementation pressure points.
@@ -59,6 +59,7 @@ Scope:
 - Translation memory:
   - SQLite store is on-demand initialized and queried asynchronously.
   - TMX import/export exists for current locale-pair workflow.
+  - A8 cross-platform release-hardening baseline is green (CI matrix + dry-run artifacts).
 
 ---
 
