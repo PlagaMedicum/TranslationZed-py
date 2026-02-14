@@ -4,10 +4,9 @@ from __future__ import annotations
 import argparse
 import os
 import re
-import sys
 from pathlib import Path
 
-_SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
+_TAG_RE = re.compile(r"^(?P<version>\d+\.\d+\.\d+)(?:-rc(?P<rc>\d+))?$", re.IGNORECASE)
 
 
 def _repo_root() -> Path:
@@ -41,17 +40,18 @@ def _extract_changelog_versions(text: str) -> set[str]:
     )
 
 
-def _normalize_tag(raw: str) -> str:
+def _normalize_tag(raw: str) -> tuple[str, str | None]:
     tag = raw.strip()
     if tag.startswith("refs/tags/"):
         tag = tag.removeprefix("refs/tags/")
     if tag.startswith("v"):
         tag = tag[1:]
-    if not _SEMVER_RE.fullmatch(tag):
+    match = _TAG_RE.fullmatch(tag)
+    if not match:
         raise RuntimeError(
-            f"Tag '{raw}' does not look like vX.Y.Z or X.Y.Z semantic version."
+            f"Tag '{raw}' does not look like vX.Y.Z (or vX.Y.Z-rcN)."
         )
-    return tag
+    return match.group("version"), match.group("rc")
 
 
 def _resolve_tag(cli_tag: str | None) -> str:
@@ -73,12 +73,15 @@ def main() -> int:
     parser.add_argument(
         "--tag",
         default="",
-        help="Release tag (for example v0.5.0). If omitted, TAG/GITHUB_REF_NAME is used.",
+        help=(
+            "Release tag (for example v0.5.0 or v0.5.0-rc1). "
+            "If omitted, TAG/GITHUB_REF_NAME is used."
+        ),
     )
     args = parser.parse_args()
 
     raw_tag = _resolve_tag(args.tag)
-    expected_version = _normalize_tag(raw_tag)
+    expected_version, rc_suffix = _normalize_tag(raw_tag)
     root = _repo_root()
 
     pyproject_path = root / "pyproject.toml"
@@ -109,9 +112,10 @@ def main() -> int:
             print(f"- {item}")
         return 1
 
+    suffix = f"-rc{rc_suffix}" if rc_suffix else ""
     print(
         "release-check OK: "
-        f"tag={raw_tag} version={expected_version} "
+        f"tag={raw_tag} normalized={expected_version}{suffix} "
         "(pyproject/version.py/changelog aligned)"
     )
     return 0
