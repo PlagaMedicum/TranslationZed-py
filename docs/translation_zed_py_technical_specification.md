@@ -482,6 +482,7 @@ if dirty_files and not prompt_save():
   it does not auto-run search.
 - Left Search side panel shows a minimal match list generated from current toolbar query/scope;
   each item is `<relative path>:<row> · <one-line excerpt>` and click navigates to that match.
+  Relative paths in UI/report text are normalized to `/` separators on all platforms.
 - For sessions with multiple opened target locales, UI exposes a read-only
   cross-locale variants preview for the current key (locale, value, compact
   status tag), ordered by current session locale order.
@@ -625,6 +626,7 @@ UNTOUCHED).
     suppressed for one-token queries.
   - Single-character token typos (length >= 4) are tolerated in fuzzy token matching.
   - TM suggestion diagnostics expose both ranked score and raw similarity score.
+    Path values in diagnostics text are normalized to `/` separators on all platforms.
   - Project TM outranks imported TM.
   - TM suggestions include source name (`tm_name`); when missing, UI falls back to TM file path.
   - TM suggestions include row status for project-origin matches as compact tags

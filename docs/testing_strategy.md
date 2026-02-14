@@ -34,6 +34,8 @@ _Last updated: 2026-02-11_
 - Save preserves original file bytes outside literal spans.
 - Open/switch/close without edits keeps file bytes identical across UTF-8/CP1251/UTF-16 + EOL styles.
 - Preferences canonicalize relative TM import paths to stable absolute paths.
+- User-facing/report path labels are rendered with `/` separators cross-platform
+  (search list, save prompts, encoding/TM diagnostics, orphan-cache warnings).
 - GUI save preserves CRLF endings when editing CRLF-backed files.
 - Filename labels used for corpus temp paths sanitize Windows-invalid characters.
 - Architecture guards enforce allowed GUI->core imports and `main_window.py`
