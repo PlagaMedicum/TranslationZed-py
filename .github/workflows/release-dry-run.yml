@@ -1,0 +1,85 @@
+name: Release Dry Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release candidate tag (e.g. v0.6.0-rc1)"
+        required: true
+        type: string
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system dependencies (Linux)
+        run: make ci-deps
+      - name: Configure Qt offscreen (Linux)
+        run: echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ".[dev]"
+      - name: Run local RC gates
+        run: make release-dry-run TAG=${{ inputs.tag }}
+
+  build:
+    needs: preflight
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e ".[dev,packaging]"
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          bash scripts/pack.sh
+          (cd dist && zip -9 -r -X ../TranslationZed-Py-${{ runner.os }}.zip TranslationZed-Py)
+      - name: Smoke run (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libegl1 libxcb-cursor0
+          QT_QPA_PLATFORM=offscreen TZP_SMOKE=1 TZP_SMOKE_TIMEOUT_MS=3000 TZP_ALLOW_A11Y=0 \
+            xvfb-run -a dist/TranslationZed-Py/TranslationZed-Py tests/fixtures/prod_like
+      - name: Smoke run (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if [ -x "dist/TranslationZed-Py.app/Contents/MacOS/TranslationZed-Py" ]; then
+            BIN="dist/TranslationZed-Py.app/Contents/MacOS/TranslationZed-Py"
+          else
+            BIN="dist/TranslationZed-Py/TranslationZed-Py"
+          fi
+          TZP_SMOKE=1 TZP_SMOKE_TIMEOUT_MS=3000 TZP_ALLOW_A11Y=0 \
+            "$BIN" tests/fixtures/prod_like
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/pack.ps1
+          powershell -Command "Compress-Archive -Path dist\TranslationZed-Py -DestinationPath TranslationZed-Py-${{ runner.os }}.zip -CompressionLevel Optimal"
+      - name: Smoke run (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $env:TZP_SMOKE="1"
+          $env:TZP_SMOKE_TIMEOUT_MS="3000"
+          $env:TZP_ALLOW_A11Y="0"
+          & "dist\\TranslationZed-Py\\TranslationZed-Py.exe" "tests\\fixtures\\prod_like"
+      - name: Upload dry-run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TranslationZed-Py-dry-run-${{ runner.os }}
+          path: TranslationZed-Py-${{ runner.os }}.zip
