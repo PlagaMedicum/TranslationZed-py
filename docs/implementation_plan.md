@@ -363,7 +363,7 @@ Release target: **v0.6.0**
 v0.6.0 exit criteria (must all be true):
 - [✓] `A0`, `A7`, and `C1` are completed (no `[→]`/`[ ]` for their v0.6 scope).
 - [ ] Cross-platform CI (`linux`, `windows`, `macos`) is green on release branch.
-- [ ] `make verify` and `make release-check TAG=v0.6.0` pass before tagging.
+- [✓] `make verify` and `make release-check TAG=v0.6.0` pass before tagging.
 - [ ] Packaging smoke checks pass for Linux/Windows/macOS release workflow.
 
 Out of scope for v0.6.0:
@@ -760,7 +760,7 @@ A8 [→] **Cross-platform CI/release hardening**
        with explicit RC-tag validation in preflight.
      - [✓] Prevent accidental release publishing on RC tags by excluding `v*-rc*` from `Release` workflow triggers.
    - **Dry-run definition**:
-     - [ ] `make verify` + `make release-check TAG=v0.6.0-rcX` pass locally on the release branch.
+     - [✓] `make verify` + `make release-check TAG=v0.6.0-rcX` pass locally on the release branch.
      - [ ] CI matrix (`linux`, `windows`, `macos`) is fully green for the same `v0.6.0-rcX` commit.
      - [ ] Release workflow artifacts build successfully from that commit (without publishing final tag).
    - **Acceptance**: no OS-specific flaky failures in two consecutive dry-runs (`rc1`, `rc2`) from different commits.
