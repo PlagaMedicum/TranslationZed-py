@@ -7,7 +7,14 @@ from translationzed_py.core.tm_store import TMImportFile, TMMatch
 from translationzed_py.core.tm_workflow_service import TMWorkflowService
 
 
-def _match(*, source: str, target: str, score: int, origin: str = "project") -> TMMatch:
+def _match(
+    *,
+    source: str,
+    target: str,
+    score: int,
+    origin: str = "project",
+    row_status: int | None = None,
+) -> TMMatch:
     return TMMatch(
         source_text=source,
         target_text=target,
@@ -18,6 +25,7 @@ def _match(*, source: str, target: str, score: int, origin: str = "project") -> 
         file_path=None,
         key=None,
         updated_at=0,
+        row_status=row_status,
     )
 
 
@@ -48,7 +56,7 @@ def test_tm_workflow_queue_and_flush_batches() -> None:
     service = TMWorkflowService()
     service.queue_updates(
         "root/BE/a.txt",
-        [("k1", "src1", "tr1"), ("k2", "src2", "tr2")],
+        [("k1", "src1", "tr1", 2), ("k2", "src2", "tr2")],
     )
     service.queue_updates("root/RU/a.txt", [("k1", "src1", "ru1")])
 
@@ -60,6 +68,8 @@ def test_tm_workflow_queue_and_flush_batches() -> None:
     assert batches[0].file_key == "root/BE/a.txt"
     assert batches[0].target_locale == "BE"
     assert len(batches[0].rows) == 2
+    assert batches[0].rows[0][3] == 2
+    assert batches[0].rows[1][3] is None
 
     service.mark_batch_flushed("root/BE/a.txt")
     remaining = service.pending_batches(locale_for_path=lambda path: path.split("/")[1])
@@ -281,7 +291,13 @@ def test_tm_workflow_format_rebuild_status_wrapper_delegates(monkeypatch) -> Non
 def test_tm_workflow_build_suggestions_view_formats_items() -> None:
     service = TMWorkflowService()
     matches = [
-        _match(source="Drop all", target="Скінуць усё", score=85, origin="project"),
+        _match(
+            source="Drop all",
+            target="Скінуць усё",
+            score=85,
+            origin="project",
+            row_status=1,
+        ),
         _match(source="Drop one", target="Скінуць шт.", score=20, origin="import"),
     ]
     view = service.build_suggestions_view(
@@ -293,8 +309,38 @@ def test_tm_workflow_build_suggestions_view_formats_items() -> None:
     item = view.items[0]
     assert item.match.source_text == "Drop all"
     assert "project" in item.label
+    assert "[FR]" in item.label
     assert "S: Drop all" in item.label
     assert "Translation" in item.tooltip_html
+
+
+def test_tm_workflow_build_suggestions_view_imported_label_has_no_status_tag() -> None:
+    service = TMWorkflowService()
+    view = service.build_suggestions_view(
+        matches=[
+            _match(source="Drop one", target="Скінуць шт.", score=70, origin="import")
+        ],
+        policy=TMQueryPolicy(min_score=5, origin_project=False, origin_import=True),
+    )
+    assert len(view.items) == 1
+    assert "import" in view.items[0].label
+    assert "import [" not in view.items[0].label
+
+
+def test_tm_workflow_build_locale_variants_view_formats_compact_items() -> None:
+    service = TMWorkflowService()
+    view = service.build_locale_variants_view(
+        variants=[
+            ("RU", "Russian", "Скінуць усё", 2),
+            ("KO", "Korean", "모두 버리기", 1),
+        ],
+        preview_limit=10,
+    )
+    assert view.message == "Locale variants"
+    assert len(view.items) == 2
+    assert view.items[0].label.startswith("RU · Russian [T]")
+    assert view.items[1].label.startswith("KO · Korean [FR]")
+    assert "모두 버리기" in view.items[1].tooltip_html
 
 
 def test_tm_workflow_build_suggestions_view_empty_and_filtered_messages() -> None:

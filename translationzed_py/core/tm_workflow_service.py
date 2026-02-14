@@ -41,7 +41,7 @@ from .tm_store import TMImportFile, TMMatch, TMStore
 class TMPendingBatch:
     file_key: str
     target_locale: str
-    rows: tuple[tuple[str, str, str], ...]
+    rows: tuple[tuple[str, str, str, int | None], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +63,22 @@ class TMSuggestionItem:
 class TMSuggestionsView:
     message: str
     items: tuple[TMSuggestionItem, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TMLocaleVariantItem:
+    locale_code: str
+    locale_name: str
+    status_tag: str
+    value: str
+    label: str
+    tooltip_html: str
+
+
+@dataclass(frozen=True, slots=True)
+class TMLocaleVariantsView:
+    message: str
+    items: tuple[TMLocaleVariantItem, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,7 +151,7 @@ class TMWorkflowService:
         repr=False,
         default_factory=OrderedDict,
     )
-    _pending: dict[str, dict[str, tuple[str, str, str]]] = field(
+    _pending: dict[str, dict[str, tuple[str, str, str, int | None]]] = field(
         init=False,
         repr=False,
         default_factory=dict,
@@ -144,11 +160,22 @@ class TMWorkflowService:
     def clear_cache(self) -> None:
         self._cache.clear()
 
-    def queue_updates(self, path: str, rows: Iterable[tuple[str, str, str]]) -> None:
+    def queue_updates(self, path: str, rows: Iterable[tuple[str, ...]]) -> None:
         self._cache.clear()
         bucket = self._pending.setdefault(path, {})
-        for key, source_text, value_text in rows:
-            bucket[key] = (key, source_text, value_text)
+        for row in rows:
+            if len(row) == 3:
+                key, source_text, value_text = row
+                row_status: int | None = None
+            elif len(row) == 4:
+                key, source_text, value_text, status_raw = row
+                try:
+                    row_status = int(status_raw)
+                except (TypeError, ValueError):
+                    row_status = None
+            else:
+                continue
+            bucket[key] = (key, source_text, value_text, row_status)
 
     def pending_batches(
         self,
@@ -549,6 +576,33 @@ class TMWorkflowService:
         )
         return TMSuggestionsView(message="TM suggestions", items=items)
 
+    def build_locale_variants_view(
+        self,
+        *,
+        variants: list[tuple[str, str, str, int | None]],
+        preview_limit: int = 80,
+    ) -> TMLocaleVariantsView:
+        if not variants:
+            return TMLocaleVariantsView(
+                message="No locale variants available.",
+                items=(),
+            )
+        items = tuple(
+            TMLocaleVariantItem(
+                locale_code=locale_code,
+                locale_name=locale_name,
+                status_tag=_status_tag(status),
+                value=value,
+                label=(
+                    f"{locale_code} · {locale_name} [{_status_tag(status)}] · "
+                    f"{_truncate_text(value, preview_limit)}"
+                ),
+                tooltip_html=html.escape(value),
+            )
+            for locale_code, locale_name, value, status in variants
+        )
+        return TMLocaleVariantsView(message="Locale variants", items=items)
+
 
 def query_terms(source_text: str) -> list[str]:
     out: list[str] = []
@@ -595,6 +649,9 @@ def format_match_label(
     target_preview_limit: int,
 ) -> str:
     origin = "project" if match.origin == "project" else "import"
+    if origin == "project":
+        tag = _status_tag(match.row_status)
+        origin = f"{origin} [{tag}]"
     source_name = _source_name_for_match(match)
     source_preview = _truncate_text(match.source_text, source_preview_limit)
     target_preview = _truncate_text(match.target_text, target_preview_limit)
@@ -606,6 +663,18 @@ def format_match_label(
         f"S: {source_preview}\n"
         f"T: {target_preview}"
     )
+
+
+def _status_tag(status: int | None) -> str:
+    if status == 0:
+        return "U"
+    if status == 1:
+        return "FR"
+    if status == 2:
+        return "T"
+    if status == 3:
+        return "P"
+    return "U"
 
 
 def match_tooltip_html(match: TMMatch) -> str:

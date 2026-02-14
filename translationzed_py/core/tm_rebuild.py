@@ -77,7 +77,7 @@ def rebuild_project_tm(
                     skipped_parse += 1
                     continue
                 source_by_key = {entry.key: entry.value for entry in en_pf.entries}
-                batch: list[tuple[str, str, str]] = []
+                batch: list[tuple[str, str, str, int]] = []
                 for entry in target_pf.entries:
                     source_text, target_text = _source_target_for_entry(
                         entry, source_by_key
@@ -88,7 +88,9 @@ def rebuild_project_tm(
                     if target_text is None:
                         skipped_empty += 1
                         continue
-                    batch.append((entry.key, source_text, target_text))
+                    batch.append(
+                        (entry.key, source_text, target_text, int(entry.status))
+                    )
                     if len(batch) >= batch_size:
                         entries += store.upsert_project_entries(
                             batch,

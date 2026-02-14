@@ -67,6 +67,39 @@ def test_tm_store_exact_and_fuzzy(tmp_path: Path) -> None:
     store.close()
 
 
+def test_tm_store_project_match_exposes_row_status(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [("key1", "Drop all", "Пакінуць усё", 1)],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+    store.insert_import_pairs(
+        [("Drop all", "Import drop all")],
+        source_locale="EN",
+        target_locale="BE",
+        tm_name="ext",
+        tm_path=str(root / ".tzp" / "tms" / "ext.tmx"),
+    )
+
+    matches = store.query(
+        "Drop all",
+        source_locale="EN",
+        target_locale="BE",
+        limit=10,
+    )
+    project = next(match for match in matches if match.origin == "project")
+    imported = next(match for match in matches if match.origin == "import")
+    assert project.row_status == 1
+    assert imported.row_status is None
+    store.close()
+
+
 def test_tm_store_filters_low_token_overlap_candidates(tmp_path: Path) -> None:
     root = tmp_path / "root"
     root.mkdir()

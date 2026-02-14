@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .app_config import LEGACY_CONFIG_DIR
 from .app_config import load as _load_app_config
+from .model import Status
 from .tmx_io import iter_tmx_pairs, write_tmx
 
 _PROJECT_ORIGIN = "project"
@@ -41,6 +42,10 @@ OR COALESCE(
 ) = 1
 """
 
+ProjectEntryRow = (
+    tuple[str, str, str] | tuple[str, str, str, int] | tuple[str, str, str, Status]
+)
+
 
 @dataclass(frozen=True, slots=True)
 class TMMatch:
@@ -54,6 +59,7 @@ class TMMatch:
     key: str | None
     updated_at: int
     raw_score: int | None = None
+    row_status: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,6 +227,26 @@ def _normalize_locale(locale: str) -> str:
     return locale.strip().upper()
 
 
+def _normalize_row_status(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, Status):
+        return int(value)
+    if isinstance(value, int):
+        raw = value
+    elif isinstance(value, str):
+        with contextlib.suppress(ValueError):
+            raw = int(value.strip())
+            with contextlib.suppress(ValueError):
+                return int(Status(raw))
+        return None
+    else:
+        return None
+    with contextlib.suppress(ValueError):
+        return int(Status(raw))
+    return None
+
+
 def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
     if origins is None:
         return (_PROJECT_ORIGIN, _IMPORT_ORIGIN)
@@ -333,6 +359,7 @@ class TMStore:
                 tm_path TEXT,
                 file_path TEXT,
                 key TEXT,
+                row_status INTEGER,
                 updated_at INTEGER NOT NULL
             )
             """
@@ -415,6 +442,8 @@ class TMStore:
             self._conn.execute("ALTER TABLE tm_entries ADD COLUMN tm_name TEXT")
         if "tm_path" not in cols:
             self._conn.execute("ALTER TABLE tm_entries ADD COLUMN tm_path TEXT")
+        if "row_status" not in cols:
+            self._conn.execute("ALTER TABLE tm_entries ADD COLUMN row_status INTEGER")
 
     def _ensure_tm_import_files_columns(self) -> None:
         cols = {
@@ -442,7 +471,7 @@ class TMStore:
 
     def upsert_project_entries(
         self,
-        entries: Iterable[tuple[str, str, str]],
+        entries: Iterable[ProjectEntryRow],
         *,
         source_locale: str,
         target_locale: str,
@@ -454,7 +483,15 @@ class TMStore:
         now = int(updated_at if updated_at is not None else time.time())
         count = 0
         rows = []
-        for key, source_text, target_text in entries:
+        for row in entries:
+            if len(row) == 3:
+                key, source_text, target_text = row
+                row_status: int | None = None
+            elif len(row) == 4:
+                key, source_text, target_text, status_raw = row
+                row_status = _normalize_row_status(status_raw)
+            else:
+                continue
             if not (source_text or target_text):
                 continue
             source_norm = _normalize(source_text)
@@ -474,6 +511,7 @@ class TMStore:
                     None,
                     file_path,
                     key,
+                    row_status,
                     now,
                 )
             )
@@ -494,8 +532,9 @@ class TMStore:
                 tm_path,
                 file_path,
                 key,
+                row_status,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(origin, source_locale, target_locale, file_path, key)
             DO UPDATE SET
                 source_text=excluded.source_text,
@@ -503,6 +542,7 @@ class TMStore:
                 source_norm=excluded.source_norm,
                 source_prefix=excluded.source_prefix,
                 source_len=excluded.source_len,
+                row_status=excluded.row_status,
                 updated_at=excluded.updated_at
             """,
             rows,
@@ -547,6 +587,7 @@ class TMStore:
                     tm_path,
                     None,
                     None,
+                    None,
                     now,
                 )
             )
@@ -567,8 +608,9 @@ class TMStore:
                 tm_path,
                 file_path,
                 key,
+                row_status,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -901,6 +943,7 @@ class TMStore:
                 tm_path,
                 file_path,
                 key,
+                row_status,
                 updated_at
             FROM tm_entries
             WHERE source_locale = ? AND target_locale = ? AND source_norm = ?
@@ -940,6 +983,7 @@ class TMStore:
                     key=row["key"],
                     updated_at=row["updated_at"],
                     raw_score=100,
+                    row_status=row["row_status"],
                 )
             )
             if len(matches) >= max_exact:
@@ -979,6 +1023,7 @@ class TMStore:
                     key=cand["key"],
                     updated_at=cand["updated_at"],
                     raw_score=raw_score,
+                    row_status=cand["row_status"],
                 )
             )
             if len(matches) >= limit:
@@ -1032,8 +1077,9 @@ class TMStore:
         ) -> list[sqlite3.Row]:
             return conn.execute(
                 f"""
-                SELECT source_text, source_norm, target_text, origin, file_path, key, updated_at
-                     , tm_name, tm_path
+                SELECT
+                    source_text, source_norm, target_text, origin, file_path, key
+                    , row_status, updated_at, tm_name, tm_path
                 FROM tm_entries
                 WHERE source_locale = ? AND target_locale = ?
                   AND {where_sql}
