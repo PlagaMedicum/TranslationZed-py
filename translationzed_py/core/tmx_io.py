@@ -7,7 +7,7 @@ from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
 
 _XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
-_SUPPORTED_TM_IMPORT_SUFFIXES = (".tmx", ".xliff", ".po")
+_SUPPORTED_TM_IMPORT_SUFFIXES = (".tmx", ".xliff", ".xlf", ".po", ".pot")
 
 
 def _lang_value(elem: ET.Element) -> str:
@@ -52,10 +52,10 @@ def iter_tm_pairs(
     if suffix == ".tmx":
         yield from iter_tmx_pairs(path, source_locale, target_locale)
         return
-    if suffix == ".xliff":
+    if suffix in {".xliff", ".xlf"}:
         yield from iter_xliff_pairs(path, source_locale, target_locale)
         return
-    if suffix == ".po":
+    if suffix in {".po", ".pot"}:
         yield from iter_po_pairs(path, source_locale, target_locale)
         return
     raise ValueError(f"Unsupported TM import format: {path.suffix or '<none>'}")
@@ -135,9 +135,9 @@ def detect_tm_languages(path: Path, *, limit: int = 2000) -> set[str]:
     suffix = path.suffix.lower()
     if suffix == ".tmx":
         return detect_tmx_languages(path, limit=limit)
-    if suffix == ".xliff":
+    if suffix in {".xliff", ".xlf"}:
         return detect_xliff_languages(path, limit=limit)
-    if suffix == ".po":
+    if suffix in {".po", ".pot"}:
         return detect_po_languages(path)
     return set()
 

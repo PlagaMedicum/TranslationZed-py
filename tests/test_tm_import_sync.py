@@ -289,7 +289,9 @@ def test_sync_import_folder_reports_zero_segment_imports_and_raw_locales(
     store.close()
 
 
-def test_sync_import_folder_ignores_unsupported_extensions(tmp_path: Path) -> None:
+def test_sync_import_folder_processes_supported_aliases_and_ignores_unsupported(
+    tmp_path: Path,
+) -> None:
     root = tmp_path / "root"
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"
@@ -305,8 +307,11 @@ def test_sync_import_folder_ignores_unsupported_extensions(tmp_path: Path) -> No
     )
 
     assert report.imported_segments == 0
-    assert report.imported_files == ()
-    assert report.checked_files == ()
-    assert report.changed is False
-    assert store.list_import_files() == []
+    assert report.checked_files == ("ignored.xlf",)
+    assert report.imported_files == ("ignored.xlf (0 segment(s))",)
+    assert report.changed is True
+    records = store.list_import_files()
+    assert len(records) == 1
+    assert records[0].tm_path.endswith("ignored.xlf")
+    assert records[0].segment_count == 0
     store.close()
