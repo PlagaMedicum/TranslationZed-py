@@ -288,7 +288,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  3 | SYS writes TMX stream from project TM for selected pair and reports exported unit count. |
 
 ### UC-13h  Rebuild Project TM (Selected Locales)
-| **Trigger** | TM side panel glyph button (hover tooltip: *Rebuild project TM for selected locales*) or *General ▸ Preferences ▸ TM tab ▸ Rebuild TM* |
+| **Trigger** | *General ▸ Preferences ▸ TM tab ▸ Rebuild TM* (primary control surface) or TM side panel glyph button (hover tooltip: *Rebuild project TM for selected locales*) |
 | **Flow** |
 |  1 | SYS validates selected non-EN locales. |
 |  2 | SYS starts background rebuild worker that pairs EN source with target translations. |
@@ -309,7 +309,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Flow** |
 |  1 | SYS lists imported TM files with locale pair, raw locale tags in braces (when different), segment count, status, and enabled toggle for ready files. |
 |  1a | If any ready imported file has `0` segments, SYS shows an inline warning banner in the TM preferences tab (in addition to row marker). |
-|  2 | SYS shows inline TM format/storage hints (import: TMX/XLIFF/PO, export: TMX, runtime `.tzp` paths) to clarify data flow. |
+|  2 | SYS shows inline TM format/storage hints (import: TMX/XLIFF/XLF/PO/POT/CSV/MO/XML/XLSX, export: TMX, runtime `.tzp` paths) to clarify data flow. |
 |  3 | User may queue TM imports, remove selected imported TM files, or toggle ready files on/off. |
 |  4 | Before removals are applied, SYS asks for explicit confirmation that selected TM files will be deleted from disk. |
 |  5 | On confirmation, SYS applies removals/toggles and imports queued files into managed TM folder. |
@@ -448,4 +448,4 @@ UNTOUCHED ──────────────────────▶ 
    translation equals Source). Implement **only after** TM import/export is complete.
 
 ---
-_Last updated: 2026‑02‑13 (v0.6.0-dev)_
+_Last updated: 2026-02-14 (v0.6.0-dev)_
