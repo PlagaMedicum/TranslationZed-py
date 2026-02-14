@@ -296,7 +296,7 @@ def test_sync_import_folder_processes_supported_aliases_and_ignores_unsupported(
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"
     tm_dir.mkdir(parents=True, exist_ok=True)
-    (tm_dir / "ignored.csv").write_text("a,b,c\n", encoding="utf-8")
+    (tm_dir / "ignored.json").write_text('{"a": 1}\n', encoding="utf-8")
     (tm_dir / "ignored.xlf").write_text("<xliff/>", encoding="utf-8")
     store = TMStore(root)
 

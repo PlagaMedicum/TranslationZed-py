@@ -1,13 +1,40 @@
 from __future__ import annotations
 
 import ast
+import csv
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
 
 _XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
-_SUPPORTED_TM_IMPORT_SUFFIXES = (".tmx", ".xliff", ".xlf", ".po", ".pot")
+_SUPPORTED_TM_IMPORT_SUFFIXES = (".tmx", ".xliff", ".xlf", ".po", ".pot", ".csv")
+_CSV_SOURCE_HEADERS = frozenset(
+    {
+        "source",
+        "src",
+        "original",
+        "source_text",
+        "source text",
+        "en",
+    }
+)
+_CSV_TARGET_HEADERS = frozenset(
+    {
+        "target",
+        "trg",
+        "translation",
+        "translated",
+        "target_text",
+        "target text",
+    }
+)
+_CSV_SOURCE_LOCALE_HEADERS = frozenset(
+    {"source_locale", "source_lang", "src_locale", "src_lang"}
+)
+_CSV_TARGET_LOCALE_HEADERS = frozenset(
+    {"target_locale", "target_lang", "trg_locale", "trg_lang"}
+)
 
 
 def _lang_value(elem: ET.Element) -> str:
@@ -57,6 +84,9 @@ def iter_tm_pairs(
         return
     if suffix in {".po", ".pot"}:
         yield from iter_po_pairs(path, source_locale, target_locale)
+        return
+    if suffix == ".csv":
+        yield from iter_csv_pairs(path, source_locale, target_locale)
         return
     raise ValueError(f"Unsupported TM import format: {path.suffix or '<none>'}")
 
@@ -139,6 +169,8 @@ def detect_tm_languages(path: Path, *, limit: int = 2000) -> set[str]:
         return detect_xliff_languages(path, limit=limit)
     if suffix in {".po", ".pot"}:
         return detect_po_languages(path)
+    if suffix == ".csv":
+        return detect_csv_languages(path, limit=limit)
     return set()
 
 
@@ -284,6 +316,90 @@ def iter_po_pairs(
 def detect_po_languages(path: Path) -> set[str]:
     _pairs, langs = _parse_po(path)
     return langs
+
+
+def iter_csv_pairs(
+    path: Path,
+    source_locale: str,
+    target_locale: str,
+) -> Iterator[tuple[str, str]]:
+    # Locale pair is resolved by import workflow; CSV units are source/target columns.
+    _ = source_locale, target_locale
+    with path.open("r", encoding="utf-8-sig", errors="replace", newline="") as handle:
+        reader = csv.reader(handle)
+        first = next(reader, None)
+        if first is None:
+            return
+        source_idx, target_idx, has_header = _resolve_csv_column_indexes(first)
+        if not has_header:
+            source_text = _csv_value(first, source_idx)
+            target_text = _csv_value(first, target_idx)
+            if source_text and target_text:
+                yield source_text, target_text
+        for row in reader:
+            source_text = _csv_value(row, source_idx)
+            target_text = _csv_value(row, target_idx)
+            if source_text and target_text:
+                yield source_text, target_text
+
+
+def detect_csv_languages(path: Path, *, limit: int = 2000) -> set[str]:
+    langs: set[str] = set()
+    with path.open("r", encoding="utf-8-sig", errors="replace", newline="") as handle:
+        reader = csv.reader(handle)
+        header = next(reader, None)
+        if not header:
+            return langs
+        normalized = [_normalize_csv_header(cell) for cell in header]
+        source_idx = _find_csv_header_index(normalized, _CSV_SOURCE_LOCALE_HEADERS)
+        target_idx = _find_csv_header_index(normalized, _CSV_TARGET_LOCALE_HEADERS)
+        if source_idx is None and target_idx is None:
+            return langs
+        for count, row in enumerate(reader, start=1):
+            if source_idx is not None:
+                source_locale = _csv_value(row, source_idx)
+                if source_locale:
+                    langs.add(source_locale)
+            if target_idx is not None:
+                target_locale = _csv_value(row, target_idx)
+                if target_locale:
+                    langs.add(target_locale)
+            if len(langs) >= 32 or count >= limit:
+                break
+    return langs
+
+
+def _resolve_csv_column_indexes(row: list[str]) -> tuple[int, int, bool]:
+    if not row:
+        return 0, 1, False
+    normalized = [_normalize_csv_header(cell) for cell in row]
+    source_idx = _find_csv_header_index(normalized, _CSV_SOURCE_HEADERS)
+    target_idx = _find_csv_header_index(normalized, _CSV_TARGET_HEADERS)
+    has_header = source_idx is not None or target_idx is not None
+    if source_idx is None:
+        source_idx = 0
+    if target_idx is None:
+        target_idx = 1 if source_idx == 0 else 0
+    if target_idx == source_idx and len(row) > 1:
+        target_idx = 1 if source_idx == 0 else 0
+    return source_idx, target_idx, has_header
+
+
+def _normalize_csv_header(value: str) -> str:
+    return value.strip().lower().replace("-", "_")
+
+
+def _find_csv_header_index(row: list[str], labels: frozenset[str]) -> int | None:
+    for idx, value in enumerate(row):
+        if value in labels:
+            return idx
+    return None
+
+
+def _csv_value(row: list[str], idx: int) -> str:
+    if idx < 0 or idx >= len(row):
+        return ""
+    return row[idx].strip()
 
 
 def _parse_po(path: Path) -> tuple[list[tuple[str, str]], set[str]]:

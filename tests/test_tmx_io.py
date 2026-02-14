@@ -94,7 +94,14 @@ msgstr "Прывітанне свет"
 
 
 def test_supported_tm_import_suffixes() -> None:
-    assert supported_tm_import_suffixes() == (".tmx", ".xliff", ".xlf", ".po", ".pot")
+    assert supported_tm_import_suffixes() == (
+        ".tmx",
+        ".xliff",
+        ".xlf",
+        ".po",
+        ".pot",
+        ".csv",
+    )
 
 
 def test_iter_tm_pairs_xlf_alias(tmp_path: Path) -> None:
@@ -143,9 +150,47 @@ msgstr "Прывітанне свет"
     assert "be" in langs
 
 
-def test_iter_tm_pairs_unsupported_extension_raises(tmp_path: Path) -> None:
+def test_iter_tm_pairs_csv_with_header(tmp_path: Path) -> None:
     path = tmp_path / "sample.csv"
-    path.write_text("a,b,c\n", encoding="utf-8")
+    path.write_text(
+        "source,target\n" "Hello world,Прывітанне свет\n" "Drop all,Скінуць усё\n",
+        encoding="utf-8",
+    )
+    parsed = list(iter_tm_pairs(path, "EN", "BE"))
+    assert parsed == [
+        ("Hello world", "Прывітанне свет"),
+        ("Drop all", "Скінуць усё"),
+    ]
+
+
+def test_iter_tm_pairs_csv_without_header(tmp_path: Path) -> None:
+    path = tmp_path / "sample.csv"
+    path.write_text(
+        "Hello world,Прывітанне свет\n" "Drop all,Скінуць усё\n",
+        encoding="utf-8",
+    )
+    parsed = list(iter_tm_pairs(path, "EN", "BE"))
+    assert parsed == [
+        ("Hello world", "Прывітанне свет"),
+        ("Drop all", "Скінуць усё"),
+    ]
+
+
+def test_detect_tm_languages_csv_from_locale_columns(tmp_path: Path) -> None:
+    path = tmp_path / "sample.csv"
+    path.write_text(
+        "source_locale,target_locale,source,target\n"
+        "en,be,Hello world,Прывітанне свет\n"
+        "en,be,Drop all,Скінуць усё\n",
+        encoding="utf-8",
+    )
+    langs = detect_tm_languages(path)
+    assert langs == {"en", "be"}
+
+
+def test_iter_tm_pairs_unsupported_extension_raises(tmp_path: Path) -> None:
+    path = tmp_path / "sample.json"
+    path.write_text('{"a": 1}\n', encoding="utf-8")
 
     try:
         list(iter_tm_pairs(path, "EN", "BE"))
