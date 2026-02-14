@@ -24,6 +24,8 @@ avoid missing mandatory tasks.
 - **Run** `make verify`
 - **Run** `make release-dry-run TAG=vX.Y.Z-rcN` on the release-candidate commit
   (`verify` + `release-check`) before creating/pushing the final tag
+- **Trigger** GitHub Actions workflow **Release Dry Run** with `tag=vX.Y.Z-rcN`
+  to validate matrix packaging/smoke artifacts without publishing a release
 - **Run** `make test-encoding-integrity`
 - **Run** `make diagnose-encoding ARGS=\"<project-root>\"` for the release corpus
 - **Run** `make test-readonly-clean` to confirm read-only workflows do not mutate tracked files

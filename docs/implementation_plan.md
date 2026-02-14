@@ -754,6 +754,8 @@ A8 [→] **Cross-platform CI/release hardening**
      - [✓] Add one platform-specific regression test per known class (path canonicalization, EOL normalization, invalid filename chars).
      - [✓] Accept `vX.Y.Z-rcN` tags in `release-check` and add `make release-dry-run TAG=vX.Y.Z-rcN`
        for local RC gating (`verify` + metadata check).
+     - [✓] Add non-publishing GitHub workflow (`Release Dry Run`) that runs preflight + matrix build/smoke
+       for `vX.Y.Z-rcN` inputs and uploads artifacts only.
    - **Dry-run definition**:
      - [ ] `make verify` + `make release-check TAG=v0.6.0-rcX` pass locally on the release branch.
      - [ ] CI matrix (`linux`, `windows`, `macos`) is fully green for the same `v0.6.0-rcX` commit.
