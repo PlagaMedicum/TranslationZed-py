@@ -25,6 +25,7 @@ _SHORT_QUERY_LEN = 4
 _SHORT_QUERY_RESERVED_SLOTS = 6
 _SHORT_QUERY_MAX_CANDIDATES = 5000
 _SHORT_QUERY_BUCKET_CANDIDATES = 2500
+_MULTI_TOKEN_LEN_PADDING = 4
 _MAX_FUZZY_SOURCE_LEN = 5000
 _IMPORT_VISIBLE_SQL = """
 origin != 'import'
@@ -1057,6 +1058,12 @@ class TMStore:
         length = len(norm)
         min_len = max(1, int(length * 0.6))
         max_len = int(length * 1.4) if length > 5 else length + 10
+        if len(query_tokens) > 1:
+            # Allow phrase-expansion neighbors (e.g. "make item" -> "make new item").
+            max_len = max(
+                max_len,
+                length + max(_MULTI_TOKEN_LEN_PADDING, len(query_tokens) * 2),
+            )
         max_candidates = _MAX_FUZZY_CANDIDATES
         bucket_candidates = _FUZZY_BUCKET_CANDIDATES
         if length <= _SHORT_QUERY_LEN:

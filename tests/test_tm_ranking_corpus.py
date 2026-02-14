@@ -56,6 +56,19 @@ def _first_index_by_source(matches) -> dict[str, int]:
     return out
 
 
+def _diagnostics_snapshot(matches) -> dict[str, float]:
+    visible = len(matches)
+    fuzzy = sum(1 for match in matches if match.score < 100)
+    unique_sources = len({match.source_text for match in matches})
+    recall_density = float(unique_sources) / float(visible) if visible else 0.0
+    return {
+        "visible": float(visible),
+        "fuzzy": float(fuzzy),
+        "unique_sources": float(unique_sources),
+        "recall_density": recall_density,
+    }
+
+
 def _safe_case_label(label: str) -> str:
     return "".join(ch if ch.isalnum() or ch in {"_", "-", "."} else "_" for ch in label)
 
@@ -110,6 +123,41 @@ def test_tm_ranking_corpus(tmp_path: Path) -> None:
                     f"{case_label}: expected at least {expect_min_unique_sources} unique "
                     f"sources, got {len(unique_sources)}"
                 )
+
+            expect_diagnostics = case.get("expect_diagnostics")
+            if isinstance(expect_diagnostics, dict):
+                snap = _diagnostics_snapshot(matches)
+                for metric, expected in expect_diagnostics.items():
+                    metric_name = str(metric)
+                    if metric_name.endswith("_min"):
+                        name = metric_name[: -len("_min")]
+                        op = "min"
+                    elif metric_name.endswith("_max"):
+                        name = metric_name[: -len("_max")]
+                        op = "max"
+                    else:
+                        name = metric_name
+                        op = "eq"
+                    actual = snap.get(name)
+                    assert (
+                        actual is not None
+                    ), f"{case_label}: unknown diagnostics metric '{metric}'"
+                    expected_f = float(expected)
+                    if op == "min":
+                        assert actual >= expected_f, (
+                            f"{case_label}: diagnostics {name}={actual:.2f} "
+                            f"< min {expected_f:.2f}"
+                        )
+                    elif op == "max":
+                        assert actual <= expected_f, (
+                            f"{case_label}: diagnostics {name}={actual:.2f} "
+                            f"> max {expected_f:.2f}"
+                        )
+                    else:
+                        assert abs(actual - expected_f) <= 1e-6, (
+                            f"{case_label}: diagnostics {name}={actual:.2f} "
+                            f"!= expected {expected_f:.2f}"
+                        )
 
             expect_top = case.get("expect_top")
             if expect_top:

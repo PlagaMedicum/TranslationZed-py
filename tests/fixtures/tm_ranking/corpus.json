@@ -140,6 +140,46 @@
       ]
     },
     {
+      "id": "exact_pool_reverse_neighbor_visibility",
+      "profile": "synthetic_core",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "Official: Run",
+      "min_score": 5,
+      "limit": 12,
+      "entries": [
+        {"origin": "project", "key": "k_run", "source": "Official: Run", "target": "run tr", "updated_at": 1},
+        {"origin": "project", "key": "k_rest", "source": "Official: Rest", "target": "rest tr", "updated_at": 2},
+        {"origin": "import", "source": "Official: Run", "target": "imported run 1", "tm_name": "tm_1", "updated_at": 3},
+        {"origin": "import", "source": "Official: Run", "target": "imported run 2", "tm_name": "tm_2", "updated_at": 4},
+        {"origin": "import", "source": "Official: Run", "target": "imported run 3", "tm_name": "tm_3", "updated_at": 5},
+        {"origin": "import", "source": "Official: Run", "target": "imported run 4", "tm_name": "tm_4", "updated_at": 6},
+        {"origin": "import", "source": "Official: Run", "target": "imported run 5", "tm_name": "tm_5", "updated_at": 7},
+        {"origin": "import", "source": "Official: Run", "target": "imported run 6", "tm_name": "tm_6", "updated_at": 8}
+      ],
+      "expect_present": [
+        {"source": "Official: Rest", "min_score": 70}
+      ]
+    },
+    {
+      "id": "make_item_phrase_expansion_neighbor",
+      "profile": "synthetic_core",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "Make item",
+      "min_score": 5,
+      "limit": 12,
+      "entries": [
+        {"origin": "project", "key": "k1", "source": "Make item", "target": "make item tr", "updated_at": 1},
+        {"origin": "project", "key": "k2", "source": "Make new item", "target": "make new item tr", "updated_at": 2},
+        {"origin": "project", "key": "k3", "source": "Make old item", "target": "make old item tr", "updated_at": 3},
+        {"origin": "project", "key": "k4", "source": "Break item", "target": "break item tr", "updated_at": 4}
+      ],
+      "expect_present": [
+        {"source": "Make new item", "min_score": 85}
+      ]
+    },
+    {
       "id": "pz_drop_neighbors_dense_pool",
       "profile": "pz_fixture_like",
       "source_locale": "EN",
@@ -171,7 +211,13 @@
       "expect_order": [
         ["Drop all", "Drop"],
         ["Drop-all", "Drop"]
-      ]
+      ],
+      "expect_diagnostics": {
+        "visible_min": 8,
+        "fuzzy_min": 6,
+        "unique_sources_min": 8,
+        "recall_density_min": 0.90
+      }
     },
     {
       "id": "pz_survivalguide_tagged_neighbors",
@@ -192,7 +238,13 @@
       "expect_present": [
         {"source": "SurvivalGuide entry 1499 <LINE> <BR> Sample text with tags.", "min_score": 95},
         {"source": "SurvivalGuide entry 1501 <LINE> <BR> Sample text with tags.", "min_score": 95}
-      ]
+      ],
+      "expect_diagnostics": {
+        "visible_min": 4,
+        "fuzzy_min": 3,
+        "unique_sources_min": 4,
+        "recall_density_min": 1.00
+      }
     }
   ]
 }
