@@ -1,3 +1,4 @@
+import struct
 from pathlib import Path
 
 from translationzed_py.core.tmx_io import (
@@ -101,6 +102,7 @@ def test_supported_tm_import_suffixes() -> None:
         ".po",
         ".pot",
         ".csv",
+        ".mo",
     )
 
 
@@ -188,6 +190,30 @@ def test_detect_tm_languages_csv_from_locale_columns(tmp_path: Path) -> None:
     assert langs == {"en", "be"}
 
 
+def test_iter_tm_pairs_mo_and_detect_languages(tmp_path: Path) -> None:
+    path = tmp_path / "sample.mo"
+    _write_mo(
+        path,
+        {
+            "": (
+                "Content-Type: text/plain; charset=UTF-8\n"
+                "Language: be\n"
+                "X-Source-Language: en\n"
+            ),
+            "Hello world": "Прывітанне свет",
+            "Drop all": "Скінуць усё",
+        },
+    )
+    parsed = list(iter_tm_pairs(path, "EN", "BE"))
+    assert parsed == [
+        ("Drop all", "Скінуць усё"),
+        ("Hello world", "Прывітанне свет"),
+    ]
+    langs = detect_tm_languages(path)
+    assert "en" in langs
+    assert "be" in langs
+
+
 def test_iter_tm_pairs_unsupported_extension_raises(tmp_path: Path) -> None:
     path = tmp_path / "sample.json"
     path.write_text('{"a": 1}\n', encoding="utf-8")
@@ -203,6 +229,34 @@ def test_iter_tm_pairs_unsupported_extension_raises(tmp_path: Path) -> None:
 def test_detect_tm_languages_unsupported_extension_returns_empty(
     tmp_path: Path,
 ) -> None:
-    path = tmp_path / "sample.csv"
-    path.write_text("a,b,c\n", encoding="utf-8")
+    path = tmp_path / "sample.json"
+    path.write_text('{"a": 1}\n', encoding="utf-8")
     assert detect_tm_languages(path) == set()
+
+
+def _write_mo(path: Path, entries: dict[str, str]) -> None:
+    items = sorted(entries.items(), key=lambda item: item[0])
+    ids = b""
+    strings = b""
+    id_offsets: list[tuple[int, int]] = []
+    str_offsets: list[tuple[int, int]] = []
+    original_base = 28 + len(items) * 16
+    for source, _target in items:
+        raw = source.encode("utf-8")
+        id_offsets.append((len(raw), original_base + len(ids)))
+        ids += raw + b"\x00"
+    translation_base = original_base + len(ids)
+    for _source, target in items:
+        raw = target.encode("utf-8")
+        str_offsets.append((len(raw), translation_base + len(strings)))
+        strings += raw + b"\x00"
+    with path.open("wb") as handle:
+        handle.write(
+            struct.pack("<7I", 0x950412DE, 0, len(items), 28, 28 + len(items) * 8, 0, 0)
+        )
+        for length, offset in id_offsets:
+            handle.write(struct.pack("<2I", length, offset))
+        for length, offset in str_offsets:
+            handle.write(struct.pack("<2I", length, offset))
+        handle.write(ids)
+        handle.write(strings)

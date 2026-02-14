@@ -533,6 +533,7 @@ def test_preferences_tm_tab_shows_format_and_storage_description(tmp_path, qtbot
     assert "XLIFF" in text
     assert "PO" in text
     assert ".csv" in text
+    assert ".mo" in text
     assert ".xlf" in text
     assert ".pot" in text
     assert ".tzp/config/tm.sqlite" in text

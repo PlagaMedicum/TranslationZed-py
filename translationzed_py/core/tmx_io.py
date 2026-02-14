@@ -2,13 +2,22 @@ from __future__ import annotations
 
 import ast
 import csv
+import gettext
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
 
 _XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
-_SUPPORTED_TM_IMPORT_SUFFIXES = (".tmx", ".xliff", ".xlf", ".po", ".pot", ".csv")
+_SUPPORTED_TM_IMPORT_SUFFIXES = (
+    ".tmx",
+    ".xliff",
+    ".xlf",
+    ".po",
+    ".pot",
+    ".csv",
+    ".mo",
+)
 _CSV_SOURCE_HEADERS = frozenset(
     {
         "source",
@@ -87,6 +96,9 @@ def iter_tm_pairs(
         return
     if suffix == ".csv":
         yield from iter_csv_pairs(path, source_locale, target_locale)
+        return
+    if suffix == ".mo":
+        yield from iter_mo_pairs(path, source_locale, target_locale)
         return
     raise ValueError(f"Unsupported TM import format: {path.suffix or '<none>'}")
 
@@ -171,6 +183,8 @@ def detect_tm_languages(path: Path, *, limit: int = 2000) -> set[str]:
         return detect_po_languages(path)
     if suffix == ".csv":
         return detect_csv_languages(path, limit=limit)
+    if suffix == ".mo":
+        return detect_mo_languages(path)
     return set()
 
 
@@ -318,6 +332,47 @@ def detect_po_languages(path: Path) -> set[str]:
     return langs
 
 
+def iter_mo_pairs(
+    path: Path,
+    source_locale: str,
+    target_locale: str,
+) -> Iterator[tuple[str, str]]:
+    # Locale pair is resolved by import workflow; MO units are msgid/msgstr catalog rows.
+    _ = source_locale, target_locale
+    pairs_by_source: dict[str, str] = {}
+    for raw_key, raw_value in _read_mo_catalog(path).items():
+        source_text = _mo_source_text(raw_key)
+        target_text = _mo_target_text(raw_value)
+        if not source_text or not target_text:
+            continue
+        pairs_by_source.setdefault(source_text, target_text)
+    yield from pairs_by_source.items()
+
+
+def detect_mo_languages(path: Path) -> set[str]:
+    langs: set[str] = set()
+    metadata = _mo_target_text(_read_mo_catalog(path).get("", ""))
+    if not metadata:
+        return langs
+    for raw_line in metadata.splitlines():
+        if ":" not in raw_line:
+            continue
+        key_raw, value_raw = raw_line.split(":", 1)
+        key = key_raw.strip().lower()
+        value = value_raw.strip()
+        if not value:
+            continue
+        if key in {
+            "language",
+            "source-language",
+            "x-source-language",
+            "target-language",
+            "x-target-language",
+        }:
+            langs.add(value)
+    return langs
+
+
 def iter_csv_pairs(
     path: Path,
     source_locale: str,
@@ -400,6 +455,34 @@ def _csv_value(row: list[str], idx: int) -> str:
     if idx < 0 or idx >= len(row):
         return ""
     return row[idx].strip()
+
+
+def _read_mo_catalog(path: Path) -> dict[object, object]:
+    with path.open("rb") as handle:
+        catalog = getattr(gettext.GNUTranslations(handle), "_catalog", {})
+    return catalog if isinstance(catalog, dict) else {}
+
+
+def _mo_source_text(value: object) -> str:
+    if isinstance(value, tuple):
+        if not value:
+            return ""
+        value = value[0]
+    if not isinstance(value, str):
+        return ""
+    text = value.split("\x04", 1)[-1]
+    text = text.split("\x00", 1)[0]
+    return text.strip()
+
+
+def _mo_target_text(value: object) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, tuple):
+        for item in value:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+    return ""
 
 
 def _parse_po(path: Path) -> tuple[list[tuple[str, str]], set[str]]:
