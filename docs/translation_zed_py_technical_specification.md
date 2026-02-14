@@ -356,6 +356,10 @@ Algorithm:
     large‑file mode is forced and table preview is enabled (default 800 chars).
   - Large‑file mode keeps wrap/highlight/glyphs enabled, but uses **time‑sliced row
     sizing** and **cached text layouts** to avoid UI stalls.
+  - Column/splitter resize events use a debounced row-reflow timer, so wrap-height
+    recomputation happens once after resize settles (instead of per pixel change).
+  - Lazy prefetch margin is adaptive: render-heavy files cap prefetch windows
+    aggressively to reduce decode spikes during scroll.
   - Highlight/whitespace glyphs are suppressed for any value ≥100k chars (table + editors).
   - Tooltips are plain text, delayed ~900ms, and truncated (800/200 chars); preview‑only
     and avoid full decode for lazy values.

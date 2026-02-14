@@ -71,8 +71,11 @@ _Last updated: 2026-02-11_
   (All env‑tunable.)
 - `tests/test_gui_perf_regressions.py` enforces GUI latency regressions for:
   - row-resize burst slicing (single pass must stay budgeted, no long monolithic resize),
+  - column/splitter resize debounce behavior (single deferred row-height recompute after resize settles),
   - large-file scroll/selection stability on `SurvivalGuide_BE.txt` and
     `Recorded_Media_BE.txt`.
+- `tests/test_render_workflow_service.py` enforces adaptive prefetch-window policy:
+  render-heavy paths must cap prefetch margins to reduce lazy decode spikes.
 - pytest always prints a **Performance** summary in terminal output,
   including `make verify`, to keep regressions visible.
 

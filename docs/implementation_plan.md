@@ -716,7 +716,7 @@ A6 [✓] **Cache/original conflict handling**
    - Scope: **only opened file**; detection runs in background, notification shown when ready.
    - Cache schema must store **original translation snapshot** per key for comparisons.
 
-A7 [→] **UI latency stabilization (scroll + paint)**
+A7 [✓] **UI latency stabilization (scroll + paint)**
    - **Problem**: table scrolling/selection still laggy on large files; paint + row sizing
      costs stack with regex highlighting, tooltips, and wrap sizing.
    - **Target**: smooth scroll/selection on large files; zero hangs on huge strings.
@@ -733,12 +733,12 @@ A7 [→] **UI latency stabilization (scroll + paint)**
      - [✓] Time‑sliced row sizing (budgeted per pass) to avoid long stalls.
      - [✓] Text layout cache for highlighted/glyph rows (reuse `QTextDocument` layouts).
      - [✓] Add lightweight perf tracing for paint/resize (`TZP_PERF_TRACE=paint,row_resize`).
-     - [→] Debounce column/splitter resize to avoid redundant row‑height work.
+     - [✓] Debounce column/splitter resize to avoid redundant row‑height work.
      - [✓] Add perf tracing for selection/detail sync/layout/startup/cache scan/auto‑open
        (identify remaining hotspots).
      - [✓] Render‑cost heuristic (max entry length) to auto‑enter large‑file mode
        and enable table previews when row/size thresholds are not exceeded.
-     - [→] Reduce lazy prefetch window for very long rows to cut decode spikes on scroll.
+     - [✓] Reduce lazy prefetch window for very long rows to cut decode spikes on scroll.
      - [✓] Add automated perf assertion for row-resize burst behavior (no long single resize pass).
      - [✓] Add automated GUI regression for large-file scroll/selection stability on SurvivalGuide/Recorded_Media fixtures.
    - **Acceptance**: large single‑string files (News/Recorded_Media) open and scroll without jank;
