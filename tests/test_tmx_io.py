@@ -95,3 +95,21 @@ msgstr "Прывітанне свет"
 
 def test_supported_tm_import_suffixes() -> None:
     assert supported_tm_import_suffixes() == (".tmx", ".xliff", ".po")
+
+
+def test_iter_tm_pairs_unsupported_extension_raises(tmp_path: Path) -> None:
+    path = tmp_path / "sample.csv"
+    path.write_text("a,b,c\n", encoding="utf-8")
+
+    try:
+        list(iter_tm_pairs(path, "EN", "BE"))
+    except ValueError as exc:
+        assert "Unsupported TM import format" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for unsupported extension")
+
+
+def test_detect_tm_languages_unsupported_extension_returns_empty(tmp_path: Path) -> None:
+    path = tmp_path / "sample.csv"
+    path.write_text("a,b,c\n", encoding="utf-8")
+    assert detect_tm_languages(path) == set()

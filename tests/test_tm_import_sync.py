@@ -287,3 +287,26 @@ def test_sync_import_folder_reports_zero_segment_imports_and_raw_locales(
     assert records[0].target_locale_raw == "be-BY"
     assert records[0].segment_count == 0
     store.close()
+
+
+def test_sync_import_folder_ignores_unsupported_extensions(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    tm_dir.mkdir(parents=True, exist_ok=True)
+    (tm_dir / "ignored.csv").write_text("a,b,c\n", encoding="utf-8")
+    (tm_dir / "ignored.xlf").write_text("<xliff/>", encoding="utf-8")
+    store = TMStore(root)
+
+    report = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+
+    assert report.imported_segments == 0
+    assert report.imported_files == ()
+    assert report.checked_files == ()
+    assert report.changed is False
+    assert store.list_import_files() == []
+    store.close()

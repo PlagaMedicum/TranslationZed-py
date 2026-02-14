@@ -720,3 +720,93 @@ def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
     store.delete_import_file(str(tmx_path))
     assert not store.list_import_files()
     store.close()
+
+
+def test_tm_store_replace_import_tm_with_xliff(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    xliff_path = root / ".tzp" / "tms" / "pack_ru.xliff"
+    xliff_path.parent.mkdir(parents=True, exist_ok=True)
+    xliff_path.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.2">
+  <file source-language="en-US" target-language="ru-RU" datatype="plaintext">
+    <body>
+      <trans-unit id="1">
+        <source>Hello world</source>
+        <target>Privet mir</target>
+      </trans-unit>
+    </body>
+  </file>
+</xliff>
+""",
+        encoding="utf-8",
+    )
+
+    count = store.replace_import_tm(
+        xliff_path,
+        source_locale="EN",
+        target_locale="RU",
+        source_locale_raw="en-US",
+        target_locale_raw="ru-RU",
+        tm_name="pack_ru",
+    )
+    assert count == 1
+    matches = store.query(
+        "Hello world",
+        source_locale="EN",
+        target_locale="RU",
+        origins=["import"],
+    )
+    assert matches
+    assert matches[0].tm_name == "pack_ru"
+    records = store.list_import_files()
+    assert len(records) == 1
+    assert records[0].source_locale_raw == "en-US"
+    assert records[0].target_locale_raw == "ru-RU"
+    store.close()
+
+
+def test_tm_store_replace_import_tm_with_po(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    po_path = root / ".tzp" / "tms" / "pack_ru.po"
+    po_path.parent.mkdir(parents=True, exist_ok=True)
+    po_path.write_text(
+        """
+msgid ""
+msgstr ""
+"Language: ru\\n"
+"X-Source-Language: en\\n"
+
+msgid "Hello world"
+msgstr "Privet mir"
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    count = store.replace_import_tm(
+        po_path,
+        source_locale="EN",
+        target_locale="RU",
+        source_locale_raw="en",
+        target_locale_raw="ru",
+        tm_name="pack_ru",
+    )
+    assert count == 1
+    matches = store.query(
+        "Hello world",
+        source_locale="EN",
+        target_locale="RU",
+        origins=["import"],
+    )
+    assert matches
+    assert matches[0].tm_name == "pack_ru"
+    records = store.list_import_files()
+    assert len(records) == 1
+    assert records[0].source_locale_raw == "en"
+    assert records[0].target_locale_raw == "ru"
+    store.close()
