@@ -756,6 +756,8 @@ A8 [→] **Cross-platform CI/release hardening**
        for local RC gating (`verify` + metadata check).
      - [✓] Add non-publishing GitHub workflow (`Release Dry Run`) that runs preflight + matrix build/smoke
        for `vX.Y.Z-rcN` inputs and uploads artifacts only.
+     - [✓] Auto-trigger the non-publishing dry-run workflow on `vX.Y.Z-rcN` tag pushes,
+       with explicit RC-tag validation in preflight.
    - **Dry-run definition**:
      - [ ] `make verify` + `make release-check TAG=v0.6.0-rcX` pass locally on the release branch.
      - [ ] CI matrix (`linux`, `windows`, `macos`) is fully green for the same `v0.6.0-rcX` commit.
