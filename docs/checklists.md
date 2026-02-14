@@ -22,8 +22,8 @@ avoid missing mandatory tasks.
 ## Before pushing tags / releases
 
 - **Run** `make verify`
-- **Run** `make release-check TAG=vX.Y.Z-rcN` on the release-candidate commit
-  before creating/pushing the final tag
+- **Run** `make release-dry-run TAG=vX.Y.Z-rcN` on the release-candidate commit
+  (`verify` + `release-check`) before creating/pushing the final tag
 - **Run** `make test-encoding-integrity`
 - **Run** `make diagnose-encoding ARGS=\"<project-root>\"` for the release corpus
 - **Run** `make test-readonly-clean` to confirm read-only workflows do not mutate tracked files
