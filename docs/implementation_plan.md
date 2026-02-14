@@ -205,7 +205,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - Decision: **no dot** for status‑only changes until a future option allows
   writing status comments to original files.
 
-### Step 17 — Reference locale comparisons [→]
+### Step 17 — Reference locale comparisons [✓]
 - Touchpoints: `gui/main_window.py` + comparison widgets/services
 - v0.6 scope:
   - Read-only preview of the current key across other opened locales
@@ -386,7 +386,7 @@ Execution order for v0.6.0 (strict sequence):
 7. Final v0.6 polish: update docs/checklists/changelog only after steps 1..6 are green.
 
 Priority A — **Core workflow completeness** (ordered, status)
-A‑P0 [→] **Encoding integrity conflicts + no-write-on-open guarantee** (**highest priority**)
+A‑P0 [✓] **Encoding integrity conflicts + no-write-on-open guarantee** (**highest priority**)
    - **Problem**: opening locales appears to change some files/encodings even without user edits.
    - **Impact**: silent data corruption risk, trust loss, noisy diffs, and release blockers.
    - **Target**: opening/reading must be strictly non-mutating; encoding is preserved unless user explicitly saves edited content.
