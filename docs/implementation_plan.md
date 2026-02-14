@@ -361,7 +361,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 Release target: **v0.6.0**
 
 v0.6.0 exit criteria (must all be true):
-- [ ] `A0`, `A7`, and `C1` are completed (no `[→]`/`[ ]` for their v0.6 scope).
+- [✓] `A0`, `A7`, and `C1` are completed (no `[→]`/`[ ]` for their v0.6 scope).
 - [ ] Cross-platform CI (`linux`, `windows`, `macos`) is green on release branch.
 - [ ] `make verify` and `make release-check TAG=v0.6.0` pass before tagging.
 - [ ] Packaging smoke checks pass for Linux/Windows/macOS release workflow.
@@ -640,16 +640,16 @@ A0 [✓] **Main-window declutter + explicit application layer (Clean architectur
      - [✓] Service-level tests cover open/switch/save/conflict/search flows.
      - [✓] Behavior parity confirmed by existing regression suite + perf budgets.
 
-A0.1 [ ] **Architecture enforcement gates (deferred post-v0.6)**
+A0.1 [✓] **Architecture enforcement gates**
    - **Problem**: without automated guardrails, new changes can reintroduce
      direct domain/infra coupling into GUI adapters.
    - **Target**: fail CI when `gui/main_window.py` (or other GUI modules)
      imports prohibited core internals directly (outside approved service
      boundaries).
    - **Mini-steps**:
-     - [ ] Add a lightweight import-boundary check script (service-allowlist driven).
-     - [ ] Add a complexity/size watchdog for `gui/main_window.py` growth.
-     - [ ] Wire guard scripts into `make verify` and CI.
+     - [✓] Add a lightweight import-boundary check script (service-allowlist driven).
+     - [✓] Add a complexity/size watchdog for `gui/main_window.py` growth.
+     - [✓] Wire guard scripts into `make verify` and CI.
 A1 [✓] **Search/Replace scopes**
    - **Problem**: scopes are persisted but not enforced; users expect Locale/Pool yet only File is reliable.
    - **Impact**: false confidence, missed matches, and inconsistent replace behavior.

@@ -36,6 +36,8 @@ _Last updated: 2026-02-11_
 - Preferences canonicalize relative TM import paths to stable absolute paths.
 - GUI save preserves CRLF endings when editing CRLF-backed files.
 - Filename labels used for corpus temp paths sanitize Windows-invalid characters.
+- Architecture guards enforce allowed GUI->core imports and `main_window.py`
+  line-budget threshold.
 - EN hash change dialog (implemented).
 
 ### 2.3 GUI Smoke Tests
@@ -261,6 +263,8 @@ They include:
 - GUI adapter delegation: verifies `main_window` routes key orchestration to services
   for open/switch/save/conflict/search flows, including file-level replace-all
   delegation (`tests/test_gui_service_adapters.py`).
+- Architecture guardrail checks: import-boundary allowlist + line-budget watchdog
+  for `gui/main_window.py` (`tests/test_architecture_guard.py`, `make arch-check`).
 
 **Not covered yet (automation gaps, by layer):**
 
