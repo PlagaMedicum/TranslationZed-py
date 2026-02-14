@@ -126,3 +126,22 @@ def test_ensure_defaults_migrates_root_imported_tms_into_tms(
     assert new_file.exists()
     assert new_file.read_text(encoding="utf-8") == "tmx"
     assert not old_file.exists()
+
+
+def test_ensure_defaults_canonicalizes_relative_tm_import_dir(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    cfg_path = tmp_path / ".tzp" / "config" / "settings.env"
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text(
+        "TM_IMPORT_DIR=./relative/../tm_import\n",
+        encoding="utf-8",
+    )
+
+    prefs = preferences.ensure_defaults(tmp_path)
+
+    expected = str((tmp_path / "tm_import").resolve())
+    assert prefs["tm_import_dir"] == expected
+    raw = cfg_path.read_text(encoding="utf-8")
+    assert f"TM_IMPORT_DIR={expected}" in raw

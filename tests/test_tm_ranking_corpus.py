@@ -73,6 +73,13 @@ def _safe_case_label(label: str) -> str:
     return "".join(ch if ch.isalnum() or ch in {"_", "-", "."} else "_" for ch in label)
 
 
+def test_safe_case_label_sanitizes_platform_invalid_filename_chars() -> None:
+    assert _safe_case_label("synthetic:drop/all") == "synthetic_drop_all"
+    assert _safe_case_label("abc-_.123") == "abc-_.123"
+    safe = _safe_case_label('a:b/c\\d*e?f"g<h>i|j')
+    assert all(ch.isalnum() or ch in {"_", "-", "."} for ch in safe)
+
+
 def test_tm_ranking_corpus(tmp_path: Path) -> None:
     corpus = _load_corpus()
     cases = corpus.get("cases", [])

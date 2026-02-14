@@ -51,3 +51,18 @@ def test_gui_save_preserves_utf16(tmp_path, qtbot):
     data = path.read_bytes()
     assert data[:2] in {b"\xff\xfe", b"\xfe\xff"}
     assert data.decode("utf-16").replace("\r\n", "\n") == 'UI_OK = "테스트2"\n'
+
+
+def test_gui_save_preserves_crlf_line_endings(tmp_path, qtbot):
+    root = _make_project(tmp_path, "RU", "CP1251", "Тест")
+    path = root / "RU" / "ui.txt"
+    path.write_bytes('UI_OK = "Тест"\r\n'.encode("cp1251"))
+    win = MainWindow(str(root), selected_locales=["RU"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(path)
+    win._file_chosen(ix)
+    model = win.table.model()
+    model.setData(model.index(0, 2), "Привет")
+    win._save_current()
+    data = path.read_bytes()
+    assert data.decode("cp1251") == 'UI_OK = "Привет"\r\n'
