@@ -13,7 +13,7 @@
 | **Entry**            | A single `key = "value"` line inside a locale file                 |
 | **Target locale**    | Locale currently edited by the translator                          |
 | **Reference locale** | A second locale shown in the **Source** column for comparison      |
-| **MVP**              | Minimum Viable Product (v0.1 release)                              |
+| **Baseline scope**   | Historical minimal feature set shipped in early releases            |
 
 ---
 
@@ -23,7 +23,7 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 
 ---
 
-## 2  Functional Scope (MVP)
+## 2  Functional Scope (Current v0.6-dev)
 
 - Open an existing `ProjectZomboidTranslations` folder.
 - Detect locale sub‑folders in the repo root, ignoring `_TVRADIO_TRANSLATIONS`.
@@ -32,22 +32,23 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
   immutable base** and is not edited directly.
 - Present file tree (with sub‑dirs) and a 4‑column table (Key | Source | Translation | Status),
   where **Source** is the English string by default; **EN is not editable**.
-- One file open at a time in the table (no tabs in MVP).
+- One file open at a time in the table (no tabs in current scope).
 - On startup, open the **most recently opened file** across the selected locales.
   The timestamp is stored in each file’s cache header for fast lookup.
 - Status per Entry: **Untouched** (initial state), **For review**, **Translated**, **Proofread**.
   Future statuses remain pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
 - Live plain / regex search over Key / Source / Translation with `F3` / `Shift+F3` navigation.
-- Reference‑locale switching without reloading UI (future; English is base in MVP).
+- Reference‑locale switching without reloading UI (future; English remains the base source in current scope).
 - On startup, check EN hash cache; if changed, show a confirmation dialog to
   reset the cache to the new EN version.
-- Atomic multi‑file save; **prompt only on exit** (locale switch is cache‑only).
+- Atomic multi‑file save; save/exit flows use explicit write prompts
+  (locale switch remains cache‑only).
 - Clipboard, wrap‑text (View menu), keyboard navigation.
 - **Productivity bias**: prioritize low‑latency startup and interaction; avoid
   heavyweight scans on startup.
 
-*Out of scope for MVP*: English diff colours, item/recipe generator, VCS, self‑update.
+*Out of scope for current scope*: English diff colours, item/recipe generator, VCS, self‑update.
 
 ---
 
@@ -58,11 +59,11 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 | **Performance**   | Load 20k keys ≤ 2 s; memory ≤ 300 MB.                                                |
 | **Usability**     | All actions accessible via menu and shortcuts; table usable without mouse.           |
 | **Portability**   | Tested on Win 10‑11, macOS 13‑14 (ARM + x86), Ubuntu 22.04+.                         |
-| **Reliability**   | No data loss on power‑kill (`os.replace` atomic writes; cache‑only recovery in v0.1). |
+| **Reliability**   | No data loss on power‑kill (`os.replace` atomic writes; cache‑only recovery model). |
 | **Extensibility** | New statuses, parsers and generators added by registering entry‑points.              |
 | **Security**      | Never execute user‑provided code; sanitise paths to prevent traversal.               |
 | **Productivity**  | Startup < 1s for cached project; key search/respond < 50ms typical.                  |
-| **UI Guidelines** | Follow GNOME HIG + KDE HIG via native Qt widgets; avoid custom theming.              |
+| **UI Guidelines** | Follow GNOME HIG + KDE HIG via native Qt widgets; keep theme overrides minimal and readability-focused. |
 
 ---
 
@@ -146,7 +147,7 @@ This table binds technical sections to canonical UC IDs.
 | Search and replace scopes | UC-05a, UC-05b, UC-07 |
 | Conflict/orphan cache handling | UC-06, UC-06b |
 | Save, dirty marker, exit behavior | UC-10a, UC-10b, UC-11, UC-12 |
-| Side panel + TM workflows | UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j |
+| Side panel + TM workflows | UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j, UC-13k, UC-13l |
 
 ### 5.1  `core.project_scanner`
 
@@ -254,7 +255,7 @@ Algorithm:
 - If `is_regex`: `re_flags = re.IGNORECASE | re.MULTILINE`.
 - Otherwise lower‑case substring on indexed `.lower()` caches.
 - Returns `(file_path, row_index)` list for selection (multi‑file capable).
-- Future: optional `match_span`/`snippet` payload for preview; not in v0.1.
+- Future: optional `match_span`/`snippet` payload for preview; not in current scope.
 - GUI must delegate search logic to this module (no GUI-level search).
 - Related UCs: UC-05a.
 
@@ -327,7 +328,7 @@ Algorithm:
   - `LOCALE`: all files in the current locale.
   - `POOL` (**Locale Pool**): all files in all selected locales (current session).
 - **Replace scope**:
-  - `FILE`: current file only (default in v0.1).
+  - `FILE`: current file only (default in current scope).
   - `LOCALE`: all files in the current locale.
   - `POOL` (**Locale Pool**): all files in all selected locales (current session).
 - Scope selection lives in Preferences (not in the toolbar by default), and UI text
@@ -477,7 +478,10 @@ if dirty_files and not prompt_save():
   it does not auto-run search.
 - Left Search side panel shows a minimal match list generated from current toolbar query/scope;
   each item is `<relative path>:<row> · <one-line excerpt>` and click navigates to that match.
-- Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b.
+- For sessions with multiple opened target locales, UI exposes a read-only
+  cross-locale variants preview for the current key (locale, value, compact
+  status tag), ordered by current session locale order.
+- Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b, UC-13l.
 
 ### 5.9.1  UI Guidelines (GNOME + KDE)
 
@@ -619,6 +623,9 @@ UNTOUCHED).
   - TM suggestion diagnostics expose both ranked score and raw similarity score.
   - Project TM outranks imported TM.
   - TM suggestions include source name (`tm_name`); when missing, UI falls back to TM file path.
+  - TM suggestions include row status for project-origin matches as compact tags
+    (`U/T/FR/P` = Untouched/Translated/For review/Proofread); imported matches
+    do not expose status and are rendered without status marker.
   - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.
   - TM suggestion fetch depth scales with min-score to support high-recall review:
     very low thresholds return deeper candidate lists.
@@ -676,7 +683,7 @@ UNTOUCHED).
    - Auto‑bootstrap runs once per session on first TM-panel activation for selected locales
      (even if DB already has entries), to prevent stale/partial project-index behavior.
    - Rebuild/bootstrapping runs asynchronously (background worker).
-- Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j, UC-13k.
+- Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j, UC-13k, UC-13l.
 
 ---
 
@@ -754,7 +761,7 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 
 ## 9  Crash Recovery
 
-v0.1 uses **cache‑only** recovery:
+Current builds use **cache‑only** recovery:
 - Drafts are persisted to `.tzp/cache` on edit.
 - No separate temp recovery file is created.
 - If future crash recovery is needed, it will build on cache state only.
@@ -765,7 +772,7 @@ v0.1 uses **cache‑only** recovery:
 
 - **Wheel** (`pipx install translationzed‑py==0.1.*`).
 - **Standalone** (`pyinstaller --windowed --onefile`).  Separate spec files per OS with icon resources.
-- **macOS .app bundle** via `py2app` (optional after v0.1).
+- **macOS .app bundle** via `py2app` (optional post‑v0.6).
 
 ---
 
@@ -784,7 +791,7 @@ v0.1 uses **cache‑only** recovery:
   (Linux/Windows/macOS) and bundle LICENSE + README.
 - **CI**: GitHub Actions matrix (Linux/Windows/macOS) runs ruff, mypy, pytest; Linux runs Qt offscreen.
 
-## 13  Backlog (Post‑v0.1)
+## 13  Backlog (Post‑v0.6)
 
 1. English diff colours (NEW / REMOVED / MODIFIED).
 2. Item/Recipe template generator.
