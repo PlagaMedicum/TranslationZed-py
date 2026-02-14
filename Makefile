@@ -3,7 +3,7 @@ PY      ?= python            # override on CLI:  make PY=python3.12 venv
 VENV    ?= .venv
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt lint typecheck test check verify verify-core verify-fast release-check run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win test-encoding-integrity diagnose-encoding test-readonly-clean
+.PHONY: venv install precommit fmt lint typecheck arch-check test check verify verify-core verify-fast release-check run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win test-encoding-integrity diagnose-encoding test-readonly-clean
 
 ## create .venv and populate dev deps (one-off)
 venv:
@@ -26,6 +26,9 @@ lint:
 typecheck:
 	VENV=$(VENV) bash scripts/typecheck.sh
 
+arch-check:
+	VENV=$(VENV) bash scripts/arch_check.sh
+
 test:
 	VENV=$(VENV) bash scripts/test.sh
 
@@ -39,7 +42,7 @@ test-readonly-clean:
 	VENV=$(VENV) bash scripts/test_readonly_clean.sh
 
 ## run all quality gates
-check: fmt lint typecheck test
+check: fmt lint typecheck arch-check test
 
 ## pre-commit core verification (clean fixtures + full quality gates)
 verify-core: clean-cache clean-config check test-encoding-integrity diagnose-encoding test-readonly-clean
