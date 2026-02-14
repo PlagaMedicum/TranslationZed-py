@@ -1976,16 +1976,22 @@ class MainWindow(QMainWindow):
             return
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Import TMX",
+            "Import TM",
             str(self._root),
-            "TMX files (*.tmx);;All files (*)",
+            (
+                "TM files (*.tmx *.xliff *.po);;"
+                "TMX files (*.tmx);;"
+                "XLIFF files (*.xliff);;"
+                "PO files (*.po);;"
+                "All files (*)"
+            ),
         )
         if not path:
             return
         try:
             dest = self._copy_tmx_to_import_dir(Path(path))
         except Exception as exc:
-            QMessageBox.warning(self, "TMX import failed", str(exc))
+            QMessageBox.warning(self, "TM import failed", str(exc))
             return
         self._sync_tm_import_folder(
             interactive=True,

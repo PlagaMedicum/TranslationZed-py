@@ -205,13 +205,13 @@ class PreferencesDialog(QDialog):
         layout.addWidget(label)
         self._tm_formats_label = QLabel(
             "Supported now:\n"
-            "- Import: TMX (.tmx, TMX 1.4)\n"
+            "- Import: TMX (.tmx), XLIFF (.xliff), PO (.po)\n"
             "- Export: TMX (.tmx, TMX 1.4)\n"
             "- Runtime store: .tzp/config/tm.sqlite\n"
             "- Managed imported folder: .tzp/tms\n"
             "\n"
             "Planned later:\n"
-            "- Additional exchange formats (deferred).",
+            "- XML, CSV, POT, MO, XLF, XLSX",
             widget,
         )
         self._tm_formats_label.setWordWrap(True)
@@ -224,8 +224,10 @@ class PreferencesDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.setContentsMargins(0, 0, 0, 0)
         btn_row.setSpacing(6)
-        import_btn = QPushButton("Import TMX…", widget)
-        import_btn.setToolTip("Queue TMX files for import into the managed TM folder")
+        import_btn = QPushButton("Import TM…", widget)
+        import_btn.setToolTip(
+            "Queue TM files (.tmx/.xliff/.po) for import into the managed TM folder"
+        )
         import_btn.clicked.connect(self._queue_tm_imports)
         remove_btn = QPushButton("Remove selected", widget)
         remove_btn.setToolTip(
@@ -317,9 +319,15 @@ class PreferencesDialog(QDialog):
         start_dir = self._tm_import_dir_edit.text().strip() or str(Path.cwd())
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Import TMX files",
+            "Import TM files",
             start_dir,
-            "TMX files (*.tmx);;All files (*)",
+            (
+                "TM files (*.tmx *.xliff *.po);;"
+                "TMX files (*.tmx);;"
+                "XLIFF files (*.xliff);;"
+                "PO files (*.po);;"
+                "All files (*)"
+            ),
         )
         for raw_path in paths:
             tm_path = str(Path(raw_path))
