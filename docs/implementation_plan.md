@@ -813,9 +813,9 @@ C1 [→] **Translation memory** (Step 29).
      - [✓] Search side panel now exposes minimal clickable results list (`<path>:<row>`) wired to toolbar search scope/query.
      - [✓] Preferences TM tab now exposes a dedicated **Diagnostics** action with copyable report window (policy + import/query summary).
      - [✓] Preferences TM tab format hints now use explicit **Supported now / Planned later** matrix text.
-     - [ ] TM suggestions should display project-TM row status for each project-origin match
+     - [✓] TM suggestions should display project-TM row status for each project-origin match
        as compact tags (`U/T/FR/P`); imported matches show no status/`n/a`.
-     - [ ] Add current-key cross-locale variants preview (other opened locales only):
+     - [✓] Add current-key cross-locale variants preview (other opened locales only):
        session-order locale code/name + value + compact status tag (`U/T/FR/P`)
        in a compact read-only panel.
      - [ ] Add TM diagnostics snapshot assertions for recall quality (`visible`, `fuzzy`, `unique_sources`, `recall_density`) on production-like data slices.
