@@ -257,14 +257,14 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 ### UC-13d  Import TM File
 | **Trigger** | *General ▸ Preferences ▸ TM tab ▸ Import TM…* |
 | **Flow** |
-|  1 | SYS opens TM file picker (`.tmx`, `.xliff`, `.xlf`, `.po`, `.pot`, `.csv`). |
+|  1 | SYS opens TM file picker (`.tmx`, `.xliff`, `.xlf`, `.po`, `.pot`, `.csv`, `.mo`). |
 |  2 | SYS copies selected TM file into managed TM import folder (default: `.tzp/tms` at the runtime root). |
 |  3 | SYS detects source/target locales from TM metadata where available; if unresolved, SYS asks user to map locales manually. |
 |  4 | SYS imports TM units into project TM store for resolved locale pair (`origin=import`) and records TM source name. |
 |  5 | SYS reports imported unit count and unresolved/failed files when applicable; zero-segment imports are reported as warnings. |
 
 ### UC-13e  Drop-In TM Sync
-| **Trigger** | User drops supported TM files (`.tmx`, `.xliff`, `.xlf`, `.po`, `.pot`, `.csv`) into the managed TM import folder outside the app. |
+| **Trigger** | User drops supported TM files (`.tmx`, `.xliff`, `.xlf`, `.po`, `.pot`, `.csv`, `.mo`) into the managed TM import folder outside the app. |
 | **Flow** |
 |  1 | On TM panel activation, SYS scans TM import folder for new/changed/removed supported TM files. |
 |  2 | SYS auto-detects source/target locales when possible; unresolved files trigger immediate locale-mapping dialogs with **Skip all for now** support. |
