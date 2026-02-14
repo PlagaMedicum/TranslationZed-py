@@ -147,7 +147,7 @@ def test_search_result_label_handles_external_path_without_preview() -> None:
     root = Path("/tmp/proj")
     external = Path("/var/tmp/external.txt")
     match = Match(external, 0)
-    assert search_result_label(match=match, root=root) == f"{external}:1"
+    assert search_result_label(match=match, root=root) == f"{external.as_posix()}:1"
 
 
 def test_build_search_panel_plan_with_truncation() -> None:

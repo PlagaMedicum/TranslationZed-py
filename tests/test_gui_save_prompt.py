@@ -100,7 +100,7 @@ def test_prompt_write_can_deselect_files(tmp_path, qtbot, monkeypatch):
     _edit_value(win, ui_path)
 
     captured_files: list[str] = []
-    selected_rel = str(menu_path.relative_to(root))
+    selected_rel = menu_path.relative_to(root).as_posix()
 
     class FakeDialog:
         def __init__(self, files, *_args, **_kwargs):
@@ -120,7 +120,7 @@ def test_prompt_write_can_deselect_files(tmp_path, qtbot, monkeypatch):
     monkeypatch.setattr(mw, "SaveFilesDialog", FakeDialog)
     win._request_write_original()
 
-    assert str(ui_path.relative_to(root)) in captured_files
+    assert ui_path.relative_to(root).as_posix() in captured_files
     assert selected_rel in captured_files
     assert ui_path.read_text(encoding="utf-8") == 'UI_YES = "Так"\n'
     assert menu_path.read_text(encoding="utf-8") == 'UI_MENU = "Супер меню"\n'
