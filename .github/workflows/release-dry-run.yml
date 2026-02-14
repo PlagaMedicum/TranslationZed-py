@@ -1,12 +1,22 @@
 name: Release Dry Run
 
 on:
+  push:
+    tags:
+      - "v*-rc*"
   workflow_dispatch:
     inputs:
       tag:
         description: "Release candidate tag (e.g. v0.6.0-rc1)"
         required: true
         type: string
+
+concurrency:
+  group: release-dry-run-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RC_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
 jobs:
   preflight:
@@ -24,8 +34,21 @@ jobs:
         run: |
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
+      - name: Validate RC tag format
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import sys
+
+          tag = os.environ.get("RC_TAG", "").strip()
+          if not re.fullmatch(r"v\d+\.\d+\.\d+-rc\d+", tag, flags=re.IGNORECASE):
+              print(f"Invalid RC tag for dry-run workflow: {tag!r}")
+              sys.exit(2)
+          print(f"RC tag: {tag}")
+          PY
       - name: Run local RC gates
-        run: make release-dry-run TAG=${{ inputs.tag }}
+        run: make release-dry-run TAG=${{ env.RC_TAG }}
 
   build:
     needs: preflight
