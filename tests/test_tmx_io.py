@@ -109,7 +109,9 @@ def test_iter_tm_pairs_unsupported_extension_raises(tmp_path: Path) -> None:
         raise AssertionError("Expected ValueError for unsupported extension")
 
 
-def test_detect_tm_languages_unsupported_extension_returns_empty(tmp_path: Path) -> None:
+def test_detect_tm_languages_unsupported_extension_returns_empty(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "sample.csv"
     path.write_text("a,b,c\n", encoding="utf-8")
     assert detect_tm_languages(path) == set()

@@ -308,6 +308,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | *General ▸ Preferences ▸ TM tab* |
 | **Flow** |
 |  1 | SYS lists imported TM files with locale pair, raw locale tags in braces (when different), segment count, status, and enabled toggle for ready files. |
+|  1a | If any ready imported file has `0` segments, SYS shows an inline warning banner in the TM preferences tab (in addition to row marker). |
 |  2 | SYS shows inline TM format/storage hints (import: TMX/XLIFF/PO, export: TMX, runtime `.tzp` paths) to clarify data flow. |
 |  3 | User may queue TM imports, remove selected imported TM files, or toggle ready files on/off. |
 |  4 | Before removals are applied, SYS asks for explicit confirmation that selected TM files will be deleted from disk. |

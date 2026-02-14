@@ -177,6 +177,9 @@ They include:
   one-token substring-noise suppression.
 - TM query perf regression at auto-derived production baseline size
   (max entry count from committed `tests/fixtures/perf_root/BE/*.txt`).
+- TM import perf regression at auto-derived production baseline size:
+  bulk import into TM store and import-origin query latency on the same derived
+  segment count.
 - TM origin-filter regressions: fuzzy recall remains intact for `project`-only and
   `import`-only modes (no exact-only collapse).
 - TM ranking diagnostics and locale-scoped morphology: verify ranked-vs-raw score exposure

@@ -654,6 +654,8 @@ UNTOUCHED).
   - Sync summary reports imported/unresolved/failed files; zero-segment imports are surfaced as warnings.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
     new imports, with per-file segment counts and raw locale-tag metadata display.
+  - TM Preferences tab shows an inline warning banner when one or more ready imported files have
+    zero segments, so low-value imports are visible without opening per-row details.
   - Preferences TM tab shows explicit `Supported now`/`Planned later` format matrix plus
     storage paths (`TMX/XLIFF/PO import`, `TMX export`, `.tzp/config/tm.sqlite`, `.tzp/tms`) to reduce import/export ambiguity.
   - TM operational commands (resolve pending imports, export TMX, rebuild TM) are executed from

@@ -7,6 +7,7 @@ from pathlib import Path
 from translationzed_py.core import parse_lazy
 from translationzed_py.core.project_scanner import scan_root_with_errors
 from translationzed_py.core.tm_store import TMStore
+from translationzed_py.core.tmx_io import write_tmx
 
 
 def _budget_ms(env_name: str, default_ms: float) -> float:
@@ -89,6 +90,76 @@ def test_tm_query_perf_autoderived_from_committed_perf_fixtures(
             f"entries={count}",
         )
         assert elapsed_ms <= budget_ms
+        sources = {item.source_text for item in matches}
+        assert "Drop all" in sources
+        assert "Drop one" in sources
+    finally:
+        store.close()
+
+
+def test_tm_import_query_perf_autoderived_from_committed_perf_fixtures(
+    tmp_path: Path, perf_recorder
+) -> None:
+    count = max(100, _derive_tm_stress_size())
+    import_budget_ms = _budget_ms("TZP_PERF_TM_IMPORT_MS", 2200.0)
+    query_budget_ms = _budget_ms("TZP_PERF_TM_IMPORT_QUERY_MS", 1200.0)
+    root = tmp_path / "tm_import_perf"
+    root.mkdir(parents=True, exist_ok=True)
+    tm_path = root / ".tzp" / "tms" / "bulk.tmx"
+    tm_path.parent.mkdir(parents=True, exist_ok=True)
+
+    pairs = [
+        ("Drop all", "Пакід. усё"),
+        ("Drop one", "Скінуць шт."),
+        ("Drop-all", "Пакінуць усё"),
+    ]
+    pairs.extend(
+        (
+            f"Random token {idx:05d}",
+            f"Noise tr {idx:05d}",
+        )
+        for idx in range(max(0, count - len(pairs)))
+    )
+    write_tmx(tm_path, pairs, source_locale="EN", target_locale="BE")
+
+    store = TMStore(root)
+    try:
+        start = time.perf_counter()
+        imported = store.replace_import_tm(
+            tm_path,
+            source_locale="EN",
+            target_locale="BE",
+            source_locale_raw="EN",
+            target_locale_raw="BE",
+            tm_name="bulk",
+        )
+        import_elapsed_ms = (time.perf_counter() - start) * 1000.0
+        perf_recorder(
+            "tm import load (auto-derived prod max)",
+            import_elapsed_ms,
+            import_budget_ms,
+            f"segments={count}",
+        )
+        assert import_elapsed_ms <= import_budget_ms
+        assert imported == count
+
+        start = time.perf_counter()
+        matches = store.query(
+            "Drop all",
+            source_locale="EN",
+            target_locale="BE",
+            limit=20,
+            min_score=5,
+            origins=["import"],
+        )
+        query_elapsed_ms = (time.perf_counter() - start) * 1000.0
+        perf_recorder(
+            "tm import query (auto-derived prod max)",
+            query_elapsed_ms,
+            query_budget_ms,
+            f"entries={count}",
+        )
+        assert query_elapsed_ms <= query_budget_ms
         sources = {item.source_text for item in matches}
         assert "Drop all" in sources
         assert "Drop one" in sources
