@@ -750,8 +750,8 @@ A8 [→] **Cross-platform CI/release hardening**
    - **Tasks**:
      - [✓] Add release metadata preflight (`make release-check`) and enforce in release workflow.
      - [✓] Fix path/EOL-sensitive tests for Windows/macOS.
-     - [ ] Add explicit CI step for `make release-check TAG=<tag>` in pre-tag local checklist runbook.
-     - [ ] Add one platform-specific regression test per known class (path canonicalization, EOL normalization, invalid filename chars).
+     - [✓] Add explicit CI step for `make release-check TAG=<tag>` in pre-tag local checklist runbook.
+     - [✓] Add one platform-specific regression test per known class (path canonicalization, EOL normalization, invalid filename chars).
    - **Dry-run definition**:
      - [ ] `make verify` + `make release-check TAG=v0.6.0-rcX` pass locally on the release branch.
      - [ ] CI matrix (`linux`, `windows`, `macos`) is fully green for the same `v0.6.0-rcX` commit.

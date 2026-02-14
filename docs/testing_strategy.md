@@ -33,6 +33,9 @@ _Last updated: 2026-02-11_
 - Edit + save path writes file + cache.
 - Save preserves original file bytes outside literal spans.
 - Open/switch/close without edits keeps file bytes identical across UTF-8/CP1251/UTF-16 + EOL styles.
+- Preferences canonicalize relative TM import paths to stable absolute paths.
+- GUI save preserves CRLF endings when editing CRLF-backed files.
+- Filename labels used for corpus temp paths sanitize Windows-invalid characters.
 - EN hash change dialog (implemented).
 
 ### 2.3 GUI Smoke Tests
