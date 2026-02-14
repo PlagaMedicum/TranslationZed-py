@@ -57,6 +57,7 @@ class TranslationModel(QAbstractTableModel):
         self._source_by_row = source_by_row
         self._baseline_by_row = dict(baseline_by_row or {})
         self._changed_rows: set[int] = set(self._baseline_by_row)
+        self._status_touched_rows: set[int] = set()
         self._dirty = bool(self._baseline_by_row)
         self._pf.dirty = self._dirty
         self._preview_limit: int | None = None
@@ -113,6 +114,9 @@ class TranslationModel(QAbstractTableModel):
             else:
                 if baseline is not None:
                     self._changed_rows.add(row)
+        else:
+            # Status-only edits should propagate to TM metadata updates.
+            self._status_touched_rows.add(row)
         left = self.index(row, 0)
         right = self.index(row, self.columnCount() - 1)
         self.dataChanged.emit(
@@ -133,10 +137,12 @@ class TranslationModel(QAbstractTableModel):
                 out[e.key] = e.value
         return out
 
-    def changed_rows_with_source(self) -> list[tuple[str, str, str]]:
-        """Return (key, source, value) for edited rows."""
-        out: list[tuple[str, str, str]] = []
-        for row in self._baseline_by_row:
+    def changed_rows_with_source(self) -> list[tuple[str, str, str, int]]:
+        """Return (key, source, value, status) for value/status touched rows."""
+        out: list[tuple[str, str, str, int]] = []
+        touched_rows = set(self._baseline_by_row)
+        touched_rows.update(self._status_touched_rows)
+        for row in touched_rows:
             if 0 <= row < len(self._entries):
                 e = self._entries[row]
                 source_text = ""
@@ -145,7 +151,7 @@ class TranslationModel(QAbstractTableModel):
                 else:
                     source_text = self._source_values.get(e.key, "")
                 value_text = "" if e.value is None else str(e.value)
-                out.append((e.key, source_text, value_text))
+                out.append((e.key, source_text, value_text, int(e.status)))
         return out
 
     def changed_keys(self) -> set[str]:
@@ -204,6 +210,7 @@ class TranslationModel(QAbstractTableModel):
     def clear_changed_values(self) -> None:
         self._baseline_by_row.clear()
         self._changed_rows.clear()
+        self._status_touched_rows.clear()
         self._dirty = False
         self._pf.dirty = False
 

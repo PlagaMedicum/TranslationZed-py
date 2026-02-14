@@ -272,6 +272,37 @@ def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
     assert "import" in origins
 
 
+def test_tm_panel_shows_cross_locale_variants_in_session_order(
+    tmp_path, qtbot, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "proj"
+    for loc in ("EN", "BE", "RU", "KO"):
+        (root / loc).mkdir(parents=True, exist_ok=True)
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "ui.txt").write_text('UI_KEY = "Drop one"\n', encoding="utf-8")
+    (root / "BE" / "ui.txt").write_text('UI_KEY = "Скінуць шт."\n', encoding="utf-8")
+    (root / "RU" / "ui.txt").write_text('UI_KEY = "Сбросить шт."\n', encoding="utf-8")
+    (root / "KO" / "ui.txt").write_text('UI_KEY = "하나 버리기"\n', encoding="utf-8")
+
+    win = MainWindow(str(root), selected_locales=["BE", "RU", "KO"])
+    qtbot.addWidget(win)
+    assert win._ensure_tm_store()
+    ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    model = win.table.model()
+    win.table.setCurrentIndex(model.index(0, 2))
+    win._left_stack.setCurrentIndex(1)
+    win._update_tm_suggestions()
+
+    assert win._tm_variants_list.count() == 2
+    assert win._tm_variants_list.item(0).text().startswith("RU ·")
+    assert win._tm_variants_list.item(1).text().startswith("KO ·")
+
+
 def test_tm_bootstrap_rebuild_runs_even_when_store_has_entries(
     tmp_path, qtbot, monkeypatch
 ):
