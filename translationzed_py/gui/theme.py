@@ -115,9 +115,7 @@ def _apply_dark(app: QApplication) -> None:
     palette.setColor(QPalette.Highlight, QColor(63, 111, 180))
     palette.setColor(QPalette.HighlightedText, QColor(255, 255, 255))
     palette.setColor(QPalette.Disabled, QPalette.Text, QColor(135, 135, 135))
-    palette.setColor(
-        QPalette.Disabled, QPalette.PlaceholderText, QColor(95, 95, 95)
-    )
+    palette.setColor(QPalette.Disabled, QPalette.PlaceholderText, QColor(95, 95, 95))
     palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(135, 135, 135))
     palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor(135, 135, 135))
     app.setPalette(palette)

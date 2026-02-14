@@ -332,9 +332,7 @@ class TextVisualHighlighter(QSyntaxHighlighter):
             for match in regex.finditer(text):
                 self.setFormat(match.start(), match.end() - match.start(), formats.tag)
         for match in _ESCAPE_RE.finditer(text):
-            self.setFormat(
-                match.start(), match.end() - match.start(), formats.escape
-            )
+            self.setFormat(match.start(), match.end() - match.start(), formats.escape)
         for match in _WS_RE.finditer(text):
             self.setFormat(
                 match.start(), match.end() - match.start(), formats.ws_repeat
