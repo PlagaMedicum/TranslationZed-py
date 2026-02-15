@@ -10,12 +10,14 @@ from .qa_rules import (
     has_newline_mismatch,
     missing_protected_tokens,
     newline_count,
+    same_as_source,
     trailing_fragment,
 )
 
 QA_CODE_TRAILING = "qa.trailing"
 QA_CODE_NEWLINES = "qa.newlines"
 QA_CODE_TOKENS = "qa.tokens"
+QA_CODE_SAME_AS_SOURCE = "qa.same_source"
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +34,7 @@ class QAFinding:
     code: str
     excerpt: str
     severity: str = "warning"
+    group: str = "format"
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +76,7 @@ class QAService:
         check_trailing: bool,
         check_newlines: bool,
         check_tokens: bool = False,
+        check_same_as_source: bool = False,
     ) -> tuple[QAFinding, ...]:
         return scan_qa_rows(
             file=file,
@@ -80,6 +84,7 @@ class QAService:
             check_trailing=check_trailing,
             check_newlines=check_newlines,
             check_tokens=check_tokens,
+            check_same_as_source=check_same_as_source,
         )
 
     def auto_mark_rows(self, findings: Sequence[QAFinding]) -> tuple[int, ...]:
@@ -91,7 +96,10 @@ def qa_finding_label(*, finding: QAFinding, root: Path) -> str:
         rel = finding.file.relative_to(root).as_posix()
     except ValueError:
         rel = finding.file.as_posix()
-    label = f"{rel}:{finding.row + 1} · {finding.code}"
+    label = (
+        f"{rel}:{finding.row + 1} · "
+        f"{finding.severity.lower()}/{finding.group.lower()} · {finding.code}"
+    )
     excerpt = finding.excerpt.strip()
     if not excerpt:
         return label
@@ -143,6 +151,7 @@ def scan_qa_rows(
     check_trailing: bool,
     check_newlines: bool,
     check_tokens: bool,
+    check_same_as_source: bool,
 ) -> tuple[QAFinding, ...]:
     findings: list[QAFinding] = []
     for row in rows:
@@ -157,6 +166,7 @@ def scan_qa_rows(
                     code=QA_CODE_TRAILING,
                     excerpt=_trailing_excerpt(row.source_text, row.target_text),
                     severity="warning",
+                    group="format",
                 )
             )
         if check_newlines and has_newline_mismatch(row.source_text, row.target_text):
@@ -167,6 +177,7 @@ def scan_qa_rows(
                     code=QA_CODE_NEWLINES,
                     excerpt=_newline_excerpt(row.source_text, row.target_text),
                     severity="warning",
+                    group="format",
                 )
             )
         if check_tokens:
@@ -182,9 +193,35 @@ def scan_qa_rows(
                         code=QA_CODE_TOKENS,
                         excerpt=_tokens_excerpt(missing_tokens),
                         severity="warning",
+                        group="format",
                     )
                 )
+        if (
+            check_same_as_source
+            and row.source_text
+            and row.target_text
+            and same_as_source(row.source_text, row.target_text)
+        ):
+            findings.append(
+                QAFinding(
+                    file=file,
+                    row=row.row,
+                    code=QA_CODE_SAME_AS_SOURCE,
+                    excerpt="Translation equals source",
+                    severity="warning",
+                    group="content",
+                )
+            )
     return tuple(findings)
+
+
+def build_auto_mark_rows(findings: Sequence[QAFinding]) -> tuple[int, ...]:
+    rows: set[int] = set()
+    for finding in findings:
+        if finding.severity.lower() != "warning":
+            continue
+        rows.add(finding.row)
+    return tuple(sorted(rows))
 
 
 def _trailing_excerpt(source_text: str, target_text: str) -> str:
@@ -197,10 +234,6 @@ def _newline_excerpt(source_text: str, target_text: str) -> str:
     source_nl = newline_count(source_text)
     target_nl = newline_count(target_text)
     return f"S newlines={source_nl}, T newlines={target_nl}"
-
-
-def build_auto_mark_rows(findings: Sequence[QAFinding]) -> tuple[int, ...]:
-    return tuple(sorted({finding.row for finding in findings}))
 
 
 def _tokens_excerpt(tokens: Sequence[str]) -> str:

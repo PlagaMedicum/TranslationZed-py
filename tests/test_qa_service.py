@@ -4,6 +4,7 @@ from pathlib import Path
 
 from translationzed_py.core.qa_service import (
     QA_CODE_NEWLINES,
+    QA_CODE_SAME_AS_SOURCE,
     QA_CODE_TOKENS,
     QA_CODE_TRAILING,
     QAFinding,
@@ -23,7 +24,7 @@ def test_qa_finding_label_uses_relative_posix_path() -> None:
         excerpt="Missing '.'",
     )
     assert qa_finding_label(finding=finding, root=root) == (
-        "BE/ui.txt:8 · qa.trailing · Missing '.'"
+        "BE/ui.txt:8 · warning/format · qa.trailing · Missing '.'"
     )
 
 
@@ -69,7 +70,7 @@ def test_qa_service_wrapper_delegates() -> None:
     )
     service = QAService()
     label = service.finding_label(finding=finding, root=root)
-    assert label.startswith("BE/ui.txt:1 · qa.same_source")
+    assert label.startswith("BE/ui.txt:1 · warning/format · qa.same_source")
     plan = service.build_panel_plan(findings=[finding], root=root, result_limit=10)
     assert len(plan.items) == 1
 
@@ -148,3 +149,18 @@ def test_qa_service_auto_mark_rows_is_sorted_unique() -> None:
         ]
     )
     assert rows == (2, 5)
+
+
+def test_qa_service_scan_rows_detects_same_as_source_when_enabled() -> None:
+    service = QAService()
+    findings = service.scan_rows(
+        file=Path("/tmp/proj/BE/ui.txt"),
+        rows=(QAInputRow(row=3, source_text="Same", target_text="Same"),),
+        check_trailing=False,
+        check_newlines=False,
+        check_tokens=False,
+        check_same_as_source=True,
+    )
+    assert len(findings) == 1
+    assert findings[0].code == QA_CODE_SAME_AS_SOURCE
+    assert findings[0].group == "content"

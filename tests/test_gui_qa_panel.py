@@ -158,3 +158,33 @@ def test_qa_token_check_toggle_controls_placeholder_tag_findings(
     win._qa_check_escapes = True
     win._refresh_qa_for_current_file()
     assert any(f.code == "qa.tokens" for f in win._qa_findings)
+
+
+def test_qa_same_as_source_toggle_adds_content_group_finding(
+    qtbot, tmp_path: Path
+) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    for loc in ("EN", "BE"):
+        (root / loc).mkdir()
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "qa.txt").write_text('L1 = "The Same"\n', encoding="utf-8")
+    (root / "BE" / "qa.txt").write_text('L1 = "The Same"\n', encoding="utf-8")
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
+    win._file_chosen(ix)
+    win._qa_check_trailing = False
+    win._qa_check_newlines = False
+    win._qa_check_escapes = False
+    win._qa_check_same_as_source = True
+    win._refresh_qa_for_current_file()
+    win._left_qa_btn.click()
+
+    assert any(f.code == "qa.same_source" for f in win._qa_findings)
+    labels = [win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())]
+    assert any("warning/content · qa.same_source" in label for label in labels)
