@@ -43,6 +43,7 @@ _Last updated: 2026-02-15_
   (search list, save prompts, encoding/TM diagnostics, orphan-cache warnings).
 - GUI save preserves CRLF endings when editing CRLF-backed files.
 - Filename labels used for corpus temp paths sanitize Windows-invalid characters.
+- QA side panel adapter wiring: finding-list labels render correctly and click-to-row navigation opens target file/row.
 - Architecture guards enforce allowed GUI->core imports and `main_window.py`
   line-budget threshold.
 - EN hash change dialog (implemented).

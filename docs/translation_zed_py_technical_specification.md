@@ -86,6 +86,8 @@ translationzed_py/
 │   ├── project_session.py   # session cache scan + auto-open selection (non-Qt)
 │   ├── render_workflow_service.py # large-file render/span policy (non-Qt)
 │   ├── search_replace_service.py # scope/search/replace planning (non-Qt)
+│   ├── qa_rules.py         # pure QA primitives (trailing/newline/token checks)
+│   ├── qa_service.py       # QA list DTO/label/panel planning (non-Qt)
 │   ├── preferences_service.py # startup root + prefs normalization/persist policy (non-Qt)
 │   ├── tm_store.py          # project TM storage/query (SQLite)
 │   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
@@ -488,10 +490,13 @@ if dirty_files and not prompt_save():
 - Left Search side panel shows a minimal match list generated from current toolbar query/scope;
   each item is `<relative path>:<row> · <one-line excerpt>` and click navigates to that match.
   Relative paths in UI/report text are normalized to `/` separators on all platforms.
+- Left QA side panel (v0.7 in progress) uses core-provided finding DTOs and renders compact
+  rows (`<relative path>:<row> · <check-code> · <short excerpt>`); selecting an item
+  navigates to file/row, and empty state is explicit when no findings exist.
 - For sessions with multiple opened target locales, UI exposes a read-only
   cross-locale variants preview for the current key (locale, value, compact
   status tag), ordered by current session locale order.
-- Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b, UC-13l.
+- Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b, UC-13l, UC-13m.
 
 ### 5.9.1  UI Guidelines (GNOME + KDE)
 
@@ -828,8 +833,9 @@ Current builds use **cache‑only** recovery:
 4. Automatic update check (GitHub Releases).
 5. Simple editor for location `description.txt` files.
 6. LanguageTool server API integration for grammar/spell suggestions.
-7. Translation QA checks (post‑TM import/export): per‑check toggles for missing trailing
-   characters, missing/extra newlines, missing escapes/code blocks, and translation equals Source.
+7. Translation QA checks (v0.7 in progress): side-panel scaffolding + QA preference keys are in place;
+   remaining rule execution/polish includes missing trailing characters, missing/extra newlines,
+   missing escapes/code blocks, and translation equals Source.
 8. Theme presets beyond `SYSTEM|LIGHT|DARK` (future).
 
 ## 14  Undo / Redo

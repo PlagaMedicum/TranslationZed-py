@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.6.0-dev · 2026‑02‑11_
+_version 0.6.0-dev · 2026‑02‑15_
 
 ---
 ## 1  Actors
@@ -223,12 +223,13 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  2 | Future: optional recovery prompt may be added if cache is extended. |
 
 ### UC-13a  Side Panel Mode Switch
-| **Trigger** | Click **Files**, **TM**, or **Search** in the left panel toggle bar. |
+| **Trigger** | Click **Files**, **TM**, **Search**, or **QA** in the left panel toggle bar. |
 | **Flow** |
 |  1 | SYS switches the left panel stack to the selected mode. |
 |  2 | SYS preserves side-panel visibility and width preference. |
 |  3 | If TM mode is selected, SYS refreshes TM suggestions for current row context. |
 |  4 | If Search mode is selected, SYS shows a minimal results list (`<path>:<row> · <one-line excerpt>`) produced by toolbar search execution; selecting an item jumps to file/row. |
+|  5 | If QA mode is selected, SYS shows the QA findings list for current context (or explicit empty-state text if there are no findings). Selecting an item jumps to file/row. |
 
 ### UC-13b  TM Suggestions Query
 | Field | Value |
@@ -339,6 +340,19 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  4 | If no sibling locales are opened or key is missing there, SYS shows an explicit empty state. |
 | **Post-condition** | Translator can compare cross-locale phrasing without switching files/locales. |
 
+### UC-13m  QA Findings Side Panel (in progress)
+| Field | Value |
+|-------|-------|
+| **Goal** | Surface mechanical QA findings in a compact, navigable list. |
+| **Primary Actor** | TR / PR |
+| **Trigger** | QA side panel is opened or QA findings are refreshed. |
+| **Main Success Scenario** |
+|  1 | SYS receives precomputed QA finding DTOs from core QA workflow services. |
+|  2 | SYS renders list rows as `<path>:<row> · <check-code> · <short excerpt>`. |
+|  3 | Selecting a finding jumps to file/row in the main table. |
+|  4 | When no findings exist, SYS shows explicit empty-state text. |
+| **Post-condition** | QA context is visible without blocking normal editing/search/TM workflows. |
+
 ---
 ## 4  GUI Wireframe (ASCII)
 ```
@@ -438,14 +452,17 @@ UNTOUCHED ──────────────────────▶ 
 9. **Tooltips**: plain text only (no highlighting/selection), delayed ~900ms, truncated for large
    values (800 chars normally, 200 chars when length ≥5,000); preview‑only and avoids full
    decode for lazy values (app font to prevent oversized text).
-10. **Side panel (current)**: left‑side panel switches between **Files / TM / Search**
+10. **Side panel (current)**: left‑side panel switches between **Files / TM / Search / QA**
    and can be hidden/shown via a **left‑side toggle**; the detail editor pane is
    toggled from the **bottom bar**. TM panel includes filters (min score + origin
    toggles for project/import) and supports project‑TM rebuild from selected locales.
+   QA tab currently provides list+navigation scaffolding and explicit empty state.
 11. **Theme modes**: Preferences → View supports **System / Light / Dark**; changes apply app-wide immediately and persist.
-12. **Translation QA checks (future)**: add an opt‑in QA panel with per‑check toggles
+12. **Translation QA checks (in progress)**: QA side panel scaffolding is implemented;
+   remaining rule execution and per-check preference UX are rolling out in phased slices.
+   Planned checks:
    (missing trailing characters, missing/extra newlines, missing escapes/code blocks,
-   translation equals Source). Implement **only after** TM import/export is complete.
+   translation equals Source).
 
 ---
-_Last updated: 2026-02-14 (v0.6.0-dev)_
+_Last updated: 2026-02-15 (v0.6.0-dev)_

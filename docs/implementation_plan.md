@@ -840,6 +840,8 @@ C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
    - **Infrastructure progress (v0.7 kickoff)**:
      - [✓] Core QA rule primitives added (`core/qa_rules.py`) with unit coverage.
      - [✓] QA preference keys added and persisted (`QA_CHECK_*`, `QA_AUTO_MARK_FOR_REVIEW`).
+     - [✓] QA side-panel scaffolding wired (`Files/TM/Search/QA`), backed by
+       Qt-free `core/qa_service.py` DTO/label planning + click-to-row adapter tests.
    - **Planned scope**:
      - [ ] Missing trailing characters.
      - [ ] Missing/extra newlines.
