@@ -45,6 +45,8 @@ def test_newline_mismatch_normalizes_crlf() -> None:
     assert newline_count(source) == 2
     assert has_newline_mismatch(source, "A\nB\nC") is False
     assert has_newline_mismatch(source, "A\nBC") is True
+    assert newline_count(r"A\nB") == 1
+    assert has_newline_mismatch(r"A\nB", "AB") is True
 
 
 def test_same_as_source_requires_exact_match() -> None:

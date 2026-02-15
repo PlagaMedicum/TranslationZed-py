@@ -4,6 +4,23 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from .qa_rules import (
+    has_missing_trailing_fragment,
+    has_newline_mismatch,
+    newline_count,
+    trailing_fragment,
+)
+
+QA_CODE_TRAILING = "qa.trailing"
+QA_CODE_NEWLINES = "qa.newlines"
+
+
+@dataclass(frozen=True, slots=True)
+class QAInputRow:
+    row: int
+    source_text: str
+    target_text: str
+
 
 @dataclass(frozen=True, slots=True)
 class QAFinding:
@@ -43,6 +60,21 @@ class QAService:
             findings=findings,
             root=root,
             result_limit=result_limit,
+        )
+
+    def scan_rows(
+        self,
+        *,
+        file: Path,
+        rows: Sequence[QAInputRow],
+        check_trailing: bool,
+        check_newlines: bool,
+    ) -> tuple[QAFinding, ...]:
+        return scan_qa_rows(
+            file=file,
+            rows=rows,
+            check_trailing=check_trailing,
+            check_newlines=check_newlines,
         )
 
 
@@ -94,3 +126,50 @@ def build_qa_panel_plan(
         items=tuple(items),
         truncated=False,
     )
+
+
+def scan_qa_rows(
+    *,
+    file: Path,
+    rows: Sequence[QAInputRow],
+    check_trailing: bool,
+    check_newlines: bool,
+) -> tuple[QAFinding, ...]:
+    findings: list[QAFinding] = []
+    for row in rows:
+        if check_trailing and has_missing_trailing_fragment(
+            row.source_text,
+            row.target_text,
+        ):
+            findings.append(
+                QAFinding(
+                    file=file,
+                    row=row.row,
+                    code=QA_CODE_TRAILING,
+                    excerpt=_trailing_excerpt(row.source_text, row.target_text),
+                    severity="warning",
+                )
+            )
+        if check_newlines and has_newline_mismatch(row.source_text, row.target_text):
+            findings.append(
+                QAFinding(
+                    file=file,
+                    row=row.row,
+                    code=QA_CODE_NEWLINES,
+                    excerpt=_newline_excerpt(row.source_text, row.target_text),
+                    severity="warning",
+                )
+            )
+    return tuple(findings)
+
+
+def _trailing_excerpt(source_text: str, target_text: str) -> str:
+    source_tail = trailing_fragment(source_text)
+    target_tail = trailing_fragment(target_text)
+    return f"S:{source_tail!r} T:{target_tail!r}"
+
+
+def _newline_excerpt(source_text: str, target_text: str) -> str:
+    source_nl = newline_count(source_text)
+    target_nl = newline_count(target_text)
+    return f"S newlines={source_nl}, T newlines={target_nl}"

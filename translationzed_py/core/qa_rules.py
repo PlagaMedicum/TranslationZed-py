@@ -8,6 +8,7 @@ _BRACKET_TAG_RE = re.compile(r"\[[Ii][Mm][Gg]=[^\]\r\n]+\]")
 _PLACEHOLDER_RE = re.compile(r"%(?:\d+\$[A-Za-z]|\d+|[A-Za-z])")
 _ESCAPE_RE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|[nrt\"\\\\])")
 _TRAILING_RE = re.compile(r"[ \t\.,;:!?…]+$")
+_NEWLINE_ESCAPE_RE = re.compile(r"(?<!\\)(?:\\\\)*\\n")
 
 
 def trailing_fragment(text: str) -> str:
@@ -31,7 +32,9 @@ def has_missing_trailing_fragment(source_text: str, target_text: str) -> bool:
 
 def newline_count(text: str) -> int:
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-    return normalized.count("\n")
+    raw_newlines = normalized.count("\n")
+    escaped_newlines = len(_NEWLINE_ESCAPE_RE.findall(normalized))
+    return raw_newlines + escaped_newlines
 
 
 def has_newline_mismatch(source_text: str, target_text: str) -> bool:

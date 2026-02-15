@@ -142,6 +142,9 @@ from translationzed_py.core.qa_service import (
     QAFinding as _QAFinding,
 )
 from translationzed_py.core.qa_service import (
+    QAInputRow as _QAInputRow,
+)
+from translationzed_py.core.qa_service import (
     QAService as _QAService,
 )
 from translationzed_py.core.render_workflow_service import (
@@ -523,6 +526,10 @@ class MainWindow(QMainWindow):
         self._tm_bootstrap_pending = False
         self._qa_findings: tuple[_QAFinding, ...] = ()
         self._qa_panel_result_limit = 500
+        self._qa_refresh_delay_ms = 140
+        self._qa_refresh_timer = QTimer(self)
+        self._qa_refresh_timer.setSingleShot(True)
+        self._qa_refresh_timer.timeout.connect(self._refresh_qa_for_current_file)
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -1005,16 +1012,28 @@ class MainWindow(QMainWindow):
         qa_layout = QVBoxLayout(self._qa_panel)
         qa_layout.setContentsMargins(6, 0, 6, 6)
         qa_layout.setSpacing(6)
+        qa_header = QHBoxLayout()
+        qa_header.setContentsMargins(0, 0, 0, 0)
+        qa_header.setSpacing(6)
         self._qa_status_label = QLabel(
-            "QA checks are not implemented yet for this build stage.",
+            "Select a file to run QA checks.",
             self._qa_panel,
         )
         self._qa_status_label.setWordWrap(True)
+        qa_header.addWidget(self._qa_status_label, 1)
+        self._qa_refresh_btn = QToolButton(self._qa_panel)
+        self._qa_refresh_btn.setAutoRaise(True)
+        self._qa_refresh_btn.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)
+        )
+        self._qa_refresh_btn.setToolTip("Refresh QA findings for current file")
+        self._qa_refresh_btn.clicked.connect(self._refresh_qa_for_current_file)
+        qa_header.addWidget(self._qa_refresh_btn)
         self._qa_results_list = QListWidget(self._qa_panel)
         self._qa_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._qa_results_list.itemActivated.connect(self._open_qa_result_item)
         self._qa_results_list.itemClicked.connect(self._open_qa_result_item)
-        qa_layout.addWidget(self._qa_status_label)
+        qa_layout.addLayout(qa_header)
         qa_layout.addWidget(self._qa_results_list)
         self._left_stack.addWidget(self._qa_panel)
 
@@ -2580,7 +2599,7 @@ class MainWindow(QMainWindow):
             )
             self._current_model.dataChanged.connect(self._on_model_changed)
             self._current_model.dataChanged.connect(self._on_model_data_changed)
-            self._set_qa_findings(())
+            self._schedule_qa_refresh(immediate=True)
             if not self._user_resized_columns:
                 self._source_translation_ratio = 0.5
             self._table_layout_guard = True
@@ -2928,7 +2947,7 @@ class MainWindow(QMainWindow):
         if idx == _LEFT_PANEL_SEARCH:
             self._refresh_search_panel_results()
         if idx == _LEFT_PANEL_QA:
-            self._refresh_qa_panel_results()
+            self._schedule_qa_refresh(immediate=True)
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         table = getattr(self, "table", None)
@@ -4532,6 +4551,44 @@ class MainWindow(QMainWindow):
             return
         self._select_match(match)
 
+    def _schedule_qa_refresh(self, *, immediate: bool = False) -> None:
+        if immediate:
+            if self._qa_refresh_timer.isActive():
+                self._qa_refresh_timer.stop()
+            self._refresh_qa_for_current_file()
+            return
+        self._qa_refresh_timer.start(self._qa_refresh_delay_ms)
+
+    def _collect_qa_input_rows(self) -> tuple[_QAInputRow, ...]:
+        model = self._current_model
+        if model is None:
+            return ()
+        rows: list[_QAInputRow] = []
+        for row in model.iter_search_rows(include_source=True, include_value=True):
+            rows.append(
+                _QAInputRow(
+                    row=row.row,
+                    source_text=str(row.source or ""),
+                    target_text=str(row.value or ""),
+                )
+            )
+        return tuple(rows)
+
+    def _refresh_qa_for_current_file(self) -> None:
+        path = self._current_pf.path if self._current_pf is not None else None
+        if path is None or self._current_model is None:
+            self._set_qa_findings(())
+            self._set_qa_panel_message("No file selected.")
+            return
+        rows = self._collect_qa_input_rows()
+        findings = self._qa_service.scan_rows(
+            file=path,
+            rows=rows,
+            check_trailing=self._qa_check_trailing,
+            check_newlines=self._qa_check_newlines,
+        )
+        self._set_qa_findings(findings)
+
     def _set_qa_findings(self, findings: Sequence[_QAFinding]) -> None:
         self._qa_findings = tuple(findings)
         if self._left_stack.currentIndex() == _LEFT_PANEL_QA:
@@ -4789,6 +4846,7 @@ class MainWindow(QMainWindow):
                 and not self._detail_translation.hasFocus()
             ):
                 self._sync_detail_editors()
+            self._schedule_qa_refresh()
 
     def _on_selection_changed(self, current, previous) -> None:
         perf_trace = PERF_TRACE

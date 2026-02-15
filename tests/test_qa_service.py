@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from translationzed_py.core.qa_service import (
+    QA_CODE_NEWLINES,
+    QA_CODE_TRAILING,
     QAFinding,
+    QAInputRow,
     QAService,
     build_qa_panel_plan,
     qa_finding_label,
@@ -68,3 +71,30 @@ def test_qa_service_wrapper_delegates() -> None:
     assert label.startswith("BE/ui.txt:1 · qa.same_source")
     plan = service.build_panel_plan(findings=[finding], root=root, result_limit=10)
     assert len(plan.items) == 1
+
+
+def test_qa_service_scan_rows_runs_trailing_and_newline_checks() -> None:
+    service = QAService()
+    findings = service.scan_rows(
+        file=Path("/tmp/proj/BE/ui.txt"),
+        rows=(
+            QAInputRow(row=0, source_text="Hello.", target_text="Privet"),
+            QAInputRow(row=1, source_text="Line 1\nLine 2", target_text="Radok"),
+        ),
+        check_trailing=True,
+        check_newlines=True,
+    )
+    assert [f.code for f in findings] == [QA_CODE_TRAILING, QA_CODE_NEWLINES]
+    assert findings[0].row == 0
+    assert findings[1].row == 1
+
+
+def test_qa_service_scan_rows_respects_check_toggles() -> None:
+    service = QAService()
+    findings = service.scan_rows(
+        file=Path("/tmp/proj/BE/ui.txt"),
+        rows=(QAInputRow(row=0, source_text="Hello.", target_text="Privet"),),
+        check_trailing=False,
+        check_newlines=True,
+    )
+    assert findings == ()
