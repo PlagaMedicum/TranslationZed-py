@@ -500,6 +500,8 @@ if dirty_files and not prompt_save():
   file-open/edit and explicit via QA-panel refresh button.
   QA row labels include severity/group tags (`warning/format`, `warning/content`)
   alongside code labels for compact triage.
+  QA navigation actions (`F8` next, `Shift+F8` previous) traverse findings with wrap;
+  status bar reports `QA i/n` hint and selected finding summary.
   If `QA_AUTO_MARK_FOR_REVIEW=true`, rows with active findings are status-updated to
   **For review** through the normal model-edit pipeline; default is visual-only (`false`).
   Token regexes are shared from `core.qa_rules` by GUI delegates and QA scan logic

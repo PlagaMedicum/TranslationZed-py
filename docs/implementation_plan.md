@@ -852,6 +852,8 @@ C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
      - [✓] Same-as-source check implemented (`qa.same_source`, opt-in via
        `QA_CHECK_SAME_AS_SOURCE`) with QA list severity/group labels (`warning/format`,
        `warning/content`) for faster triage.
+     - [✓] QA next/prev navigation actions added (`F8` / `Shift+F8`) with
+       wrapped traversal + status-bar hints (`QA i/n`) and QA-list focus sync.
    - **Planned scope**:
      - [✓] Missing trailing characters.
      - [✓] Missing/extra newlines.
