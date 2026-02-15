@@ -842,9 +842,11 @@ C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
      - [✓] QA preference keys added and persisted (`QA_CHECK_*`, `QA_AUTO_MARK_FOR_REVIEW`).
      - [✓] QA side-panel scaffolding wired (`Files/TM/Search/QA`), backed by
        Qt-free `core/qa_service.py` DTO/label planning + click-to-row adapter tests.
+     - [✓] Trailing/newline checks now run for current file via debounced refresh
+       (file open, row edits, QA-tab open, manual refresh button).
    - **Planned scope**:
-     - [ ] Missing trailing characters.
-     - [ ] Missing/extra newlines.
+     - [✓] Missing trailing characters.
+     - [✓] Missing/extra newlines.
      - [ ] Missing escape sequences / code blocks / placeholders.
      - [ ] Translation equals Source.
    - **Out of planned QA scope**:

@@ -493,6 +493,9 @@ if dirty_files and not prompt_save():
 - Left QA side panel (v0.7 in progress) uses core-provided finding DTOs and renders compact
   rows (`<relative path>:<row> · <check-code> · <short excerpt>`); selecting an item
   navigates to file/row, and empty state is explicit when no findings exist.
+  Current active checks: trailing-fragment mismatch and newline-count mismatch
+  (including escaped `\\n` markers). Refresh is debounced on file-open/edit and
+  explicit via QA-panel refresh button.
 - For sessions with multiple opened target locales, UI exposes a read-only
   cross-locale variants preview for the current key (locale, value, compact
   status tag), ordered by current session locale order.

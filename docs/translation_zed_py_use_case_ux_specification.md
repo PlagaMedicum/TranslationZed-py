@@ -351,6 +351,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  2 | SYS renders list rows as `<path>:<row> · <check-code> · <short excerpt>`. |
 |  3 | Selecting a finding jumps to file/row in the main table. |
 |  4 | When no findings exist, SYS shows explicit empty-state text. |
+| **Notes** | Current active checks are `qa.trailing` and `qa.newlines`; refresh is debounced on file-open/edit and also available by explicit QA-panel refresh action. |
 | **Post-condition** | QA context is visible without blocking normal editing/search/TM workflows. |
 
 ---
@@ -459,7 +460,8 @@ UNTOUCHED ──────────────────────▶ 
    QA tab currently provides list+navigation scaffolding and explicit empty state.
 11. **Theme modes**: Preferences → View supports **System / Light / Dark**; changes apply app-wide immediately and persist.
 12. **Translation QA checks (in progress)**: QA side panel scaffolding is implemented;
-   remaining rule execution and per-check preference UX are rolling out in phased slices.
+   first active checks are missing trailing fragment + newline mismatch.
+   Remaining rule execution and per-check preference UX are rolling out in phased slices.
    Planned checks:
    (missing trailing characters, missing/extra newlines, missing escapes/code blocks,
    translation equals Source).
