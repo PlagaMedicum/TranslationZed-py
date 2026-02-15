@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.6.0-dev · 2026-02-14**\
+**Version 0.6.0-dev · 2026-02-15**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -301,6 +301,11 @@ Algorithm:
   - `PROMPT_WRITE_ON_EXIT=true|false`
   - `WRAP_TEXT=true|false`
   - `LARGE_TEXT_OPTIMIZATIONS=true|false`
+  - `QA_CHECK_TRAILING=true|false` (default `true`)
+  - `QA_CHECK_NEWLINES=true|false` (default `true`)
+  - `QA_CHECK_ESCAPES=true|false` (default `false`; reserved until full QA checks ship)
+  - `QA_CHECK_SAME_AS_SOURCE=true|false` (default `false`; reserved until full QA checks ship)
+  - `QA_AUTO_MARK_FOR_REVIEW=true|false` (default `false`)
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
   - `DEFAULT_ROOT=<path>` (default project root in Preferences)

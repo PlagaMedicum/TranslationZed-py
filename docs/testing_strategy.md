@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-11_
+_Last updated: 2026-02-15_
 
 ---
 
@@ -27,6 +27,11 @@ _Last updated: 2026-02-11_
 - EN hash cache index read/write (implemented).
 - Core search behavior (once `core.search` is introduced).
 - Cache header `last_opened_unix` read/write correctness.
+- QA rule primitives:
+  - trailing-fragment detection,
+  - newline mismatch detection,
+  - protected token extraction (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes),
+  - same-as-source check primitive.
 
 ### 2.2 Integration Tests
 - Open project, select locale, load table.

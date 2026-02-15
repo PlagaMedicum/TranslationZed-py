@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-14_
+_Last updated: 2026-02-15_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.5.0 is shipped; this plan now
@@ -837,6 +837,9 @@ C1 [✓] **Translation memory** (Step 29).
 C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes, placeholders) are easy to miss.
    - **Target**: opt‑in QA panel with per-check toggles; non-blocking warnings by default.
+   - **Infrastructure progress (v0.7 kickoff)**:
+     - [✓] Core QA rule primitives added (`core/qa_rules.py`) with unit coverage.
+     - [✓] QA preference keys added and persisted (`QA_CHECK_*`, `QA_AUTO_MARK_FOR_REVIEW`).
    - **Planned scope**:
      - [ ] Missing trailing characters.
      - [ ] Missing/extra newlines.
