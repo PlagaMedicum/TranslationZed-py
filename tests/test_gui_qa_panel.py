@@ -6,6 +6,9 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt
+
+from translationzed_py.core.model import Status
 from translationzed_py.core.qa_service import QAFinding
 from translationzed_py.gui import MainWindow
 
@@ -75,6 +78,7 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
 
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
+    win._qa_auto_mark_for_review = False
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
     win._left_qa_btn.click()
@@ -83,3 +87,34 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     labels = [win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())]
     assert any("qa.trailing" in label for label in labels)
     assert any("qa.newlines" in label for label in labels)
+
+
+def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
+    qtbot, tmp_path: Path
+) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    for loc in ("EN", "BE"):
+        (root / loc).mkdir()
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "qa.txt").write_text('L1 = "Hello."\n', encoding="utf-8")
+    (root / "BE" / "qa.txt").write_text('L1 = "Privet"\n', encoding="utf-8")
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
+    win._file_chosen(ix)
+    model = win.table.model()
+    assert model is not None
+    status_index = model.index(0, 3)
+    assert model.data(status_index, Qt.EditRole) == Status.UNTOUCHED
+
+    win._refresh_qa_for_current_file()
+    assert model.data(status_index, Qt.EditRole) == Status.UNTOUCHED
+
+    win._qa_auto_mark_for_review = True
+    win._refresh_qa_for_current_file()
+    assert model.data(status_index, Qt.EditRole) == Status.FOR_REVIEW

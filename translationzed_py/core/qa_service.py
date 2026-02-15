@@ -77,6 +77,9 @@ class QAService:
             check_newlines=check_newlines,
         )
 
+    def auto_mark_rows(self, findings: Sequence[QAFinding]) -> tuple[int, ...]:
+        return build_auto_mark_rows(findings)
+
 
 def qa_finding_label(*, finding: QAFinding, root: Path) -> str:
     try:
@@ -173,3 +176,7 @@ def _newline_excerpt(source_text: str, target_text: str) -> str:
     source_nl = newline_count(source_text)
     target_nl = newline_count(target_text)
     return f"S newlines={source_nl}, T newlines={target_nl}"
+
+
+def build_auto_mark_rows(findings: Sequence[QAFinding]) -> tuple[int, ...]:
+    return tuple(sorted({finding.row for finding in findings}))

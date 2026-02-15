@@ -98,3 +98,30 @@ def test_qa_service_scan_rows_respects_check_toggles() -> None:
         check_newlines=True,
     )
     assert findings == ()
+
+
+def test_qa_service_auto_mark_rows_is_sorted_unique() -> None:
+    service = QAService()
+    rows = service.auto_mark_rows(
+        [
+            QAFinding(
+                file=Path("/tmp/proj/BE/ui.txt"),
+                row=5,
+                code=QA_CODE_TRAILING,
+                excerpt="x",
+            ),
+            QAFinding(
+                file=Path("/tmp/proj/BE/ui.txt"),
+                row=2,
+                code=QA_CODE_NEWLINES,
+                excerpt="y",
+            ),
+            QAFinding(
+                file=Path("/tmp/proj/BE/ui.txt"),
+                row=5,
+                code=QA_CODE_NEWLINES,
+                excerpt="z",
+            ),
+        ]
+    )
+    assert rows == (2, 5)

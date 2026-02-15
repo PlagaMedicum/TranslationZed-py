@@ -4588,6 +4588,8 @@ class MainWindow(QMainWindow):
             check_newlines=self._qa_check_newlines,
         )
         self._set_qa_findings(findings)
+        if self._qa_auto_mark_for_review:
+            self._apply_qa_auto_mark(findings)
 
     def _set_qa_findings(self, findings: Sequence[_QAFinding]) -> None:
         self._qa_findings = tuple(findings)
@@ -5413,27 +5415,53 @@ class MainWindow(QMainWindow):
         widget.setToolTip(f"{title}: {scope.title()}")
         widget.setVisible(True)
 
+    def _apply_status_to_rows(
+        self,
+        rows: Sequence[int],
+        *,
+        status: Status,
+        label: str,
+    ) -> None:
+        if not self._current_model:
+            return
+        unique_rows = sorted({int(row) for row in rows if int(row) >= 0})
+        if not unique_rows:
+            return
+        rows_to_change = [
+            row
+            for row in unique_rows
+            if self._current_model.status_for_row(row) != status
+        ]
+        if not rows_to_change:
+            return
+        if len(rows_to_change) == 1:
+            model_index = self._current_model.index(rows_to_change[0], 3)
+            self._current_model.setData(model_index, status, Qt.EditRole)
+            return
+        stack = self._current_model.undo_stack
+        stack.beginMacro(label)
+        try:
+            for row in rows_to_change:
+                model_index = self._current_model.index(row, 3)
+                self._current_model.setData(model_index, status, Qt.EditRole)
+        finally:
+            stack.endMacro()
+
+    def _apply_qa_auto_mark(self, findings: Sequence[_QAFinding]) -> None:
+        rows = self._qa_service.auto_mark_rows(findings)
+        self._apply_status_to_rows(
+            rows,
+            status=Status.FOR_REVIEW,
+            label="QA auto-mark For review",
+        )
+
     def _apply_status_to_selection(self, status: Status, label: str) -> None:
         if not (self._current_pf and self._current_model):
             return
         rows = self._selected_rows()
         if not rows:
             return
-        if len(rows) == 1:
-            model_index = self._current_model.index(rows[0], 3)
-            self._current_model.setData(model_index, status, Qt.EditRole)
-            self._update_status_combo_from_selection()
-            return
-        if not any(self._current_model.status_for_row(row) != status for row in rows):
-            return
-        stack = self._current_model.undo_stack
-        stack.beginMacro(label)
-        try:
-            for row in rows:
-                model_index = self._current_model.index(row, 3)
-                self._current_model.setData(model_index, status, Qt.EditRole)
-        finally:
-            stack.endMacro()
+        self._apply_status_to_rows(rows, status=status, label=label)
         self._update_status_combo_from_selection()
 
     def _mark_proofread(self) -> None:
