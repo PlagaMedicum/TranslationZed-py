@@ -46,6 +46,7 @@ _Last updated: 2026-02-15_
 - QA side panel adapter wiring: finding-list labels render correctly and click-to-row navigation opens target file/row.
 - QA checks integration: trailing/newline findings refresh on file-open/edit and explicit QA-panel refresh.
 - QA auto-mark guard: `QA_AUTO_MARK_FOR_REVIEW=false` keeps status untouched; `true` mutates only affected rows to **For review**.
+- QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
 - Architecture guards enforce allowed GUI->core imports and `main_window.py`
   line-budget threshold.
 - EN hash change dialog (implemented).

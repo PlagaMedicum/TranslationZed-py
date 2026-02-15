@@ -846,10 +846,13 @@ C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
        (file open, row edits, QA-tab open, manual refresh button).
      - [✓] `QA_AUTO_MARK_FOR_REVIEW` wiring implemented: when enabled, QA findings
        auto-mark affected rows to **For review**; default remains visual-only (`false`).
+     - [✓] Escape/code-block/placeholder check implemented (`qa.tokens`, opt-in via
+       `QA_CHECK_ESCAPES`) with shared token contract reused by both QA rules and
+       GUI visual highlighting.
    - **Planned scope**:
      - [✓] Missing trailing characters.
      - [✓] Missing/extra newlines.
-     - [ ] Missing escape sequences / code blocks / placeholders.
+     - [✓] Missing escape sequences / code blocks / placeholders.
      - [ ] Translation equals Source.
    - **Out of planned QA scope**:
      - Advanced QA rule sets and per-project custom rules.

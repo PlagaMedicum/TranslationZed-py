@@ -493,11 +493,14 @@ if dirty_files and not prompt_save():
 - Left QA side panel (v0.7 in progress) uses core-provided finding DTOs and renders compact
   rows (`<relative path>:<row> · <check-code> · <short excerpt>`); selecting an item
   navigates to file/row, and empty state is explicit when no findings exist.
-  Current active checks: trailing-fragment mismatch and newline-count mismatch
-  (including escaped `\\n` markers). Refresh is debounced on file-open/edit and
-  explicit via QA-panel refresh button.
+  Current active checks: trailing-fragment mismatch (`qa.trailing`), newline-count
+  mismatch including escaped `\\n` markers (`qa.newlines`), and missing code/placeholder
+  tokens (`qa.tokens`, gated by `QA_CHECK_ESCAPES`). Refresh is debounced on file-open/edit
+  and explicit via QA-panel refresh button.
   If `QA_AUTO_MARK_FOR_REVIEW=true`, rows with active findings are status-updated to
   **For review** through the normal model-edit pipeline; default is visual-only (`false`).
+  Token regexes are shared from `core.qa_rules` by GUI delegates and QA scan logic
+  to keep highlight/QA semantics aligned (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes).
 - For sessions with multiple opened target locales, UI exposes a read-only
   cross-locale variants preview for the current key (locale, value, compact
   status tag), ordered by current session locale order.
