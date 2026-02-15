@@ -24,6 +24,11 @@ class LoadedPreferences:
     prompt_write_on_exit: bool
     wrap_text: bool
     large_text_optimizations: bool
+    qa_check_trailing: bool
+    qa_check_newlines: bool
+    qa_check_escapes: bool
+    qa_check_same_as_source: bool
+    qa_auto_mark_for_review: bool
     default_root: str
     search_scope: str
     replace_scope: str
@@ -98,11 +103,21 @@ class PreferencesService:
         search_scope: str,
         replace_scope: str,
         extras: dict[str, str],
+        qa_check_trailing: bool = True,
+        qa_check_newlines: bool = True,
+        qa_check_escapes: bool = False,
+        qa_check_same_as_source: bool = False,
+        qa_auto_mark_for_review: bool = False,
     ) -> None:
         prefs = build_persist_payload(
             prompt_write_on_exit=prompt_write_on_exit,
             wrap_text=wrap_text,
             large_text_optimizations=large_text_optimizations,
+            qa_check_trailing=qa_check_trailing,
+            qa_check_newlines=qa_check_newlines,
+            qa_check_escapes=qa_check_escapes,
+            qa_check_same_as_source=qa_check_same_as_source,
+            qa_auto_mark_for_review=qa_auto_mark_for_review,
             last_root=last_root,
             last_locales=last_locales,
             window_geometry=window_geometry,
@@ -158,6 +173,11 @@ def normalize_loaded_preferences(
 
     wrap_text = bool(raw.get("wrap_text", False))
     large_text_optimizations = bool(raw.get("large_text_optimizations", True))
+    qa_check_trailing = bool(raw.get("qa_check_trailing", True))
+    qa_check_newlines = bool(raw.get("qa_check_newlines", True))
+    qa_check_escapes = bool(raw.get("qa_check_escapes", False))
+    qa_check_same_as_source = bool(raw.get("qa_check_same_as_source", False))
+    qa_auto_mark_for_review = bool(raw.get("qa_auto_mark_for_review", False))
     default_root = str(raw.get("default_root", "") or fallback_default_root)
     search_scope = normalize_scope(raw.get("search_scope", "FILE"), default="FILE")
     replace_scope = normalize_scope(raw.get("replace_scope", "FILE"), default="FILE")
@@ -186,6 +206,11 @@ def normalize_loaded_preferences(
         prompt_write_on_exit=prompt_write_on_exit,
         wrap_text=wrap_text,
         large_text_optimizations=large_text_optimizations,
+        qa_check_trailing=qa_check_trailing,
+        qa_check_newlines=qa_check_newlines,
+        qa_check_escapes=qa_check_escapes,
+        qa_check_same_as_source=qa_check_same_as_source,
+        qa_auto_mark_for_review=qa_auto_mark_for_review,
         default_root=default_root,
         search_scope=search_scope,
         replace_scope=replace_scope,
@@ -211,11 +236,21 @@ def build_persist_payload(
     search_scope: str,
     replace_scope: str,
     extras: dict[str, str],
+    qa_check_trailing: bool = True,
+    qa_check_newlines: bool = True,
+    qa_check_escapes: bool = False,
+    qa_check_same_as_source: bool = False,
+    qa_auto_mark_for_review: bool = False,
 ) -> dict[str, Any]:
     return {
         "prompt_write_on_exit": bool(prompt_write_on_exit),
         "wrap_text": bool(wrap_text),
         "large_text_optimizations": bool(large_text_optimizations),
+        "qa_check_trailing": bool(qa_check_trailing),
+        "qa_check_newlines": bool(qa_check_newlines),
+        "qa_check_escapes": bool(qa_check_escapes),
+        "qa_check_same_as_source": bool(qa_check_same_as_source),
+        "qa_auto_mark_for_review": bool(qa_auto_mark_for_review),
         "last_root": str(last_root),
         "last_locales": list(last_locales),
         "window_geometry": str(window_geometry),

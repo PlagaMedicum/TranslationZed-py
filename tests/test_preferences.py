@@ -12,6 +12,11 @@ def test_load_is_pure_read_for_missing_settings_env(
     assert prefs["prompt_write_on_exit"] is True
     assert prefs["wrap_text"] is False
     assert prefs["large_text_optimizations"] is True
+    assert prefs["qa_check_trailing"] is True
+    assert prefs["qa_check_newlines"] is True
+    assert prefs["qa_check_escapes"] is False
+    assert prefs["qa_check_same_as_source"] is False
+    assert prefs["qa_auto_mark_for_review"] is False
     assert prefs["search_scope"] == "FILE"
     assert prefs["replace_scope"] == "FILE"
     assert prefs["tm_import_dir"] == str((tmp_path / ".tzp" / "tms").resolve())
@@ -28,6 +33,11 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert prefs["prompt_write_on_exit"] is True
     assert prefs["wrap_text"] is False
     assert prefs["large_text_optimizations"] is True
+    assert prefs["qa_check_trailing"] is True
+    assert prefs["qa_check_newlines"] is True
+    assert prefs["qa_check_escapes"] is False
+    assert prefs["qa_check_same_as_source"] is False
+    assert prefs["qa_auto_mark_for_review"] is False
     assert prefs["search_scope"] == "FILE"
     assert prefs["replace_scope"] == "FILE"
     assert prefs["tm_import_dir"] == str((tmp_path / ".tzp" / "tms").resolve())
@@ -38,6 +48,11 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert "PROMPT_WRITE_ON_EXIT=true" in raw
     assert "WRAP_TEXT=false" in raw
     assert "LARGE_TEXT_OPTIMIZATIONS=true" in raw
+    assert "QA_CHECK_TRAILING=true" in raw
+    assert "QA_CHECK_NEWLINES=true" in raw
+    assert "QA_CHECK_ESCAPES=false" in raw
+    assert "QA_CHECK_SAME_AS_SOURCE=false" in raw
+    assert "QA_AUTO_MARK_FOR_REVIEW=false" in raw
     assert "SEARCH_SCOPE=FILE" in raw
     assert "REPLACE_SCOPE=FILE" in raw
     assert f"TM_IMPORT_DIR={(tmp_path / '.tzp' / 'tms').resolve()}" in raw
@@ -50,13 +65,17 @@ def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
     legacy_path = tmp_path / ".tzp-config" / "settings.env"
     legacy_path.parent.mkdir(parents=True, exist_ok=True)
     legacy_path.write_text(
-        "WRAP_TEXT=true\nTM_IMPORT_DIR=/tmp/custom_tm_import\nCUSTOM_FLAG=1\n",
+        "WRAP_TEXT=true\n"
+        "QA_CHECK_ESCAPES=true\n"
+        "TM_IMPORT_DIR=/tmp/custom_tm_import\n"
+        "CUSTOM_FLAG=1\n",
         encoding="utf-8",
     )
 
     prefs = preferences.ensure_defaults(tmp_path)
 
     assert prefs["wrap_text"] is True
+    assert prefs["qa_check_escapes"] is True
     assert prefs["prompt_write_on_exit"] is True
     assert prefs["search_scope"] == "FILE"
     assert prefs["replace_scope"] == "FILE"
@@ -67,6 +86,11 @@ def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
     raw = path.read_text(encoding="utf-8")
     assert "PROMPT_WRITE_ON_EXIT=true" in raw
     assert "WRAP_TEXT=true" in raw
+    assert "QA_CHECK_TRAILING=true" in raw
+    assert "QA_CHECK_NEWLINES=true" in raw
+    assert "QA_CHECK_ESCAPES=true" in raw
+    assert "QA_CHECK_SAME_AS_SOURCE=false" in raw
+    assert "QA_AUTO_MARK_FOR_REVIEW=false" in raw
     assert "SEARCH_SCOPE=FILE" in raw
     assert "REPLACE_SCOPE=FILE" in raw
     assert f"TM_IMPORT_DIR={Path('/tmp/custom_tm_import').resolve()}" in raw

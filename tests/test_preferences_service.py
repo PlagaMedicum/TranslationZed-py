@@ -67,6 +67,11 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
         "prompt_write_on_exit": True,
         "wrap_text": True,
         "large_text_optimizations": False,
+        "qa_check_trailing": False,
+        "qa_check_newlines": True,
+        "qa_check_escapes": True,
+        "qa_check_same_as_source": True,
+        "qa_auto_mark_for_review": True,
         "default_root": "/tmp/default",
         "search_scope": "bad-scope",
         "replace_scope": "POOL",
@@ -90,6 +95,11 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
     assert result.prompt_write_on_exit is False
     assert result.wrap_text is True
     assert result.large_text_optimizations is False
+    assert result.qa_check_trailing is False
+    assert result.qa_check_newlines is True
+    assert result.qa_check_escapes is True
+    assert result.qa_check_same_as_source is True
+    assert result.qa_auto_mark_for_review is True
     assert result.default_root == "/tmp/default"
     assert result.search_scope == "FILE"
     assert result.replace_scope == "POOL"
@@ -118,11 +128,21 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
         search_scope="invalid",
         replace_scope="locale",
         extras=extras,
+        qa_check_trailing=False,
+        qa_check_newlines=False,
+        qa_check_escapes=True,
+        qa_check_same_as_source=True,
+        qa_auto_mark_for_review=True,
     )
     locales.append("TH")
     extras["B"] = "2"
     assert payload["search_scope"] == "FILE"
     assert payload["replace_scope"] == "LOCALE"
+    assert payload["qa_check_trailing"] is False
+    assert payload["qa_check_newlines"] is False
+    assert payload["qa_check_escapes"] is True
+    assert payload["qa_check_same_as_source"] is True
+    assert payload["qa_auto_mark_for_review"] is True
     assert payload["last_locales"] == ["BE", "RU"]
     assert payload["__extras__"] == {"A": "1"}
     assert payload["default_root"] == "/default"
@@ -143,6 +163,11 @@ def test_preferences_service_load_normalized_bootstraps_settings(
     )
 
     assert loaded.wrap_text is False
+    assert loaded.qa_check_trailing is True
+    assert loaded.qa_check_newlines is True
+    assert loaded.qa_check_escapes is False
+    assert loaded.qa_check_same_as_source is False
+    assert loaded.qa_auto_mark_for_review is False
     assert loaded.search_scope == "FILE"
     assert (tmp_path / ".tzp" / "config" / "settings.env").exists()
 
@@ -167,6 +192,11 @@ def test_preferences_service_persist_main_window_preferences(
         search_scope="locale",
         replace_scope="pool",
         extras={"X": "1"},
+        qa_check_trailing=False,
+        qa_check_newlines=False,
+        qa_check_escapes=True,
+        qa_check_same_as_source=True,
+        qa_auto_mark_for_review=True,
     )
 
     saved = preferences.load(None)
@@ -175,6 +205,11 @@ def test_preferences_service_persist_main_window_preferences(
     assert saved["default_root"] == str(default_root)
     assert saved["search_scope"] == "LOCALE"
     assert saved["replace_scope"] == "POOL"
+    assert saved["qa_check_trailing"] is False
+    assert saved["qa_check_newlines"] is False
+    assert saved["qa_check_escapes"] is True
+    assert saved["qa_check_same_as_source"] is True
+    assert saved["qa_auto_mark_for_review"] is True
     assert saved["__extras__"]["X"] == "1"
 
 
