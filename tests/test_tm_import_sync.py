@@ -64,8 +64,7 @@ msgstr ""
 
 msgid "Hello world"
 msgstr "Privet mir"
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
 

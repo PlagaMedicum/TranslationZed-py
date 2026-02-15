@@ -85,8 +85,7 @@ msgstr ""
 
 msgid "Hello world"
 msgstr "Прывітанне свет"
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     parsed = list(iter_tm_pairs(path, "EN", "BE"))
@@ -145,8 +144,7 @@ msgstr ""
 
 msgid "Hello world"
 msgstr "Прывітанне свет"
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     parsed = list(iter_tm_pairs(path, "EN", "BE"))

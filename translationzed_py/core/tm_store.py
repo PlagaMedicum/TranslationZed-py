@@ -344,8 +344,7 @@ class TMStore:
         return conn
 
     def _ensure_schema(self) -> None:
-        self._conn.execute(
-            """
+        self._conn.execute("""
             CREATE TABLE IF NOT EXISTS tm_entries (
                 id INTEGER PRIMARY KEY,
                 source_text TEXT NOT NULL,
@@ -363,11 +362,9 @@ class TMStore:
                 row_status INTEGER,
                 updated_at INTEGER NOT NULL
             )
-            """
-        )
+            """)
         self._ensure_tm_entries_columns()
-        self._conn.execute(
-            """
+        self._conn.execute("""
             CREATE TABLE IF NOT EXISTS tm_import_files (
                 tm_path TEXT PRIMARY KEY,
                 tm_name TEXT NOT NULL,
@@ -383,19 +380,15 @@ class TMStore:
                 note TEXT NOT NULL DEFAULT '',
                 updated_at INTEGER NOT NULL
             )
-            """
-        )
+            """)
         self._ensure_tm_import_files_columns()
         self._conn.execute("DROP INDEX IF EXISTS tm_project_key")
         self._conn.execute("DROP INDEX IF EXISTS tm_import_unique")
-        self._conn.execute(
-            """
+        self._conn.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS tm_project_key
             ON tm_entries(origin, source_locale, target_locale, file_path, key)
-            """
-        )
-        self._conn.execute(
-            """
+            """)
+        self._conn.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS tm_import_unique
             ON tm_entries(
                 origin,
@@ -406,32 +399,23 @@ class TMStore:
                 target_text
             )
             WHERE origin = 'import'
-            """
-        )
-        self._conn.execute(
-            """
+            """)
+        self._conn.execute("""
             CREATE INDEX IF NOT EXISTS tm_exact_lookup
             ON tm_entries(source_locale, target_locale, source_norm, origin)
-            """
-        )
-        self._conn.execute(
-            """
+            """)
+        self._conn.execute("""
             CREATE INDEX IF NOT EXISTS tm_prefix_lookup
             ON tm_entries(source_locale, target_locale, source_prefix, source_len)
-            """
-        )
-        self._conn.execute(
-            """
+            """)
+        self._conn.execute("""
             CREATE INDEX IF NOT EXISTS tm_len_lookup
             ON tm_entries(source_locale, target_locale, source_len, origin)
-            """
-        )
-        self._conn.execute(
-            """
+            """)
+        self._conn.execute("""
             CREATE INDEX IF NOT EXISTS tm_import_path_lookup
             ON tm_entries(origin, tm_path)
-            """
-        )
+            """)
         self._conn.commit()
 
     def _ensure_tm_entries_columns(self) -> None:
@@ -713,8 +697,7 @@ class TMStore:
         return count
 
     def list_import_files(self) -> list[TMImportFile]:
-        rows = self._conn.execute(
-            """
+        rows = self._conn.execute("""
             SELECT
                 tm_path,
                 tm_name,
@@ -731,8 +714,7 @@ class TMStore:
                 updated_at
             FROM tm_import_files
             ORDER BY tm_name COLLATE NOCASE, tm_path
-            """
-        ).fetchall()
+            """).fetchall()
         return [
             TMImportFile(
                 tm_path=row["tm_path"],
