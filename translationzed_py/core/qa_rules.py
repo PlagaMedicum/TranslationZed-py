@@ -3,12 +3,18 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-_TAG_RE = re.compile(r"<[A-Z][A-Z0-9_]*(?::[^>\r\n]+)?>")
-_BRACKET_TAG_RE = re.compile(r"\[[Ii][Mm][Gg]=[^\]\r\n]+\]")
-_PLACEHOLDER_RE = re.compile(r"%(?:\d+\$[A-Za-z]|\d+|[A-Za-z])")
-_ESCAPE_RE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|[nrt\"\\\\])")
+TAG_TOKEN_RE = re.compile(r"<[A-Z][A-Z0-9_]*(?::[^>\r\n]+)?>")
+BRACKET_TAG_TOKEN_RE = re.compile(r"\[[Ii][Mm][Gg]=[^\]\r\n]+\]")
+PLACEHOLDER_TOKEN_RE = re.compile(r"%(?:\d+\$[A-Za-z]|\d+|[A-Za-z])")
+ESCAPE_TOKEN_RE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|[nrt\"\\\\])")
 _TRAILING_RE = re.compile(r"[ \t\.,;:!?…]+$")
 _NEWLINE_ESCAPE_RE = re.compile(r"(?<!\\)(?:\\\\)*\\n")
+_PROTECTED_TOKEN_REGEXES = (
+    TAG_TOKEN_RE,
+    BRACKET_TAG_TOKEN_RE,
+    PLACEHOLDER_TOKEN_RE,
+    ESCAPE_TOKEN_RE,
+)
 
 
 def trailing_fragment(text: str) -> str:
@@ -50,7 +56,7 @@ def extract_protected_tokens(text: str) -> tuple[str, ...]:
     Return code-like tokens to preserve across translation.
     """
     spans: list[tuple[int, int, str]] = []
-    for regex in (_TAG_RE, _BRACKET_TAG_RE, _PLACEHOLDER_RE, _ESCAPE_RE):
+    for regex in _PROTECTED_TOKEN_REGEXES:
         for match in regex.finditer(text):
             spans.append((match.start(), match.end(), match.group(0)))
     spans.sort(key=lambda item: (item[0], item[1]))

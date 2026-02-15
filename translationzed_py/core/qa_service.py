@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,12 +8,14 @@ from pathlib import Path
 from .qa_rules import (
     has_missing_trailing_fragment,
     has_newline_mismatch,
+    missing_protected_tokens,
     newline_count,
     trailing_fragment,
 )
 
 QA_CODE_TRAILING = "qa.trailing"
 QA_CODE_NEWLINES = "qa.newlines"
+QA_CODE_TOKENS = "qa.tokens"
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,12 +72,14 @@ class QAService:
         rows: Sequence[QAInputRow],
         check_trailing: bool,
         check_newlines: bool,
+        check_tokens: bool = False,
     ) -> tuple[QAFinding, ...]:
         return scan_qa_rows(
             file=file,
             rows=rows,
             check_trailing=check_trailing,
             check_newlines=check_newlines,
+            check_tokens=check_tokens,
         )
 
     def auto_mark_rows(self, findings: Sequence[QAFinding]) -> tuple[int, ...]:
@@ -137,6 +142,7 @@ def scan_qa_rows(
     rows: Sequence[QAInputRow],
     check_trailing: bool,
     check_newlines: bool,
+    check_tokens: bool,
 ) -> tuple[QAFinding, ...]:
     findings: list[QAFinding] = []
     for row in rows:
@@ -163,6 +169,21 @@ def scan_qa_rows(
                     severity="warning",
                 )
             )
+        if check_tokens:
+            missing_tokens = missing_protected_tokens(
+                row.source_text,
+                row.target_text,
+            )
+            if missing_tokens:
+                findings.append(
+                    QAFinding(
+                        file=file,
+                        row=row.row,
+                        code=QA_CODE_TOKENS,
+                        excerpt=_tokens_excerpt(missing_tokens),
+                        severity="warning",
+                    )
+                )
     return tuple(findings)
 
 
@@ -180,3 +201,14 @@ def _newline_excerpt(source_text: str, target_text: str) -> str:
 
 def build_auto_mark_rows(findings: Sequence[QAFinding]) -> tuple[int, ...]:
     return tuple(sorted({finding.row for finding in findings}))
+
+
+def _tokens_excerpt(tokens: Sequence[str]) -> str:
+    counts = Counter(tokens)
+    parts: list[str] = []
+    for token, count in counts.items():
+        if count == 1:
+            parts.append(token)
+        else:
+            parts.append(f"{token}x{count}")
+    return "Missing: " + ", ".join(parts[:5])

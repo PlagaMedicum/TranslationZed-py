@@ -4,6 +4,7 @@ from pathlib import Path
 
 from translationzed_py.core.qa_service import (
     QA_CODE_NEWLINES,
+    QA_CODE_TOKENS,
     QA_CODE_TRAILING,
     QAFinding,
     QAInputRow,
@@ -98,6 +99,28 @@ def test_qa_service_scan_rows_respects_check_toggles() -> None:
         check_newlines=True,
     )
     assert findings == ()
+
+
+def test_qa_service_scan_rows_detects_missing_protected_tokens() -> None:
+    service = QAService()
+    findings = service.scan_rows(
+        file=Path("/tmp/proj/BE/ui.txt"),
+        rows=(
+            QAInputRow(
+                row=0,
+                source_text="<LINE> [img=music] %1 <gasps from the courtroom>",
+                target_text="<gasps from the courtroom>",
+            ),
+        ),
+        check_trailing=False,
+        check_newlines=False,
+        check_tokens=True,
+    )
+    assert len(findings) == 1
+    assert findings[0].code == QA_CODE_TOKENS
+    assert "<LINE>" in findings[0].excerpt
+    assert "[img=music]" in findings[0].excerpt
+    assert "%1" in findings[0].excerpt
 
 
 def test_qa_service_auto_mark_rows_is_sorted_unique() -> None:

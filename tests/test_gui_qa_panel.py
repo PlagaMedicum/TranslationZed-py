@@ -79,6 +79,8 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
     win._qa_auto_mark_for_review = False
+    win._qa_check_trailing = True
+    win._qa_check_newlines = True
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
     win._left_qa_btn.click()
@@ -105,6 +107,8 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
 
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
+    win._qa_check_trailing = True
+    win._qa_check_newlines = True
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
     model = win.table.model()
@@ -118,3 +122,39 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     win._qa_auto_mark_for_review = True
     win._refresh_qa_for_current_file()
     assert model.data(status_index, Qt.EditRole) == Status.FOR_REVIEW
+
+
+def test_qa_token_check_toggle_controls_placeholder_tag_findings(
+    qtbot, tmp_path: Path
+) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    for loc in ("EN", "BE"):
+        (root / loc).mkdir()
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "qa.txt").write_text(
+        'L1 = "<LINE> [img=music] %1 <gasps from the courtroom>"\n',
+        encoding="utf-8",
+    )
+    (root / "BE" / "qa.txt").write_text(
+        'L1 = "<gasps from the courtroom>"\n',
+        encoding="utf-8",
+    )
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
+    win._file_chosen(ix)
+    win._qa_check_trailing = False
+    win._qa_check_newlines = False
+
+    win._qa_check_escapes = False
+    win._refresh_qa_for_current_file()
+    assert not any(f.code == "qa.tokens" for f in win._qa_findings)
+
+    win._qa_check_escapes = True
+    win._refresh_qa_for_current_file()
+    assert any(f.code == "qa.tokens" for f in win._qa_findings)

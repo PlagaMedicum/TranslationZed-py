@@ -4586,6 +4586,7 @@ class MainWindow(QMainWindow):
             rows=rows,
             check_trailing=self._qa_check_trailing,
             check_newlines=self._qa_check_newlines,
+            check_tokens=self._qa_check_escapes,
         )
         self._set_qa_findings(findings)
         if self._qa_auto_mark_for_review:

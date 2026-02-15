@@ -26,6 +26,18 @@ from PySide6.QtWidgets import (
 )
 
 from translationzed_py.core.model import STATUS_ORDER, Status
+from translationzed_py.core.qa_rules import (
+    BRACKET_TAG_TOKEN_RE as _BRACKET_TAG_RE,
+)
+from translationzed_py.core.qa_rules import (
+    ESCAPE_TOKEN_RE as _ESCAPE_RE,
+)
+from translationzed_py.core.qa_rules import (
+    PLACEHOLDER_TOKEN_RE as _PLACEHOLDER_RE,
+)
+from translationzed_py.core.qa_rules import (
+    TAG_TOKEN_RE as _TAG_RE,
+)
 
 from .perf_trace import PERF_TRACE
 
@@ -146,10 +158,6 @@ class MultiLineEditDelegate(QStyledItemDelegate):
         editor.setGeometry(rect)
 
 
-_TAG_RE = re.compile(r"<[A-Z][A-Z0-9_]*(?::[^>\r\n]+)?>")
-_BRACKET_TAG_RE = re.compile(r"\[[Ii][Mm][Gg]=[^\]\r\n]+\]")
-_PLACEHOLDER_RE = re.compile(r"%(?:\d+\$[A-Za-z]|\d+|[A-Za-z])")
-_ESCAPE_RE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|[nrt\"\\\\])")
 _WS_RE = re.compile(r"[ \t]{2,}")
 _WS_GLYPH_RE = re.compile(r"[ \t]")
 
