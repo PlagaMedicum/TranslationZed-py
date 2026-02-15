@@ -351,7 +351,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  2 | SYS renders list rows as `<path>:<row> · <check-code> · <short excerpt>`. |
 |  3 | Selecting a finding jumps to file/row in the main table. |
 |  4 | When no findings exist, SYS shows explicit empty-state text. |
-| **Notes** | Current active checks are `qa.trailing` and `qa.newlines`; refresh is debounced on file-open/edit and also available by explicit QA-panel refresh action. |
+| **Notes** | Current active checks are `qa.trailing` and `qa.newlines`; refresh is debounced on file-open/edit and also available by explicit QA-panel refresh action. If `QA_AUTO_MARK_FOR_REVIEW=true`, findings auto-mark affected rows to **For review**; default is visual-only. |
 | **Post-condition** | QA context is visible without blocking normal editing/search/TM workflows. |
 
 ---

@@ -496,6 +496,8 @@ if dirty_files and not prompt_save():
   Current active checks: trailing-fragment mismatch and newline-count mismatch
   (including escaped `\\n` markers). Refresh is debounced on file-open/edit and
   explicit via QA-panel refresh button.
+  If `QA_AUTO_MARK_FOR_REVIEW=true`, rows with active findings are status-updated to
+  **For review** through the normal model-edit pipeline; default is visual-only (`false`).
 - For sessions with multiple opened target locales, UI exposes a read-only
   cross-locale variants preview for the current key (locale, value, compact
   status tag), ordered by current session locale order.

@@ -844,6 +844,8 @@ C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
        Qt-free `core/qa_service.py` DTO/label planning + click-to-row adapter tests.
      - [✓] Trailing/newline checks now run for current file via debounced refresh
        (file open, row edits, QA-tab open, manual refresh button).
+     - [✓] `QA_AUTO_MARK_FOR_REVIEW` wiring implemented: when enabled, QA findings
+       auto-mark affected rows to **For review**; default remains visual-only (`false`).
    - **Planned scope**:
      - [✓] Missing trailing characters.
      - [✓] Missing/extra newlines.
