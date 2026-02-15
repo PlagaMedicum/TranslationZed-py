@@ -228,3 +228,33 @@ def test_qa_next_prev_navigation_moves_between_findings(qtbot, tmp_path: Path) -
     win._qa_prev_finding()
     assert win.table.currentIndex().row() == 0
     assert "QA " in win.statusBar().currentMessage()
+
+
+def test_qa_refresh_does_not_mutate_file_bytes_without_save(
+    qtbot, tmp_path: Path
+) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    for loc in ("EN", "BE"):
+        (root / loc).mkdir()
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "qa.txt").write_text('L1 = "Hello."\n', encoding="utf-8")
+    be_path = root / "BE" / "qa.txt"
+    be_path.write_text('L1 = "Hello."\n', encoding="utf-8")
+    before = be_path.read_bytes()
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._qa_check_trailing = True
+    win._qa_check_newlines = True
+    win._qa_check_escapes = True
+    win._qa_check_same_as_source = True
+    win._qa_auto_mark_for_review = True
+    ix = win.fs_model.index_for_path(be_path)
+    win._file_chosen(ix)
+    win._refresh_qa_for_current_file()
+
+    assert be_path.read_bytes() == before
