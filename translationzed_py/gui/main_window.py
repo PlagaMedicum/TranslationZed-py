@@ -1060,6 +1060,18 @@ class MainWindow(QMainWindow):
         act_review.triggered.connect(self._mark_for_review)
         self.addAction(act_review)
         self.act_review = act_review
+        act_qa_next = QAction("Next QA Finding", self)
+        act_qa_next.setShortcut("F8")
+        act_qa_next.triggered.connect(self._qa_next_finding)
+        self.addAction(act_qa_next)
+        self.menu_edit.addAction(act_qa_next)
+        self.act_qa_next = act_qa_next
+        act_qa_prev = QAction("Previous QA Finding", self)
+        act_qa_prev.setShortcut("Shift+F8")
+        act_qa_prev.triggered.connect(self._qa_prev_finding)
+        self.addAction(act_qa_prev)
+        self.menu_edit.addAction(act_qa_prev)
+        self.act_qa_prev = act_qa_prev
 
         # ── right pane: entry table ─────────────────────────────────────────
         self.table = QTableView()
@@ -4630,6 +4642,48 @@ class MainWindow(QMainWindow):
         except Exception:
             return
         self._select_match(match)
+
+    def _focus_qa_finding_item(self, finding: _QAFinding) -> None:
+        if not hasattr(self, "_qa_results_list") or self._qa_results_list is None:
+            return
+        target = (str(finding.file), int(finding.row))
+        for idx in range(self._qa_results_list.count()):
+            item = self._qa_results_list.item(idx)
+            payload = item.data(Qt.UserRole)
+            if payload != target:
+                continue
+            self._qa_results_list.setCurrentItem(item)
+            self._qa_results_list.scrollToItem(item)
+            return
+
+    def _navigate_qa_finding(self, direction: int) -> None:
+        self._schedule_qa_refresh(immediate=True)
+        current = self.table.currentIndex()
+        current_row = current.row() if current.isValid() else None
+        current_path = self._current_pf.path if self._current_pf is not None else None
+        plan = self._qa_service.build_navigation_plan(
+            findings=self._qa_findings,
+            current_path=current_path,
+            current_row=current_row,
+            direction=direction,
+            root=self._root,
+        )
+        if plan.finding is None:
+            self.statusBar().showMessage(plan.status_message, 3000)
+            return
+        match = _SearchMatch(plan.finding.file, plan.finding.row)
+        if not self._select_match(match):
+            self.statusBar().showMessage("Unable to navigate to QA finding.", 3000)
+            return
+        if self._left_stack.currentIndex() == _LEFT_PANEL_QA:
+            self._focus_qa_finding_item(plan.finding)
+        self.statusBar().showMessage(plan.status_message, 4000)
+
+    def _qa_next_finding(self) -> None:
+        self._navigate_qa_finding(direction=1)
+
+    def _qa_prev_finding(self) -> None:
+        self._navigate_qa_finding(direction=-1)
 
     def _run_search(self) -> None:
         self._search_from_anchor(direction=1, anchor_row=-1)

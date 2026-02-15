@@ -188,3 +188,43 @@ def test_qa_same_as_source_toggle_adds_content_group_finding(
     assert any(f.code == "qa.same_source" for f in win._qa_findings)
     labels = [win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())]
     assert any("warning/content · qa.same_source" in label for label in labels)
+
+
+def test_qa_next_prev_navigation_moves_between_findings(qtbot, tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    for loc in ("EN", "BE"):
+        (root / loc).mkdir()
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "qa.txt").write_text(
+        'L1 = "Hello."\nL2 = "World!"\n',
+        encoding="utf-8",
+    )
+    (root / "BE" / "qa.txt").write_text(
+        'L1 = "Privet"\nL2 = "Svet"\n',
+        encoding="utf-8",
+    )
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
+    win._file_chosen(ix)
+    model = win.table.model()
+    assert model is not None
+    win._qa_check_trailing = True
+    win._qa_check_newlines = False
+    win._qa_check_escapes = False
+    win._qa_check_same_as_source = False
+    win._refresh_qa_for_current_file()
+    assert len(win._qa_findings) >= 2
+
+    win.table.setCurrentIndex(model.index(0, 2))
+    win._qa_next_finding()
+    assert win.table.currentIndex().row() == 1
+
+    win._qa_prev_finding()
+    assert win.table.currentIndex().row() == 0
+    assert "QA " in win.statusBar().currentMessage()

@@ -164,3 +164,32 @@ def test_qa_service_scan_rows_detects_same_as_source_when_enabled() -> None:
     assert len(findings) == 1
     assert findings[0].code == QA_CODE_SAME_AS_SOURCE
     assert findings[0].group == "content"
+
+
+def test_qa_service_navigation_plan_moves_and_wraps() -> None:
+    service = QAService()
+    file_path = Path("/tmp/proj/BE/ui.txt")
+    findings = [
+        QAFinding(file=file_path, row=1, code=QA_CODE_TRAILING, excerpt="x"),
+        QAFinding(file=file_path, row=3, code=QA_CODE_NEWLINES, excerpt="y"),
+    ]
+    next_plan = service.build_navigation_plan(
+        findings=findings,
+        current_path=file_path,
+        current_row=1,
+        direction=1,
+        root=Path("/tmp/proj"),
+    )
+    assert next_plan.finding is not None
+    assert next_plan.finding.row == 3
+    assert next_plan.status_message.startswith("QA 2/2")
+
+    prev_wrap_plan = service.build_navigation_plan(
+        findings=findings,
+        current_path=file_path,
+        current_row=1,
+        direction=-1,
+        root=Path("/tmp/proj"),
+    )
+    assert prev_wrap_plan.finding is not None
+    assert prev_wrap_plan.finding.row == 3

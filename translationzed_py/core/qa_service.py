@@ -51,6 +51,12 @@ class QAPanelPlan:
 
 
 @dataclass(frozen=True, slots=True)
+class QANavigationPlan:
+    finding: QAFinding | None
+    status_message: str
+
+
+@dataclass(frozen=True, slots=True)
 class QAService:
     def finding_label(self, *, finding: QAFinding, root: Path) -> str:
         return qa_finding_label(finding=finding, root=root)
@@ -89,6 +95,23 @@ class QAService:
 
     def auto_mark_rows(self, findings: Sequence[QAFinding]) -> tuple[int, ...]:
         return build_auto_mark_rows(findings)
+
+    def build_navigation_plan(
+        self,
+        *,
+        findings: Sequence[QAFinding],
+        current_path: Path | None,
+        current_row: int | None,
+        direction: int,
+        root: Path,
+    ) -> QANavigationPlan:
+        return build_qa_navigation_plan(
+            findings=findings,
+            current_path=current_path,
+            current_row=current_row,
+            direction=direction,
+            root=root,
+        )
 
 
 def qa_finding_label(*, finding: QAFinding, root: Path) -> str:
@@ -224,6 +247,53 @@ def build_auto_mark_rows(findings: Sequence[QAFinding]) -> tuple[int, ...]:
     return tuple(sorted(rows))
 
 
+def build_qa_navigation_plan(
+    *,
+    findings: Sequence[QAFinding],
+    current_path: Path | None,
+    current_row: int | None,
+    direction: int,
+    root: Path,
+) -> QANavigationPlan:
+    if not findings:
+        return QANavigationPlan(
+            finding=None,
+            status_message="No QA findings in current scope.",
+        )
+    ordered = sorted(findings, key=_finding_sort_key)
+    if not current_path or current_row is None:
+        initial_target = ordered[0 if direction >= 0 else -1]
+        return QANavigationPlan(
+            finding=initial_target,
+            status_message=f"QA 1/{len(ordered)} · {initial_target.code}",
+        )
+    anchor = (current_path.as_posix(), int(current_row))
+    target: QAFinding | None = None
+    if direction >= 0:
+        for candidate in ordered:
+            key = _finding_sort_key(candidate)
+            if (key[0], key[1]) > anchor:
+                target = candidate
+                break
+        if target is None:
+            target = ordered[0]
+    else:
+        for candidate in reversed(ordered):
+            key = _finding_sort_key(candidate)
+            if (key[0], key[1]) < anchor:
+                target = candidate
+                break
+        if target is None:
+            target = ordered[-1]
+    assert target is not None
+    position = ordered.index(target) + 1
+    label = qa_finding_label(finding=target, root=root)
+    return QANavigationPlan(
+        finding=target,
+        status_message=f"QA {position}/{len(ordered)} · {label}",
+    )
+
+
 def _trailing_excerpt(source_text: str, target_text: str) -> str:
     source_tail = trailing_fragment(source_text)
     target_tail = trailing_fragment(target_text)
@@ -245,3 +315,11 @@ def _tokens_excerpt(tokens: Sequence[str]) -> str:
         else:
             parts.append(f"{token}x{count}")
     return "Missing: " + ", ".join(parts[:5])
+
+
+def _finding_sort_key(finding: QAFinding) -> tuple[str, int, str]:
+    return (
+        finding.file.as_posix(),
+        finding.row,
+        finding.code,
+    )
