@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("PySide6")
+
+from translationzed_py.core.qa_service import QAFinding
+from translationzed_py.gui import MainWindow
+
+
+def test_qa_side_panel_lists_findings_and_navigates(qtbot, tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    for loc in ("EN", "BE"):
+        (root / loc).mkdir()
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "first.txt").write_text('UI_FIRST = "One"\n', encoding="utf-8")
+    (root / "EN" / "second.txt").write_text('UI_SECOND = "Two."\n', encoding="utf-8")
+    (root / "BE" / "first.txt").write_text('UI_FIRST = "Adzin"\n', encoding="utf-8")
+    (root / "BE" / "second.txt").write_text('UI_SECOND = "Dva"\n', encoding="utf-8")
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix_first = win.fs_model.index_for_path(root / "BE" / "first.txt")
+    win._file_chosen(ix_first)
+
+    finding = QAFinding(
+        file=root / "BE" / "second.txt",
+        row=0,
+        code="qa.trailing",
+        excerpt="Missing trailing '.'",
+    )
+    win._set_qa_findings([finding])
+    win._left_qa_btn.click()
+
+    qtbot.waitUntil(lambda: win._qa_results_list.count() == 1, timeout=1000)
+    item = win._qa_results_list.item(0)
+    assert item is not None
+    assert "second.txt:1" in item.text()
+    assert "qa.trailing" in item.text()
+    assert "Missing trailing" in item.text()
+
+    win._open_qa_result_item(item)
+    qtbot.waitUntil(
+        lambda: win._current_pf and win._current_pf.path == root / "BE" / "second.txt",
+        timeout=1000,
+    )

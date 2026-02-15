@@ -138,6 +138,12 @@ from translationzed_py.core.project_session import (
 from translationzed_py.core.project_session import (
     TreeRebuildPlan as _TreeRebuildPlan,
 )
+from translationzed_py.core.qa_service import (
+    QAFinding as _QAFinding,
+)
+from translationzed_py.core.qa_service import (
+    QAService as _QAService,
+)
 from translationzed_py.core.render_workflow_service import (
     RenderWorkflowService as _RenderWorkflowService,
 )
@@ -253,6 +259,11 @@ _ORIG_QMESSAGEBOX_EXEC = None
 _ORIG_QMESSAGEBOX_WARNING = None
 _ORIG_QMESSAGEBOX_CRITICAL = None
 _ORIG_QMESSAGEBOX_INFORMATION = None
+
+_LEFT_PANEL_FILES = 0
+_LEFT_PANEL_TM = 1
+_LEFT_PANEL_SEARCH = 2
+_LEFT_PANEL_QA = 3
 
 
 def _in_test_mode() -> bool:
@@ -483,6 +494,7 @@ class MainWindow(QMainWindow):
         self._file_workflow_service = _FileWorkflowService()
         self._conflict_workflow_service = _ConflictWorkflowService()
         self._search_replace_service = _SearchReplaceService()
+        self._qa_service = _QAService()
         self._save_exit_flow_service = _SaveExitFlowService()
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
@@ -509,6 +521,8 @@ class MainWindow(QMainWindow):
         self._tm_rebuild_locales: list[str] = []
         self._tm_rebuild_interactive = False
         self._tm_bootstrap_pending = False
+        self._qa_findings: tuple[_QAFinding, ...] = ()
+        self._qa_panel_result_limit = 500
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -523,6 +537,11 @@ class MainWindow(QMainWindow):
         self._wrap_text_user = normalized_prefs.wrap_text
         self._wrap_text = self._wrap_text_user
         self._large_text_optimizations = normalized_prefs.large_text_optimizations
+        self._qa_check_trailing = normalized_prefs.qa_check_trailing
+        self._qa_check_newlines = normalized_prefs.qa_check_newlines
+        self._qa_check_escapes = normalized_prefs.qa_check_escapes
+        self._qa_check_same_as_source = normalized_prefs.qa_check_same_as_source
+        self._qa_auto_mark_for_review = normalized_prefs.qa_auto_mark_for_review
         self._default_root = normalized_prefs.default_root
         self._search_scope = normalized_prefs.search_scope
         self._replace_scope = normalized_prefs.replace_scope
@@ -839,7 +858,7 @@ class MainWindow(QMainWindow):
         self.menu_view = menubar.addMenu("View")
         self.menu_help = menubar.addMenu("Help")
 
-        # ── left pane: side panel (Files / TM / Search) ─────────────────────
+        # ── left pane: side panel (Files / TM / Search / QA) ────────────────
         self._left_panel = QWidget()
         left_layout = QVBoxLayout(self._left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -860,10 +879,14 @@ class MainWindow(QMainWindow):
         self._left_search_btn = QToolButton(self)
         self._left_search_btn.setText("Search")
         self._left_search_btn.setCheckable(True)
+        self._left_qa_btn = QToolButton(self)
+        self._left_qa_btn.setText("QA")
+        self._left_qa_btn.setCheckable(True)
         for btn, idx in (
-            (self._left_files_btn, 0),
-            (self._left_tm_btn, 1),
-            (self._left_search_btn, 2),
+            (self._left_files_btn, _LEFT_PANEL_FILES),
+            (self._left_tm_btn, _LEFT_PANEL_TM),
+            (self._left_search_btn, _LEFT_PANEL_SEARCH),
+            (self._left_qa_btn, _LEFT_PANEL_QA),
         ):
             btn.setAutoRaise(True)
             self._left_group.addButton(btn, idx)
@@ -978,8 +1001,25 @@ class MainWindow(QMainWindow):
         search_layout.addWidget(self._search_results_list)
         self._left_stack.addWidget(self._search_panel)
 
+        self._qa_panel = QWidget(self._left_panel)
+        qa_layout = QVBoxLayout(self._qa_panel)
+        qa_layout.setContentsMargins(6, 0, 6, 6)
+        qa_layout.setSpacing(6)
+        self._qa_status_label = QLabel(
+            "QA checks are not implemented yet for this build stage.",
+            self._qa_panel,
+        )
+        self._qa_status_label.setWordWrap(True)
+        self._qa_results_list = QListWidget(self._qa_panel)
+        self._qa_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self._qa_results_list.itemActivated.connect(self._open_qa_result_item)
+        self._qa_results_list.itemClicked.connect(self._open_qa_result_item)
+        qa_layout.addWidget(self._qa_status_label)
+        qa_layout.addWidget(self._qa_results_list)
+        self._left_stack.addWidget(self._qa_panel)
+
         self._left_files_btn.setChecked(True)
-        self._left_stack.setCurrentIndex(0)
+        self._left_stack.setCurrentIndex(_LEFT_PANEL_FILES)
 
         left_layout.addWidget(toggle_bar)
         left_layout.addWidget(self._left_stack)
@@ -2540,6 +2580,7 @@ class MainWindow(QMainWindow):
             )
             self._current_model.dataChanged.connect(self._on_model_changed)
             self._current_model.dataChanged.connect(self._on_model_data_changed)
+            self._set_qa_findings(())
             if not self._user_resized_columns:
                 self._source_translation_ratio = 0.5
             self._table_layout_guard = True
@@ -2878,14 +2919,16 @@ class MainWindow(QMainWindow):
         idx = self._left_group.id(button)
         if idx >= 0:
             self._left_stack.setCurrentIndex(idx)
-        if idx == 1 and self._ensure_tm_store():
+        if idx == _LEFT_PANEL_TM and self._ensure_tm_store():
             self._sync_tm_import_folder(interactive=True, show_summary=False)
             if self._tm_bootstrap_pending:
                 self._tm_bootstrap_pending = False
                 self._maybe_bootstrap_tm()
             self._schedule_tm_update()
-        if idx == 2:
+        if idx == _LEFT_PANEL_SEARCH:
             self._refresh_search_panel_results()
+        if idx == _LEFT_PANEL_QA:
+            self._refresh_qa_panel_results()
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         table = getattr(self, "table", None)
@@ -4489,6 +4532,44 @@ class MainWindow(QMainWindow):
             return
         self._select_match(match)
 
+    def _set_qa_findings(self, findings: Sequence[_QAFinding]) -> None:
+        self._qa_findings = tuple(findings)
+        if self._left_stack.currentIndex() == _LEFT_PANEL_QA:
+            self._refresh_qa_panel_results()
+
+    def _set_qa_panel_message(self, text: str) -> None:
+        if hasattr(self, "_qa_status_label") and self._qa_status_label is not None:
+            self._qa_status_label.setText(text)
+        if hasattr(self, "_qa_results_list") and self._qa_results_list is not None:
+            self._qa_results_list.clear()
+
+    def _refresh_qa_panel_results(self) -> None:
+        if not hasattr(self, "_qa_results_list") or self._qa_results_list is None:
+            return
+        plan = self._qa_service.build_panel_plan(
+            findings=self._qa_findings,
+            root=self._root,
+            result_limit=self._qa_panel_result_limit,
+        )
+        self._qa_results_list.clear()
+        for row in plan.items:
+            item = QListWidgetItem(row.label)
+            finding = row.finding
+            item.setData(Qt.UserRole, (str(finding.file), int(finding.row)))
+            self._qa_results_list.addItem(item)
+        self._qa_status_label.setText(plan.status_message)
+
+    def _open_qa_result_item(self, item: QListWidgetItem) -> None:
+        payload = item.data(Qt.UserRole)
+        if not isinstance(payload, tuple) or len(payload) != 2:
+            return
+        raw_path, raw_row = payload
+        try:
+            match = _SearchMatch(Path(str(raw_path)), int(raw_row))
+        except Exception:
+            return
+        self._select_match(match)
+
     def _run_search(self) -> None:
         self._search_from_anchor(direction=1, anchor_row=-1)
 
@@ -4671,6 +4752,11 @@ class MainWindow(QMainWindow):
             prompt_write_on_exit=self._prompt_write_on_exit,
             wrap_text=self._wrap_text_user,
             large_text_optimizations=self._large_text_optimizations,
+            qa_check_trailing=self._qa_check_trailing,
+            qa_check_newlines=self._qa_check_newlines,
+            qa_check_escapes=self._qa_check_escapes,
+            qa_check_same_as_source=self._qa_check_same_as_source,
+            qa_auto_mark_for_review=self._qa_auto_mark_for_review,
             last_root=str(self._root),
             last_locales=list(self._selected_locales),
             window_geometry=geometry,

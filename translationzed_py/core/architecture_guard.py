@@ -24,6 +24,7 @@ DEFAULT_RULES: dict[str, BoundaryRule] = {
                 "translationzed_py.core.model",
                 "translationzed_py.core.preferences_service",
                 "translationzed_py.core.project_session",
+                "translationzed_py.core.qa_service",
                 "translationzed_py.core.render_workflow_service",
                 "translationzed_py.core.save_exit_flow",
                 "translationzed_py.core.saver",
