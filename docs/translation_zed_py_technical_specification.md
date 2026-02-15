@@ -495,8 +495,11 @@ if dirty_files and not prompt_save():
   navigates to file/row, and empty state is explicit when no findings exist.
   Current active checks: trailing-fragment mismatch (`qa.trailing`), newline-count
   mismatch including escaped `\\n` markers (`qa.newlines`), and missing code/placeholder
-  tokens (`qa.tokens`, gated by `QA_CHECK_ESCAPES`). Refresh is debounced on file-open/edit
-  and explicit via QA-panel refresh button.
+  tokens (`qa.tokens`, gated by `QA_CHECK_ESCAPES`), plus same-as-source detection
+  (`qa.same_source`, gated by `QA_CHECK_SAME_AS_SOURCE`). Refresh is debounced on
+  file-open/edit and explicit via QA-panel refresh button.
+  QA row labels include severity/group tags (`warning/format`, `warning/content`)
+  alongside code labels for compact triage.
   If `QA_AUTO_MARK_FOR_REVIEW=true`, rows with active findings are status-updated to
   **For review** through the normal model-edit pipeline; default is visual-only (`false`).
   Token regexes are shared from `core.qa_rules` by GUI delegates and QA scan logic

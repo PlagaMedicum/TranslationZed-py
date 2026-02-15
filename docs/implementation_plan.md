@@ -849,11 +849,14 @@ C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
      - [✓] Escape/code-block/placeholder check implemented (`qa.tokens`, opt-in via
        `QA_CHECK_ESCAPES`) with shared token contract reused by both QA rules and
        GUI visual highlighting.
+     - [✓] Same-as-source check implemented (`qa.same_source`, opt-in via
+       `QA_CHECK_SAME_AS_SOURCE`) with QA list severity/group labels (`warning/format`,
+       `warning/content`) for faster triage.
    - **Planned scope**:
      - [✓] Missing trailing characters.
      - [✓] Missing/extra newlines.
      - [✓] Missing escape sequences / code blocks / placeholders.
-     - [ ] Translation equals Source.
+     - [✓] Translation equals Source.
    - **Out of planned QA scope**:
      - Advanced QA rule sets and per-project custom rules.
    - **Acceptance**:

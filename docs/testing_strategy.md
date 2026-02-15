@@ -47,6 +47,7 @@ _Last updated: 2026-02-15_
 - QA checks integration: trailing/newline findings refresh on file-open/edit and explicit QA-panel refresh.
 - QA auto-mark guard: `QA_AUTO_MARK_FOR_REVIEW=false` keeps status untouched; `true` mutates only affected rows to **For review**.
 - QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
+- QA same-as-source checks: opt-in `qa.same_source` findings and severity/group label rendering are validated in core + panel tests.
 - Architecture guards enforce allowed GUI->core imports and `main_window.py`
   line-budget threshold.
 - EN hash change dialog (implemented).
