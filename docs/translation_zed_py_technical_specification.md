@@ -506,6 +506,8 @@ if dirty_files and not prompt_save():
   **For review** through the normal model-edit pipeline; default is visual-only (`false`).
   Token regexes are shared from `core.qa_rules` by GUI delegates and QA scan logic
   to keep highlight/QA semantics aligned (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes).
+  QA perf regression smoke is budgeted on committed large fixtures (`SurvivalGuide`,
+  `Recorded_Media`), and QA refresh is guaranteed non-mutating until explicit save.
 - For sessions with multiple opened target locales, UI exposes a read-only
   cross-locale variants preview for the current key (locale, value, compact
   status tag), ordered by current session locale order.

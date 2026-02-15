@@ -834,7 +834,7 @@ C1 [✓] **Translation memory** (Step 29).
      - [✓] Add preferences-side inline warning banner for zero-segment imported TMs (beside existing marker in list rows).
      - [✓] Add deferred import/export format adapters (XLSX) behind the same import-workflow contract.
    - **Deferred**: LanguageTool API (post‑v0.6).
-C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
+C2 [→] **Translation QA checks (post‑v0.6)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes, placeholders) are easy to miss.
    - **Target**: opt‑in QA panel with per-check toggles; non-blocking warnings by default.
    - **Infrastructure progress (v0.7 kickoff)**:
@@ -854,6 +854,9 @@ C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
        `warning/content`) for faster triage.
      - [✓] QA next/prev navigation actions added (`F8` / `Shift+F8`) with
        wrapped traversal + status-bar hints (`QA i/n`) and QA-list focus sync.
+     - [✓] QA performance + safety guards added: auto-derived perf smoke on
+       `SurvivalGuide`/`Recorded_Media` fixtures and non-mutating file-byte assertion
+       when QA refresh runs without explicit save.
    - **Planned scope**:
      - [✓] Missing trailing characters.
      - [✓] Missing/extra newlines.
@@ -862,9 +865,9 @@ C2 [≈] **Translation QA checks (post‑v0.6)** (Step 30).
    - **Out of planned QA scope**:
      - Advanced QA rule sets and per-project custom rules.
    - **Acceptance**:
-     - [ ] QA checks run without blocking editing.
+     - [✓] QA checks run without blocking editing.
      - [ ] Per-check toggles persist in Preferences.
-     - [ ] Warnings are visible and navigable from UI.
+     - [✓] Warnings are visible and navigable from UI.
 
 ---
 
