@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.6.0-dev · 2026‑02‑15_
+_version 0.6.0-dev · 2026‑02‑16_
 
 ---
 ## 1  Actors
@@ -340,7 +340,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  4 | If no sibling locales are opened or key is missing there, SYS shows an explicit empty state. |
 | **Post-condition** | Translator can compare cross-locale phrasing without switching files/locales. |
 
-### UC-13m  QA Findings Side Panel (in progress)
+### UC-13m  QA Findings Side Panel
 | Field | Value |
 |-------|-------|
 | **Goal** | Surface mechanical QA findings in a compact, navigable list. |
@@ -354,6 +354,24 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  5 | User may jump between findings with **F8** (next) / **Shift+F8** (previous); SYS wraps at boundaries and shows `QA i/n` hint in status bar. |
 | **Notes** | Current active checks are `qa.trailing`, `qa.newlines`, opt-in `qa.tokens` (`QA_CHECK_ESCAPES=true`), and opt-in `qa.same_source` (`QA_CHECK_SAME_AS_SOURCE=true`). QA list labels include severity/group tags (`warning/format`, `warning/content`). Refresh is debounced on file-open/edit and also available by explicit QA-panel refresh action. If `QA_AUTO_MARK_FOR_REVIEW=true`, findings auto-mark affected rows to **For review**; default is visual-only. |
 | **Post-condition** | QA context is visible without blocking normal editing/search/TM workflows. |
+
+### UC-13n  Source Reference Locale Switch
+| Field | Value |
+|-------|-------|
+| **Goal** | Switch Source-column reference locale across project locales without reloading project. |
+| **Primary Actor** | TR / PR |
+| **Trigger** | User changes toolbar **Source:** selector. |
+| **Main Success Scenario** |
+|  1 | SYS normalizes requested locale and resolves fallback to `EN` if unavailable in current project-locale set. |
+|  2 | SYS refreshes Source-column values for active file using the selected reference locale. |
+|  3 | SYS persists selection in `SOURCE_REFERENCE_MODE`. |
+|  4 | SYS invalidates source-search row cache, then reruns search/TM refresh adapters for current row context. |
+| **Variant: per-file pin** |
+|  A1 | User toggles **Pin** near `Source:` selector while a file is open. |
+|  A2 | SYS stores/removes file-local override in `SOURCE_REFERENCE_FILE_OVERRIDES`; pinned mode overrides global mode for that file only. |
+|  A3 | User chooses fallback order in Preferences → View (`EN → Target` or `Target → EN`); SYS persists it in `SOURCE_REFERENCE_FALLBACK_POLICY`. |
+|  A4 | User clears all pinned overrides from Preferences; SYS removes `SOURCE_REFERENCE_FILE_OVERRIDES`. |
+| **Post-condition** | Source rendering/search use the selected reference locale; behavior remains deterministic after reopen. |
 
 ---
 ## 4  GUI Wireframe (ASCII)
@@ -458,14 +476,19 @@ UNTOUCHED ──────────────────────▶ 
    and can be hidden/shown via a **left‑side toggle**; the detail editor pane is
    toggled from the **bottom bar**. TM panel includes filters (min score + origin
    toggles for project/import) and supports project‑TM rebuild from selected locales.
-   QA tab currently provides list+navigation scaffolding and explicit empty state.
+   QA tab provides finding list/navigation with explicit empty state.
 11. **Theme modes**: Preferences → View supports **System / Light / Dark**; changes apply app-wide immediately and persist.
-12. **Translation QA checks (in progress)**: QA side panel scaffolding is implemented;
-   first active checks are missing trailing fragment + newline mismatch.
-   Remaining rule execution and per-check preference UX are rolling out in phased slices.
-   Planned checks:
-   (missing trailing characters, missing/extra newlines, missing escapes/code blocks,
-   translation equals Source).
+12. **Translation QA checks (current)**: active checks are missing trailing characters,
+   missing/extra newlines, and opt-in checks for missing escapes/code markers/placeholders
+   plus translation-equals-source. QA checks are visual-only by default; optional
+   `QA_AUTO_MARK_FOR_REVIEW=true` auto-marks affected rows.
+13. **Source reference selector (current)**: Source-column locale can be switched among
+   project locales via toolbar selector (`EN` default), persisted in
+   `SOURCE_REFERENCE_MODE`. Fallback behavior is configurable in Preferences
+   (`EN → Target` or `Target → EN`) and persisted in
+   `SOURCE_REFERENCE_FALLBACK_POLICY`.
+   Per-file **Pin** override is persisted in `SOURCE_REFERENCE_FILE_OVERRIDES`;
+   Preferences can clear all pins in one action.
 
 ---
-_Last updated: 2026-02-15 (v0.6.0-dev)_
+_Last updated: 2026-02-16 (v0.7.0)_

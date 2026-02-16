@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.6.0-dev · 2026-02-15**\
+**Version 0.6.0-dev · 2026-02-16**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -39,7 +39,10 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
   Future statuses remain pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
 - Live plain / regex search over Key / Source / Translation with `F3` / `Shift+F3` navigation.
-- Reference‑locale switching without reloading UI (future; English remains the base source in current scope).
+- Source column supports reference‑locale switching across project locales
+  without reloading UI (`EN` default).
+  Global mode is persisted, per-file pin may override it, and fallback policy
+  is configurable (`EN → Target` or `Target → EN`) when selected locale is unavailable.
 - On startup, check EN hash cache; if changed, show a confirmation dialog to
   reset the cache to the new EN version.
 - Atomic multi‑file save; save/exit flows use explicit write prompts
@@ -86,6 +89,7 @@ translationzed_py/
 │   ├── project_session.py   # session cache scan + auto-open selection (non-Qt)
 │   ├── render_workflow_service.py # large-file render/span policy (non-Qt)
 │   ├── search_replace_service.py # scope/search/replace planning (non-Qt)
+│   ├── source_reference_service.py # source-reference locale/path planning (non-Qt)
 │   ├── qa_rules.py         # pure QA primitives (trailing/newline/token checks)
 │   ├── qa_service.py       # QA list DTO/label/panel planning (non-Qt)
 │   ├── preferences_service.py # startup root + prefs normalization/persist policy (non-Qt)
@@ -108,6 +112,10 @@ translationzed_py/
 │   ├── entry_model.py       # table model (Key|Source|Translation|Status)
 │   ├── fs_model.py          # file tree model
 │   ├── main_window.py       # primary GUI controller
+│   ├── search_scope_ui.py   # search-scope indicator icon helpers
+│   ├── source_lookup.py     # source-column lazy/by-row lookup adapters
+│   ├── source_reference_ui.py # source-reference selector UI helpers
+│   ├── source_reference_state.py # source-reference mode/override UI state helpers
 │   ├── perf_trace.py        # opt-in perf tracing
 │   └── preferences_dialog.py# preferences UI
 └── __main__.py              # CLI + GUI entry‑point
@@ -305,8 +313,8 @@ Algorithm:
   - `LARGE_TEXT_OPTIMIZATIONS=true|false`
   - `QA_CHECK_TRAILING=true|false` (default `true`)
   - `QA_CHECK_NEWLINES=true|false` (default `true`)
-  - `QA_CHECK_ESCAPES=true|false` (default `false`; reserved until full QA checks ship)
-  - `QA_CHECK_SAME_AS_SOURCE=true|false` (default `false`; reserved until full QA checks ship)
+  - `QA_CHECK_ESCAPES=true|false` (default `false`)
+  - `QA_CHECK_SAME_AS_SOURCE=true|false` (default `false`)
   - `QA_AUTO_MARK_FOR_REVIEW=true|false` (default `false`)
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
@@ -315,6 +323,9 @@ Algorithm:
   - `SEARCH_SCOPE=FILE|LOCALE|POOL`
   - `REPLACE_SCOPE=FILE|LOCALE|POOL`
   - `UI_THEME_MODE=SYSTEM|LIGHT|DARK` (optional extra key; absent means `SYSTEM`)
+  - `SOURCE_REFERENCE_MODE=EN|<LOCALE_CODE>` (active extra key for source-column reference locale mode)
+  - `SOURCE_REFERENCE_FALLBACK_POLICY=EN_THEN_TARGET|TARGET_THEN_EN` (optional source-reference fallback order)
+  - `SOURCE_REFERENCE_FILE_OVERRIDES=<json>` (optional per-file pinned source-reference locale map)
 - (No last‑open metadata in settings; timestamps live in per‑file cache headers.)
 - Store: last root path, last locale(s), window geometry, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
@@ -893,4 +904,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-14 (v0.6.0-dev)*
+*Last updated: 2026-02-16 (v0.7.0)*

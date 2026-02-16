@@ -1,4 +1,4 @@
-_Last updated: 2026-02-14_
+_Last updated: 2026-02-16_
 
 # Checklists
 
@@ -45,14 +45,19 @@ avoid missing mandatory tasks.
   - `docs/testing_strategy.md`
   - `docs/tm_ranking_algorithm.md` (if TM ranking changed)
 
-## v0.6.0 release gate (current target)
+## v0.7.0 release gate (current target)
 
-- **Current baseline status (2026-02-14)**:
-  - CI matrix and RC dry-run artifact builds are green for the active v0.6 RC evidence set.
+- **Current baseline status (2026-02-16)**:
+  - Final tag requires a green `v0.7.0-rcN` dry-run workflow for the same commit.
+  - Final tag requires green CI matrix (`linux`, `windows`, `macos`) on release commit.
 
 - **Feature readiness**
   - A‑P0 encoding integrity guarantees remain green (no-write-on-open, diagnostics, readonly-clean gate).
   - A0 clean-architecture extraction slices are reflected in docs and adapter tests.
+  - Source-reference selector behavior is stable:
+    - persisted global mode (`SOURCE_REFERENCE_MODE`),
+    - fallback order policy (`SOURCE_REFERENCE_FALLBACK_POLICY`),
+    - per-file pin overrides (`SOURCE_REFERENCE_FILE_OVERRIDES`) with clear action.
   - TM import/sync/query path stable for project+import origins.
   - TM fuzzy ranking behavior validated against corpus + targeted regression cases.
   - Large-file editing/scroll behavior within perf budgets.

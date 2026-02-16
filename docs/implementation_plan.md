@@ -1,9 +1,9 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-15_
+_Last updated: 2026-02-16_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
-explicit dependencies, and acceptance criteria. v0.5.0 is shipped; this plan now
-anchors v0.6.0 preparation and subsequent expansion.
+explicit dependencies, and acceptance criteria. v0.6.0 is shipped; this plan now
+anchors v0.7.0 implementation and subsequent expansion.
 
 Legend:
 - [✓] done
@@ -212,8 +212,19 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
     (value + compact `U/T/FR/P` status tag per locale) in a compact side/bottom surface.
   - Variants are ordered by current session locale order.
   - Keep current EN-as-source editing model unchanged.
-- Deferred (post-v0.6):
-  - Full Source-column locale switching (EN -> arbitrary reference locale).
+- v0.7 progress:
+  - Source column now supports reference-locale switching across project locales
+    (toolbar selector, default `EN`).
+  - Selection persists via `SOURCE_REFERENCE_MODE` and falls back safely to
+    `EN` when requested locale is unavailable.
+  - Fallback order is configurable in Preferences (`EN → Target` or
+    `Target → EN`) and persists via `SOURCE_REFERENCE_FALLBACK_POLICY`.
+  - Per-file pin overrides persist via `SOURCE_REFERENCE_FILE_OVERRIDES` and
+    can be cleared in bulk from Preferences.
+  - Source-reference switch invalidates source-search row cache to prevent stale
+    source-column matches after locale mode changes.
+  - GUI perf regression budget now tracks reference-locale switch latency on
+    large fixtures (`tests/test_gui_perf_regressions.py`).
 
 ### Step 18 — Preferences window [✓]
 - Touchpoints: `gui/preferences_dialog.py` (new), `core/preferences.py`
@@ -834,7 +845,7 @@ C1 [✓] **Translation memory** (Step 29).
      - [✓] Add preferences-side inline warning banner for zero-segment imported TMs (beside existing marker in list rows).
      - [✓] Add deferred import/export format adapters (XLSX) behind the same import-workflow contract.
    - **Deferred**: LanguageTool API (post‑v0.6).
-C2 [→] **Translation QA checks (post‑v0.6)** (Step 30).
+C2 [✓] **Translation QA checks (post‑v0.6)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes, placeholders) are easy to miss.
    - **Target**: opt‑in QA panel with per-check toggles; non-blocking warnings by default.
    - **Infrastructure progress (v0.7 kickoff)**:
@@ -857,6 +868,8 @@ C2 [→] **Translation QA checks (post‑v0.6)** (Step 30).
      - [✓] QA performance + safety guards added: auto-derived perf smoke on
        `SurvivalGuide`/`Recorded_Media` fixtures and non-mutating file-byte assertion
        when QA refresh runs without explicit save.
+     - [✓] Preferences now expose a dedicated QA tab and persist per-check toggles
+       (`qa_check_*`) plus `qa_auto_mark_for_review`.
    - **Planned scope**:
      - [✓] Missing trailing characters.
      - [✓] Missing/extra newlines.
@@ -866,8 +879,25 @@ C2 [→] **Translation QA checks (post‑v0.6)** (Step 30).
      - Advanced QA rule sets and per-project custom rules.
    - **Acceptance**:
      - [✓] QA checks run without blocking editing.
-     - [ ] Per-check toggles persist in Preferences.
+     - [✓] Per-check toggles persist in Preferences.
      - [✓] Warnings are visible and navigable from UI.
+
+D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope)**
+   - [✓] `core.source_reference_service` added for locale-mode normalization,
+     path resolution (mirror + `_LOCALE` suffix rewrites), and lookup materialization.
+   - [✓] Toolbar source selector (`Source:`) added; mode persists in
+     `SOURCE_REFERENCE_MODE` and falls back to `EN` when unavailable.
+   - [✓] Source-column search and row-cache semantics updated for source-mode
+     switching (cache invalidation on mode change).
+   - [✓] Per-file source-reference pin override added (toolbar `Pin` action),
+     persisted in `SOURCE_REFERENCE_FILE_OVERRIDES`.
+   - [✓] Source-reference fallback policy added in Preferences (`EN → Target` or
+     `Target → EN`), persisted in `SOURCE_REFERENCE_FALLBACK_POLICY`.
+   - [✓] Preferences action added to clear all per-file pinned source overrides.
+   - [✓] Integration coverage added for source-column rendering + source-mode search.
+   - [✓] GUI perf budget added for source-locale switching on large fixtures.
+   - **Deferred remainder**: advanced source-reference policies beyond current
+     selector (for example per-locale policy presets and multi-step fallback chains).
 
 ---
 
@@ -886,8 +916,8 @@ C2 [→] **Translation QA checks (post‑v0.6)** (Step 30).
 
 ## 6) Deferred Items (post‑v0.6)
 
-- Full Source-column reference-locale switching window
-  (read-only cross-locale variants preview is already in v0.6 scope)
+- Source-column reference mode enhancements:
+  advanced selector behavior (per-locale policy presets, multi-step fallback chains).
 - Program‑generated comments (`TZP:`) with optional write‑back
 - English diff markers (NEW / REMOVED / MODIFIED)
 - Crash recovery beyond cache (if ever needed)

@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-15_
+_Last updated: 2026-02-16_
 
 ---
 
@@ -32,6 +32,10 @@ _Last updated: 2026-02-15_
   - newline mismatch detection,
   - protected token extraction (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes),
   - same-as-source check primitive.
+- Source-reference service primitives:
+  - source-reference mode normalization/fallback,
+  - fallback-policy normalization (`EN_THEN_TARGET` / `TARGET_THEN_EN`),
+  - target↔reference file path resolution (mirror + `_LOCALE` suffix rewrites).
 
 ### 2.2 Integration Tests
 - Open project, select locale, load table.
@@ -49,6 +53,15 @@ _Last updated: 2026-02-15_
 - QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
 - QA same-as-source checks: opt-in `qa.same_source` findings and severity/group label rendering are validated in core + panel tests.
 - QA navigation checks: `F8`/`Shift+F8` next-prev traversal moves between findings with wrap and updates status-bar hint.
+- Source-reference selector integration: toolbar source-locale switch updates
+  Source column rendering for project locales, persists `SOURCE_REFERENCE_MODE`, and falls back to
+  `EN` when unavailable.
+- Source-reference per-file pin integration: pinned file mode overrides global
+  source mode and persists through `SOURCE_REFERENCE_FILE_OVERRIDES`.
+- Source-reference preferences integration: fallback-policy updates and
+  "clear pinned overrides" action update runtime state + persisted extras.
+- Source-reference search cache guard: switching source locale invalidates
+  cached source rows so Source-column search results cannot reuse stale mode data.
 - Architecture guards enforce allowed GUI->core imports and `main_window.py`
   line-budget threshold.
 - EN hash change dialog (implemented).
@@ -91,7 +104,8 @@ _Last updated: 2026-02-15_
   - row-resize burst slicing (single pass must stay budgeted, no long monolithic resize),
   - column/splitter resize debounce behavior (single deferred row-height recompute after resize settles),
   - large-file scroll/selection stability on `SurvivalGuide_BE.txt` and
-    `Recorded_Media_BE.txt`.
+    `Recorded_Media_BE.txt`,
+  - source-reference locale switching latency on large fixtures.
 - `tests/test_render_workflow_service.py` enforces adaptive prefetch-window policy:
   render-heavy paths must cap prefetch margins to reduce lazy decode spikes.
 - pytest always prints a **Performance** summary in terminal output,
@@ -218,6 +232,8 @@ They include:
   for selected locales even when DB already has stale partial entries
   (`tests/test_gui_tm_preferences.py`).
 - TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
+- Source-reference path service: cross-locale mirror and suffix-rewrite resolution
+  is covered by `tests/test_source_reference_service.py`.
   (`core.tm_import_sync` unit tests).
 - TM query/policy service: cache-key construction and score/origin filtering semantics.
 - TM workflow service: suggestion view-model formatting/status messages and
