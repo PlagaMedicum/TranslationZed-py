@@ -53,13 +53,11 @@ _Last updated: 2026-02-16_
 - QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
 - QA same-as-source checks: opt-in `qa.same_source` findings and severity/group label rendering are validated in core + panel tests.
 - QA navigation checks: `F8`/`Shift+F8` next-prev traversal moves between findings with wrap and updates status-bar hint.
-- Source-reference selector integration: toolbar source-locale switch updates
+- Source-reference selector integration: Source-column header locale switch updates
   Source column rendering for project locales, persists `SOURCE_REFERENCE_MODE`, and falls back to
   `EN` when unavailable.
-- Source-reference per-file pin integration: pinned file mode overrides global
-  source mode and persists through `SOURCE_REFERENCE_FILE_OVERRIDES`.
-- Source-reference preferences integration: fallback-policy updates and
-  "clear pinned overrides" action update runtime state + persisted extras.
+- Source-reference preferences integration: fallback-policy updates runtime
+  state and persisted extras coherently.
 - Source-reference search cache guard: switching source locale invalidates
   cached source rows so Source-column search results cannot reuse stale mode data.
 - Architecture guards enforce allowed GUI->core imports and `main_window.py`

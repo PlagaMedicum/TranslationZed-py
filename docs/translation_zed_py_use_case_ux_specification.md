@@ -352,7 +352,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  3 | Selecting a finding jumps to file/row in the main table. |
 |  4 | When no findings exist, SYS shows explicit empty-state text. |
 |  5 | User may jump between findings with **F8** (next) / **Shift+F8** (previous); SYS wraps at boundaries and shows `QA i/n` hint in status bar. |
-| **Notes** | Current active checks are `qa.trailing`, `qa.newlines`, opt-in `qa.tokens` (`QA_CHECK_ESCAPES=true`), and opt-in `qa.same_source` (`QA_CHECK_SAME_AS_SOURCE=true`). QA list labels include severity/group tags (`warning/format`, `warning/content`). Refresh is manual by default via explicit **Run QA** action in QA panel; optional background mode is controlled by `QA_AUTO_REFRESH`. If `QA_AUTO_MARK_FOR_REVIEW=true`, only rows still in **Untouched** state are auto-marked to **For review**; explicit user-set statuses are preserved. |
+| **Notes** | Current active checks are `qa.trailing`, `qa.newlines`, opt-in `qa.tokens` (`QA_CHECK_ESCAPES=true`), and opt-in `qa.same_source` (`QA_CHECK_SAME_AS_SOURCE=true`). QA list labels include severity/group tags (`warning/format`, `warning/content`). Refresh is manual by default via explicit **Run QA** action in QA panel; optional background mode is controlled by `QA_AUTO_REFRESH`. If `QA_AUTO_MARK_FOR_REVIEW=true`, findings in **Untouched** rows are auto-marked to **For review**. Optional `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true` extends auto-marking to non-Untouched rows (Translated/Proofread). |
 | **Post-condition** | QA context is visible without blocking normal editing/search/TM workflows. |
 
 ### UC-13n  Source Reference Locale Switch
@@ -360,17 +360,14 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |-------|-------|
 | **Goal** | Switch Source-column reference locale across project locales without reloading project. |
 | **Primary Actor** | TR / PR |
-| **Trigger** | User changes toolbar **Source:** selector. |
+| **Trigger** | User opens **Source** column-header dropdown and selects locale. |
 | **Main Success Scenario** |
-|  1 | SYS normalizes requested locale and resolves fallback to `EN` if unavailable in current project-locale set. |
+|  1 | SYS normalizes requested locale and resolves fallback to `EN` if unavailable in current opened-locale set. |
 |  2 | SYS refreshes Source-column values for active file using the selected reference locale. |
 |  3 | SYS persists selection in `SOURCE_REFERENCE_MODE`. |
 |  4 | SYS invalidates source-search row cache, then reruns search/TM refresh adapters for current row context. |
-| **Variant: per-file pin** |
-|  A1 | User toggles **Pin** near `Source:` selector while a file is open. |
-|  A2 | SYS stores/removes file-local override in `SOURCE_REFERENCE_FILE_OVERRIDES`; pinned mode overrides global mode for that file only. |
-|  A3 | User chooses fallback order in Preferences → View (`EN → Target` or `Target → EN`); SYS persists it in `SOURCE_REFERENCE_FALLBACK_POLICY`. |
-|  A4 | User clears all pinned overrides from Preferences; SYS removes `SOURCE_REFERENCE_FILE_OVERRIDES`. |
+| **Variant: fallback policy** |
+|  A1 | User chooses fallback order in Preferences → View (`EN → Target` or `Target → EN`); SYS persists it in `SOURCE_REFERENCE_FALLBACK_POLICY`. |
 | **Post-condition** | Source rendering/search use the selected reference locale; behavior remains deterministic after reopen. |
 
 ---
@@ -482,14 +479,23 @@ UNTOUCHED ──────────────────────▶ 
    missing/extra newlines, and opt-in checks for missing escapes/code markers/placeholders
    plus translation-equals-source. QA runs manually by default via **Run QA** in the QA panel
    (`QA_AUTO_REFRESH=false`); optional background auto-refresh can be enabled in Preferences.
-   Optional `QA_AUTO_MARK_FOR_REVIEW=true` auto-marks only **Untouched** rows.
+   Optional `QA_AUTO_MARK_FOR_REVIEW=true` auto-marks findings in **Untouched** rows to
+   **For review**; optional `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true` extends this to
+   non-Untouched rows.
+13. **Responsiveness and explainability invariants**:
+   - UI should never appear stalled: long-running work must keep the interface interactive
+     (no visible freezes).
+   - Every user action should produce immediate visible reaction in the interface.
+   - No long process should run with invisible state; users should always see that work
+     started and is in progress (status update, busy state, progress bar, etc.).
+   - Primary workflows should be self-explanatory in the interface (labels, tooltips,
+     empty states, and dialog text), minimizing the need for separate documentation.
+   - UX should remain intuitive for all users, including skilled translation specialists.
 13. **Source reference selector (current)**: Source-column locale can be switched among
-   project locales via toolbar selector (`EN` default), persisted in
+   opened locales from the Source-column header dropdown (`EN` default), persisted in
    `SOURCE_REFERENCE_MODE`. Fallback behavior is configurable in Preferences
    (`EN → Target` or `Target → EN`) and persisted in
    `SOURCE_REFERENCE_FALLBACK_POLICY`.
-   Per-file **Pin** override is persisted in `SOURCE_REFERENCE_FILE_OVERRIDES`;
-   Preferences can clear all pins in one action.
 
 ---
 _Last updated: 2026-02-16 (v0.7.0)_

@@ -39,9 +39,10 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
   Future statuses remain pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
 - Live plain / regex search over Key / Source / Translation with `F3` / `Shift+F3` navigation.
-- Source column supports reference‑locale switching across project locales
+- Source column supports reference‑locale switching across **opened locales**
   without reloading UI (`EN` default).
-  Global mode is persisted, per-file pin may override it, and fallback policy
+  Locale switching is exposed from the **Source column header dropdown** (header label
+  indicates current mode). Global mode is persisted, and fallback policy
   is configurable (`EN → Target` or `Target → EN`) when selected locale is unavailable.
 - On startup, check EN hash cache; if changed, show a confirmation dialog to
   reset the cache to the new EN version.
@@ -317,6 +318,7 @@ Algorithm:
   - `QA_CHECK_SAME_AS_SOURCE=true|false` (default `false`)
   - `QA_AUTO_REFRESH=true|false` (default `false`)
   - `QA_AUTO_MARK_FOR_REVIEW=true|false` (default `false`)
+  - `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true|false` (default `false`)
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
   - `DEFAULT_ROOT=<path>` (default project root in Preferences)
@@ -326,7 +328,6 @@ Algorithm:
   - `UI_THEME_MODE=SYSTEM|LIGHT|DARK` (optional extra key; absent means `SYSTEM`)
   - `SOURCE_REFERENCE_MODE=EN|<LOCALE_CODE>` (active extra key for source-column reference locale mode)
   - `SOURCE_REFERENCE_FALLBACK_POLICY=EN_THEN_TARGET|TARGET_THEN_EN` (optional source-reference fallback order)
-  - `SOURCE_REFERENCE_FILE_OVERRIDES=<json>` (optional per-file pinned source-reference locale map)
 - (No last‑open metadata in settings; timestamps live in per‑file cache headers.)
 - Store: last root path, last locale(s), window geometry, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
@@ -515,8 +516,10 @@ if dirty_files and not prompt_save():
   alongside code labels for compact triage.
   QA navigation actions (`F8` next, `Shift+F8` previous) traverse findings with wrap;
   status bar reports `QA i/n` hint and selected finding summary.
-  If `QA_AUTO_MARK_FOR_REVIEW=true`, only rows still in **Untouched** state are
-  auto-marked to **For review**; explicit user-set statuses are preserved.
+  If `QA_AUTO_MARK_FOR_REVIEW=true`, rows with findings in **Untouched** status
+  are auto-marked to **For review**. If
+  `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true`, auto-mark also applies to non-Untouched
+  rows (e.g., Translated/Proofread).
   Token regexes are shared from `core.qa_rules` by GUI delegates and QA scan logic
   to keep highlight/QA semantics aligned (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes).
   QA perf regression smoke is budgeted on committed large fixtures (`SurvivalGuide`,
@@ -535,6 +538,14 @@ if dirty_files and not prompt_save():
 - Toolbar style: compact mixed controls (text + icon-only glyphs where appropriate),
   with separators to keep visual groups clear.
 - Provide **compact, fast UI**: minimal chrome, clear focus order, no heavy redraws.
+- UI MUST stay responsive during long operations (QA, TM query/rebuild, search, save):
+  no blocking freezes on the main thread.
+- UI MUST never run long work silently. Users must always see that processing started and is
+  running (status text, progress indicator, busy control state, or equivalent visible signal).
+- UI SHOULD be self-explanatory and discoverable via in-context labels, tooltips, empty states,
+  and dialog copy; users should not need separate documentation to understand core workflows.
+- UX target audience includes expert translators: flows must remain intuitive for any user while
+  preserving advanced controls and precise feedback for skilled specialists.
 
 ### 5.10  `gui.entry_model` + `gui.delegates`
 

@@ -56,8 +56,7 @@ avoid missing mandatory tasks.
   - A0 clean-architecture extraction slices are reflected in docs and adapter tests.
   - Source-reference selector behavior is stable:
     - persisted global mode (`SOURCE_REFERENCE_MODE`),
-    - fallback order policy (`SOURCE_REFERENCE_FALLBACK_POLICY`),
-    - per-file pin overrides (`SOURCE_REFERENCE_FILE_OVERRIDES`) with clear action.
+    - fallback order policy (`SOURCE_REFERENCE_FALLBACK_POLICY`).
   - TM import/sync/query path stable for project+import origins.
   - TM fuzzy ranking behavior validated against corpus + targeted regression cases.
   - Large-file editing/scroll behavior within perf budgets.

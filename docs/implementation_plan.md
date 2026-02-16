@@ -214,13 +214,11 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Keep current EN-as-source editing model unchanged.
 - v0.7 progress:
   - Source column now supports reference-locale switching across project locales
-    (toolbar selector, default `EN`).
+    (Source column-header selector, default `EN`).
   - Selection persists via `SOURCE_REFERENCE_MODE` and falls back safely to
     `EN` when requested locale is unavailable.
   - Fallback order is configurable in Preferences (`EN → Target` or
     `Target → EN`) and persists via `SOURCE_REFERENCE_FALLBACK_POLICY`.
-  - Per-file pin overrides persist via `SOURCE_REFERENCE_FILE_OVERRIDES` and
-    can be cleared in bulk from Preferences.
   - Source-reference switch invalidates source-search row cache to prevent stale
     source-column matches after locale mode changes.
   - GUI perf regression budget now tracks reference-locale switch latency on
@@ -886,15 +884,12 @@ C2 [✓] **Translation QA checks (post‑v0.6)** (Step 30).
 D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope)**
    - [✓] `core.source_reference_service` added for locale-mode normalization,
      path resolution (mirror + `_LOCALE` suffix rewrites), and lookup materialization.
-   - [✓] Toolbar source selector (`Source:`) added; mode persists in
+   - [✓] Source column-header selector added; mode persists in
      `SOURCE_REFERENCE_MODE` and falls back to `EN` when unavailable.
    - [✓] Source-column search and row-cache semantics updated for source-mode
      switching (cache invalidation on mode change).
-   - [✓] Per-file source-reference pin override added (toolbar `Pin` action),
-     persisted in `SOURCE_REFERENCE_FILE_OVERRIDES`.
    - [✓] Source-reference fallback policy added in Preferences (`EN → Target` or
      `Target → EN`), persisted in `SOURCE_REFERENCE_FALLBACK_POLICY`.
-   - [✓] Preferences action added to clear all per-file pinned source overrides.
    - [✓] Integration coverage added for source-column rendering + source-mode search.
    - [✓] GUI perf budget added for source-locale switching on large fixtures.
    - **Deferred remainder**: advanced source-reference policies beyond current
