@@ -115,6 +115,7 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     win._qa_check_trailing = True
     win._qa_check_newlines = True
     win._qa_auto_refresh = False
+    win._qa_auto_mark_touched_for_review = False
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
     model = win.table.model()
@@ -129,10 +130,15 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     win._refresh_qa_for_current_file()
     assert model.data(status_index, Qt.EditRole) == Status.FOR_REVIEW
 
-    # Manual status changes must remain user-controlled and not be overwritten.
+    # Default auto-mark updates Untouched rows only.
     model.setData(status_index, Status.TRANSLATED, Qt.EditRole)
     win._refresh_qa_for_current_file()
     assert model.data(status_index, Qt.EditRole) == Status.TRANSLATED
+
+    # Optional setting allows auto-marking non-Untouched statuses too.
+    win._qa_auto_mark_touched_for_review = True
+    win._refresh_qa_for_current_file()
+    assert model.data(status_index, Qt.EditRole) == Status.FOR_REVIEW
 
 
 def test_qa_token_check_toggle_controls_placeholder_tag_findings(

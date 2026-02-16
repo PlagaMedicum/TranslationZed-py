@@ -62,7 +62,6 @@ class PreferencesDialog(QDialog):
         self._tm_export_tmx = False
         self._tm_rebuild = False
         self._tm_show_diagnostics = False
-        self._source_reference_clear_overrides = False
         self._tm_resolve_btn: QPushButton | None = None
         self._tm_zero_segment_banner: QLabel | None = None
 
@@ -106,11 +105,14 @@ class PreferencesDialog(QDialog):
             "qa_check_same_as_source": self._qa_same_source_check.isChecked(),
             "qa_auto_refresh": self._qa_auto_refresh_check.isChecked(),
             "qa_auto_mark_for_review": self._qa_auto_mark_check.isChecked(),
+            "qa_auto_mark_touched_for_review": (
+                self._qa_auto_mark_check.isChecked()
+                and self._qa_auto_mark_touched_check.isChecked()
+            ),
             "theme_mode": self._theme_mode_combo.currentData(),
             "source_reference_fallback_policy": (
                 self._source_ref_fallback_combo.currentData()
             ),
-            "source_reference_clear_overrides": self._source_reference_clear_overrides,
             "tm_enabled": changed_tm_enabled,
             "tm_remove_paths": sorted(self._tm_remove_paths),
             "tm_import_paths": list(self._tm_import_paths),
@@ -214,14 +216,30 @@ class PreferencesDialog(QDialog):
             bool(self._prefs.get("qa_auto_refresh", False))
         )
         self._qa_auto_mark_check = QCheckBox(
-            "Auto-mark findings as For review",
+            "Auto-mark Untouched findings as For review",
             widget,
         )
         self._qa_auto_mark_check.setChecked(
             bool(self._prefs.get("qa_auto_mark_for_review", False))
         )
         self._qa_auto_mark_check.setToolTip(
-            "When enabled, rows with QA warnings are set to For review automatically."
+            "When enabled, rows in Untouched status with QA warnings are set to For review."
+        )
+        self._qa_auto_mark_touched_check = QCheckBox(
+            "Also mark translated/proofread findings as For review",
+            widget,
+        )
+        self._qa_auto_mark_touched_check.setChecked(
+            bool(self._prefs.get("qa_auto_mark_touched_for_review", False))
+        )
+        self._qa_auto_mark_touched_check.setToolTip(
+            "When enabled, QA auto-mark also affects rows that are not Untouched."
+        )
+        self._qa_auto_mark_touched_check.setEnabled(
+            self._qa_auto_mark_check.isChecked()
+        )
+        self._qa_auto_mark_check.toggled.connect(
+            self._qa_auto_mark_touched_check.setEnabled
         )
 
         layout.addWidget(self._qa_trailing_check)
@@ -230,6 +248,7 @@ class PreferencesDialog(QDialog):
         layout.addWidget(self._qa_same_source_check)
         layout.addWidget(self._qa_auto_refresh_check)
         layout.addWidget(self._qa_auto_mark_check)
+        layout.addWidget(self._qa_auto_mark_touched_check)
         layout.addStretch(1)
         return widget
 
@@ -269,20 +288,8 @@ class PreferencesDialog(QDialog):
         self._visual_whitespace_check.setChecked(
             bool(self._prefs.get("visual_whitespace", False))
         )
-        source_ref_override_count = int(
-            self._prefs.get("source_reference_overrides_count", 0)
-        )
-        source_ref_clear_btn = QPushButton("Clear pinned Source overrides", self)
-        source_ref_clear_btn.setEnabled(source_ref_override_count > 0)
-        source_ref_clear_btn.clicked.connect(self._clear_source_reference_overrides)
-        self._source_ref_overrides_label = QLabel(
-            f"Pinned file overrides: {source_ref_override_count}",
-            self,
-        )
-
         layout.addRow(QLabel("Theme"), self._theme_mode_combo)
         layout.addRow(QLabel("Source fallback"), self._source_ref_fallback_combo)
-        layout.addRow(self._source_ref_overrides_label, source_ref_clear_btn)
         layout.addRow(self._wrap_text_check)
         layout.addRow(self._large_text_opt_check)
         layout.addRow(self._visual_highlight_check)
@@ -532,11 +539,6 @@ class PreferencesDialog(QDialog):
 
     def _request_tm_diagnostics(self) -> None:
         self._tm_show_diagnostics = True
-
-    def _clear_source_reference_overrides(self) -> None:
-        self._source_reference_clear_overrides = True
-        self._source_ref_overrides_label.setText("Pinned file overrides: 0")
-        self.accept()
 
     def _browse_root(self) -> None:
         start_dir = self._default_root_edit.text().strip()

@@ -62,6 +62,7 @@ class TranslationModel(QAbstractTableModel):
         self._pf.dirty = self._dirty
         self._preview_limit: int | None = None
         self._max_value_len: int | None = None
+        self._headers = list(_HEADERS)
 
         self.undo_stack = QUndoStack()
 
@@ -501,8 +502,28 @@ class TranslationModel(QAbstractTableModel):
         self, section: int, orientation: Qt.Orientation, role: int
     ):  # noqa: N802
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return _HEADERS[section]
+            return self._headers[section]
         return super().headerData(section, orientation, role)
+
+    def setHeaderData(  # noqa: N802
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        value,
+        role: int = Qt.EditRole,
+    ) -> bool:
+        if (
+            orientation == Qt.Horizontal
+            and role == Qt.DisplayRole
+            and 0 <= section < len(self._headers)
+        ):
+            text = str(value or "")
+            if self._headers[section] == text:
+                return True
+            self._headers[section] = text
+            self.headerDataChanged.emit(orientation, section, section)
+            return True
+        return super().setHeaderData(section, orientation, value, role)
 
     def flags(self, index: QModelIndex):  # noqa: N802
         base = super().flags(index)

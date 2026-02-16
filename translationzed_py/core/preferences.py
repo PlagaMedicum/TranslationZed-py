@@ -27,6 +27,7 @@ _DEFAULTS: dict[str, Any] = {
     "qa_check_same_as_source": False,
     "qa_auto_refresh": False,
     "qa_auto_mark_for_review": False,
+    "qa_auto_mark_touched_for_review": False,
     "last_root": "",
     "last_locales": [],
     "window_geometry": "",
@@ -45,6 +46,7 @@ _REQUIRED_PREF_KEYS = (
     "qa_check_same_as_source",
     "qa_auto_refresh",
     "qa_auto_mark_for_review",
+    "qa_auto_mark_touched_for_review",
     "search_scope",
     "replace_scope",
     "tm_import_dir",
@@ -213,6 +215,12 @@ def _parse_env(path: Path) -> dict[str, Any]:
                     out["qa_auto_mark_for_review"] = True
                 elif val in _BOOL_FALSE:
                     out["qa_auto_mark_for_review"] = False
+            elif key == "QA_AUTO_MARK_TOUCHED_FOR_REVIEW":
+                val = value.lower()
+                if val in _BOOL_TRUE:
+                    out["qa_auto_mark_touched_for_review"] = True
+                elif val in _BOOL_FALSE:
+                    out["qa_auto_mark_touched_for_review"] = False
             elif key == "LAST_ROOT":
                 out["last_root"] = value
             elif key == "LAST_LOCALES":
@@ -309,6 +317,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         "QA_CHECK_SAME_AS_SOURCE",
         "QA_AUTO_REFRESH",
         "QA_AUTO_MARK_FOR_REVIEW",
+        "QA_AUTO_MARK_TOUCHED_FOR_REVIEW",
         "LAST_ROOT",
         "LAST_LOCALES",
         "WINDOW_GEOMETRY",
@@ -338,6 +347,10 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         (
             "QA_AUTO_MARK_FOR_REVIEW="
             f"{'true' if prefs.get('qa_auto_mark_for_review', False) else 'false'}"
+        ),
+        (
+            "QA_AUTO_MARK_TOUCHED_FOR_REVIEW="
+            f"{'true' if prefs.get('qa_auto_mark_touched_for_review', False) else 'false'}"
         ),
     ]
     last_root = str(prefs.get("last_root", "")).strip()

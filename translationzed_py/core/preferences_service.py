@@ -31,6 +31,7 @@ class LoadedPreferences:
     qa_check_same_as_source: bool
     qa_auto_refresh: bool
     qa_auto_mark_for_review: bool
+    qa_auto_mark_touched_for_review: bool
     default_root: str
     search_scope: str
     replace_scope: str
@@ -111,6 +112,7 @@ class PreferencesService:
         qa_check_same_as_source: bool = False,
         qa_auto_refresh: bool = False,
         qa_auto_mark_for_review: bool = False,
+        qa_auto_mark_touched_for_review: bool = False,
     ) -> None:
         prefs = build_persist_payload(
             prompt_write_on_exit=prompt_write_on_exit,
@@ -122,6 +124,7 @@ class PreferencesService:
             qa_check_same_as_source=qa_check_same_as_source,
             qa_auto_refresh=qa_auto_refresh,
             qa_auto_mark_for_review=qa_auto_mark_for_review,
+            qa_auto_mark_touched_for_review=qa_auto_mark_touched_for_review,
             last_root=last_root,
             last_locales=last_locales,
             window_geometry=window_geometry,
@@ -165,8 +168,8 @@ def normalize_scope(value: object, *, default: str = "FILE") -> str:
 def resolve_qa_preferences(
     values: Mapping[str, object],
     *,
-    current: tuple[bool, bool, bool, bool, bool, bool],
-) -> tuple[tuple[bool, bool, bool, bool, bool, bool], bool]:
+    current: tuple[bool, bool, bool, bool, bool, bool, bool],
+) -> tuple[tuple[bool, bool, bool, bool, bool, bool, bool], bool]:
     updated = (
         bool(values.get("qa_check_trailing", current[0])),
         bool(values.get("qa_check_newlines", current[1])),
@@ -174,6 +177,7 @@ def resolve_qa_preferences(
         bool(values.get("qa_check_same_as_source", current[3])),
         bool(values.get("qa_auto_refresh", current[4])),
         bool(values.get("qa_auto_mark_for_review", current[5])),
+        bool(values.get("qa_auto_mark_touched_for_review", current[6])),
     )
     return updated, updated != current
 
@@ -199,6 +203,9 @@ def normalize_loaded_preferences(
     qa_check_same_as_source = bool(raw.get("qa_check_same_as_source", False))
     qa_auto_refresh = bool(raw.get("qa_auto_refresh", False))
     qa_auto_mark_for_review = bool(raw.get("qa_auto_mark_for_review", False))
+    qa_auto_mark_touched_for_review = bool(
+        raw.get("qa_auto_mark_touched_for_review", False)
+    )
     default_root = str(raw.get("default_root", "") or fallback_default_root)
     search_scope = normalize_scope(raw.get("search_scope", "FILE"), default="FILE")
     replace_scope = normalize_scope(raw.get("replace_scope", "FILE"), default="FILE")
@@ -233,6 +240,7 @@ def normalize_loaded_preferences(
         qa_check_same_as_source=qa_check_same_as_source,
         qa_auto_refresh=qa_auto_refresh,
         qa_auto_mark_for_review=qa_auto_mark_for_review,
+        qa_auto_mark_touched_for_review=qa_auto_mark_touched_for_review,
         default_root=default_root,
         search_scope=search_scope,
         replace_scope=replace_scope,
@@ -264,6 +272,7 @@ def build_persist_payload(
     qa_check_same_as_source: bool = False,
     qa_auto_refresh: bool = False,
     qa_auto_mark_for_review: bool = False,
+    qa_auto_mark_touched_for_review: bool = False,
 ) -> dict[str, Any]:
     return {
         "prompt_write_on_exit": bool(prompt_write_on_exit),
@@ -275,6 +284,7 @@ def build_persist_payload(
         "qa_check_same_as_source": bool(qa_check_same_as_source),
         "qa_auto_refresh": bool(qa_auto_refresh),
         "qa_auto_mark_for_review": bool(qa_auto_mark_for_review),
+        "qa_auto_mark_touched_for_review": bool(qa_auto_mark_touched_for_review),
         "last_root": str(last_root),
         "last_locales": list(last_locales),
         "window_geometry": str(window_geometry),

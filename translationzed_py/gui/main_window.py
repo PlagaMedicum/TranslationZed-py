@@ -53,6 +53,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QRadioButton,
     QSizePolicy,
@@ -141,9 +142,6 @@ from translationzed_py.core.qa_service import (
     QAFinding as _QAFinding,
 )
 from translationzed_py.core.qa_service import (
-    QAInputRow as _QAInputRow,
-)
-from translationzed_py.core.qa_service import (
     QAService as _QAService,
 )
 from translationzed_py.core.render_workflow_service import (
@@ -200,9 +198,6 @@ from translationzed_py.core.search_replace_service import (
 )
 from translationzed_py.core.source_reference_service import (
     load_reference_lookup as _load_reference_lookup,
-)
-from translationzed_py.core.source_reference_service import (
-    load_source_reference_file_overrides as _load_source_reference_file_overrides,
 )
 from translationzed_py.core.source_reference_service import (
     normalize_source_reference_mode as _normalize_source_reference_mode,
@@ -272,9 +267,14 @@ from .entry_model import TranslationModel
 from .fs_model import FsModel
 from .perf_trace import PERF_TRACE
 from .preferences_dialog import PreferencesDialog
+from .qa_async import poll_scan as _qa_poll_scan
+from .qa_async import refresh_sync_for_test as _qa_refresh_sync_for_test
+from .qa_async import start_scan as _qa_start_scan
 from .search_scope_ui import scope_icon_for as _scope_icon_for
 from .source_lookup import LazySourceRows as _LazySourceRows
 from .source_lookup import SourceLookup as _SourceLookup
+from .source_reference_header import handle_header_click as _source_header_click
+from .source_reference_header import refresh_header_label as _source_header_refresh
 from .source_reference_state import (
     apply_source_reference_preferences_for_window as _apply_source_ref_preferences_for_window,
 )
@@ -283,9 +283,6 @@ from .source_reference_state import (
 )
 from .source_reference_state import (
     handle_source_reference_changed as _handle_source_reference_changed,
-)
-from .source_reference_state import (
-    handle_source_reference_pin_toggle as _handle_source_reference_pin_toggle,
 )
 from .source_reference_state import (
     normalize_source_reference_fallback_policy as _normalize_source_reference_fallback_policy,
@@ -309,7 +306,6 @@ _ORIG_QMESSAGEBOX_EXEC = None
 _ORIG_QMESSAGEBOX_WARNING = None
 _ORIG_QMESSAGEBOX_CRITICAL = None
 _ORIG_QMESSAGEBOX_INFORMATION = None
-
 _LEFT_PANEL_FILES = 0
 _LEFT_PANEL_TM = 1
 _LEFT_PANEL_SEARCH = 2
@@ -344,10 +340,8 @@ def _int_from_pref(
 
 
 def _patch_message_boxes_for_tests() -> None:
-    global _TEST_DIALOGS_PATCHED
-    global _ORIG_QMESSAGEBOX_EXEC
-    global _ORIG_QMESSAGEBOX_WARNING
-    global _ORIG_QMESSAGEBOX_CRITICAL
+    global _TEST_DIALOGS_PATCHED, _ORIG_QMESSAGEBOX_EXEC
+    global _ORIG_QMESSAGEBOX_WARNING, _ORIG_QMESSAGEBOX_CRITICAL
     global _ORIG_QMESSAGEBOX_INFORMATION
     if _TEST_DIALOGS_PATCHED or not _in_test_mode():
         return
@@ -384,7 +378,6 @@ def _patch_message_boxes_for_tests() -> None:
     _TEST_DIALOGS_PATCHED = True
 
 
-# Avoid blocking UI by deferring detail-panel loads for huge strings.
 _DETAIL_LAZY_THRESHOLD = 100_000
 
 
@@ -406,8 +399,6 @@ class _CommitPlainTextEdit(QPlainTextEdit):
 
 
 class MainWindow(QMainWindow):
-    """Main window: left file-tree, right translation table."""
-
     def __init__(
         self,
         project_root: str | None = None,
@@ -488,9 +479,17 @@ class MainWindow(QMainWindow):
         self._qa_findings: tuple[_QAFinding, ...] = ()
         self._qa_panel_result_limit = 500
         self._qa_refresh_delay_ms = 140
+        self._qa_scan_pool: ThreadPoolExecutor | None = None
+        self._qa_scan_future: Future[tuple[Path, list[_QAFinding]]] | None = None
+        self._qa_scan_path: Path | None = None
+        self._qa_scan_busy = False
+        self._qa_scan_timer = QTimer(self)
+        self._qa_scan_timer.setSingleShot(False)
+        self._qa_scan_timer.setInterval(50)
+        self._qa_scan_timer.timeout.connect(self._poll_qa_scan)
         self._qa_refresh_timer = QTimer(self)
         self._qa_refresh_timer.setSingleShot(True)
-        self._qa_refresh_timer.timeout.connect(self._refresh_qa_for_current_file)
+        self._qa_refresh_timer.timeout.connect(self._start_qa_scan_for_current_file)
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -511,6 +510,9 @@ class MainWindow(QMainWindow):
         self._qa_check_same_as_source = normalized_prefs.qa_check_same_as_source
         self._qa_auto_refresh = normalized_prefs.qa_auto_refresh
         self._qa_auto_mark_for_review = normalized_prefs.qa_auto_mark_for_review
+        self._qa_auto_mark_touched_for_review = (
+            normalized_prefs.qa_auto_mark_touched_for_review
+        )
         self._default_root = normalized_prefs.default_root
         self._search_scope = normalized_prefs.search_scope
         self._replace_scope = normalized_prefs.replace_scope
@@ -523,6 +525,7 @@ class MainWindow(QMainWindow):
         self._last_locales = normalized_prefs.last_locales
         self._last_root = normalized_prefs.last_root
         self._prefs_extras = normalized_prefs.extras
+        self._prefs_extras.pop("SOURCE_REFERENCE_FILE_OVERRIDES", None)
         self._theme_mode = _normalize_theme_mode(
             self._prefs_extras.get("UI_THEME_MODE"), default=_THEME_SYSTEM
         )
@@ -534,9 +537,7 @@ class MainWindow(QMainWindow):
                 self._prefs_extras.get("SOURCE_REFERENCE_FALLBACK_POLICY")
             )
         )
-        self._source_reference_file_overrides = _load_source_reference_file_overrides(
-            self._prefs_extras.get("SOURCE_REFERENCE_FILE_OVERRIDES")
-        )
+        self._source_reference_file_overrides: dict[str, str] = {}
         self._apply_theme_mode(self._theme_mode, persist=False)
         callback = self._on_system_color_scheme_changed
         self._system_theme_sync_connected = _connect_system_theme_sync(callback)
@@ -641,22 +642,12 @@ class MainWindow(QMainWindow):
         self.status_combo.setEnabled(False)
         self.status_combo.currentIndexChanged.connect(self._status_combo_changed)
         self.toolbar.addWidget(self.status_combo)
-        self.source_ref_label = QLabel("Source:", self)
-        self.source_ref_label.setContentsMargins(8, 0, 4, 0)
-        self.toolbar.addWidget(self.source_ref_label)
         self.source_ref_combo = QComboBox(self)
         self.source_ref_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.source_ref_combo.currentIndexChanged.connect(
             self._source_reference_changed
         )
-        self.toolbar.addWidget(self.source_ref_combo)
-        self.source_ref_pin_btn = QToolButton(self)
-        self.source_ref_pin_btn.setText("Pin")
-        self.source_ref_pin_btn.setCheckable(True)
-        self.source_ref_pin_btn.clicked.connect(
-            self._toggle_source_reference_file_override
-        )
-        self.toolbar.addWidget(self.source_ref_pin_btn)
+        self.source_ref_combo.setVisible(False)
         self.toolbar.addSeparator()
         self.regex_check = QCheckBox("Regex", self)
         self.regex_check.stateChanged.connect(self._on_search_controls_changed)
@@ -951,6 +942,10 @@ class MainWindow(QMainWindow):
         self._tm_rebuild_side_btn.setToolTip("Rebuild project TM for selected locales")
         self._tm_rebuild_side_btn.clicked.connect(self._rebuild_tm_selected)
         tm_filter_row.addWidget(self._tm_rebuild_side_btn)
+        self._tm_progress = QProgressBar(self._tm_panel)
+        self._tm_progress.setTextVisible(False)
+        self._tm_progress.setRange(0, 0)
+        self._tm_progress.setVisible(False)
         self._tm_list = QListWidget(self._tm_panel)
         self._tm_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._tm_list.itemSelectionChanged.connect(self._update_tm_apply_state)
@@ -972,6 +967,7 @@ class MainWindow(QMainWindow):
         self._tm_apply_btn.clicked.connect(self._apply_tm_selection)
         tm_layout.addWidget(self._tm_status_label)
         tm_layout.addLayout(tm_filter_row)
+        tm_layout.addWidget(self._tm_progress)
         tm_layout.addWidget(self._tm_list)
         tm_layout.addWidget(QLabel("Source", self._tm_panel))
         tm_layout.addWidget(self._tm_source_preview)
@@ -1019,13 +1015,18 @@ class MainWindow(QMainWindow):
         )
         self._qa_refresh_btn.setText("Run QA")
         self._qa_refresh_btn.setToolTip("Run QA checks for current file")
-        self._qa_refresh_btn.clicked.connect(self._refresh_qa_for_current_file)
+        self._qa_refresh_btn.clicked.connect(self._start_qa_scan_for_current_file)
         qa_header.addWidget(self._qa_refresh_btn)
+        self._qa_progress = QProgressBar(self._qa_panel)
+        self._qa_progress.setTextVisible(False)
+        self._qa_progress.setRange(0, 0)
+        self._qa_progress.setVisible(False)
         self._qa_results_list = QListWidget(self._qa_panel)
         self._qa_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._qa_results_list.itemActivated.connect(self._open_qa_result_item)
         self._qa_results_list.itemClicked.connect(self._open_qa_result_item)
         qa_layout.addLayout(qa_header)
+        qa_layout.addWidget(self._qa_progress)
         qa_layout.addWidget(self._qa_results_list)
         self._left_stack.addWidget(self._qa_panel)
 
@@ -1093,7 +1094,9 @@ class MainWindow(QMainWindow):
         self.table.setItemDelegateForColumn(2, self._value_delegate)
         self._status_delegate = StatusDelegate(self.table)
         self.table.setItemDelegateForColumn(3, self._status_delegate)
-        self.table.horizontalHeader().sectionResized.connect(self._on_header_resized)
+        header = self.table.horizontalHeader()
+        header.sectionResized.connect(self._on_header_resized)
+        header.sectionClicked.connect(self._on_table_header_clicked)
         # Use app font for tooltips to avoid table-specific font scaling.
         QToolTip.setFont(QApplication.font())
         self._right_stack = QStackedWidget(self)
@@ -1573,15 +1576,15 @@ class MainWindow(QMainWindow):
 
     def _sync_source_reference_mode(self, *, persist: bool) -> None:
         _sync_source_reference_mode_for_window(self, persist=persist)
+        self._refresh_source_header_label()
 
     def _sync_source_reference_override_ui(self) -> None:
         _sync_source_reference_override_ui_for_window(self)
-
-    def _toggle_source_reference_file_override(self, checked: bool) -> None:
-        _handle_source_reference_pin_toggle(self, checked)
+        self._refresh_source_header_label()
 
     def _source_reference_changed(self, index: int) -> None:
         _handle_source_reference_changed(self, index)
+        self._refresh_source_header_label()
 
     def _init_locales(self, selected_locales: list[str] | None) -> None:
         try:
@@ -2149,6 +2152,7 @@ class MainWindow(QMainWindow):
         label = ", ".join(self._tm_rebuild_locales)
         prefix = "Rebuilding TM" if force else "Bootstrapping TM"
         self.statusBar().showMessage(f"{prefix} for {label}…", 0)
+        self._set_tm_progress_visible(True)
         self._tm_rebuild_future = self._tm_rebuild_pool.submit(
             self._tm_workflow.rebuild_project_tm,
             self._root,
@@ -2163,11 +2167,13 @@ class MainWindow(QMainWindow):
         future = self._tm_rebuild_future
         if future is None:
             self._tm_rebuild_timer.stop()
+            self._set_tm_progress_visible(self._tm_query_future is not None)
             return
         if not future.done():
             return
         self._tm_rebuild_timer.stop()
         self._tm_rebuild_future = None
+        self._set_tm_progress_visible(self._tm_query_future is not None)
         try:
             result = future.result()
         except Exception as exc:
@@ -2192,9 +2198,6 @@ class MainWindow(QMainWindow):
             "tm_import_dir": self._tm_import_dir,
             "theme_mode": self._theme_mode,
             "source_reference_fallback_policy": self._source_reference_fallback_policy,
-            "source_reference_overrides_count": len(
-                self._source_reference_file_overrides
-            ),
             "prompt_write_on_exit": self._prompt_write_on_exit,
             "wrap_text": self._wrap_text_user,
             "large_text_optimizations": self._large_text_optimizations,
@@ -2208,6 +2211,7 @@ class MainWindow(QMainWindow):
             "qa_check_same_as_source": self._qa_check_same_as_source,
             "qa_auto_refresh": self._qa_auto_refresh,
             "qa_auto_mark_for_review": self._qa_auto_mark_for_review,
+            "qa_auto_mark_touched_for_review": (self._qa_auto_mark_touched_for_review),
         }
         tm_files: list[dict[str, object]] = []
         if self._ensure_tm_store():
@@ -2307,6 +2311,7 @@ class MainWindow(QMainWindow):
             self._qa_check_same_as_source,
             self._qa_auto_refresh,
             self._qa_auto_mark_for_review,
+            self._qa_auto_mark_touched_for_review,
         )
         updated_qa, qa_changed = _resolve_qa_preferences(values, current=previous_qa)
         (
@@ -2316,6 +2321,7 @@ class MainWindow(QMainWindow):
             self._qa_check_same_as_source,
             self._qa_auto_refresh,
             self._qa_auto_mark_for_review,
+            self._qa_auto_mark_touched_for_review,
         ) = updated_qa
         if qa_changed and self._current_model is not None:
             if self._qa_auto_refresh:
@@ -2961,6 +2967,9 @@ class MainWindow(QMainWindow):
             self.table,
             self.table.visualRect(idx),
         )
+
+    _refresh_source_header_label = _source_header_refresh
+    _on_table_header_clicked = _source_header_click
 
     def _on_header_resized(self, logical_index: int, _old: int, _new: int) -> None:
         if self._table_layout_guard or not self.table.model():
@@ -4529,46 +4538,23 @@ class MainWindow(QMainWindow):
     def _schedule_qa_refresh(self, *, immediate: bool = False) -> None:
         if not self._qa_auto_refresh:
             return
+        if self._qa_scan_busy:
+            return
         if immediate:
             if self._qa_refresh_timer.isActive():
                 self._qa_refresh_timer.stop()
-            self._refresh_qa_for_current_file()
+            self._start_qa_scan_for_current_file()
             return
         self._qa_refresh_timer.start(self._qa_refresh_delay_ms)
 
-    def _collect_qa_input_rows(self) -> tuple[_QAInputRow, ...]:
-        model = self._current_model
-        if model is None:
-            return ()
-        rows: list[_QAInputRow] = []
-        for row in model.iter_search_rows(include_source=True, include_value=True):
-            rows.append(
-                _QAInputRow(
-                    row=row.row,
-                    source_text=str(row.source or ""),
-                    target_text=str(row.value or ""),
-                )
-            )
-        return tuple(rows)
+    def _set_qa_progress_visible(self, visible: bool) -> None:
+        self._qa_scan_busy = bool(visible)
+        self._qa_progress.setVisible(self._qa_scan_busy)
+        self._qa_refresh_btn.setEnabled(not self._qa_scan_busy)
 
-    def _refresh_qa_for_current_file(self) -> None:
-        path = self._current_pf.path if self._current_pf is not None else None
-        if path is None or self._current_model is None:
-            self._set_qa_findings(())
-            self._set_qa_panel_message("No file selected.")
-            return
-        rows = self._collect_qa_input_rows()
-        findings = self._qa_service.scan_rows(
-            file=path,
-            rows=rows,
-            check_trailing=self._qa_check_trailing,
-            check_newlines=self._qa_check_newlines,
-            check_tokens=self._qa_check_escapes,
-            check_same_as_source=self._qa_check_same_as_source,
-        )
-        self._set_qa_findings(findings)
-        if self._qa_auto_mark_for_review:
-            self._apply_qa_auto_mark(findings)
+    _refresh_qa_for_current_file = _qa_refresh_sync_for_test
+    _start_qa_scan_for_current_file = _qa_start_scan
+    _poll_qa_scan = _qa_poll_scan
 
     def _set_qa_findings(self, findings: Sequence[_QAFinding]) -> None:
         self._qa_findings = tuple(findings)
@@ -4840,6 +4826,7 @@ class MainWindow(QMainWindow):
             qa_check_same_as_source=self._qa_check_same_as_source,
             qa_auto_refresh=self._qa_auto_refresh,
             qa_auto_mark_for_review=self._qa_auto_mark_for_review,
+            qa_auto_mark_touched_for_review=(self._qa_auto_mark_touched_for_review),
             last_root=str(self._root),
             last_locales=list(self._selected_locales),
             window_geometry=geometry,
@@ -4910,6 +4897,9 @@ class MainWindow(QMainWindow):
             self._tm_update_timer.stop()
         if plan.start_timer:
             self._tm_update_timer.start()
+
+    def _set_tm_progress_visible(self, visible: bool) -> None:
+        self._tm_progress.setVisible(bool(visible))
 
     def _update_tm_apply_state(self) -> None:
         items = self._tm_list.selectedItems()
@@ -5160,15 +5150,15 @@ class MainWindow(QMainWindow):
         try:
             value_index = self._current_model.index(current.row(), 2)
             self._current_model.setData(value_index, plan.target_text, Qt.EditRole)
-            if plan.mark_for_review:
-                status_index = self._current_model.index(current.row(), 3)
-                self._current_model.setData(
-                    status_index, Status.FOR_REVIEW, Qt.EditRole
-                )
             self._update_status_combo_from_selection()
+            self._flush_tm_updates(paths=[self._current_pf.path])
+            self._tm_workflow.clear_cache()
         finally:
             self._tm_apply_in_progress = False
-        self._schedule_tm_update()
+        if self._left_stack.currentIndex() == _LEFT_PANEL_TM:
+            self._update_tm_suggestions()
+        else:
+            self._schedule_tm_update()
 
     def _update_tm_suggestions(self) -> None:
         policy = self._tm_query_policy()
@@ -5222,6 +5212,7 @@ class MainWindow(QMainWindow):
             min_score=request.min_score,
             origins=request.origins,
         )
+        self._set_tm_progress_visible(True)
         if not self._tm_query_timer.isActive():
             self._tm_query_timer.start()
 
@@ -5230,12 +5221,14 @@ class MainWindow(QMainWindow):
         cache_key = self._tm_query_key
         if future is None:
             self._tm_query_timer.stop()
+            self._set_tm_progress_visible(self._tm_rebuild_future is not None)
             return
         if not future.done():
             return
         self._tm_query_timer.stop()
         self._tm_query_future = None
         self._tm_query_key = None
+        self._set_tm_progress_visible(self._tm_rebuild_future is not None)
         if cache_key is None:
             return
         try:
@@ -5463,16 +5456,17 @@ class MainWindow(QMainWindow):
             stack.endMacro()
 
     def _apply_qa_auto_mark(self, findings: Sequence[_QAFinding]) -> None:
-        rows = self._qa_service.auto_mark_rows(findings)
-        if not self._current_model:
+        if self._current_model is None:
             return
-        untouched_rows = [
-            row
-            for row in rows
-            if self._current_model.status_for_row(row) == Status.UNTOUCHED
-        ]
+        rows = self._qa_service.auto_mark_rows(findings)
+        if not self._qa_auto_mark_touched_for_review:
+            rows = tuple(
+                row
+                for row in rows
+                if self._current_model.status_for_row(row) == Status.UNTOUCHED
+            )
         self._apply_status_to_rows(
-            untouched_rows,
+            rows,
             status=Status.FOR_REVIEW,
             label="QA auto-mark For review",
         )
@@ -5514,6 +5508,7 @@ class MainWindow(QMainWindow):
             self._system_theme_sync_connected = False
         with contextlib.suppress(Exception):
             self._flush_tm_updates()
+        self._shutdown_qa_workers()
         self._shutdown_tm_workers()
         if self._tm_store is not None:
             with contextlib.suppress(Exception):
@@ -5541,10 +5536,23 @@ class MainWindow(QMainWindow):
                 self._tm_rebuild_future.cancel()
         self._tm_rebuild_future = None
         if self._tm_rebuild_pool is None:
+            self._set_tm_progress_visible(False)
             return
         with contextlib.suppress(Exception):
             self._tm_rebuild_pool.shutdown(wait=False, cancel_futures=True)
         self._tm_rebuild_pool = None
+        self._set_tm_progress_visible(False)
+
+    def _shutdown_qa_workers(self) -> None:
+        if self._qa_scan_future is not None:
+            with contextlib.suppress(Exception):
+                self._qa_scan_future.cancel()
+        self._qa_scan_future = None
+        if self._qa_scan_pool is not None:
+            with contextlib.suppress(Exception):
+                self._qa_scan_pool.shutdown(wait=False, cancel_futures=True)
+        self._qa_scan_pool = None
+        self._set_qa_progress_visible(False)
 
     def _stop_timers(self) -> None:
         timers = [
@@ -5555,6 +5563,8 @@ class MainWindow(QMainWindow):
             self._tooltip_timer,
             self._tree_width_timer,
             self._post_locale_timer,
+            self._qa_refresh_timer,
+            self._qa_scan_timer,
             self._tm_update_timer,
             self._tm_flush_timer,
             self._tm_query_timer,
