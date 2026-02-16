@@ -352,7 +352,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  3 | Selecting a finding jumps to file/row in the main table. |
 |  4 | When no findings exist, SYS shows explicit empty-state text. |
 |  5 | User may jump between findings with **F8** (next) / **Shift+F8** (previous); SYS wraps at boundaries and shows `QA i/n` hint in status bar. |
-| **Notes** | Current active checks are `qa.trailing`, `qa.newlines`, opt-in `qa.tokens` (`QA_CHECK_ESCAPES=true`), and opt-in `qa.same_source` (`QA_CHECK_SAME_AS_SOURCE=true`). QA list labels include severity/group tags (`warning/format`, `warning/content`). Refresh is debounced on file-open/edit and also available by explicit QA-panel refresh action. If `QA_AUTO_MARK_FOR_REVIEW=true`, findings auto-mark affected rows to **For review**; default is visual-only. |
+| **Notes** | Current active checks are `qa.trailing`, `qa.newlines`, opt-in `qa.tokens` (`QA_CHECK_ESCAPES=true`), and opt-in `qa.same_source` (`QA_CHECK_SAME_AS_SOURCE=true`). QA list labels include severity/group tags (`warning/format`, `warning/content`). Refresh is manual by default via explicit **Run QA** action in QA panel; optional background mode is controlled by `QA_AUTO_REFRESH`. If `QA_AUTO_MARK_FOR_REVIEW=true`, only rows still in **Untouched** state are auto-marked to **For review**; explicit user-set statuses are preserved. |
 | **Post-condition** | QA context is visible without blocking normal editing/search/TM workflows. |
 
 ### UC-13n  Source Reference Locale Switch
@@ -480,8 +480,9 @@ UNTOUCHED ──────────────────────▶ 
 11. **Theme modes**: Preferences → View supports **System / Light / Dark**; changes apply app-wide immediately and persist.
 12. **Translation QA checks (current)**: active checks are missing trailing characters,
    missing/extra newlines, and opt-in checks for missing escapes/code markers/placeholders
-   plus translation-equals-source. QA checks are visual-only by default; optional
-   `QA_AUTO_MARK_FOR_REVIEW=true` auto-marks affected rows.
+   plus translation-equals-source. QA runs manually by default via **Run QA** in the QA panel
+   (`QA_AUTO_REFRESH=false`); optional background auto-refresh can be enabled in Preferences.
+   Optional `QA_AUTO_MARK_FOR_REVIEW=true` auto-marks only **Untouched** rows.
 13. **Source reference selector (current)**: Source-column locale can be switched among
    project locales via toolbar selector (`EN` default), persisted in
    `SOURCE_REFERENCE_MODE`. Fallback behavior is configurable in Preferences

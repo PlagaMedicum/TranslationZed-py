@@ -850,13 +850,14 @@ C2 [✓] **Translation QA checks (post‑v0.6)** (Step 30).
    - **Target**: opt‑in QA panel with per-check toggles; non-blocking warnings by default.
    - **Infrastructure progress (v0.7 kickoff)**:
      - [✓] Core QA rule primitives added (`core/qa_rules.py`) with unit coverage.
-     - [✓] QA preference keys added and persisted (`QA_CHECK_*`, `QA_AUTO_MARK_FOR_REVIEW`).
+     - [✓] QA preference keys added and persisted (`QA_CHECK_*`, `QA_AUTO_REFRESH`, `QA_AUTO_MARK_FOR_REVIEW`).
      - [✓] QA side-panel scaffolding wired (`Files/TM/Search/QA`), backed by
        Qt-free `core/qa_service.py` DTO/label planning + click-to-row adapter tests.
-     - [✓] Trailing/newline checks now run for current file via debounced refresh
-       (file open, row edits, QA-tab open, manual refresh button).
+     - [✓] QA refresh flow now defaults to manual execution (`Run QA` button),
+       with optional background refresh via `QA_AUTO_REFRESH=true`.
      - [✓] `QA_AUTO_MARK_FOR_REVIEW` wiring implemented: when enabled, QA findings
-       auto-mark affected rows to **For review**; default remains visual-only (`false`).
+       auto-mark only **Untouched** rows to **For review**; explicit user-set statuses
+       are preserved (default remains visual-only, `false`).
      - [✓] Escape/code-block/placeholder check implemented (`qa.tokens`, opt-in via
        `QA_CHECK_ESCAPES`) with shared token contract reused by both QA rules and
        GUI visual highlighting.

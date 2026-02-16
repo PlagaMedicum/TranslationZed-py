@@ -315,6 +315,7 @@ Algorithm:
   - `QA_CHECK_NEWLINES=true|false` (default `true`)
   - `QA_CHECK_ESCAPES=true|false` (default `false`)
   - `QA_CHECK_SAME_AS_SOURCE=true|false` (default `false`)
+  - `QA_AUTO_REFRESH=true|false` (default `false`)
   - `QA_AUTO_MARK_FOR_REVIEW=true|false` (default `false`)
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
@@ -507,14 +508,15 @@ if dirty_files and not prompt_save():
   Current active checks: trailing-fragment mismatch (`qa.trailing`), newline-count
   mismatch including escaped `\\n` markers (`qa.newlines`), and missing code/placeholder
   tokens (`qa.tokens`, gated by `QA_CHECK_ESCAPES`), plus same-as-source detection
-  (`qa.same_source`, gated by `QA_CHECK_SAME_AS_SOURCE`). Refresh is debounced on
-  file-open/edit and explicit via QA-panel refresh button.
+  (`qa.same_source`, gated by `QA_CHECK_SAME_AS_SOURCE`). Refresh is manual by default
+  (`Run QA` button in QA panel) and optional background auto-refresh can be enabled
+  via `QA_AUTO_REFRESH=true`.
   QA row labels include severity/group tags (`warning/format`, `warning/content`)
   alongside code labels for compact triage.
   QA navigation actions (`F8` next, `Shift+F8` previous) traverse findings with wrap;
   status bar reports `QA i/n` hint and selected finding summary.
-  If `QA_AUTO_MARK_FOR_REVIEW=true`, rows with active findings are status-updated to
-  **For review** through the normal model-edit pipeline; default is visual-only (`false`).
+  If `QA_AUTO_MARK_FOR_REVIEW=true`, only rows still in **Untouched** state are
+  auto-marked to **For review**; explicit user-set statuses are preserved.
   Token regexes are shared from `core.qa_rules` by GUI delegates and QA scan logic
   to keep highlight/QA semantics aligned (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes).
   QA perf regression smoke is budgeted on committed large fixtures (`SurvivalGuide`,
