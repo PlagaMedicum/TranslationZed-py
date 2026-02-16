@@ -383,7 +383,7 @@ def test_tm_workflow_build_apply_plan() -> None:
     )
     assert plan is not None
     assert plan.target_text == "Скінуць шт."
-    assert plan.mark_for_review is True
+    assert plan.mark_for_review is False
     assert service.build_apply_plan(None) is None
 
 

@@ -455,7 +455,7 @@ class TMWorkflowService:
             return None
         return TMApplyPlan(
             target_text=match.target_text,
-            mark_for_review=True,
+            mark_for_review=False,
         )
 
     def build_selection_plan(
