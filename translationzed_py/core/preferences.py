@@ -25,6 +25,7 @@ _DEFAULTS: dict[str, Any] = {
     "qa_check_newlines": True,
     "qa_check_escapes": False,
     "qa_check_same_as_source": False,
+    "qa_auto_refresh": False,
     "qa_auto_mark_for_review": False,
     "last_root": "",
     "last_locales": [],
@@ -42,6 +43,7 @@ _REQUIRED_PREF_KEYS = (
     "qa_check_newlines",
     "qa_check_escapes",
     "qa_check_same_as_source",
+    "qa_auto_refresh",
     "qa_auto_mark_for_review",
     "search_scope",
     "replace_scope",
@@ -199,6 +201,12 @@ def _parse_env(path: Path) -> dict[str, Any]:
                     out["qa_check_same_as_source"] = True
                 elif val in _BOOL_FALSE:
                     out["qa_check_same_as_source"] = False
+            elif key == "QA_AUTO_REFRESH":
+                val = value.lower()
+                if val in _BOOL_TRUE:
+                    out["qa_auto_refresh"] = True
+                elif val in _BOOL_FALSE:
+                    out["qa_auto_refresh"] = False
             elif key == "QA_AUTO_MARK_FOR_REVIEW":
                 val = value.lower()
                 if val in _BOOL_TRUE:
@@ -299,6 +307,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         "QA_CHECK_NEWLINES",
         "QA_CHECK_ESCAPES",
         "QA_CHECK_SAME_AS_SOURCE",
+        "QA_AUTO_REFRESH",
         "QA_AUTO_MARK_FOR_REVIEW",
         "LAST_ROOT",
         "LAST_LOCALES",
@@ -321,6 +330,10 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         (
             "QA_CHECK_SAME_AS_SOURCE="
             f"{'true' if prefs.get('qa_check_same_as_source', False) else 'false'}"
+        ),
+        (
+            "QA_AUTO_REFRESH="
+            f"{'true' if prefs.get('qa_auto_refresh', False) else 'false'}"
         ),
         (
             "QA_AUTO_MARK_FOR_REVIEW="

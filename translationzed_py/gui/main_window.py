@@ -511,6 +511,7 @@ class MainWindow(QMainWindow):
         self._qa_check_newlines = normalized_prefs.qa_check_newlines
         self._qa_check_escapes = normalized_prefs.qa_check_escapes
         self._qa_check_same_as_source = normalized_prefs.qa_check_same_as_source
+        self._qa_auto_refresh = normalized_prefs.qa_auto_refresh
         self._qa_auto_mark_for_review = normalized_prefs.qa_auto_mark_for_review
         self._default_root = normalized_prefs.default_root
         self._search_scope = normalized_prefs.search_scope
@@ -1013,11 +1014,12 @@ class MainWindow(QMainWindow):
         self._qa_status_label.setWordWrap(True)
         qa_header.addWidget(self._qa_status_label, 1)
         self._qa_refresh_btn = QToolButton(self._qa_panel)
-        self._qa_refresh_btn.setAutoRaise(True)
+        self._qa_refresh_btn.setAutoRaise(False)
         self._qa_refresh_btn.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)
         )
-        self._qa_refresh_btn.setToolTip("Refresh QA findings for current file")
+        self._qa_refresh_btn.setText("Run QA")
+        self._qa_refresh_btn.setToolTip("Run QA checks for current file")
         self._qa_refresh_btn.clicked.connect(self._refresh_qa_for_current_file)
         qa_header.addWidget(self._qa_refresh_btn)
         self._qa_results_list = QListWidget(self._qa_panel)
@@ -2205,6 +2207,7 @@ class MainWindow(QMainWindow):
             "qa_check_newlines": self._qa_check_newlines,
             "qa_check_escapes": self._qa_check_escapes,
             "qa_check_same_as_source": self._qa_check_same_as_source,
+            "qa_auto_refresh": self._qa_auto_refresh,
             "qa_auto_mark_for_review": self._qa_auto_mark_for_review,
         }
         tm_files: list[dict[str, object]] = []
@@ -2303,6 +2306,7 @@ class MainWindow(QMainWindow):
             self._qa_check_newlines,
             self._qa_check_escapes,
             self._qa_check_same_as_source,
+            self._qa_auto_refresh,
             self._qa_auto_mark_for_review,
         )
         updated_qa, qa_changed = _resolve_qa_preferences(values, current=previous_qa)
@@ -2311,10 +2315,15 @@ class MainWindow(QMainWindow):
             self._qa_check_newlines,
             self._qa_check_escapes,
             self._qa_check_same_as_source,
+            self._qa_auto_refresh,
             self._qa_auto_mark_for_review,
         ) = updated_qa
         if qa_changed and self._current_model is not None:
-            self._schedule_qa_refresh(immediate=True)
+            if self._qa_auto_refresh:
+                self._schedule_qa_refresh(immediate=True)
+            else:
+                self._set_qa_findings(())
+                self._set_qa_panel_message("QA settings changed. Click Run QA.")
         _apply_source_ref_preferences_for_window(self, values)
         self._default_root = str(values.get("default_root", "")).strip()
         tm_import_dir = str(values.get("tm_import_dir", "")).strip()
@@ -2544,7 +2553,11 @@ class MainWindow(QMainWindow):
             )
             self._current_model.dataChanged.connect(self._on_model_changed)
             self._current_model.dataChanged.connect(self._on_model_data_changed)
-            self._schedule_qa_refresh(immediate=True)
+            if self._qa_auto_refresh:
+                self._schedule_qa_refresh(immediate=True)
+            else:
+                self._set_qa_findings(())
+                self._set_qa_panel_message("QA is manual. Click Run QA for this file.")
             if not self._user_resized_columns:
                 self._source_translation_ratio = 0.5
             self._table_layout_guard = True
@@ -2893,7 +2906,10 @@ class MainWindow(QMainWindow):
         if idx == _LEFT_PANEL_SEARCH:
             self._refresh_search_panel_results()
         if idx == _LEFT_PANEL_QA:
-            self._schedule_qa_refresh(immediate=True)
+            if not self._qa_findings and not self._qa_auto_refresh:
+                self._set_qa_panel_message("QA is manual. Click Run QA for this file.")
+            else:
+                self._refresh_qa_panel_results()
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         table = getattr(self, "table", None)
@@ -4512,6 +4528,8 @@ class MainWindow(QMainWindow):
         self._select_match(match)
 
     def _schedule_qa_refresh(self, *, immediate: bool = False) -> None:
+        if not self._qa_auto_refresh:
+            return
         if immediate:
             if self._qa_refresh_timer.isActive():
                 self._qa_refresh_timer.stop()
@@ -4605,7 +4623,9 @@ class MainWindow(QMainWindow):
             return
 
     def _navigate_qa_finding(self, direction: int) -> None:
-        self._schedule_qa_refresh(immediate=True)
+        if not self._qa_findings:
+            self.statusBar().showMessage("Run QA first to navigate findings.", 3000)
+            return
         current = self.table.currentIndex()
         current_row = current.row() if current.isValid() else None
         current_path = self._current_pf.path if self._current_pf is not None else None
@@ -4819,6 +4839,7 @@ class MainWindow(QMainWindow):
             qa_check_newlines=self._qa_check_newlines,
             qa_check_escapes=self._qa_check_escapes,
             qa_check_same_as_source=self._qa_check_same_as_source,
+            qa_auto_refresh=self._qa_auto_refresh,
             qa_auto_mark_for_review=self._qa_auto_mark_for_review,
             last_root=str(self._root),
             last_locales=list(self._selected_locales),
@@ -4852,7 +4873,14 @@ class MainWindow(QMainWindow):
                 and not self._detail_translation.hasFocus()
             ):
                 self._sync_detail_editors()
-            self._schedule_qa_refresh()
+            if self._qa_auto_refresh:
+                self._schedule_qa_refresh()
+            else:
+                self._set_qa_findings(())
+                if self._left_stack.currentIndex() == _LEFT_PANEL_QA:
+                    self._set_qa_panel_message(
+                        "Edited. Click Run QA to refresh findings."
+                    )
 
     def _on_selection_changed(self, current, previous) -> None:
         perf_trace = PERF_TRACE
@@ -5453,8 +5481,15 @@ class MainWindow(QMainWindow):
 
     def _apply_qa_auto_mark(self, findings: Sequence[_QAFinding]) -> None:
         rows = self._qa_service.auto_mark_rows(findings)
+        if not self._current_model:
+            return
+        untouched_rows = [
+            row
+            for row in rows
+            if self._current_model.status_for_row(row) == Status.UNTOUCHED
+        ]
         self._apply_status_to_rows(
-            rows,
+            untouched_rows,
             status=Status.FOR_REVIEW,
             label="QA auto-mark For review",
         )

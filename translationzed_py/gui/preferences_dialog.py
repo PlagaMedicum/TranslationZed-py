@@ -104,6 +104,7 @@ class PreferencesDialog(QDialog):
             "qa_check_newlines": self._qa_newlines_check.isChecked(),
             "qa_check_escapes": self._qa_tokens_check.isChecked(),
             "qa_check_same_as_source": self._qa_same_source_check.isChecked(),
+            "qa_auto_refresh": self._qa_auto_refresh_check.isChecked(),
             "qa_auto_mark_for_review": self._qa_auto_mark_check.isChecked(),
             "theme_mode": self._theme_mode_combo.currentData(),
             "source_reference_fallback_policy": (
@@ -179,7 +180,8 @@ class PreferencesDialog(QDialog):
         layout.setSpacing(6)
 
         info = QLabel(
-            "QA checks run in the side-panel QA tab. Enable rules to surface warnings.",
+            "Use Run QA in the QA side-panel to scan current file. "
+            "Automatic background QA is optional.",
             widget,
         )
         info.setWordWrap(True)
@@ -204,6 +206,13 @@ class PreferencesDialog(QDialog):
         self._qa_same_source_check.setChecked(
             bool(self._prefs.get("qa_check_same_as_source", False))
         )
+        self._qa_auto_refresh_check = QCheckBox(
+            "Run QA automatically in background",
+            widget,
+        )
+        self._qa_auto_refresh_check.setChecked(
+            bool(self._prefs.get("qa_auto_refresh", False))
+        )
         self._qa_auto_mark_check = QCheckBox(
             "Auto-mark findings as For review",
             widget,
@@ -219,6 +228,7 @@ class PreferencesDialog(QDialog):
         layout.addWidget(self._qa_newlines_check)
         layout.addWidget(self._qa_tokens_check)
         layout.addWidget(self._qa_same_source_check)
+        layout.addWidget(self._qa_auto_refresh_check)
         layout.addWidget(self._qa_auto_mark_check)
         layout.addStretch(1)
         return widget
