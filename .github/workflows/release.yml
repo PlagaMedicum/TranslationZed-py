@@ -19,7 +19,6 @@ env:
 
 jobs:
   preflight:
-    if: startsWith(env.RELEASE_TAG, 'v') && !contains(env.RELEASE_TAG, '-rc') && !contains(env.RELEASE_TAG, '-RC')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +35,19 @@ jobs:
         run: |
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
+      - name: Validate release tag format
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import sys
+
+          tag = os.environ.get("RELEASE_TAG", "").strip()
+          if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+              print(f"Invalid final release tag: {tag!r}")
+              sys.exit(2)
+          print(f"Release tag: {tag}")
+          PY
       - name: Encoding integrity suite
         run: make test-encoding-integrity
       - name: Encoding diagnostics (fixture corpus)
@@ -47,7 +59,6 @@ jobs:
 
   build:
     needs: preflight
-    if: startsWith(env.RELEASE_TAG, 'v') && !contains(env.RELEASE_TAG, '-rc') && !contains(env.RELEASE_TAG, '-RC')
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -107,7 +118,6 @@ jobs:
 
   publish:
     needs: build
-    if: startsWith(env.RELEASE_TAG, 'v') && !contains(env.RELEASE_TAG, '-rc') && !contains(env.RELEASE_TAG, '-RC')
     runs-on: ubuntu-latest
     steps:
       - name: Download packaged artifacts
