@@ -7,6 +7,7 @@ from pathlib import Path
 from .model import Entry
 from .parser import parse
 from .project_scanner import LocaleMeta, list_translatable_files
+from .source_reference_service import reference_path_for
 from .tm_store import TMStore
 
 
@@ -151,28 +152,9 @@ def _source_target_for_entry(
 
 
 def _tm_en_path_for(root: Path, locale: str, path: Path) -> Path | None:
-    locale_root = root / locale
-    try:
-        rel = path.relative_to(locale_root)
-    except ValueError:
-        try:
-            rel_full = path.relative_to(root)
-            if rel_full.parts and rel_full.parts[0] == locale:
-                rel = Path(*rel_full.parts[1:])
-            else:
-                return None
-        except ValueError:
-            return None
-    candidate = root / "EN" / rel
-    if candidate.exists():
-        return candidate
-    stem = rel.stem
-    for token in (locale, locale.replace(" ", "_")):
-        suffix = f"_{token}"
-        if stem.endswith(suffix):
-            new_stem = stem[: -len(suffix)] + "_EN"
-            alt = rel.with_name(new_stem + rel.suffix)
-            alt_path = root / "EN" / alt
-            if alt_path.exists():
-                return alt_path
-    return None
+    return reference_path_for(
+        root,
+        path,
+        target_locale=locale,
+        reference_locale="EN",
+    )

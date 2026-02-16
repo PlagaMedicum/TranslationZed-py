@@ -32,6 +32,10 @@ _THEME_MODES = [
     ("Light", "LIGHT"),
     ("Dark", "DARK"),
 ]
+_SOURCE_REF_FALLBACKS = [
+    ("EN, then file locale", "EN_THEN_TARGET"),
+    ("File locale, then EN", "TARGET_THEN_EN"),
+]
 _TM_PATH_ROLE = Qt.UserRole + 1
 _TM_IS_PENDING_ROLE = Qt.UserRole + 2
 _TM_STATUS_ROLE = Qt.UserRole + 3
@@ -58,12 +62,14 @@ class PreferencesDialog(QDialog):
         self._tm_export_tmx = False
         self._tm_rebuild = False
         self._tm_show_diagnostics = False
+        self._source_reference_clear_overrides = False
         self._tm_resolve_btn: QPushButton | None = None
         self._tm_zero_segment_banner: QLabel | None = None
 
         tabs = QTabWidget(self)
         tabs.addTab(self._build_general_tab(), "General")
         tabs.addTab(self._build_search_tab(), "Search / Replace")
+        tabs.addTab(self._build_qa_tab(), "QA")
         tabs.addTab(self._build_tm_tab(), "TM")
         tabs.addTab(self._build_view_tab(), "View")
 
@@ -94,7 +100,16 @@ class PreferencesDialog(QDialog):
             "visual_whitespace": self._visual_whitespace_check.isChecked(),
             "search_scope": self._search_scope_combo.currentData(),
             "replace_scope": self._replace_scope_combo.currentData(),
+            "qa_check_trailing": self._qa_trailing_check.isChecked(),
+            "qa_check_newlines": self._qa_newlines_check.isChecked(),
+            "qa_check_escapes": self._qa_tokens_check.isChecked(),
+            "qa_check_same_as_source": self._qa_same_source_check.isChecked(),
+            "qa_auto_mark_for_review": self._qa_auto_mark_check.isChecked(),
             "theme_mode": self._theme_mode_combo.currentData(),
+            "source_reference_fallback_policy": (
+                self._source_ref_fallback_combo.currentData()
+            ),
+            "source_reference_clear_overrides": self._source_reference_clear_overrides,
             "tm_enabled": changed_tm_enabled,
             "tm_remove_paths": sorted(self._tm_remove_paths),
             "tm_import_paths": list(self._tm_import_paths),
@@ -157,6 +172,57 @@ class PreferencesDialog(QDialog):
         layout.addRow(QLabel("Replace scope"), self._replace_scope_combo)
         return widget
 
+    def _build_qa_tab(self) -> QWidget:
+        widget = QWidget(self)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        info = QLabel(
+            "QA checks run in the side-panel QA tab. Enable rules to surface warnings.",
+            widget,
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        self._qa_trailing_check = QCheckBox("Missing trailing characters", widget)
+        self._qa_trailing_check.setChecked(
+            bool(self._prefs.get("qa_check_trailing", True))
+        )
+        self._qa_newlines_check = QCheckBox("Missing/extra newlines", widget)
+        self._qa_newlines_check.setChecked(
+            bool(self._prefs.get("qa_check_newlines", True))
+        )
+        self._qa_tokens_check = QCheckBox(
+            "Missing escapes / code markers / placeholders",
+            widget,
+        )
+        self._qa_tokens_check.setChecked(
+            bool(self._prefs.get("qa_check_escapes", False))
+        )
+        self._qa_same_source_check = QCheckBox("Translation equals source", widget)
+        self._qa_same_source_check.setChecked(
+            bool(self._prefs.get("qa_check_same_as_source", False))
+        )
+        self._qa_auto_mark_check = QCheckBox(
+            "Auto-mark findings as For review",
+            widget,
+        )
+        self._qa_auto_mark_check.setChecked(
+            bool(self._prefs.get("qa_auto_mark_for_review", False))
+        )
+        self._qa_auto_mark_check.setToolTip(
+            "When enabled, rows with QA warnings are set to For review automatically."
+        )
+
+        layout.addWidget(self._qa_trailing_check)
+        layout.addWidget(self._qa_newlines_check)
+        layout.addWidget(self._qa_tokens_check)
+        layout.addWidget(self._qa_same_source_check)
+        layout.addWidget(self._qa_auto_mark_check)
+        layout.addStretch(1)
+        return widget
+
     def _build_view_tab(self) -> QWidget:
         widget = QWidget(self)
         layout = QFormLayout(widget)
@@ -166,6 +232,13 @@ class PreferencesDialog(QDialog):
             self._theme_mode_combo.addItem(label, value)
         theme_mode = str(self._prefs.get("theme_mode", "SYSTEM")).upper()
         self._set_combo_value(self._theme_mode_combo, theme_mode)
+        self._source_ref_fallback_combo = QComboBox(self)
+        for label, value in _SOURCE_REF_FALLBACKS:
+            self._source_ref_fallback_combo.addItem(label, value)
+        source_ref_fallback = str(
+            self._prefs.get("source_reference_fallback_policy", "EN_THEN_TARGET")
+        ).upper()
+        self._set_combo_value(self._source_ref_fallback_combo, source_ref_fallback)
         self._wrap_text_check = QCheckBox("Wrap long strings in table", self)
         self._wrap_text_check.setChecked(bool(self._prefs.get("wrap_text", False)))
         self._large_text_opt_check = QCheckBox(
@@ -186,8 +259,20 @@ class PreferencesDialog(QDialog):
         self._visual_whitespace_check.setChecked(
             bool(self._prefs.get("visual_whitespace", False))
         )
+        source_ref_override_count = int(
+            self._prefs.get("source_reference_overrides_count", 0)
+        )
+        source_ref_clear_btn = QPushButton("Clear pinned Source overrides", self)
+        source_ref_clear_btn.setEnabled(source_ref_override_count > 0)
+        source_ref_clear_btn.clicked.connect(self._clear_source_reference_overrides)
+        self._source_ref_overrides_label = QLabel(
+            f"Pinned file overrides: {source_ref_override_count}",
+            self,
+        )
 
         layout.addRow(QLabel("Theme"), self._theme_mode_combo)
+        layout.addRow(QLabel("Source fallback"), self._source_ref_fallback_combo)
+        layout.addRow(self._source_ref_overrides_label, source_ref_clear_btn)
         layout.addRow(self._wrap_text_check)
         layout.addRow(self._large_text_opt_check)
         layout.addRow(self._visual_highlight_check)
@@ -437,6 +522,10 @@ class PreferencesDialog(QDialog):
 
     def _request_tm_diagnostics(self) -> None:
         self._tm_show_diagnostics = True
+
+    def _clear_source_reference_overrides(self) -> None:
+        self._source_reference_clear_overrides = True
+        self._source_ref_overrides_label.setText("Pinned file overrides: 0")
         self.accept()
 
     def _browse_root(self) -> None:

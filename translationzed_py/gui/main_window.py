@@ -120,6 +120,9 @@ from translationzed_py.core.model import STATUS_ORDER, Status
 from translationzed_py.core.preferences_service import (
     PreferencesService as _PreferencesService,
 )
+from translationzed_py.core.preferences_service import (
+    resolve_qa_preferences as _resolve_qa_preferences,
+)
 from translationzed_py.core.project_session import (
     CacheMigrationBatchCallbacks as _CacheMigrationBatchCallbacks,
 )
@@ -154,10 +157,18 @@ from translationzed_py.core.save_exit_flow import (
     SaveExitFlowService as _SaveExitFlowService,
 )
 from translationzed_py.core.saver import save
-from translationzed_py.core.search import Match as _SearchMatch
-from translationzed_py.core.search import SearchField as _SearchField
-from translationzed_py.core.search import SearchRow as _SearchRow
-from translationzed_py.core.search import iter_matches as _iter_search_matches
+from translationzed_py.core.search import (
+    Match as _SearchMatch,
+)
+from translationzed_py.core.search import (
+    SearchField as _SearchField,
+)
+from translationzed_py.core.search import (
+    SearchRow as _SearchRow,
+)
+from translationzed_py.core.search import (
+    iter_matches as _iter_search_matches,
+)
 from translationzed_py.core.search_replace_service import (
     ReplaceAllFileApplyCallbacks as _ReplaceAllFileApplyCallbacks,
 )
@@ -190,6 +201,18 @@ from translationzed_py.core.search_replace_service import (
 )
 from translationzed_py.core.search_replace_service import (
     SearchRowsFileCallbacks as _SearchRowsFileCallbacks,
+)
+from translationzed_py.core.source_reference_service import (
+    load_reference_lookup as _load_reference_lookup,
+)
+from translationzed_py.core.source_reference_service import (
+    load_source_reference_file_overrides as _load_source_reference_file_overrides,
+)
+from translationzed_py.core.source_reference_service import (
+    normalize_source_reference_mode as _normalize_source_reference_mode,
+)
+from translationzed_py.core.source_reference_service import (
+    reference_path_for as _reference_path_for,
 )
 from translationzed_py.core.status_cache import (
     CacheEntry,
@@ -253,8 +276,34 @@ from .entry_model import TranslationModel
 from .fs_model import FsModel
 from .perf_trace import PERF_TRACE
 from .preferences_dialog import PreferencesDialog
+from .search_scope_ui import scope_icon_for as _scope_icon_for
+from .source_lookup import LazySourceRows as _LazySourceRows
+from .source_lookup import SourceLookup as _SourceLookup
+from .source_reference_state import (
+    apply_source_reference_preferences_for_window as _apply_source_ref_preferences_for_window,
+)
+from .source_reference_state import (
+    effective_source_reference_mode_for_window as _effective_source_reference_mode_for_window,
+)
+from .source_reference_state import (
+    handle_source_reference_changed as _handle_source_reference_changed,
+)
+from .source_reference_state import (
+    handle_source_reference_pin_toggle as _handle_source_reference_pin_toggle,
+)
+from .source_reference_state import (
+    normalize_source_reference_fallback_policy as _normalize_source_reference_fallback_policy,
+)
+from .source_reference_state import (
+    sync_source_reference_mode_for_window as _sync_source_reference_mode_for_window,
+)
+from .source_reference_state import (
+    sync_source_reference_override_ui_for_window as _sync_source_reference_override_ui_for_window,
+)
 from .theme import THEME_SYSTEM as _THEME_SYSTEM
 from .theme import apply_theme as _apply_app_theme
+from .theme import connect_system_theme_sync as _connect_system_theme_sync
+from .theme import disconnect_system_theme_sync as _disconnect_system_theme_sync
 from .theme import normalize_theme_mode as _normalize_theme_mode
 
 _TEST_DIALOGS_PATCHED = False
@@ -356,92 +405,6 @@ class _CommitPlainTextEdit(QPlainTextEdit):
         super().focusInEvent(event)
         if self._focus_cb:
             self._focus_cb()
-
-
-class _SourceLookup(Mapping[str, str]):
-    __slots__ = ("_by_row", "_keys", "_by_key")
-
-    def __init__(
-        self,
-        *,
-        by_row: Sequence[str] | None = None,
-        keys: list[str] | None = None,
-        by_key: dict[str, str] | None = None,
-    ) -> None:
-        self._by_row = by_row
-        self._keys = keys
-        self._by_key = by_key
-
-    @property
-    def by_row(self) -> Sequence[str] | None:
-        return self._by_row
-
-    def _ensure_by_key(self) -> dict[str, str]:
-        if self._by_key is None:
-            if self._by_row is None or self._keys is None:
-                self._by_key = {}
-            else:
-                by_key: dict[str, str] = {}
-                limit = min(len(self._keys), len(self._by_row))
-                for idx in range(limit):
-                    by_key[self._keys[idx]] = self._by_row[idx]
-                self._by_key = by_key
-        return self._by_key
-
-    def get(self, key: str, default: str = "") -> str:
-        return self._ensure_by_key().get(key, default)
-
-    def __getitem__(self, key: str) -> str:
-        return self.get(key, "")
-
-    def __iter__(self):
-        return iter(self._ensure_by_key())
-
-    def __len__(self) -> int:
-        return len(self._ensure_by_key())
-
-
-class _LazySourceRows:
-    __slots__ = ("_entries",)
-
-    def __init__(self, entries: Sequence[Entry]) -> None:
-        self._entries = entries
-
-    def __len__(self) -> int:
-        return len(self._entries)
-
-    def __getitem__(self, idx):
-        if isinstance(idx, slice):
-            start, stop, step = idx.indices(len(self._entries))
-            return [self._entries[i].value for i in range(start, stop, step)]
-        return self._entries[idx].value
-
-    def length_at(self, idx: int) -> int:
-        entries = self._entries
-        if hasattr(entries, "meta_at"):
-            try:
-                meta = entries.meta_at(idx)
-                if meta.segments:
-                    return sum(meta.segments)
-            except Exception:
-                return 0
-            return 0
-        value = entries[idx].value
-        return len(value) if value else 0
-
-    def preview_at(self, idx: int, limit: int) -> str:
-        entries = self._entries
-        if hasattr(entries, "preview_at"):
-            try:
-                return entries.preview_at(idx, limit)
-            except Exception:
-                return ""
-        value = entries[idx].value
-        if not value:
-            return ""
-        if limit <= 0:
-            return ""
-        return value[:limit]
 
 
 class MainWindow(QMainWindow):
@@ -564,9 +527,20 @@ class MainWindow(QMainWindow):
         self._theme_mode = _normalize_theme_mode(
             self._prefs_extras.get("UI_THEME_MODE"), default=_THEME_SYSTEM
         )
+        self._source_reference_mode = _normalize_source_reference_mode(
+            self._prefs_extras.get("SOURCE_REFERENCE_MODE"), default="EN"
+        )
+        self._source_reference_fallback_policy = (
+            _normalize_source_reference_fallback_policy(
+                self._prefs_extras.get("SOURCE_REFERENCE_FALLBACK_POLICY")
+            )
+        )
+        self._source_reference_file_overrides = _load_source_reference_file_overrides(
+            self._prefs_extras.get("SOURCE_REFERENCE_FILE_OVERRIDES")
+        )
         self._apply_theme_mode(self._theme_mode, persist=False)
-        self._system_theme_sync_connected = False
-        self._connect_system_theme_sync()
+        callback = self._on_system_color_scheme_changed
+        self._system_theme_sync_connected = _connect_system_theme_sync(callback)
         self._search_case_sensitive = _bool_from_pref(
             self._prefs_extras.get("SEARCH_CASE_SENSITIVE"), False
         )
@@ -667,6 +641,22 @@ class MainWindow(QMainWindow):
         self.status_combo.setEnabled(False)
         self.status_combo.currentIndexChanged.connect(self._status_combo_changed)
         self.toolbar.addWidget(self.status_combo)
+        self.source_ref_label = QLabel("Source:", self)
+        self.source_ref_label.setContentsMargins(8, 0, 4, 0)
+        self.toolbar.addWidget(self.source_ref_label)
+        self.source_ref_combo = QComboBox(self)
+        self.source_ref_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.source_ref_combo.currentIndexChanged.connect(
+            self._source_reference_changed
+        )
+        self.toolbar.addWidget(self.source_ref_combo)
+        self.source_ref_pin_btn = QToolButton(self)
+        self.source_ref_pin_btn.setText("Pin")
+        self.source_ref_pin_btn.setCheckable(True)
+        self.source_ref_pin_btn.clicked.connect(
+            self._toggle_source_reference_file_override
+        )
+        self.toolbar.addWidget(self.source_ref_pin_btn)
         self.toolbar.addSeparator()
         self.regex_check = QCheckBox("Regex", self)
         self.regex_check.stateChanged.connect(self._on_search_controls_changed)
@@ -908,6 +898,7 @@ class MainWindow(QMainWindow):
         if not self._selected_locales:
             self._startup_aborted = True
             return
+        self._sync_source_reference_mode(persist=False)
         tree_plan = self._project_session_service.build_tree_rebuild_plan(
             selected_locales=self._selected_locales,
             resize_splitter=False,
@@ -1579,20 +1570,17 @@ class MainWindow(QMainWindow):
         finally:
             perf_trace.stop("detail_sync", perf_start, items=1, unit="events")
 
-    def _scope_icon(self, scope: str) -> QIcon:
-        if scope == "FILE":
-            return QIcon.fromTheme(
-                "text-x-generic",
-                self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon),
-            )
-        if scope == "LOCALE":
-            return QIcon.fromTheme(
-                "folder", self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon)
-            )
-        return QIcon.fromTheme(
-            "view-list-tree",
-            self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon),
-        )
+    def _sync_source_reference_mode(self, *, persist: bool) -> None:
+        _sync_source_reference_mode_for_window(self, persist=persist)
+
+    def _sync_source_reference_override_ui(self) -> None:
+        _sync_source_reference_override_ui_for_window(self)
+
+    def _toggle_source_reference_file_override(self, checked: bool) -> None:
+        _handle_source_reference_pin_toggle(self, checked)
+
+    def _source_reference_changed(self, index: int) -> None:
+        _handle_source_reference_changed(self, index)
 
     def _init_locales(self, selected_locales: list[str] | None) -> None:
         try:
@@ -1893,102 +1881,47 @@ class MainWindow(QMainWindow):
     def _locale_for_string_path(self, path_key: str) -> str | None:
         return self._locale_for_path(Path(path_key))
 
-    def _en_path_for(self, path: Path, locale: str | None) -> Path | None:
-        if not locale or locale == "EN":
-            return None
-        en_meta = self._locales.get("EN")
-        if not en_meta:
-            return None
-        try:
-            rel = path.relative_to(self._root / locale)
-        except ValueError:
-            try:
-                rel_full = path.relative_to(self._root)
-                if rel_full.parts and rel_full.parts[0] == locale:
-                    rel = Path(*rel_full.parts[1:])
-                else:
-                    return None
-            except ValueError:
-                return None
-        candidate = en_meta.path / rel
-        if candidate.exists():
-            return candidate
-        stem = rel.stem
-        for token in (locale, locale.replace(" ", "_")):
-            suffix = f"_{token}"
-            if stem.endswith(suffix):
-                new_stem = stem[: -len(suffix)] + "_EN"
-                alt = rel.with_name(new_stem + rel.suffix)
-                alt_path = en_meta.path / alt
-                if alt_path.exists():
-                    return alt_path
-        return None
-
-    def _load_en_source(
+    def _load_reference_source(
         self,
         path: Path,
         locale: str | None,
         *,
         target_entries: Sequence[Entry] | None = None,
     ) -> _SourceLookup:
-        def _key_at(entries: Sequence[Entry], idx: int) -> str:
-            if hasattr(entries, "key_at"):
-                return entries.key_at(idx)
-            return entries[idx].key
-
-        def _keys_match(a: Sequence[Entry], b: Sequence[Entry]) -> bool:
-            count = len(a)
-            if count != len(b):
-                return False
-            return all(_key_at(a, idx) == _key_at(b, idx) for idx in range(count))
-
-        def _keys_list(entries: Sequence[Entry]) -> list[str]:
-            return [_key_at(entries, idx) for idx in range(len(entries))]
-
-        en_path = self._en_path_for(path, locale)
-        if not en_path:
+        reference_mode = _effective_source_reference_mode_for_window(
+            self,
+            path,
+            locale,
+        )
+        materialized = _load_reference_lookup(
+            root=self._root,
+            path=path,
+            target_locale=locale,
+            reference_locale=reference_mode,
+            locale_encodings={
+                code: meta.charset for code, meta in self._locales.items()
+            },
+            target_entries=target_entries,
+            parsed_cache=self._en_cache,
+            should_parse_lazy=self._should_parse_lazy,
+            parse_eager=lambda file_path, encoding: parse(file_path, encoding=encoding),
+            parse_lazy=lambda file_path, encoding: parse_lazy(
+                file_path, encoding=encoding
+            ),
+        )
+        if materialized is None:
             return _SourceLookup(by_key={})
-        if en_path in self._en_cache:
-            pf = self._en_cache[en_path]
-        else:
-            en_meta = self._locales.get("EN")
-            encoding = en_meta.charset if en_meta else "utf-8"
-            try:
-                if self._should_parse_lazy(en_path):
-                    pf = parse_lazy(en_path, encoding=encoding)
-                else:
-                    pf = parse(en_path, encoding=encoding)
-            except Exception:
-                return _SourceLookup(by_key={})
-            self._en_cache[en_path] = pf
-        entries = pf.entries
-        if entries:
-            if hasattr(entries, "meta_at"):
-                if len(entries) == 1 and entries.meta_at(0).raw:
-                    raw_value = entries[0].value
-                    if (
-                        target_entries
-                        and len(target_entries) == 1
-                        and _key_at(target_entries, 0) == path.name
-                    ):
-                        return _SourceLookup(by_row=[raw_value], keys=[path.name])
-                    return _SourceLookup(by_key={path.name: raw_value})
-            elif all(getattr(e, "raw", False) for e in entries):
-                raw_value = entries[0].value
-                if (
-                    target_entries
-                    and len(target_entries) == 1
-                    and _key_at(target_entries, 0) == path.name
-                ):
-                    return _SourceLookup(by_row=[raw_value], keys=[path.name])
-                return _SourceLookup(by_key={path.name: raw_value})
-        if target_entries and _keys_match(target_entries, entries):
-            keys = _keys_list(target_entries)
-            if hasattr(entries, "prefetch"):
-                return _SourceLookup(by_row=_LazySourceRows(entries), keys=keys)
-            by_row = [entry.value for entry in entries]
-            return _SourceLookup(by_row=by_row, keys=keys)
-        return _SourceLookup(by_key={entry.key: entry.value for entry in entries})
+        if materialized.by_row_entries is not None:
+            return _SourceLookup(
+                by_row=_LazySourceRows(materialized.by_row_entries),
+                keys=materialized.keys,
+            )
+        if materialized.by_row_values is not None:
+            return _SourceLookup(
+                by_row=materialized.by_row_values,
+                keys=materialized.keys,
+            )
+        return _SourceLookup(by_key=materialized.by_key or {})
 
     # ----------------------------------------------------------------- slots
     def _check_en_hash_cache(self) -> bool:
@@ -2257,6 +2190,10 @@ class MainWindow(QMainWindow):
             "default_root": self._default_root,
             "tm_import_dir": self._tm_import_dir,
             "theme_mode": self._theme_mode,
+            "source_reference_fallback_policy": self._source_reference_fallback_policy,
+            "source_reference_overrides_count": len(
+                self._source_reference_file_overrides
+            ),
             "prompt_write_on_exit": self._prompt_write_on_exit,
             "wrap_text": self._wrap_text_user,
             "large_text_optimizations": self._large_text_optimizations,
@@ -2264,6 +2201,11 @@ class MainWindow(QMainWindow):
             "visual_whitespace": self._visual_whitespace,
             "search_scope": self._search_scope,
             "replace_scope": self._replace_scope,
+            "qa_check_trailing": self._qa_check_trailing,
+            "qa_check_newlines": self._qa_check_newlines,
+            "qa_check_escapes": self._qa_check_escapes,
+            "qa_check_same_as_source": self._qa_check_same_as_source,
+            "qa_auto_mark_for_review": self._qa_auto_mark_for_review,
         }
         tm_files: list[dict[str, object]] = []
         if self._ensure_tm_store():
@@ -2291,34 +2233,6 @@ class MainWindow(QMainWindow):
     def _show_about(self) -> None:
         dialog = AboutDialog(self)
         dialog.exec()
-
-    def _connect_system_theme_sync(self) -> None:
-        if self._system_theme_sync_connected:
-            return
-        app = QApplication.instance()
-        if app is None:
-            return
-        hints = app.styleHints()
-        signal = getattr(hints, "colorSchemeChanged", None)
-        if signal is None or not hasattr(signal, "connect"):
-            return
-        with contextlib.suppress(Exception):
-            signal.connect(self._on_system_color_scheme_changed)
-            self._system_theme_sync_connected = True
-
-    def _disconnect_system_theme_sync(self) -> None:
-        if not self._system_theme_sync_connected:
-            return
-        app = QApplication.instance()
-        if app is None:
-            self._system_theme_sync_connected = False
-            return
-        hints = app.styleHints()
-        signal = getattr(hints, "colorSchemeChanged", None)
-        if signal is not None and hasattr(signal, "disconnect"):
-            with contextlib.suppress(Exception):
-                signal.disconnect(self._on_system_color_scheme_changed)
-        self._system_theme_sync_connected = False
 
     def _on_system_color_scheme_changed(self, *_args) -> None:
         if self._theme_mode != _THEME_SYSTEM:
@@ -2384,6 +2298,24 @@ class MainWindow(QMainWindow):
                 "true" if self._visual_whitespace else "false"
             )
             self._apply_text_visual_options()
+        previous_qa = (
+            self._qa_check_trailing,
+            self._qa_check_newlines,
+            self._qa_check_escapes,
+            self._qa_check_same_as_source,
+            self._qa_auto_mark_for_review,
+        )
+        updated_qa, qa_changed = _resolve_qa_preferences(values, current=previous_qa)
+        (
+            self._qa_check_trailing,
+            self._qa_check_newlines,
+            self._qa_check_escapes,
+            self._qa_check_same_as_source,
+            self._qa_auto_mark_for_review,
+        ) = updated_qa
+        if qa_changed and self._current_model is not None:
+            self._schedule_qa_refresh(immediate=True)
+        _apply_source_ref_preferences_for_window(self, values)
         self._default_root = str(values.get("default_root", "")).strip()
         tm_import_dir = str(values.get("tm_import_dir", "")).strip()
         self._tm_import_dir = tm_import_dir or str(self._default_tm_import_dir())
@@ -2479,6 +2411,7 @@ class MainWindow(QMainWindow):
         if plan is None or not plan.should_apply:
             return
         self._selected_locales = list(plan.selected_locales)
+        self._sync_source_reference_mode(persist=True)
         if plan.reset_session_state:
             reset_plan = self._project_session_service.build_locale_reset_plan()
             self._apply_locale_reset_plan(reset_plan)
@@ -2584,7 +2517,7 @@ class MainWindow(QMainWindow):
             except OSError:
                 self._current_file_size = 0
 
-            source_lookup = self._load_en_source(
+            source_lookup = self._load_reference_source(
                 path, locale, target_entries=pf.entries
             )
             self._cache_map = open_result.cache_map
@@ -2624,6 +2557,7 @@ class MainWindow(QMainWindow):
             self.table.selectionModel().currentChanged.connect(
                 self._on_selection_changed
             )
+            self._sync_source_reference_override_ui()
             self._update_status_combo_from_selection()
             self._update_replace_enabled()
             self._sync_detail_editors()
@@ -4203,7 +4137,9 @@ class MainWindow(QMainWindow):
         locale: str,
         entries: Sequence[Entry],
     ) -> tuple[Sequence[str] | None, Callable[[str], str]]:
-        source_lookup = self._load_en_source(path, locale, target_entries=entries)
+        source_lookup = self._load_reference_source(
+            path, locale, target_entries=entries
+        )
         return source_lookup.by_row, lambda key: source_lookup.get(key, "")
 
     def _cached_rows_from_file(
@@ -4284,11 +4220,23 @@ class MainWindow(QMainWindow):
         return 0
 
     def _source_mtime_for_rows(self, path: Path, locale: str) -> int:
-        en_path = self._en_path_for(path, locale)
-        if not en_path:
+        reference_locale = _effective_source_reference_mode_for_window(
+            self,
+            path,
+            locale,
+        )
+        source_path = _reference_path_for(
+            self._root,
+            path,
+            target_locale=locale,
+            reference_locale=reference_locale,
+        )
+        if reference_locale == locale:
+            source_path = path if path.exists() else None
+        if not source_path:
             return 0
         with contextlib.suppress(OSError):
-            return en_path.stat().st_mtime_ns
+            return source_path.stat().st_mtime_ns
         return 0
 
     def _search_files_for_scope(self) -> list[Path]:
@@ -5466,7 +5414,7 @@ class MainWindow(QMainWindow):
         if not active:
             widget.setVisible(False)
             return
-        icon = self._scope_icon(scope)
+        icon = _scope_icon_for(self, scope)
         icon_label.setPixmap(icon.pixmap(14, 14))
         widget.setToolTip(f"{title}: {scope.title()}")
         widget.setVisible(True)
@@ -5543,7 +5491,9 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self._stop_timers()
-        self._disconnect_system_theme_sync()
+        if self._system_theme_sync_connected:
+            _disconnect_system_theme_sync(self._on_system_color_scheme_changed)
+            self._system_theme_sync_connected = False
         with contextlib.suppress(Exception):
             self._flush_tm_updates()
         self._shutdown_tm_workers()

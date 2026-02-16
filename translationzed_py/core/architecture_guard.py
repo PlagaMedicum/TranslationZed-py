@@ -30,6 +30,7 @@ DEFAULT_RULES: dict[str, BoundaryRule] = {
                 "translationzed_py.core.saver",
                 "translationzed_py.core.search",
                 "translationzed_py.core.search_replace_service",
+                "translationzed_py.core.source_reference_service",
                 "translationzed_py.core.status_cache",
                 "translationzed_py.core.tm_import_sync",
                 "translationzed_py.core.tm_query",

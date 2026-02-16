@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -156,6 +157,21 @@ def normalize_scope(value: object, *, default: str = "FILE") -> str:
     if raw in _VALID_SCOPES:
         return raw
     return default
+
+
+def resolve_qa_preferences(
+    values: Mapping[str, object],
+    *,
+    current: tuple[bool, bool, bool, bool, bool],
+) -> tuple[tuple[bool, bool, bool, bool, bool], bool]:
+    updated = (
+        bool(values.get("qa_check_trailing", current[0])),
+        bool(values.get("qa_check_newlines", current[1])),
+        bool(values.get("qa_check_escapes", current[2])),
+        bool(values.get("qa_check_same_as_source", current[3])),
+        bool(values.get("qa_auto_mark_for_review", current[4])),
+    )
+    return updated, updated != current
 
 
 def normalize_loaded_preferences(

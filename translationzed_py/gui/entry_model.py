@@ -217,6 +217,24 @@ class TranslationModel(QAbstractTableModel):
     def set_preview_limit(self, limit: int | None) -> None:
         self._preview_limit = limit
 
+    def set_source_lookup(
+        self,
+        *,
+        source_values: Mapping[str, str] | None = None,
+        source_by_row: Sequence[str] | None = None,
+    ) -> None:
+        self._source_values = source_values or {}
+        self._source_by_row = source_by_row
+        if not self._entries:
+            return
+        top = self.index(0, 1)
+        bottom = self.index(len(self._entries) - 1, 1)
+        self.dataChanged.emit(
+            top,
+            bottom,
+            [Qt.DisplayRole, Qt.EditRole, Qt.ToolTipRole],
+        )
+
     def max_value_length(self) -> int:
         cached = self._max_value_len
         if cached is not None:

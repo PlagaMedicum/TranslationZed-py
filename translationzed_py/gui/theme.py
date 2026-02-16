@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QStyleFactory
@@ -56,6 +58,34 @@ def detect_system_theme_mode(
         return system_theme_from_qt_scheme(color_scheme())
     except Exception:
         return None
+
+
+def connect_system_theme_sync(callback: Callable[..., object]) -> bool:
+    app = QApplication.instance()
+    if app is None:
+        return False
+    signal = getattr(app.styleHints(), "colorSchemeChanged", None)
+    if signal is None or not hasattr(signal, "connect"):
+        return False
+    try:
+        signal.connect(callback)
+    except Exception:
+        return False
+    return True
+
+
+def disconnect_system_theme_sync(callback: Callable[..., object]) -> bool:
+    app = QApplication.instance()
+    if app is None:
+        return False
+    signal = getattr(app.styleHints(), "colorSchemeChanged", None)
+    if signal is None or not hasattr(signal, "disconnect"):
+        return False
+    try:
+        signal.disconnect(callback)
+    except Exception:
+        return False
+    return True
 
 
 def _style_key(name: str) -> str | None:
