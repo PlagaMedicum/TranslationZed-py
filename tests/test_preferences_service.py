@@ -58,18 +58,19 @@ def test_normalize_scope_falls_back_to_file() -> None:
 
 
 def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
-    current = (True, True, False, False, False)
+    current = (True, True, False, False, False, False)
     updated, changed = resolve_qa_preferences(
         {
             "qa_check_trailing": False,
             "qa_check_newlines": True,
             "qa_check_escapes": True,
             "qa_check_same_as_source": True,
+            "qa_auto_refresh": True,
             "qa_auto_mark_for_review": True,
         },
         current=current,
     )
-    assert updated == (False, True, True, True, True)
+    assert updated == (False, True, True, True, True, True)
     assert changed is True
 
     same, unchanged = resolve_qa_preferences({}, current=updated)
@@ -92,6 +93,7 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
         "qa_check_newlines": True,
         "qa_check_escapes": True,
         "qa_check_same_as_source": True,
+        "qa_auto_refresh": True,
         "qa_auto_mark_for_review": True,
         "default_root": "/tmp/default",
         "search_scope": "bad-scope",
@@ -120,6 +122,7 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
     assert result.qa_check_newlines is True
     assert result.qa_check_escapes is True
     assert result.qa_check_same_as_source is True
+    assert result.qa_auto_refresh is True
     assert result.qa_auto_mark_for_review is True
     assert result.default_root == "/tmp/default"
     assert result.search_scope == "FILE"
@@ -153,6 +156,7 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
         qa_check_newlines=False,
         qa_check_escapes=True,
         qa_check_same_as_source=True,
+        qa_auto_refresh=True,
         qa_auto_mark_for_review=True,
     )
     locales.append("TH")
@@ -163,6 +167,7 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
     assert payload["qa_check_newlines"] is False
     assert payload["qa_check_escapes"] is True
     assert payload["qa_check_same_as_source"] is True
+    assert payload["qa_auto_refresh"] is True
     assert payload["qa_auto_mark_for_review"] is True
     assert payload["last_locales"] == ["BE", "RU"]
     assert payload["__extras__"] == {"A": "1"}
@@ -188,6 +193,7 @@ def test_preferences_service_load_normalized_bootstraps_settings(
     assert loaded.qa_check_newlines is True
     assert loaded.qa_check_escapes is False
     assert loaded.qa_check_same_as_source is False
+    assert loaded.qa_auto_refresh is False
     assert loaded.qa_auto_mark_for_review is False
     assert loaded.search_scope == "FILE"
     assert (tmp_path / ".tzp" / "config" / "settings.env").exists()
@@ -217,6 +223,7 @@ def test_preferences_service_persist_main_window_preferences(
         qa_check_newlines=False,
         qa_check_escapes=True,
         qa_check_same_as_source=True,
+        qa_auto_refresh=True,
         qa_auto_mark_for_review=True,
     )
 
@@ -230,6 +237,7 @@ def test_preferences_service_persist_main_window_preferences(
     assert saved["qa_check_newlines"] is False
     assert saved["qa_check_escapes"] is True
     assert saved["qa_check_same_as_source"] is True
+    assert saved["qa_auto_refresh"] is True
     assert saved["qa_auto_mark_for_review"] is True
     assert saved["__extras__"]["X"] == "1"
 

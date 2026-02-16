@@ -79,11 +79,14 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
     win._qa_auto_mark_for_review = False
+    win._qa_auto_refresh = False
     win._qa_check_trailing = True
     win._qa_check_newlines = True
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
     win._left_qa_btn.click()
+    assert win._qa_results_list.count() == 0
+    win._qa_refresh_btn.click()
 
     qtbot.waitUntil(lambda: win._qa_results_list.count() >= 2, timeout=1000)
     labels = [
@@ -111,6 +114,7 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     qtbot.addWidget(win)
     win._qa_check_trailing = True
     win._qa_check_newlines = True
+    win._qa_auto_refresh = False
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
     model = win.table.model()
@@ -124,6 +128,11 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     win._qa_auto_mark_for_review = True
     win._refresh_qa_for_current_file()
     assert model.data(status_index, Qt.EditRole) == Status.FOR_REVIEW
+
+    # Manual status changes must remain user-controlled and not be overwritten.
+    model.setData(status_index, Status.TRANSLATED, Qt.EditRole)
+    win._refresh_qa_for_current_file()
+    assert model.data(status_index, Qt.EditRole) == Status.TRANSLATED
 
 
 def test_qa_token_check_toggle_controls_placeholder_tag_findings(

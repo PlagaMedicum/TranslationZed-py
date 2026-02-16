@@ -621,6 +621,7 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
             "qa_check_newlines": False,
             "qa_check_escapes": True,
             "qa_check_same_as_source": True,
+            "qa_auto_refresh": True,
             "qa_auto_mark_for_review": True,
         },
         tm_files=[],
@@ -631,12 +632,14 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert dialog._qa_newlines_check.isChecked() is False
     assert dialog._qa_tokens_check.isChecked() is True
     assert dialog._qa_same_source_check.isChecked() is True
+    assert dialog._qa_auto_refresh_check.isChecked() is True
     assert dialog._qa_auto_mark_check.isChecked() is True
 
     dialog._qa_trailing_check.setChecked(True)
     dialog._qa_newlines_check.setChecked(True)
     dialog._qa_tokens_check.setChecked(False)
     dialog._qa_same_source_check.setChecked(False)
+    dialog._qa_auto_refresh_check.setChecked(False)
     dialog._qa_auto_mark_check.setChecked(False)
 
     values = dialog.values()
@@ -644,6 +647,7 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert values["qa_check_newlines"] is True
     assert values["qa_check_escapes"] is False
     assert values["qa_check_same_as_source"] is False
+    assert values["qa_auto_refresh"] is False
     assert values["qa_auto_mark_for_review"] is False
 
 
@@ -680,6 +684,7 @@ def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
             "qa_check_newlines": False,
             "qa_check_escapes": True,
             "qa_check_same_as_source": True,
+            "qa_auto_refresh": True,
             "qa_auto_mark_for_review": True,
         }
     )
@@ -688,6 +693,7 @@ def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
     assert win._qa_check_newlines is False
     assert win._qa_check_escapes is True
     assert win._qa_check_same_as_source is True
+    assert win._qa_auto_refresh is True
     assert win._qa_auto_mark_for_review is True
     assert refresh_calls == [True]
 
