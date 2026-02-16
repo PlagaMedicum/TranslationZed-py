@@ -86,7 +86,9 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     win._left_qa_btn.click()
 
     qtbot.waitUntil(lambda: win._qa_results_list.count() >= 2, timeout=1000)
-    labels = [win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())]
+    labels = [
+        win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())
+    ]
     assert any("qa.trailing" in label for label in labels)
     assert any("qa.newlines" in label for label in labels)
 
@@ -186,7 +188,9 @@ def test_qa_same_as_source_toggle_adds_content_group_finding(
     win._left_qa_btn.click()
 
     assert any(f.code == "qa.same_source" for f in win._qa_findings)
-    labels = [win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())]
+    labels = [
+        win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())
+    ]
     assert any("warning/content · qa.same_source" in label for label in labels)
 
 

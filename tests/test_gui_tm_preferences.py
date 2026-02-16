@@ -9,6 +9,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
 from translationzed_py.core import preferences
+from translationzed_py.core.source_reference_service import (
+    load_source_reference_file_overrides,
+)
 from translationzed_py.core.tm_store import TMMatch
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
@@ -214,6 +217,204 @@ def test_system_theme_change_reapplies_only_for_system_mode(
     assert calls == [("SYSTEM", False)]
 
 
+def test_source_reference_selector_switches_source_column(tmp_path, qtbot, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "proj"
+    for loc in ("EN", "BE", "RU"):
+        (root / loc).mkdir(parents=True, exist_ok=True)
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "ui.txt").write_text('UI_KEY = "Hello"\n', encoding="utf-8")
+    (root / "BE" / "ui.txt").write_text('UI_KEY = "Прывітанне"\n', encoding="utf-8")
+    (root / "RU" / "ui.txt").write_text('UI_KEY = "Привет"\n', encoding="utf-8")
+
+    win = MainWindow(str(root), selected_locales=["BE", "RU"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    model = win.table.model()
+    assert model is not None
+    assert model.data(model.index(0, 1), Qt.DisplayRole) == "Hello"
+
+    locales = [
+        win.source_ref_combo.itemData(i) for i in range(win.source_ref_combo.count())
+    ]
+    assert locales == ["EN", "BE", "RU"]
+
+    idx = win.source_ref_combo.findData("RU")
+    assert idx >= 0
+    win.source_ref_combo.setCurrentIndex(idx)
+    assert model.data(model.index(0, 1), Qt.DisplayRole) == "Привет"
+
+    saved = preferences.load(None)
+    extras = dict(saved.get("__extras__", {}))
+    assert extras.get("SOURCE_REFERENCE_MODE") == "RU"
+
+
+def test_source_reference_selector_includes_unopened_project_locale(
+    tmp_path, qtbot, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "proj"
+    for loc in ("EN", "BE", "RU"):
+        (root / loc).mkdir(parents=True, exist_ok=True)
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "ui.txt").write_text('UI_KEY = "Hello"\n', encoding="utf-8")
+    (root / "BE" / "ui.txt").write_text('UI_KEY = "Прывітанне"\n', encoding="utf-8")
+    (root / "RU" / "ui.txt").write_text('UI_KEY = "Привет"\n', encoding="utf-8")
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    model = win.table.model()
+    assert model is not None
+
+    locales = [
+        win.source_ref_combo.itemData(i) for i in range(win.source_ref_combo.count())
+    ]
+    assert locales == ["EN", "BE", "RU"]
+
+    idx = win.source_ref_combo.findData("RU")
+    assert idx >= 0
+    win.source_ref_combo.setCurrentIndex(idx)
+    assert model.data(model.index(0, 1), Qt.DisplayRole) == "Привет"
+
+
+def test_source_reference_file_pin_overrides_global_mode(tmp_path, qtbot, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "proj"
+    for loc in ("EN", "BE", "RU"):
+        (root / loc).mkdir(parents=True, exist_ok=True)
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "ui.txt").write_text('UI_KEY = "UI EN"\n', encoding="utf-8")
+    (root / "BE" / "ui.txt").write_text('UI_KEY = "UI BE"\n', encoding="utf-8")
+    (root / "RU" / "ui.txt").write_text('UI_KEY = "UI RU"\n', encoding="utf-8")
+    (root / "EN" / "menu.txt").write_text('MENU_KEY = "MENU EN"\n', encoding="utf-8")
+    (root / "BE" / "menu.txt").write_text('MENU_KEY = "MENU BE"\n', encoding="utf-8")
+    (root / "RU" / "menu.txt").write_text('MENU_KEY = "MENU RU"\n', encoding="utf-8")
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ui_idx = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    menu_idx = win.fs_model.index_for_path(root / "BE" / "menu.txt")
+    win._file_chosen(ui_idx)
+    model = win.table.model()
+    assert model is not None
+
+    ru_idx = win.source_ref_combo.findData("RU")
+    en_idx = win.source_ref_combo.findData("EN")
+    assert ru_idx >= 0
+    assert en_idx >= 0
+    win.source_ref_combo.setCurrentIndex(ru_idx)
+    assert model.data(model.index(0, 1), Qt.DisplayRole) == "UI RU"
+
+    win.source_ref_pin_btn.click()
+    assert win.source_ref_pin_btn.isChecked()
+
+    win._file_chosen(menu_idx)
+    model = win.table.model()
+    assert model is not None
+    win.source_ref_combo.setCurrentIndex(en_idx)
+    assert model.data(model.index(0, 1), Qt.DisplayRole) == "MENU EN"
+
+    win._file_chosen(ui_idx)
+    model = win.table.model()
+    assert model is not None
+    assert win.source_ref_pin_btn.isChecked()
+    assert model.data(model.index(0, 1), Qt.DisplayRole) == "UI RU"
+
+    saved = preferences.load(None)
+    extras = dict(saved.get("__extras__", {}))
+    overrides = load_source_reference_file_overrides(
+        extras.get("SOURCE_REFERENCE_FILE_OVERRIDES")
+    )
+    assert overrides.get("BE/ui.txt") == "RU"
+
+
+def test_source_reference_selector_falls_back_to_en_when_unavailable(
+    tmp_path, qtbot, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    win._source_reference_mode = "RU"
+    win._sync_source_reference_mode(persist=False)
+
+    assert win._source_reference_mode == "EN"
+    locales = [
+        win.source_ref_combo.itemData(i) for i in range(win.source_ref_combo.count())
+    ]
+    assert locales == ["EN", "BE"]
+
+
+def test_source_reference_selector_target_then_en_fallback_policy(
+    tmp_path, qtbot, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "proj"
+    for loc, value in (("EN", "EN SRC"), ("BE", "BE SRC")):
+        (root / loc).mkdir(parents=True, exist_ok=True)
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+        (root / loc / "ui.txt").write_text(
+            f'UI_KEY = "{value}"\n',
+            encoding="utf-8",
+        )
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._source_reference_mode = "RU"
+    win._source_reference_fallback_policy = "TARGET_THEN_EN"
+    win._sync_source_reference_mode(persist=False)
+    assert win._source_reference_mode == "BE"
+
+
+def test_source_reference_clear_overrides_from_preferences(
+    tmp_path, qtbot, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "proj"
+    for loc in ("EN", "BE", "RU"):
+        (root / loc).mkdir(parents=True, exist_ok=True)
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+        (root / loc / "ui.txt").write_text(
+            f'UI_KEY = "{loc}"\n',
+            encoding="utf-8",
+        )
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ui_idx = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(ui_idx)
+    ru_idx = win.source_ref_combo.findData("RU")
+    assert ru_idx >= 0
+    win.source_ref_combo.setCurrentIndex(ru_idx)
+    win.source_ref_pin_btn.click()
+    assert win._source_reference_file_overrides
+
+    win._apply_preferences({"source_reference_clear_overrides": True})
+    assert win._source_reference_file_overrides == {}
+    saved = preferences.load(None)
+    extras = dict(saved.get("__extras__", {}))
+    assert "SOURCE_REFERENCE_FILE_OVERRIDES" not in extras
+
+
 def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
@@ -409,6 +610,86 @@ def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
     assert values["tm_export_tmx"] is False
     assert values["tm_rebuild"] is False
     assert values["tm_show_diagnostics"] is False
+
+
+def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {
+            "tm_import_dir": str(root / ".tzp" / "tms"),
+            "qa_check_trailing": False,
+            "qa_check_newlines": False,
+            "qa_check_escapes": True,
+            "qa_check_same_as_source": True,
+            "qa_auto_mark_for_review": True,
+        },
+        tm_files=[],
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog._qa_trailing_check.isChecked() is False
+    assert dialog._qa_newlines_check.isChecked() is False
+    assert dialog._qa_tokens_check.isChecked() is True
+    assert dialog._qa_same_source_check.isChecked() is True
+    assert dialog._qa_auto_mark_check.isChecked() is True
+
+    dialog._qa_trailing_check.setChecked(True)
+    dialog._qa_newlines_check.setChecked(True)
+    dialog._qa_tokens_check.setChecked(False)
+    dialog._qa_same_source_check.setChecked(False)
+    dialog._qa_auto_mark_check.setChecked(False)
+
+    values = dialog.values()
+    assert values["qa_check_trailing"] is True
+    assert values["qa_check_newlines"] is True
+    assert values["qa_check_escapes"] is False
+    assert values["qa_check_same_as_source"] is False
+    assert values["qa_auto_mark_for_review"] is False
+
+
+def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
+    tmp_path, qtbot, monkeypatch
+):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(ix)
+
+    monkeypatch.setattr(win, "_apply_tm_preferences_actions", lambda _values: None)
+    monkeypatch.setattr(win, "_persist_preferences", lambda: None)
+    refresh_calls: list[bool] = []
+    monkeypatch.setattr(
+        win,
+        "_schedule_qa_refresh",
+        lambda *, immediate=False: refresh_calls.append(bool(immediate)),
+    )
+
+    win._apply_preferences(
+        {
+            "prompt_write_on_exit": True,
+            "wrap_text": win._wrap_text_user,
+            "large_text_optimizations": win._large_text_optimizations,
+            "visual_highlight": win._visual_highlight,
+            "visual_whitespace": win._visual_whitespace,
+            "default_root": win._default_root,
+            "tm_import_dir": win._tm_import_dir,
+            "search_scope": win._search_scope,
+            "replace_scope": win._replace_scope,
+            "qa_check_trailing": False,
+            "qa_check_newlines": False,
+            "qa_check_escapes": True,
+            "qa_check_same_as_source": True,
+            "qa_auto_mark_for_review": True,
+        }
+    )
+
+    assert win._qa_check_trailing is False
+    assert win._qa_check_newlines is False
+    assert win._qa_check_escapes is True
+    assert win._qa_check_same_as_source is True
+    assert win._qa_auto_mark_for_review is True
+    assert refresh_calls == [True]
 
 
 def test_preferences_tm_diagnostics_button_sets_flag(tmp_path, qtbot):

@@ -1,0 +1,199 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from translationzed_py.core.model import Entry, ParsedFile, Status
+from translationzed_py.core.source_reference_service import (
+    build_source_lookup_materialized,
+    dump_source_reference_file_overrides,
+    load_reference_lookup,
+    load_source_reference_file_overrides,
+    normalize_source_reference_mode,
+    reference_path_for,
+    resolve_source_reference_locale,
+    resolve_source_reference_mode_for_path,
+    source_reference_path_key,
+)
+
+
+def test_normalize_source_reference_mode() -> None:
+    assert normalize_source_reference_mode(" en ") == "EN"
+    assert normalize_source_reference_mode("be") == "BE"
+    assert normalize_source_reference_mode("", default="EN") == "EN"
+
+
+def test_resolve_source_reference_locale_prefers_requested_available() -> None:
+    resolution = resolve_source_reference_locale(
+        "BE",
+        available_locales=("EN", "BE", "RU"),
+    )
+    assert resolution.requested_mode == "BE"
+    assert resolution.resolved_locale == "BE"
+    assert resolution.fallback_used is False
+
+
+def test_resolve_source_reference_locale_falls_back_to_default_then_locale() -> None:
+    resolution = resolve_source_reference_locale(
+        "KO",
+        available_locales=("BE", "RU"),
+        fallback_locale="RU",
+    )
+    assert resolution.requested_mode == "KO"
+    assert resolution.resolved_locale == "RU"
+    assert resolution.fallback_used is True
+
+
+def test_reference_path_for_mirror_layout(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    be = root / "BE"
+    en = root / "EN"
+    be.mkdir(parents=True)
+    en.mkdir(parents=True)
+    target = be / "ui.txt"
+    source = en / "ui.txt"
+    target.write_text('UI = "B"\n', encoding="utf-8")
+    source.write_text('UI = "E"\n', encoding="utf-8")
+
+    assert (
+        reference_path_for(
+            root,
+            target,
+            target_locale="BE",
+            reference_locale="EN",
+        )
+        == source
+    )
+
+
+def test_reference_path_for_suffix_rewrite(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    be = root / "BE"
+    en = root / "EN"
+    be.mkdir(parents=True)
+    en.mkdir(parents=True)
+    target = be / "IG_UI_BE.txt"
+    source = en / "IG_UI_EN.txt"
+    target.write_text('UI = "B"\n', encoding="utf-8")
+    source.write_text('UI = "E"\n', encoding="utf-8")
+
+    assert (
+        reference_path_for(
+            root,
+            target,
+            target_locale="BE",
+            reference_locale="EN",
+        )
+        == source
+    )
+
+
+def test_reference_path_for_returns_none_when_outside_root(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    root.mkdir()
+    outside = tmp_path.parent / "outside.txt"
+    assert (
+        reference_path_for(
+            root,
+            outside,
+            target_locale="BE",
+            reference_locale="EN",
+        )
+        is None
+    )
+
+
+def test_build_source_lookup_materialized_by_row_when_keys_match() -> None:
+    entries = [
+        Entry("K1", "One", Status.UNTOUCHED, (0, 0), (), ()),
+        Entry("K2", "Two", Status.UNTOUCHED, (0, 0), (), ()),
+    ]
+    target = [
+        Entry("K1", "A", Status.UNTOUCHED, (0, 0), (), ()),
+        Entry("K2", "B", Status.UNTOUCHED, (0, 0), (), ()),
+    ]
+    result = build_source_lookup_materialized(
+        entries,
+        target_entries=target,
+        path_name="ui.txt",
+    )
+    assert result.by_row_values == ["One", "Two"]
+    assert result.keys == ["K1", "K2"]
+    assert result.by_key is None
+
+
+def test_build_source_lookup_materialized_raw_single_entry() -> None:
+    reference = [
+        Entry("News_BE.txt", "RAW", Status.UNTOUCHED, (0, 0), (), (), raw=True),
+    ]
+    target = [
+        Entry("News_BE.txt", "X", Status.UNTOUCHED, (0, 0), (), (), raw=True),
+    ]
+    result = build_source_lookup_materialized(
+        reference,
+        target_entries=target,
+        path_name="News_BE.txt",
+    )
+    assert result.by_row_values == ["RAW"]
+    assert result.keys == ["News_BE.txt"]
+
+
+def test_load_reference_lookup_uses_cache_and_returns_materialized(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "proj"
+    for loc in ("EN", "BE"):
+        (root / loc).mkdir(parents=True, exist_ok=True)
+    target_path = root / "BE" / "ui.txt"
+    source_path = root / "EN" / "ui.txt"
+    target_path.write_text('K = "B"\n', encoding="utf-8")
+    source_path.write_text('K = "E"\n', encoding="utf-8")
+
+    target_entries = [Entry("K", "B", Status.UNTOUCHED, (0, 0), (), ())]
+    cached_pf = ParsedFile(
+        source_path,
+        [Entry("K", "E", Status.UNTOUCHED, (0, 0), (), ())],
+        b"",
+    )
+    cache = {source_path: cached_pf}
+
+    result = load_reference_lookup(
+        root=root,
+        path=target_path,
+        target_locale="BE",
+        reference_locale="EN",
+        locale_encodings={"EN": "utf-8", "BE": "utf-8"},
+        target_entries=target_entries,
+        parsed_cache=cache,
+        should_parse_lazy=lambda _p: False,
+        parse_eager=lambda _p, _enc: (_ for _ in ()).throw(RuntimeError("no parse")),
+        parse_lazy=lambda _p, _enc: (_ for _ in ()).throw(RuntimeError("no parse")),
+    )
+    assert result is not None
+    assert result.by_row_values == ["E"]
+    assert result.keys == ["K"]
+
+
+def test_source_reference_path_key_is_posix_relative(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    path = root / "BE" / "ui.txt"
+    assert source_reference_path_key(root, path) == "BE/ui.txt"
+
+
+def test_source_reference_file_overrides_round_trip() -> None:
+    encoded = dump_source_reference_file_overrides(
+        {"BE\\ui.txt": "ru", "BE/menu.txt": "EN", "": "RU"}
+    )
+    loaded = load_source_reference_file_overrides(encoded)
+    assert loaded == {"BE/ui.txt": "RU", "BE/menu.txt": "EN"}
+
+
+def test_resolve_source_reference_mode_for_path_uses_override(tmp_path: Path) -> None:
+    root = tmp_path / "proj"
+    path = root / "BE" / "ui.txt"
+    mode = resolve_source_reference_mode_for_path(
+        root=root,
+        path=path,
+        default_mode="EN",
+        overrides={"BE/ui.txt": "RU"},
+    )
+    assert mode == "RU"

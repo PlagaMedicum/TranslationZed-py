@@ -156,3 +156,67 @@ def test_search_side_panel_lists_results_and_navigates(qtbot, tmp_path: Path):
     tree_path = win.tree.currentIndex().data(Qt.UserRole)
     assert tree_path == str(dst / "BE" / "second.txt")
     assert ix_second.isValid()
+
+
+def test_search_source_mode_switch_changes_source_matches(qtbot, tmp_path: Path):
+    dst = tmp_path / "proj"
+    dst.mkdir()
+    for loc in ("EN", "BE", "RU"):
+        (dst / loc).mkdir()
+        (dst / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (dst / "EN" / "ui.txt").write_text('UI_KEY = "Hello source"\n', encoding="utf-8")
+    (dst / "RU" / "ui.txt").write_text('UI_KEY = "Привет источник"\n', encoding="utf-8")
+    (dst / "BE" / "ui.txt").write_text('UI_KEY = "Мэта"\n', encoding="utf-8")
+
+    win = MainWindow(str(dst), selected_locales=["BE", "RU"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(dst / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    en_idx = win.source_ref_combo.findData("EN")
+    assert en_idx >= 0
+    win.source_ref_combo.setCurrentIndex(en_idx)
+
+    win.search_mode.setCurrentIndex(1)  # Source
+    win.search_edit.setText("Привет")
+    assert win._search_from_anchor(direction=1, anchor_row=-1, wrap=False) is False
+
+    ru_idx = win.source_ref_combo.findData("RU")
+    assert ru_idx >= 0
+    win.source_ref_combo.setCurrentIndex(ru_idx)
+    assert win._search_from_anchor(direction=1, anchor_row=-1, wrap=False) is True
+
+
+def test_search_source_mode_switch_invalidates_rows_cache(qtbot, tmp_path: Path):
+    dst = tmp_path / "proj"
+    dst.mkdir()
+    for loc in ("EN", "BE", "RU"):
+        (dst / loc).mkdir()
+        (dst / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (dst / "EN" / "ui.txt").write_text('UI_KEY = "Alpha source"\n', encoding="utf-8")
+    (dst / "RU" / "ui.txt").write_text('UI_KEY = "Бэта крыніца"\n', encoding="utf-8")
+    (dst / "BE" / "ui.txt").write_text('UI_KEY = "Target"\n', encoding="utf-8")
+
+    win = MainWindow(str(dst), selected_locales=["BE", "RU"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(dst / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    en_idx = win.source_ref_combo.findData("EN")
+    assert en_idx >= 0
+    win.source_ref_combo.setCurrentIndex(en_idx)
+    win.search_mode.setCurrentIndex(1)  # Source
+    win.search_edit.setText("Alpha")
+    assert win._search_from_anchor(direction=1, anchor_row=-1, wrap=False) is True
+    assert len(win._search_rows_cache) > 0
+
+    ru_idx = win.source_ref_combo.findData("RU")
+    assert ru_idx >= 0
+    win.source_ref_combo.setCurrentIndex(ru_idx)
+    assert len(win._search_rows_cache) == 0
+    win.search_edit.setText("Бэта")
+    assert win._search_from_anchor(direction=1, anchor_row=-1, wrap=False) is True

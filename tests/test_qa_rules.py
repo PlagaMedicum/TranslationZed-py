@@ -12,10 +12,7 @@ from translationzed_py.core.qa_rules import (
 
 
 def test_extract_protected_tokens_detects_code_like_tokens_only() -> None:
-    text = (
-        '[img=music] <LINE> <CENTRE> %1 %1$s \\n '
-        "<gasps from the courtroom> plain"
-    )
+    text = "[img=music] <LINE> <CENTRE> %1 %1$s \\n " "<gasps from the courtroom> plain"
     assert extract_protected_tokens(text) == (
         "[img=music]",
         "<LINE>",

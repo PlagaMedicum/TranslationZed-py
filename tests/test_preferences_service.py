@@ -8,6 +8,7 @@ from translationzed_py.core.preferences_service import (
     build_persist_payload,
     normalize_loaded_preferences,
     normalize_scope,
+    resolve_qa_preferences,
     resolve_startup_root,
 )
 
@@ -54,6 +55,26 @@ def test_normalize_scope_falls_back_to_file() -> None:
     assert normalize_scope("LOCALE") == "LOCALE"
     assert normalize_scope("pool") == "POOL"
     assert normalize_scope("invalid") == "FILE"
+
+
+def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
+    current = (True, True, False, False, False)
+    updated, changed = resolve_qa_preferences(
+        {
+            "qa_check_trailing": False,
+            "qa_check_newlines": True,
+            "qa_check_escapes": True,
+            "qa_check_same_as_source": True,
+            "qa_auto_mark_for_review": True,
+        },
+        current=current,
+    )
+    assert updated == (False, True, True, True, True)
+    assert changed is True
+
+    same, unchanged = resolve_qa_preferences({}, current=updated)
+    assert same == updated
+    assert unchanged is False
 
 
 def test_preferences_service_normalize_scope_delegates_helper() -> None:
