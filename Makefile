@@ -3,7 +3,7 @@ PY      ?= python            # override on CLI:  make PY=python3.12 venv
 VENV    ?= .venv
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt lint typecheck arch-check test check verify verify-core verify-fast release-check release-dry-run run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win test-encoding-integrity diagnose-encoding test-readonly-clean
+.PHONY: venv install precommit fmt lint typecheck arch-check test check verify verify-core verify-fast release-check release-check-if-tag release-dry-run run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win test-encoding-integrity diagnose-encoding test-readonly-clean
 
 ## create .venv and populate dev deps (one-off)
 venv:
@@ -51,7 +51,16 @@ verify-core: clean-cache clean-config check test-encoding-integrity diagnose-enc
 verify-fast: check
 
 ## full verification (core gate + perf scenarios)
-verify: verify-core perf-scenarios
+verify: verify-core perf-scenarios release-check-if-tag
+
+## run release-check only when TAG is provided (keeps `make verify` single-command friendly)
+release-check-if-tag:
+	@if [ -n "$(TAG)" ]; then \
+		echo "TAG=$(TAG) detected; running release-check"; \
+		$(MAKE) release-check TAG=$(TAG); \
+	else \
+		echo "release-check skipped (set TAG=vX.Y.Z to include it in make verify)"; \
+	fi
 
 ## validate release tag/version/changelog alignment
 release-check:
