@@ -6,7 +6,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QListWidgetItem, QMessageBox
 
 from translationzed_py.core import preferences
 from translationzed_py.core.source_reference_service import (
@@ -16,6 +16,10 @@ from translationzed_py.core.tm_store import TMMatch
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
 from translationzed_py.gui.preferences_dialog import PreferencesDialog
+from translationzed_py.gui.tm_preview import (
+    apply_tm_preview_highlights,
+    prepare_tm_preview_terms,
+)
 
 
 def _make_project(tmp_path: Path) -> Path:
@@ -152,6 +156,47 @@ def test_tm_min_score_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
     saved = preferences.load(None)
     extras = dict(saved.get("__extras__", {}))
     assert extras.get("TM_MIN_SCORE") == "5"
+
+
+def test_tm_preview_term_sanitizer_drops_short_long_and_duplicates(tmp_path, qtbot):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    terms = ["a", "drop", "drop", "run", "x" * 120, "all"]
+    assert prepare_tm_preview_terms(terms) == ["drop", "run", "all"]
+
+
+def test_tm_apply_double_click_is_deferred(tmp_path, qtbot, monkeypatch):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[int] = []
+    triggered: list[str] = []
+
+    def _single_shot(delay: int, callback) -> None:
+        calls.append(delay)
+        callback()
+
+    monkeypatch.setattr(mw.QTimer, "singleShot", staticmethod(_single_shot))
+    monkeypatch.setattr(win, "_apply_tm_selection", lambda: triggered.append("apply"))
+
+    win._on_tm_item_double_clicked(QListWidgetItem("sample"))
+
+    assert calls == [0]
+    assert triggered == ["apply"]
+
+
+def test_tm_preview_highlight_skips_very_large_text(tmp_path, qtbot):
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    win._tm_source_preview.setPlainText("a" * 160_001)
+    apply_tm_preview_highlights(win._tm_source_preview, ["aaaa"])
+
+    assert win._tm_source_preview.extraSelections() == []
 
 
 def test_theme_mode_persists_to_settings_env(tmp_path, qtbot, monkeypatch):

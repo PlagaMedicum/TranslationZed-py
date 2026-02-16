@@ -22,20 +22,17 @@ from PySide6.QtCore import (
     QItemSelectionModel,
     QModelIndex,
     QPoint,
-    QRegularExpression,
     Qt,
     QTimer,
     QUrl,
 )
 from PySide6.QtGui import (
     QAction,
-    QColor,
     QCursor,
     QDesktopServices,
     QGuiApplication,
     QIcon,
     QKeySequence,
-    QTextCharFormat,
     QTextOption,
 )
 from PySide6.QtWidgets import (
@@ -66,7 +63,6 @@ from PySide6.QtWidgets import (
     QTableView,
     QTableWidget,
     QTableWidgetItem,
-    QTextEdit,
     QToolBar,
     QToolButton,
     QToolTip,
@@ -305,6 +301,8 @@ from .theme import apply_theme as _apply_app_theme
 from .theme import connect_system_theme_sync as _connect_system_theme_sync
 from .theme import disconnect_system_theme_sync as _disconnect_system_theme_sync
 from .theme import normalize_theme_mode as _normalize_theme_mode
+from .tm_preview import apply_tm_preview_highlights as _apply_tm_preview_highlights
+from .tm_preview import prepare_tm_preview_terms as _prepare_tm_preview_terms
 
 _TEST_DIALOGS_PATCHED = False
 _ORIG_QMESSAGEBOX_EXEC = None
@@ -596,6 +594,7 @@ class MainWindow(QMainWindow):
         self._tm_update_timer.setSingleShot(True)
         self._tm_update_timer.setInterval(120)
         self._tm_update_timer.timeout.connect(self._update_tm_suggestions)
+        self._tm_apply_in_progress = False
         self._tm_flush_timer = QTimer(self)
         self._tm_flush_timer.setSingleShot(True)
         self._tm_flush_timer.setInterval(750)
@@ -955,7 +954,7 @@ class MainWindow(QMainWindow):
         self._tm_list = QListWidget(self._tm_panel)
         self._tm_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._tm_list.itemSelectionChanged.connect(self._update_tm_apply_state)
-        self._tm_list.itemDoubleClicked.connect(self._apply_tm_selection)
+        self._tm_list.itemDoubleClicked.connect(self._on_tm_item_double_clicked)
         self._tm_source_preview = QPlainTextEdit(self._tm_panel)
         self._tm_source_preview.setReadOnly(True)
         self._tm_source_preview.setPlaceholderText("TM source (full text)")
@@ -4897,6 +4896,8 @@ class MainWindow(QMainWindow):
             perf_trace.stop("selection", perf_start, items=1, unit="events")
 
     def _schedule_tm_update(self) -> None:
+        if self._tm_apply_in_progress:
+            return
         plan = self._tm_workflow.build_update_plan(
             has_store=self._tm_store is not None,
             panel_index=self._left_stack.currentIndex(),
@@ -4929,41 +4930,14 @@ class MainWindow(QMainWindow):
             return
         self._tm_source_preview.setPlainText(plan.source_preview)
         self._tm_target_preview.setPlainText(plan.target_preview)
-        terms = list(plan.query_terms)
+        terms = _prepare_tm_preview_terms(plan.query_terms)
         with contextlib.suppress(Exception):
-            self._highlight_tm_preview(self._tm_source_preview, terms)
-            self._highlight_tm_preview(self._tm_target_preview, terms)
+            _apply_tm_preview_highlights(self._tm_source_preview, terms)
+            _apply_tm_preview_highlights(self._tm_target_preview, terms)
 
-    def _highlight_tm_preview(self, editor: QPlainTextEdit, terms: list[str]) -> None:
-        if not terms:
-            editor.setExtraSelections([])
-            return
-        fmt = QTextCharFormat()
-        fmt.setBackground(QColor(255, 235, 120, 170))
-        fmt.setForeground(QColor(0, 0, 0))
-        selections: list[QTextEdit.ExtraSelection] = []
-        doc = editor.document()
-        max_hits = 200
-        for term in terms:
-            pattern = QRegularExpression(re.escape(term))
-            pattern.setPatternOptions(QRegularExpression.CaseInsensitiveOption)
-            pos = 0
-            while True:
-                cursor = doc.find(pattern, pos)
-                if cursor.isNull():
-                    break
-                sel = QTextEdit.ExtraSelection()
-                sel.cursor = cursor
-                sel.format = fmt
-                selections.append(sel)
-                if len(selections) >= max_hits:
-                    editor.setExtraSelections(selections)
-                    return
-                next_pos = cursor.selectionEnd()
-                if next_pos <= pos:
-                    next_pos = pos + 1
-                pos = next_pos
-        editor.setExtraSelections(selections)
+    def _on_tm_item_double_clicked(self, _item: QListWidgetItem) -> None:
+        # Defer apply to avoid mutating list/model during Qt double-click delivery.
+        QTimer.singleShot(0, self._apply_tm_selection)
 
     def _tm_query_policy(self) -> TMQueryPolicy:
         return self._tm_workflow.build_filter_plan(
@@ -5166,6 +5140,8 @@ class MainWindow(QMainWindow):
             self._tm_variants_list.addItem(item)
 
     def _apply_tm_selection(self) -> None:
+        if self._tm_apply_in_progress:
+            return
         if not (self._current_model and self._current_pf):
             return
         items = self._tm_list.selectedItems()
@@ -5180,12 +5156,19 @@ class MainWindow(QMainWindow):
         current = self.table.currentIndex()
         if not current.isValid():
             return
-        value_index = self._current_model.index(current.row(), 2)
-        self._current_model.setData(value_index, plan.target_text, Qt.EditRole)
-        if plan.mark_for_review:
-            status_index = self._current_model.index(current.row(), 3)
-            self._current_model.setData(status_index, Status.FOR_REVIEW, Qt.EditRole)
-        self._update_status_combo_from_selection()
+        self._tm_apply_in_progress = True
+        try:
+            value_index = self._current_model.index(current.row(), 2)
+            self._current_model.setData(value_index, plan.target_text, Qt.EditRole)
+            if plan.mark_for_review:
+                status_index = self._current_model.index(current.row(), 3)
+                self._current_model.setData(
+                    status_index, Status.FOR_REVIEW, Qt.EditRole
+                )
+            self._update_status_combo_from_selection()
+        finally:
+            self._tm_apply_in_progress = False
+        self._schedule_tm_update()
 
     def _update_tm_suggestions(self) -> None:
         policy = self._tm_query_policy()
