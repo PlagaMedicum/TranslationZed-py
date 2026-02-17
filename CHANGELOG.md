@@ -5,38 +5,28 @@ All notable changes to this project will be documented in this file.
 ## [0.7.0] - 2026-02-16
 
 ### Added
+- Dark theme support synchronized with system theme;
+- More deterministic cross-platform path normalization in diagnostics, prompts, and search labels;
+- Better save flow transparency (changed-file prompts and improved write intent visibility).
+- Additional TM import formats and stronger TM relevance/ranking coverage;
 - Source-reference switch. You can now change source column's locale on the fly;
 - QA tab with basic QAs for translations;
 - New source-reference core/service helpers with dedicated unit and GUI integration coverage;
 - More automated tests and diagnostics stuff;
-- More options for TM import;
 - Added more indicators to the UI, like characters counter in the bottom-right cormer;
 - Additional regression checks for source-mode search/cache behavior and large-file source-reference switch performance.
 
 ### Changed
 - UI improved and is more responsive and ordered;
-- Refactored a lot of code;
+- Refactored a lot of code, improved architecture of the project;
 - Updated documentation;
-- Improved preferences.
-
-### Fixed
-- Stale source-cache/search behavior when switching Source reference locale;
-- Preference-apply edge cases around fallback policy updates and file-level Source override cleanup.
-
-## [0.6.0] - 2026-02-14
-
-### Added
-- Dark theme support synchronized with system theme.
-- More deterministic cross-platform path normalization in diagnostics, prompts, and search labels.
-- Additional TM import formats and stronger TM relevance/ranking coverage.
-- Better save flow transparency (changed-file prompts and improved write intent visibility).
-
-### Changed
-- Main-window workflow orchestration continues to move into explicit services (`A0` refactor slices).
+- Improved preferences;
 - CI/release checks are stricter and include cross-platform gating before final tagging.
 
 ### Fixed
-- Windows-specific path and separator regressions in tests and service outputs.
+- Stale source-cache/search behavior when switching Source reference locale;
+- Preference-apply edge cases around fallback policy updates and file-level Source override cleanup;
+- Windows-specific path and separator regressions in tests and service outputs;
 - TM preview/query robustness and UI edge-case behavior during panel operations.
 
 ## [0.5.0] - 2026-02-09
