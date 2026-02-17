@@ -5,19 +5,22 @@ All notable changes to this project will be documented in this file.
 ## [0.7.0] - 2026-02-16
 
 ### Added
-- Source-reference locale workflow improvements:
-  - configurable fallback order (`EN → Target` or `Target → EN`),
-  - per-file Source locale pin overrides,
-  - one-click clear action for all pinned overrides in Preferences.
-- New source-reference core/service helpers with dedicated unit and GUI integration coverage.
+- Source-reference switch. You can now change source column's locale on the fly;
+- QA tab with basic QAs for translations;
+- New source-reference core/service helpers with dedicated unit and GUI integration coverage;
+- More automated tests and diagnostics stuff;
+- More options for TM import;
+- Added more indicators to the UI, like characters counter in the bottom-right cormer;
 - Additional regression checks for source-mode search/cache behavior and large-file source-reference switch performance.
 
 ### Changed
-- Main-window source-reference logic was thinned into adapter calls backed by Qt-free state/service modules (clean-architecture continuation).
-- `make verify` remains the one-command full gate (lint/typecheck/arch/tests/encoding/readonly/perf), with optional tag-aware release-check.
+- UI improved and is more responsive and ordered;
+- Refactored a lot of code;
+- Updated documentation;
+- Improved preferences.
 
 ### Fixed
-- Stale source-cache/search behavior when switching Source reference locale.
+- Stale source-cache/search behavior when switching Source reference locale;
 - Preference-apply edge cases around fallback policy updates and file-level Source override cleanup.
 
 ## [0.6.0] - 2026-02-14
