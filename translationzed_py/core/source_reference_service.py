@@ -1,3 +1,5 @@
+"""Source reference service module."""
+
 from __future__ import annotations
 
 import json
@@ -14,6 +16,8 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class SourceReferenceResolution:
+    """Represent SourceReferenceResolution."""
+
     requested_mode: str
     resolved_locale: str
     fallback_used: bool
@@ -21,6 +25,8 @@ class SourceReferenceResolution:
 
 @dataclass(frozen=True, slots=True)
 class SourceLookupMaterialized:
+    """Represent SourceLookupMaterialized."""
+
     by_key: dict[str, str] | None = None
     by_row_values: list[str] | None = None
     by_row_entries: EntrySequence | None = None
@@ -28,6 +34,7 @@ class SourceLookupMaterialized:
 
 
 def source_reference_path_key(root: Path, path: Path) -> str:
+    """Execute source reference path key."""
     try:
         rel = path.relative_to(root)
         return rel.as_posix()
@@ -36,6 +43,7 @@ def source_reference_path_key(root: Path, path: Path) -> str:
 
 
 def load_source_reference_file_overrides(raw: object) -> dict[str, str]:
+    """Load source reference file overrides."""
     text = str(raw or "").strip()
     if not text:
         return {}
@@ -55,6 +63,7 @@ def load_source_reference_file_overrides(raw: object) -> dict[str, str]:
 
 
 def dump_source_reference_file_overrides(overrides: Mapping[str, str]) -> str:
+    """Execute dump source reference file overrides."""
     normalized: dict[str, str] = {}
     for key in sorted(overrides):
         path_key = str(key).strip().replace("\\", "/")
@@ -71,12 +80,14 @@ def resolve_source_reference_mode_for_path(
     default_mode: object,
     overrides: Mapping[str, str],
 ) -> str:
+    """Resolve source reference mode for path."""
     key = source_reference_path_key(root, path)
     requested = overrides.get(key, default_mode)
     return normalize_source_reference_mode(requested, default="EN")
 
 
 def normalize_source_reference_mode(value: object, *, default: str = "EN") -> str:
+    """Normalize source reference mode."""
     raw = str(value).strip().upper()
     if not raw:
         return default
@@ -90,6 +101,7 @@ def resolve_source_reference_locale(
     fallback_locale: str | None = None,
     default: str = "EN",
 ) -> SourceReferenceResolution:
+    """Resolve source reference locale."""
     requested = normalize_source_reference_mode(mode, default=default)
     available = {str(locale).strip().upper() for locale in available_locales if locale}
     fallback = normalize_source_reference_mode(fallback_locale or "", default="")
@@ -134,6 +146,7 @@ def reference_path_for(
     target_locale: str,
     reference_locale: str,
 ) -> Path | None:
+    """Execute reference path for."""
     target = normalize_source_reference_mode(target_locale, default="")
     reference = normalize_source_reference_mode(reference_locale, default="")
     if not target or not reference:
@@ -169,6 +182,7 @@ def reference_path_for(
 
 
 def _locale_suffix_tokens(locale: str) -> tuple[str, ...]:
+    """Execute locale suffix tokens."""
     raw = locale.strip()
     underscore = raw.replace(" ", "_")
     if underscore == raw:
@@ -182,6 +196,7 @@ def build_source_lookup_materialized(
     target_entries: EntrySequence | None,
     path_name: str,
 ) -> SourceLookupMaterialized:
+    """Build source lookup materialized."""
     if _is_raw_single_entry(reference_entries):
         raw_value = reference_entries[0].value
         if target_entries is not None and _matches_single_raw_target(
@@ -219,6 +234,7 @@ def load_reference_lookup(
     parse_eager: Callable[[Path, str], ParsedFile],
     parse_lazy: Callable[[Path, str], ParsedFile],
 ) -> SourceLookupMaterialized | None:
+    """Load reference lookup."""
     if not target_locale:
         return None
     if reference_locale not in locale_encodings:
@@ -254,12 +270,14 @@ def load_reference_lookup(
 
 
 def _entry_key(entries: EntrySequence, idx: int) -> str:
+    """Execute entry key."""
     if hasattr(entries, "key_at"):
         return str(entries.key_at(idx))
     return entries[idx].key
 
 
 def _keys_match(a: EntrySequence, b: EntrySequence) -> bool:
+    """Execute keys match."""
     count = len(a)
     if count != len(b):
         return False
@@ -267,10 +285,12 @@ def _keys_match(a: EntrySequence, b: EntrySequence) -> bool:
 
 
 def _keys_list(entries: EntrySequence) -> list[str]:
+    """Execute keys list."""
     return [_entry_key(entries, idx) for idx in range(len(entries))]
 
 
 def _is_raw_single_entry(entries: EntrySequence) -> bool:
+    """Return whether raw single entry."""
     if not entries:
         return False
     if hasattr(entries, "meta_at"):
@@ -279,4 +299,5 @@ def _is_raw_single_entry(entries: EntrySequence) -> bool:
 
 
 def _matches_single_raw_target(entries: EntrySequence, path_name: str) -> bool:
+    """Execute matches single raw target."""
     return len(entries) == 1 and _entry_key(entries, 0) == path_name

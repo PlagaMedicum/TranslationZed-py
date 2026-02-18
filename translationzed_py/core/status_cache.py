@@ -1,3 +1,5 @@
+"""Status cache module."""
+
 from __future__ import annotations
 
 import contextlib
@@ -35,12 +37,16 @@ _FLAG_HAS_DRAFTS = 0x1
 
 @dataclass(frozen=True, slots=True)
 class CacheEntry:
+    """Represent CacheEntry."""
+
     status: Status
     value: str | None
     original: str | None = None
 
 
 class CacheMap(dict[int, CacheEntry]):
+    """Represent CacheMap."""
+
     __slots__ = ("hash_bits", "legacy_status", "last_opened", "magic", "has_drafts")
 
     def __init__(
@@ -53,6 +59,7 @@ class CacheMap(dict[int, CacheEntry]):
         has_drafts: bool = False,
         **kwargs: object,
     ) -> None:
+        """Initialize the instance."""
         super().__init__(*args, **kwargs)
         self.hash_bits = hash_bits
         self.legacy_status = legacy_status
@@ -71,6 +78,8 @@ _LEGACY_STATUS_MAP = {
 
 @dataclass(frozen=True, slots=True)
 class _CacheRows:
+    """Represent CacheRows."""
+
     last_opened: int
     rows: list[tuple[int, Status, str | None, str | None]]
     legacy_status: bool
@@ -80,6 +89,7 @@ class _CacheRows:
 
 
 def _status_from_byte(status_byte: int, *, legacy: bool) -> Status | None:
+    """Execute status from byte."""
     if legacy:
         return _LEGACY_STATUS_MAP.get(status_byte)
     try:
@@ -89,6 +99,7 @@ def _status_from_byte(status_byte: int, *, legacy: bool) -> Status | None:
 
 
 def _hash_key(key: str, *, bits: int = 64, key_hash: int | None = None) -> int:
+    """Execute hash key."""
     digest = (
         int(key_hash)
         if key_hash is not None
@@ -100,6 +111,7 @@ def _hash_key(key: str, *, bits: int = 64, key_hash: int | None = None) -> int:
 
 
 def _cache_path(root: Path, file_path: Path) -> Path:
+    """Execute cache path."""
     cfg = _load_app_config(root)
     rel = file_path.relative_to(root)
     rel_cache = rel.parent / f"{rel.stem}{cfg.cache_ext}"
@@ -107,6 +119,7 @@ def _cache_path(root: Path, file_path: Path) -> Path:
 
 
 def _legacy_cache_path(root: Path, file_path: Path) -> Path:
+    """Execute legacy cache path."""
     cfg = _load_app_config(root)
     rel = file_path.relative_to(root)
     rel_cache = rel.parent / f"{rel.stem}{cfg.cache_ext}"
@@ -116,6 +129,7 @@ def _legacy_cache_path(root: Path, file_path: Path) -> Path:
 
 
 def _read_cache_path(root: Path, file_path: Path) -> Path:
+    """Read cache path."""
     current = _cache_path(root, file_path)
     if current.exists():
         return current
@@ -126,6 +140,7 @@ def _read_cache_path(root: Path, file_path: Path) -> Path:
 
 
 def _cache_roots(root: Path) -> tuple[Path, ...]:
+    """Execute cache roots."""
     cfg = _load_app_config(root)
     current = root / cfg.cache_dir
     legacy = root / LEGACY_CACHE_DIR
@@ -135,10 +150,12 @@ def _cache_roots(root: Path) -> tuple[Path, ...]:
 
 
 def cache_path(root: Path, file_path: Path) -> Path:
+    """Execute cache path."""
     return _cache_path(root, file_path)
 
 
 def _original_path_from_cache(root: Path, cache_path: Path) -> Path | None:
+    """Execute original path from cache."""
     cfg = _load_app_config(root)
     rel: Path | None = None
     for cache_root in _cache_roots(root):
@@ -157,6 +174,7 @@ def _original_path_from_cache(root: Path, cache_path: Path) -> Path | None:
 
 
 def legacy_cache_paths(root: Path) -> list[Path]:
+    """Execute legacy cache paths."""
     cfg = _load_app_config(root)
     cache_roots = _cache_roots(root)
     out: list[Path] = []
@@ -186,6 +204,7 @@ def legacy_cache_paths(root: Path) -> list[Path]:
 def _migrate_cache_path(
     root: Path, cache_path: Path, locales: dict[str, LocaleMeta]
 ) -> bool:
+    """Execute migrate cache path."""
     try:
         data = cache_path.read_bytes()
     except OSError:
@@ -238,6 +257,7 @@ def _migrate_cache_path(
 
 
 def migrate_paths(root: Path, locales: dict[str, LocaleMeta], paths: list[Path]) -> int:
+    """Execute migrate paths."""
     cfg = _load_app_config(root)
     migrated = 0
     for cache_path in paths:
@@ -249,6 +269,7 @@ def migrate_paths(root: Path, locales: dict[str, LocaleMeta], paths: list[Path])
 
 
 def migrate_all(root: Path, locales: dict[str, LocaleMeta] | None = None) -> int:
+    """Execute migrate all."""
     if locales is None:
         from translationzed_py.core.project_scanner import scan_root
 
@@ -262,6 +283,7 @@ def migrate_all(root: Path, locales: dict[str, LocaleMeta] | None = None) -> int
 def _parse_rows_v2(
     data: bytes, *, offset: int, count: int, legacy: bool
 ) -> list[tuple[int, Status, str | None, str | None]] | None:
+    """Parse rows v2."""
     rows: list[tuple[int, Status, str | None, str | None]] = []
     for _ in range(count):
         if offset + _RECORD_V2.size > len(data):
@@ -286,6 +308,7 @@ def _parse_rows_v2(
 def _parse_rows_v3(
     data: bytes, *, offset: int, count: int, legacy: bool
 ) -> list[tuple[int, Status, str | None, str | None]] | None:
+    """Parse rows v3."""
     rows: list[tuple[int, Status, str | None, str | None]] = []
     for _ in range(count):
         if offset + _RECORD_V3.size > len(data):
@@ -320,6 +343,7 @@ def _parse_rows_v3(
 def _parse_rows_v4(
     data: bytes, *, offset: int, count: int, legacy: bool
 ) -> list[tuple[int, Status, str | None, str | None]] | None:
+    """Parse rows v4."""
     rows: list[tuple[int, Status, str | None, str | None]] = []
     for _ in range(count):
         if offset + _RECORD_V4.size > len(data):
@@ -352,6 +376,7 @@ def _parse_rows_v4(
 
 
 def _read_rows_any(data: bytes) -> _CacheRows | None:
+    """Read rows any."""
     if not data:
         return None
     if data.startswith(_MAGIC_V5):
@@ -579,6 +604,7 @@ def write(
 
 
 def read_last_opened_from_path(path: Path) -> int:
+    """Read last opened from path."""
     try:
         with path.open("rb") as handle:
             data = handle.read(_HEADER_V5.size)
@@ -623,6 +649,7 @@ def read_last_opened_from_path(path: Path) -> int:
 
 
 def read_has_drafts_from_path(path: Path) -> bool:
+    """Read has drafts from path."""
     try:
         with path.open("rb") as handle:
             data = handle.read(_HEADER_V5.size)
@@ -648,6 +675,7 @@ def read_has_drafts_from_path(path: Path) -> bool:
 
 
 def touch_last_opened(root: Path, file_path: Path, last_opened: int) -> bool:
+    """Execute touch last opened."""
     status_file = _read_cache_path(root, file_path)
     current_status_file = _cache_path(root, file_path)
     try:
@@ -681,6 +709,7 @@ def _write_rows(
     hash_bits: int,
     magic: bytes | None = None,
 ) -> None:
+    """Write rows."""
     buf = bytearray()
     if magic is None:
         magic = _MAGIC_V5 if hash_bits == 64 else _MAGIC_V3

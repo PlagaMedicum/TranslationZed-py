@@ -1,3 +1,5 @@
+"""Lazy entries module."""
+
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -14,6 +16,8 @@ from translationzed_py.core.parse_utils import (
 
 @dataclass(frozen=True, slots=True)
 class EntryMeta:
+    """Represent EntryMeta."""
+
     key: str
     status: Status
     span: tuple[int, int]
@@ -25,7 +29,10 @@ class EntryMeta:
 
 
 class LazyEntries:
+    """Represent LazyEntries."""
+
     def __init__(self, raw: bytes, encoding: str, metas: list[EntryMeta]) -> None:
+        """Initialize the instance."""
         self._raw = raw
         self._encoding, _bom_len = _resolve_encoding(encoding, raw)
         self._metas = metas
@@ -36,26 +43,33 @@ class LazyEntries:
         self._max_value_len: int | None = None
 
     def __len__(self) -> int:
+        """Return the number of items."""
         return len(self._metas)
 
     def __getitem__(self, index: int) -> Entry:
+        """Return an item by key or index."""
         return self._entry_at(index, cache_value=True)
 
     def __setitem__(self, index: int, entry: Entry) -> None:
+        """Set an item by key or index."""
         self._overrides[index] = entry
         self._value_cache[index] = entry.value
 
     def __iter__(self) -> Iterator[Entry]:
+        """Iterate over items."""
         for idx in range(len(self._metas)):
             yield self._entry_at(idx, cache_value=False)
 
     def meta_at(self, index: int) -> EntryMeta:
+        """Execute meta at."""
         return self._metas[index]
 
     def key_at(self, index: int) -> str:
+        """Execute key at."""
         return self._metas[index].key
 
     def index_by_hash(self, *, bits: int = 64) -> dict[int, list[int]]:
+        """Execute index by hash."""
         if bits == 16:
             if self._index_by_hash16 is None:
                 self._index_by_hash16 = self._build_index_by_hash(bits=16)
@@ -65,6 +79,7 @@ class LazyEntries:
         return self._index_by_hash64
 
     def prefetch(self, start: int, end: int) -> None:
+        """Execute prefetch."""
         if not self._metas:
             return
         lo = max(0, start)
@@ -76,6 +91,7 @@ class LazyEntries:
             self._value_cache[idx] = self._value_for_meta(meta)
 
     def max_value_length(self) -> int:
+        """Execute max value length."""
         cached = self._max_value_len
         if cached is not None:
             return cached
@@ -87,6 +103,7 @@ class LazyEntries:
         return max_len
 
     def preview_at(self, index: int, limit: int) -> str:
+        """Execute preview at."""
         if limit <= 0:
             return ""
         meta = self._metas[index]
@@ -114,12 +131,14 @@ class LazyEntries:
         return "".join(parts)
 
     def _decode_prefix(self, raw_slice: bytes, limit: int) -> str:
+        """Execute decode prefix."""
         if limit <= 0 or not raw_slice:
             return ""
         max_bytes = min(len(raw_slice), limit * 4 + 8)
         return raw_slice[:max_bytes].decode(self._encoding, errors="replace")
 
     def _preview_raw(self, limit: int) -> str:
+        """Execute preview raw."""
         if limit <= 0 or not self._raw:
             return ""
         text = self._decode_prefix(self._raw, limit)
@@ -128,6 +147,7 @@ class LazyEntries:
         return text[:limit]
 
     def _build_index_by_hash(self, *, bits: int) -> dict[int, list[int]]:
+        """Build index by hash."""
         mask = 0xFFFF if bits == 16 else 0xFFFFFFFFFFFFFFFF
         out: dict[int, list[int]] = {}
         for idx, meta in enumerate(self._metas):
@@ -136,6 +156,7 @@ class LazyEntries:
         return out
 
     def _entry_at(self, index: int, *, cache_value: bool) -> Entry:
+        """Execute entry at."""
         if index in self._overrides:
             return self._overrides[index]
         meta = self._metas[index]
@@ -158,6 +179,7 @@ class LazyEntries:
         )
 
     def _value_for_meta(self, meta: EntryMeta) -> str:
+        """Execute value for meta."""
         if meta.raw:
             return _decode_text(self._raw, self._encoding)
         parts: list[str] = []
