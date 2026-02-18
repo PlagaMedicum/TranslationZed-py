@@ -1,3 +1,5 @@
+"""Provide undo/redo command objects for table edits."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -18,6 +20,7 @@ class EditValueCommand(QUndoCommand):
         new_entry: Entry,
         model: Any,  # TranslationModel
     ) -> None:
+        """Initialize command snapshots for one value edit."""
         super().__init__(f"Edit “{old_entry.key}”")
         self._pf, self._row = pf, row
         # keep immutable snapshots so undo truly restores the previous state
@@ -45,9 +48,11 @@ class EditValueCommand(QUndoCommand):
 
     # ---- QUndoCommand -------------------------------------------------
     def undo(self) -> None:  # noqa: D401
+        """Undo the value edit."""
         self._apply(self._old)
 
     def redo(self) -> None:  # noqa: D401
+        """Redo the value edit."""
         self._apply(self._new)
 
     # ---- helpers ------------------------------------------------------
@@ -67,6 +72,7 @@ class ChangeStatusCommand(QUndoCommand):
         new_status: Status,
         model: Any,
     ) -> None:
+        """Initialize command state for one status change."""
         super().__init__("Change status")
         self._pf, self._row = pf, row
         self._prev = pf.entries[row].status
@@ -75,9 +81,11 @@ class ChangeStatusCommand(QUndoCommand):
 
     # -------------------------------------------------
     def undo(self) -> None:  # noqa: D401
+        """Undo the status change."""
         self._apply(self._prev)
 
     def redo(self) -> None:  # noqa: D401
+        """Redo the status change."""
         self._apply(self._new)
 
     def _apply(self, st: Status) -> None:
