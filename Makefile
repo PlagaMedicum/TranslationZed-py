@@ -10,7 +10,7 @@ BENCH_CURRENT ?= $(ARTIFACTS)/bench/bench.json
 	test test-cov test-perf perf-advisory check check-local verify verify-ci verify-ci-core verify-core \
 	verify-heavy verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build bench bench-check bench-advisory test-mutation \
-	run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
+	test-warnings run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
 
 # ─── Environment/bootstrap ─────────────────────────────────────────────────────
@@ -83,6 +83,9 @@ diagnose-encoding:
 test-readonly-clean:
 	VENV=$(VENV) bash scripts/test_readonly_clean.sh
 
+test-warnings:
+	VENV=$(VENV) bash scripts/test_warnings.sh
+
 # ─── Fast dev gates ────────────────────────────────────────────────────────────
 ## strict non-mutating quality gate (check-only) for CI
 check: fmt-check lint-check typecheck arch-check test
@@ -93,7 +96,7 @@ check-local: fmt lint typecheck arch-check test
 # ─── Verification umbrella gates ───────────────────────────────────────────────
 ## full local verification core (auto-fix + warning policy)
 verify-core: clean-cache clean-config fmt lint typecheck arch-check perf-advisory \
-	bench-advisory test-cov test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build
+	bench-advisory test-cov test-warnings test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build
 
 ## local perf gates are advisory; strict blocking lives in verify-ci
 perf-advisory:
@@ -127,7 +130,7 @@ verify:
 
 ## strict CI verification core (non-mutating)
 verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-check test-cov test-perf \
-	test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build bench-check perf-scenarios release-check-if-tag
+	test-warnings test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build bench-check perf-scenarios release-check-if-tag
 
 ## strict CI verification (non-mutating + fail-on-drift)
 verify-ci:
