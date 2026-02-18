@@ -3,7 +3,6 @@ from __future__ import annotations
 import contextlib
 import re
 import sqlite3
-import threading
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -265,13 +264,12 @@ def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
 
 
 class TMStore:
-    _QUERY_LOCAL = threading.local()
-
     def __init__(self, root: Path) -> None:
         cfg = _load_app_config(root)
         self._path = self._resolve_db_path(root, cfg.config_dir)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self._path)
+        self._closed = False
         self._conn.row_factory = sqlite3.Row
         self._configure()
         self._ensure_schema()
@@ -301,7 +299,14 @@ class TMStore:
             return False
 
     def close(self) -> None:
+        if self._closed:
+            return
         self._conn.close()
+        self._closed = True
+
+    def __del__(self) -> None:
+        with contextlib.suppress(Exception):
+            self.close()
 
     @property
     def db_path(self) -> Path:
@@ -332,15 +337,9 @@ class TMStore:
 
     @classmethod
     def _query_conn_for_path(cls, db_path: Path) -> sqlite3.Connection:
-        local = cls._QUERY_LOCAL
-        conn = getattr(local, "conn", None)
-        path = getattr(local, "path", None)
-        if conn is None or path != db_path:
-            conn = sqlite3.connect(db_path)
-            conn.row_factory = sqlite3.Row
-            cls._configure_conn(conn)
-            local.conn = conn
-            local.path = db_path
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cls._configure_conn(conn)
         return conn
 
     def _ensure_schema(self) -> None:
@@ -902,15 +901,19 @@ class TMStore:
         origins: Iterable[str] | None = None,
     ) -> list[TMMatch]:
         conn = cls._query_conn_for_path(db_path)
-        return cls._query_conn(
-            conn,
-            source_text,
-            source_locale=source_locale,
-            target_locale=target_locale,
-            limit=limit,
-            min_score=min_score,
-            origins=origins,
-        )
+        try:
+            return cls._query_conn(
+                conn,
+                source_text,
+                source_locale=source_locale,
+                target_locale=target_locale,
+                limit=limit,
+                min_score=min_score,
+                origins=origins,
+            )
+        finally:
+            with contextlib.suppress(Exception):
+                conn.close()
 
     @classmethod
     def _query_conn(

@@ -1,3 +1,5 @@
+import gc
+import warnings
 from pathlib import Path
 
 from translationzed_py.core.tm_store import TMStore
@@ -98,6 +100,40 @@ def test_tm_store_project_match_exposes_row_status(tmp_path: Path) -> None:
     assert project.row_status == 1
     assert imported.row_status is None
     store.close()
+
+
+def test_tm_store_query_path_closes_temporary_connections(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [("key1", "Hello world", "Privet mir")],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+    db_path = store.db_path
+    store.close()
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", ResourceWarning)
+        for _ in range(8):
+            matches = TMStore.query_path(
+                db_path,
+                "Hello world",
+                source_locale="EN",
+                target_locale="BE",
+                limit=3,
+            )
+            assert matches
+        gc.collect()
+
+    resource_warnings = [
+        row for row in caught if issubclass(row.category, ResourceWarning)
+    ]
+    assert not resource_warnings
 
 
 def test_tm_store_filters_low_token_overlap_candidates(tmp_path: Path) -> None:
