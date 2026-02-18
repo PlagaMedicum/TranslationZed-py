@@ -10,6 +10,11 @@ from translationzed_py.core import (
     scan_root,
     scan_root_with_errors,
 )
+from translationzed_py.core.project_scanner import (
+    LanguageFileError,
+    _parse_language_file,
+    _top_level_dir,
+)
 
 
 def test_scan_root_discovers_locales(tmp_path: Path) -> None:
@@ -92,3 +97,30 @@ def test_list_translatable_files_ignores_tvradio(prod_like_root: Path) -> None:
     root = prod_like_root
     locales = scan_root(root)
     assert "_TVRADIO_TRANSLATIONS" not in locales
+
+
+def test_project_scanner_helpers_cover_top_level_and_read_error_paths(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Verify scanner helper behavior for top-level parsing and read failures."""
+    assert _top_level_dir("") is None
+    assert _top_level_dir("/.tzp/cache") == ".tzp"
+
+    lang_file = tmp_path / "language.txt"
+    lang_file.write_text("text = EN,\ncharset = UTF-8,\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        lambda *_a, **_k: (_ for _ in ()).throw(OSError("cannot read")),
+    )
+    with pytest.raises(LanguageFileError, match="Failed to read language.txt"):
+        _parse_language_file(lang_file)
+
+
+def test_scan_root_with_errors_raises_for_non_directory_input(tmp_path: Path) -> None:
+    """Verify scan root with errors rejects non-directory roots."""
+    file_path = tmp_path / "not_a_dir.txt"
+    file_path.write_text("x", encoding="utf-8")
+    with pytest.raises(NotADirectoryError):
+        scan_root_with_errors(file_path)
