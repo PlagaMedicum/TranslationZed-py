@@ -1,3 +1,5 @@
+"""Test module for property search replace."""
+
 from __future__ import annotations
 
 from hypothesis import given, settings

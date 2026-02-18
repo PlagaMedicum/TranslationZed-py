@@ -1,3 +1,5 @@
+"""Test module for qa rules."""
+
 from __future__ import annotations
 
 from translationzed_py.core.qa_rules import (
@@ -12,6 +14,7 @@ from translationzed_py.core.qa_rules import (
 
 
 def test_extract_protected_tokens_detects_code_like_tokens_only() -> None:
+    """Verify extract protected tokens detects code like tokens only."""
     text = "[img=music] <LINE> <CENTRE> %1 %1$s \\n " "<gasps from the courtroom> plain"
     assert extract_protected_tokens(text) == (
         "[img=music]",
@@ -24,12 +27,14 @@ def test_extract_protected_tokens_detects_code_like_tokens_only() -> None:
 
 
 def test_missing_protected_tokens_handles_duplicates() -> None:
+    """Verify missing protected tokens handles duplicates."""
     source = "<LINE> %1 %1"
     target = "<LINE> %1"
     assert missing_protected_tokens(source, target) == ("%1",)
 
 
 def test_trailing_fragment_and_missing_trailing_check() -> None:
+    """Verify trailing fragment and missing trailing check."""
     assert trailing_fragment("Hello!") == "!"
     assert has_missing_trailing_fragment("Hello!", "Hello") is True
     assert has_missing_trailing_fragment("Hello", "Hello!") is False
@@ -38,6 +43,7 @@ def test_trailing_fragment_and_missing_trailing_check() -> None:
 
 
 def test_newline_mismatch_normalizes_crlf() -> None:
+    """Verify newline mismatch normalizes crlf."""
     source = "A\r\nB\nC"
     assert newline_count(source) == 2
     assert has_newline_mismatch(source, "A\nB\nC") is False
@@ -47,5 +53,6 @@ def test_newline_mismatch_normalizes_crlf() -> None:
 
 
 def test_same_as_source_requires_exact_match() -> None:
+    """Verify same as source requires exact match."""
     assert same_as_source("Text", "Text") is True
     assert same_as_source("Text", "text") is False

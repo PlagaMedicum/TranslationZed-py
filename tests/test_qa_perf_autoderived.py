@@ -1,3 +1,5 @@
+"""Test module for qa perf autoderived."""
+
 from __future__ import annotations
 
 import gc
@@ -62,6 +64,7 @@ def _run_fixture_scan_perf(
 
 
 def test_qa_scan_perf_survivalguide_fixture(perf_recorder) -> None:
+    """Verify qa scan perf survivalguide fixture."""
     _run_fixture_scan_perf(
         fixture_name="SurvivalGuide_BE.txt",
         perf_label="qa scan survivalguide",
@@ -72,6 +75,7 @@ def test_qa_scan_perf_survivalguide_fixture(perf_recorder) -> None:
 
 
 def test_qa_scan_perf_recorded_media_fixture(perf_recorder) -> None:
+    """Verify qa scan perf recorded media fixture."""
     _run_fixture_scan_perf(
         fixture_name="Recorded_Media_BE.txt",
         perf_label="qa scan recorded_media",

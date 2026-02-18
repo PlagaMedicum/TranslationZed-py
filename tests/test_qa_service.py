@@ -1,3 +1,5 @@
+"""Test module for qa service."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,6 +18,7 @@ from translationzed_py.core.qa_service import (
 
 
 def test_qa_finding_label_uses_relative_posix_path() -> None:
+    """Verify qa finding label uses relative posix path."""
     root = Path("/tmp/proj")
     finding = QAFinding(
         file=root / "BE" / "ui.txt",
@@ -29,6 +32,7 @@ def test_qa_finding_label_uses_relative_posix_path() -> None:
 
 
 def test_build_qa_panel_plan_empty() -> None:
+    """Verify build qa panel plan empty."""
     plan = build_qa_panel_plan(
         findings=[],
         root=Path("/tmp/proj"),
@@ -40,6 +44,7 @@ def test_build_qa_panel_plan_empty() -> None:
 
 
 def test_build_qa_panel_plan_truncates() -> None:
+    """Verify build qa panel plan truncates."""
     root = Path("/tmp/proj")
     findings = [
         QAFinding(
@@ -61,6 +66,7 @@ def test_build_qa_panel_plan_truncates() -> None:
 
 
 def test_qa_service_wrapper_delegates() -> None:
+    """Verify qa service wrapper delegates."""
     root = Path("/tmp/proj")
     finding = QAFinding(
         file=root / "BE" / "ui.txt",
@@ -76,6 +82,7 @@ def test_qa_service_wrapper_delegates() -> None:
 
 
 def test_qa_service_scan_rows_runs_trailing_and_newline_checks() -> None:
+    """Verify qa service scan rows runs trailing and newline checks."""
     service = QAService()
     findings = service.scan_rows(
         file=Path("/tmp/proj/BE/ui.txt"),
@@ -92,6 +99,7 @@ def test_qa_service_scan_rows_runs_trailing_and_newline_checks() -> None:
 
 
 def test_qa_service_scan_rows_respects_check_toggles() -> None:
+    """Verify qa service scan rows respects check toggles."""
     service = QAService()
     findings = service.scan_rows(
         file=Path("/tmp/proj/BE/ui.txt"),
@@ -103,6 +111,7 @@ def test_qa_service_scan_rows_respects_check_toggles() -> None:
 
 
 def test_qa_service_scan_rows_detects_missing_protected_tokens() -> None:
+    """Verify qa service scan rows detects missing protected tokens."""
     service = QAService()
     findings = service.scan_rows(
         file=Path("/tmp/proj/BE/ui.txt"),
@@ -125,6 +134,7 @@ def test_qa_service_scan_rows_detects_missing_protected_tokens() -> None:
 
 
 def test_qa_service_auto_mark_rows_is_sorted_unique() -> None:
+    """Verify qa service auto mark rows is sorted unique."""
     service = QAService()
     rows = service.auto_mark_rows(
         [
@@ -152,6 +162,7 @@ def test_qa_service_auto_mark_rows_is_sorted_unique() -> None:
 
 
 def test_qa_service_scan_rows_detects_same_as_source_when_enabled() -> None:
+    """Verify qa service scan rows detects same as source when enabled."""
     service = QAService()
     findings = service.scan_rows(
         file=Path("/tmp/proj/BE/ui.txt"),
@@ -167,6 +178,7 @@ def test_qa_service_scan_rows_detects_same_as_source_when_enabled() -> None:
 
 
 def test_qa_service_navigation_plan_moves_and_wraps() -> None:
+    """Verify qa service navigation plan moves and wraps."""
     service = QAService()
     file_path = Path("/tmp/proj/BE/ui.txt")
     findings = [
