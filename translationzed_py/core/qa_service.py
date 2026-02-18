@@ -1,3 +1,5 @@
+"""Qa service module."""
+
 from __future__ import annotations
 
 from collections import Counter
@@ -22,6 +24,8 @@ QA_CODE_SAME_AS_SOURCE = "qa.same_source"
 
 @dataclass(frozen=True, slots=True)
 class QAInputRow:
+    """Represent QAInputRow."""
+
     row: int
     source_text: str
     target_text: str
@@ -29,6 +33,8 @@ class QAInputRow:
 
 @dataclass(frozen=True, slots=True)
 class QAFinding:
+    """Represent QAFinding."""
+
     file: Path
     row: int
     code: str
@@ -39,12 +45,16 @@ class QAFinding:
 
 @dataclass(frozen=True, slots=True)
 class QAPanelItem:
+    """Represent QAPanelItem."""
+
     finding: QAFinding
     label: str
 
 
 @dataclass(frozen=True, slots=True)
 class QAPanelPlan:
+    """Represent QAPanelPlan."""
+
     status_message: str
     items: tuple[QAPanelItem, ...]
     truncated: bool
@@ -52,13 +62,18 @@ class QAPanelPlan:
 
 @dataclass(frozen=True, slots=True)
 class QANavigationPlan:
+    """Represent QANavigationPlan."""
+
     finding: QAFinding | None
     status_message: str
 
 
 @dataclass(frozen=True, slots=True)
 class QAService:
+    """Represent QAService."""
+
     def finding_label(self, *, finding: QAFinding, root: Path) -> str:
+        """Execute finding label."""
         return qa_finding_label(finding=finding, root=root)
 
     def build_panel_plan(
@@ -68,6 +83,7 @@ class QAService:
         root: Path,
         result_limit: int,
     ) -> QAPanelPlan:
+        """Build panel plan."""
         return build_qa_panel_plan(
             findings=findings,
             root=root,
@@ -84,6 +100,7 @@ class QAService:
         check_tokens: bool = False,
         check_same_as_source: bool = False,
     ) -> tuple[QAFinding, ...]:
+        """Execute scan rows."""
         return scan_qa_rows(
             file=file,
             rows=rows,
@@ -94,6 +111,7 @@ class QAService:
         )
 
     def auto_mark_rows(self, findings: Sequence[QAFinding]) -> tuple[int, ...]:
+        """Execute auto mark rows."""
         return build_auto_mark_rows(findings)
 
     def build_navigation_plan(
@@ -105,6 +123,7 @@ class QAService:
         direction: int,
         root: Path,
     ) -> QANavigationPlan:
+        """Build navigation plan."""
         return build_qa_navigation_plan(
             findings=findings,
             current_path=current_path,
@@ -115,6 +134,7 @@ class QAService:
 
 
 def qa_finding_label(*, finding: QAFinding, root: Path) -> str:
+    """Execute qa finding label."""
     try:
         rel = finding.file.relative_to(root).as_posix()
     except ValueError:
@@ -135,6 +155,7 @@ def build_qa_panel_plan(
     root: Path,
     result_limit: int,
 ) -> QAPanelPlan:
+    """Build qa panel plan."""
     if not findings:
         return QAPanelPlan(
             status_message="No QA findings in current file.",
@@ -176,6 +197,7 @@ def scan_qa_rows(
     check_tokens: bool,
     check_same_as_source: bool,
 ) -> tuple[QAFinding, ...]:
+    """Execute scan qa rows."""
     findings: list[QAFinding] = []
     for row in rows:
         if check_trailing and has_missing_trailing_fragment(
@@ -239,6 +261,7 @@ def scan_qa_rows(
 
 
 def build_auto_mark_rows(findings: Sequence[QAFinding]) -> tuple[int, ...]:
+    """Build auto mark rows."""
     rows: set[int] = set()
     for finding in findings:
         if finding.severity.lower() != "warning":
@@ -255,6 +278,7 @@ def build_qa_navigation_plan(
     direction: int,
     root: Path,
 ) -> QANavigationPlan:
+    """Build qa navigation plan."""
     if not findings:
         return QANavigationPlan(
             finding=None,
@@ -295,18 +319,21 @@ def build_qa_navigation_plan(
 
 
 def _trailing_excerpt(source_text: str, target_text: str) -> str:
+    """Execute trailing excerpt."""
     source_tail = trailing_fragment(source_text)
     target_tail = trailing_fragment(target_text)
     return f"S:{source_tail!r} T:{target_tail!r}"
 
 
 def _newline_excerpt(source_text: str, target_text: str) -> str:
+    """Execute newline excerpt."""
     source_nl = newline_count(source_text)
     target_nl = newline_count(target_text)
     return f"S newlines={source_nl}, T newlines={target_nl}"
 
 
 def _tokens_excerpt(tokens: Sequence[str]) -> str:
+    """Execute tokens excerpt."""
     counts = Counter(tokens)
     parts: list[str] = []
     for token, count in counts.items():
@@ -318,6 +345,7 @@ def _tokens_excerpt(tokens: Sequence[str]) -> str:
 
 
 def _finding_sort_key(finding: QAFinding) -> tuple[str, int, str]:
+    """Execute finding sort key."""
     return (
         finding.file.as_posix(),
         finding.row,

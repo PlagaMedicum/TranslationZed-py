@@ -1,3 +1,5 @@
+"""Preferences service module."""
+
 from __future__ import annotations
 
 import contextlib
@@ -15,6 +17,8 @@ _VALID_SCOPES = {"FILE", "LOCALE", "POOL"}
 
 @dataclass(frozen=True, slots=True)
 class StartupRootResolution:
+    """Represent StartupRootResolution."""
+
     root: Path | None
     default_root: str
     requires_picker: bool
@@ -22,6 +26,8 @@ class StartupRootResolution:
 
 @dataclass(frozen=True, slots=True)
 class LoadedPreferences:
+    """Represent LoadedPreferences."""
+
     prompt_write_on_exit: bool
     wrap_text: bool
     large_text_optimizations: bool
@@ -45,12 +51,16 @@ class LoadedPreferences:
 
 @dataclass(frozen=True, slots=True)
 class PreferencesService:
+    """Represent PreferencesService."""
+
     def normalize_scope(self, value: object, *, default: str = "FILE") -> str:
+        """Normalize scope."""
         return normalize_scope(value, default=default)
 
     def resolve_startup_root(
         self, *, project_root: str | None
     ) -> StartupRootResolution:
+        """Resolve startup root."""
         prefs_global = _load_preferences(None)
         return resolve_startup_root(
             project_root=project_root,
@@ -58,6 +68,7 @@ class PreferencesService:
         )
 
     def persist_default_root(self, default_root: str) -> None:
+        """Execute persist default root."""
         raw = default_root.strip()
         if not raw:
             return
@@ -77,6 +88,7 @@ class PreferencesService:
         test_mode: bool,
         layout_reset_rev: str = "3",
     ) -> LoadedPreferences:
+        """Load normalized preferences."""
         _ensure_preferences(None)
         raw = _load_preferences(None)
         normalized = normalize_loaded_preferences(
@@ -114,6 +126,7 @@ class PreferencesService:
         qa_auto_mark_for_review: bool = False,
         qa_auto_mark_touched_for_review: bool = False,
     ) -> None:
+        """Execute persist main window preferences."""
         prefs = build_persist_payload(
             prompt_write_on_exit=prompt_write_on_exit,
             wrap_text=wrap_text,
@@ -142,6 +155,7 @@ class PreferencesService:
 def resolve_startup_root(
     *, project_root: str | None, saved_default_root: str
 ) -> StartupRootResolution:
+    """Resolve startup root."""
     if project_root:
         return StartupRootResolution(
             root=Path(project_root).resolve(),
@@ -159,6 +173,7 @@ def resolve_startup_root(
 
 
 def normalize_scope(value: object, *, default: str = "FILE") -> str:
+    """Normalize scope."""
     raw = str(value).upper().strip()
     if raw in _VALID_SCOPES:
         return raw
@@ -170,6 +185,7 @@ def resolve_qa_preferences(
     *,
     current: tuple[bool, bool, bool, bool, bool, bool, bool],
 ) -> tuple[tuple[bool, bool, bool, bool, bool, bool, bool], bool]:
+    """Resolve qa preferences."""
     updated = (
         bool(values.get("qa_check_trailing", current[0])),
         bool(values.get("qa_check_newlines", current[1])),
@@ -191,6 +207,7 @@ def normalize_loaded_preferences(
     test_mode: bool,
     layout_reset_rev: str = "3",
 ) -> LoadedPreferences:
+    """Normalize loaded preferences."""
     prompt_write_on_exit = bool(raw.get("prompt_write_on_exit", True))
     if test_mode:
         prompt_write_on_exit = False
@@ -274,6 +291,7 @@ def build_persist_payload(
     qa_auto_mark_for_review: bool = False,
     qa_auto_mark_touched_for_review: bool = False,
 ) -> dict[str, Any]:
+    """Build persist payload."""
     return {
         "prompt_write_on_exit": bool(prompt_write_on_exit),
         "wrap_text": bool(wrap_text),
