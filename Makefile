@@ -112,7 +112,8 @@ bench-advisory:
 
 ## full local verification (auto-fix allowed, warn if tracked files changed)
 verify:
-	@before="$$(mktemp)"; \
+	@set -e; \
+	before="$$(mktemp)"; \
 	after="$$(mktemp)"; \
 	trap 'rm -f "$$before" "$$after"' EXIT; \
 	git status --porcelain --untracked-files=no >"$$before"; \
@@ -130,7 +131,8 @@ verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-che
 
 ## strict CI verification (non-mutating + fail-on-drift)
 verify-ci:
-	@before="$$(mktemp)"; \
+	@set -e; \
+	before="$$(mktemp)"; \
 	after="$$(mktemp)"; \
 	trap 'rm -f "$$before" "$$after"' EXIT; \
 	git status --porcelain --untracked-files=no >"$$before"; \
