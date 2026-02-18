@@ -1,3 +1,5 @@
+"""Tm workflow service module."""
+
 from __future__ import annotations
 
 import html
@@ -39,6 +41,8 @@ from .tm_store import TMImportFile, TMMatch, TMStore
 
 @dataclass(frozen=True, slots=True)
 class TMPendingBatch:
+    """Represent TMPendingBatch."""
+
     file_key: str
     target_locale: str
     rows: tuple[tuple[str, str, str, int | None], ...]
@@ -46,6 +50,8 @@ class TMPendingBatch:
 
 @dataclass(frozen=True, slots=True)
 class TMQueryPlan:
+    """Represent TMQueryPlan."""
+
     mode: Literal["disabled", "no_lookup", "cached", "query"]
     message: str
     cache_key: TMQueryKey | None = None
@@ -54,6 +60,8 @@ class TMQueryPlan:
 
 @dataclass(frozen=True, slots=True)
 class TMSuggestionItem:
+    """Represent TMSuggestionItem."""
+
     match: TMMatch
     label: str
     tooltip_html: str
@@ -61,12 +69,16 @@ class TMSuggestionItem:
 
 @dataclass(frozen=True, slots=True)
 class TMSuggestionsView:
+    """Represent TMSuggestionsView."""
+
     message: str
     items: tuple[TMSuggestionItem, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class TMLocaleVariantItem:
+    """Represent TMLocaleVariantItem."""
+
     locale_code: str
     locale_name: str
     status_tag: str
@@ -77,12 +89,16 @@ class TMLocaleVariantItem:
 
 @dataclass(frozen=True, slots=True)
 class TMLocaleVariantsView:
+    """Represent TMLocaleVariantsView."""
+
     message: str
     items: tuple[TMLocaleVariantItem, ...]
 
 
 @dataclass(frozen=True, slots=True)
 class TMQueryRequest:
+    """Represent TMQueryRequest."""
+
     source_text: str
     source_locale: str
     target_locale: str
@@ -93,12 +109,16 @@ class TMQueryRequest:
 
 @dataclass(frozen=True, slots=True)
 class TMApplyPlan:
+    """Represent TMApplyPlan."""
+
     target_text: str
     mark_for_review: bool
 
 
 @dataclass(frozen=True, slots=True)
 class TMSelectionPlan:
+    """Represent TMSelectionPlan."""
+
     apply_enabled: bool
     source_preview: str
     target_preview: str
@@ -107,12 +127,16 @@ class TMSelectionPlan:
 
 @dataclass(frozen=True, slots=True)
 class TMFilterPlan:
+    """Represent TMFilterPlan."""
+
     policy: TMQueryPolicy
     prefs_extras: dict[str, str]
 
 
 @dataclass(frozen=True, slots=True)
 class TMUpdatePlan:
+    """Represent TMUpdatePlan."""
+
     run_update: bool
     stop_timer: bool
     start_timer: bool
@@ -120,16 +144,24 @@ class TMUpdatePlan:
 
 @dataclass(frozen=True, slots=True)
 class TMRefreshPlan:
+    """Represent TMRefreshPlan."""
+
     run_update: bool
     flush_current_file: bool
     query_plan: TMQueryPlan | None
 
 
 class TMDiagnosticsStore(Protocol):
-    @property
-    def db_path(self) -> Path: ...
+    """Describe TM store operations required by diagnostics reporting."""
 
-    def list_import_files(self) -> list[TMImportFile]: ...
+    @property
+    def db_path(self) -> Path:
+        """Return the filesystem path of the TM database."""
+        ...
+
+    def list_import_files(self) -> list[TMImportFile]:
+        """Return tracked imported TM files and their metadata."""
+        ...
 
     def query(
         self,
@@ -140,11 +172,15 @@ class TMDiagnosticsStore(Protocol):
         limit: int = ...,
         min_score: int = ...,
         origins: Iterable[str] | None = ...,
-    ) -> list[TMMatch]: ...
+    ) -> list[TMMatch]:
+        """Return TM matches for a query constrained by locale and origins."""
+        ...
 
 
 @dataclass(slots=True)
 class TMWorkflowService:
+    """Represent TMWorkflowService."""
+
     cache_limit: int = 128
     _cache: OrderedDict[TMQueryKey, list[TMMatch]] = field(
         init=False,
@@ -158,9 +194,11 @@ class TMWorkflowService:
     )
 
     def clear_cache(self) -> None:
+        """Execute clear cache."""
         self._cache.clear()
 
     def queue_updates(self, path: str, rows: Iterable[tuple[str, ...]]) -> None:
+        """Execute queue updates."""
         self._cache.clear()
         bucket = self._pending.setdefault(path, {})
         for row in rows:
@@ -183,6 +221,7 @@ class TMWorkflowService:
         locale_for_path: Callable[[str], str | None],
         paths: Iterable[str] | None = None,
     ) -> list[TMPendingBatch]:
+        """Execute pending batches."""
         wanted = None if paths is None else set(paths)
         batches: list[TMPendingBatch] = []
         for file_key, by_key in self._pending.items():
@@ -203,6 +242,7 @@ class TMWorkflowService:
         return batches
 
     def mark_batch_flushed(self, file_key: str) -> None:
+        """Execute mark batch flushed."""
         self._pending.pop(file_key, None)
 
     def plan_query(
@@ -211,6 +251,7 @@ class TMWorkflowService:
         lookup: tuple[str, str] | None,
         policy: TMQueryPolicy,
     ) -> TMQueryPlan:
+        """Execute plan query."""
         if not has_enabled_origins(policy):
             return TMQueryPlan(mode="disabled", message="No TM origins enabled.")
         if lookup is None:
@@ -246,6 +287,7 @@ class TMWorkflowService:
         lookup: tuple[str, str] | None,
         policy: TMQueryPolicy,
     ) -> bool:
+        """Execute accept query result."""
         self._cache[cache_key] = matches
         while len(self._cache) > self.cache_limit:
             self._cache.popitem(last=False)
@@ -255,14 +297,17 @@ class TMWorkflowService:
     def filter_matches(
         self, matches: list[TMMatch], *, policy: TMQueryPolicy
     ) -> list[TMMatch]:
+        """Filter matches."""
         return filter_matches(matches, policy=policy)
 
     def query_terms(self, source_text: str) -> list[str]:
+        """Execute query terms."""
         return query_terms(source_text)
 
     def build_preferences_actions(
         self, values: dict[str, object]
     ) -> TMPreferencesActions:
+        """Build preferences actions."""
         return actions_from_values(values)
 
     def apply_preferences_actions(
@@ -272,6 +317,7 @@ class TMWorkflowService:
         actions: TMPreferencesActions,
         copy_to_import_dir: Callable[[Path], Path],
     ) -> TMPreferencesApplyReport:
+        """Apply preferences actions."""
         return apply_actions(
             store,
             actions,
@@ -287,6 +333,7 @@ class TMWorkflowService:
         only_paths: set[Path] | None = None,
         pending_only: bool = False,
     ) -> TMImportSyncReport:
+        """Synchronize import folder."""
         return sync_import_folder(
             store,
             tm_dir,
@@ -301,6 +348,7 @@ class TMWorkflowService:
         locale_map: Mapping[str, LocaleMeta],
         selected_locales: list[str] | tuple[str, ...] | set[str],
     ) -> tuple[list[TMRebuildLocale], str]:
+        """Collect rebuild locales."""
         return collect_rebuild_locales(locale_map, selected_locales)
 
     def rebuild_project_tm(
@@ -312,6 +360,7 @@ class TMWorkflowService:
         en_encoding: str,
         batch_size: int = 1000,
     ) -> TMRebuildResult:
+        """Execute rebuild project tm."""
         return rebuild_project_tm(
             root,
             locales,
@@ -321,6 +370,7 @@ class TMWorkflowService:
         )
 
     def format_rebuild_status(self, result: TMRebuildResult) -> str:
+        """Format rebuild status."""
         return format_rebuild_status(result)
 
     def build_lookup(
@@ -329,6 +379,7 @@ class TMWorkflowService:
         source_text: str,
         target_locale: str | None,
     ) -> tuple[str, str] | None:
+        """Build lookup."""
         return build_lookup(source_text=source_text, target_locale=target_locale)
 
     def build_update_plan(
@@ -339,6 +390,7 @@ class TMWorkflowService:
         timer_active: bool,
         tm_panel_index: int = 1,
     ) -> TMUpdatePlan:
+        """Build update plan."""
         run_update = has_store and panel_index == tm_panel_index
         if not run_update:
             return TMUpdatePlan(
@@ -362,6 +414,7 @@ class TMWorkflowService:
         has_current_file: bool,
         tm_panel_index: int = 1,
     ) -> TMRefreshPlan:
+        """Build refresh plan."""
         update = self.build_update_plan(
             has_store=has_store,
             panel_index=panel_index,
@@ -388,6 +441,7 @@ class TMWorkflowService:
         origin_project: bool,
         origin_import: bool,
     ) -> TMFilterPlan:
+        """Build filter plan."""
         normalized = normalize_min_score(min_score)
         policy = TMQueryPolicy(
             source_locale=source_locale,
@@ -406,6 +460,7 @@ class TMWorkflowService:
         )
 
     def build_query_request(self, cache_key: TMQueryKey) -> TMQueryRequest:
+        """Build query request."""
         (
             source_text,
             source_locale,
@@ -435,6 +490,7 @@ class TMWorkflowService:
         lookup: tuple[str, str] | None,
         policy: TMQueryPolicy,
     ) -> TMQueryRequest | None:
+        """Build query request for lookup."""
         if lookup is None or not has_enabled_origins(policy):
             return None
         source_text, target_locale = lookup
@@ -451,6 +507,7 @@ class TMWorkflowService:
         )
 
     def build_apply_plan(self, match: TMMatch | None) -> TMApplyPlan | None:
+        """Build apply plan."""
         if match is None:
             return None
         return TMApplyPlan(
@@ -464,6 +521,7 @@ class TMWorkflowService:
         match: TMMatch | None,
         lookup: tuple[str, str] | None,
     ) -> TMSelectionPlan:
+        """Build selection plan."""
         terms: tuple[str, ...] = ()
         if lookup is not None:
             terms = tuple(self.query_terms(lookup[0]))
@@ -490,6 +548,7 @@ class TMWorkflowService:
         lookup: tuple[str, str] | None,
         matches: Iterable[TMMatch] | None = None,
     ) -> str:
+        """Build diagnostics report."""
         return build_diagnostics_report(
             db_path=db_path,
             policy=policy,
@@ -507,6 +566,7 @@ class TMWorkflowService:
         lookup: tuple[str, str] | None,
         query_matches: Callable[..., Iterable[TMMatch]],
     ) -> str:
+        """Build diagnostics report with query."""
         req = self.build_query_request_for_lookup(lookup=lookup, policy=policy)
         matches: list[TMMatch] = []
         if req is not None:
@@ -535,6 +595,7 @@ class TMWorkflowService:
         policy: TMQueryPolicy,
         lookup: tuple[str, str] | None,
     ) -> str:
+        """Execute diagnostics report for store."""
         return self.build_diagnostics_report_with_query(
             db_path=store.db_path,
             policy=policy,
@@ -551,6 +612,7 @@ class TMWorkflowService:
         source_preview_limit: int = 60,
         target_preview_limit: int = 80,
     ) -> TMSuggestionsView:
+        """Build suggestions view."""
         if not matches:
             return TMSuggestionsView(
                 message="No TM matches found.",
@@ -582,6 +644,7 @@ class TMWorkflowService:
         variants: list[tuple[str, str, str, int | None]],
         preview_limit: int = 80,
     ) -> TMLocaleVariantsView:
+        """Build locale variants view."""
         if not variants:
             return TMLocaleVariantsView(
                 message="No locale variants available.",
@@ -605,6 +668,7 @@ class TMWorkflowService:
 
 
 def query_terms(source_text: str) -> list[str]:
+    """Execute query terms."""
     out: list[str] = []
     for raw in re.split(r"\s+", source_text.lower()):
         token = raw.strip(".,;:!?\"'()[]{}<>")
@@ -619,6 +683,7 @@ def build_lookup(
     source_text: str,
     target_locale: str | None,
 ) -> tuple[str, str] | None:
+    """Build lookup."""
     if not target_locale:
         return None
     if not source_text.strip():
@@ -627,12 +692,14 @@ def build_lookup(
 
 
 def _truncate_text(text: str, limit: int) -> str:
+    """Execute truncate text."""
     if len(text) <= limit:
         return text
     return text[: max(0, limit - 1)] + "..."
 
 
 def _source_name_for_match(match: TMMatch) -> str:
+    """Execute source name for match."""
     if match.tm_name:
         return match.tm_name
     if match.tm_path:
@@ -648,6 +715,7 @@ def format_match_label(
     source_preview_limit: int,
     target_preview_limit: int,
 ) -> str:
+    """Format match label."""
     origin = "project" if match.origin == "project" else "import"
     if origin == "project":
         tag = _status_tag(match.row_status)
@@ -666,6 +734,7 @@ def format_match_label(
 
 
 def _status_tag(status: int | None) -> str:
+    """Execute status tag."""
     if status == 0:
         return "U"
     if status == 1:
@@ -678,6 +747,7 @@ def _status_tag(status: int | None) -> str:
 
 
 def match_tooltip_html(match: TMMatch) -> str:
+    """Execute match tooltip html."""
     source = html.escape(match.source_text)
     target = html.escape(match.target_text)
     raw = match.raw_score if match.raw_score is not None else match.score
@@ -697,6 +767,7 @@ def build_diagnostics_report(
     lookup: tuple[str, str] | None,
     matches: Iterable[TMMatch] | None = None,
 ) -> str:
+    """Build diagnostics report."""
     db_display = Path(str(db_path)).as_posix()
     import_list = list(import_files)
     ready_imports = sum(1 for rec in import_list if rec.status == "ready")
