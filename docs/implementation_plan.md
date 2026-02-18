@@ -788,8 +788,7 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] Make target split: `fmt`/`fmt-check`, `lint`/`lint-check`,
        `test-cov`, `test-perf`, `bench`, `bench-check`, `security`,
        `docstyle`, `docs-build`, `test-mutation`, `verify-heavy`.
-     - [✓] Coverage ratchet gates enforced: whole package >=72%, core >=79%;
-       long-term target documented as whole >=90%, core >=95%.
+     - [✓] Coverage gates enforced: whole package >=90%, core >=95%.
      - [✓] Benchmark baseline + comparator added with 20% regression threshold
        policy for CI.
      - [✓] Script-level regression tests added for cleanup whitelist logic and

@@ -823,17 +823,15 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 - **Testing**:
   - `pytest` + `pytest-qt`,
   - coverage gates via `make test-cov`:
-    - enforced ratchet baseline:
-      - whole package: **>=72%**,
-      - `translationzed_py/core`: **>=79%**,
-    - long-term target:
-      - whole package: **>=90%**,
-      - `translationzed_py/core`: **>=95%**.
+    - whole package: **>=90%**,
+    - `translationzed_py/core`: **>=95%**.
 - **Performance**:
   - deterministic perf budget tests (`make test-perf`),
   - fixture-backed scenario smoke (`make perf-scenarios`),
   - benchmark suite (`pytest-benchmark`) with committed baseline and
     regression threshold gate (`make bench-check`, default fail over +20% in CI),
+  - benchmark baseline is versioned per platform (`linux`, `macos`, `windows`),
+  - local `make verify` runs `make bench-check BENCH_COMPARE_MODE=warn` (advisory),
   - local `make verify` treats perf budget/scenario failures as advisory warnings;
     strict blocking is enforced in `make verify-ci` and release workflows.
 - **Architecture guardrails**: GUI adapter tests + import/size architecture checks
@@ -842,7 +840,7 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
   - `make security`: bandit report artifact for all findings across `translationzed_py`, `tests`, and `scripts`,
     plus medium/high severity+confidence gate on shipped code (`translationzed_py` + `scripts`)
     with `B608` suppressed for known parameterized SQLite query patterns,
-  - `make docstyle`: repo-wide pydocstyle (PEP257 profile).
+  - `make docstyle`: repo-wide pydocstyle with strict PEP257 checks (no local ignore overrides).
 - **Documentation build**: `make docs-build` runs MkDocs strict build (warnings fail).
 - **Gate contract**:
   - local umbrella gate: `make verify` (auto-fix allowed; warns on tracked-file changes),

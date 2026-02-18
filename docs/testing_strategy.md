@@ -132,8 +132,10 @@ _Last updated: 2026-02-18_
 - `make bench-check` compares current benchmark medians against committed
   baseline `tests/benchmarks/baseline.json` using threshold
   `BENCH_REGRESSION_THRESHOLD_PERCENT` (default 20%).
+- Baseline file includes dedicated platform sections (`linux`, `macos`, `windows`)
+  and benchmark checks resolve against the active platform key.
 - CI enforces benchmark regression in dedicated Linux job (`BENCH_COMPARE_MODE=fail`);
-  local verify path treats benchmark output as visibility-first.
+  local verify runs benchmark compare in advisory mode (`BENCH_COMPARE_MODE=warn`).
 
 ### 2.9 Property and mutation testing
 - Property-based tests (Hypothesis) are part of the default suite for:
@@ -356,10 +358,7 @@ They include:
 
 ## 6) Coverage Goals
 
-- Enforced ratchet baseline:
-  - Core modules (`translationzed_py/core`): **>=79%** line coverage.
-  - Whole package (`translationzed_py`): **>=72%** line coverage.
-- Long-term target:
+- Enforced gate thresholds:
   - Core modules (`translationzed_py/core`): **>=95%** line coverage.
   - Whole package (`translationzed_py`): **>=90%** line coverage.
 - GUI: smoke and integration coverage sufficient to validate wiring.

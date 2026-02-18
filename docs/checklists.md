@@ -13,7 +13,8 @@ avoid missing mandatory tasks.
     runtime-local user config is never auto-deleted
   - Runs full local verification families:
     formatter/linter (auto-fix), typecheck, architecture guard, coverage gate,
-    perf tests (advisory warnings), benchmark run, security/docstyle/docs-build checks, encoding-integrity
+    perf tests (advisory warnings), benchmark regression compare (advisory warn mode),
+    security/docstyle/docs-build checks, encoding-integrity
     gates, read-only repo-clean gate, and perf scenarios
   - Warns (does not fail) when auto-fixers modify tracked files
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
