@@ -1,3 +1,5 @@
+"""Qt application singleton construction helpers."""
+
 from __future__ import annotations
 
 import sys
@@ -9,6 +11,7 @@ _APP: QApplication | None = None
 
 
 def get_app() -> QApplication:
+    """Return the process-wide QApplication instance."""
     global _APP
     if _APP is None:
         _APP = cast(QApplication, QApplication.instance()) or QApplication(sys.argv)

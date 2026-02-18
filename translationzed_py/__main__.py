@@ -67,6 +67,7 @@ def _configure_qt_env() -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    """Launch the GUI entrypoint after environment setup and arg parsing."""
     _configure_qt_env()
     from translationzed_py.gui import launch
 
