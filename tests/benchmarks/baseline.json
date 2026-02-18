@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "platforms": {
+    "linux": {
+      "benchmarks": {
+        "test_bench_parse_lazy_survivalguide": {"median_ms": 255.0},
+        "test_bench_parse_eager_recorded_media": {"median_ms": 196.0},
+        "test_bench_search_translation_survivalguide": {"median_ms": 2.0}
+      }
+    }
+  }
+}
