@@ -68,7 +68,9 @@ def test_compute_skips_files_that_fail_to_read(tmp_path: Path, monkeypatch) -> N
     assert f"EN/{second.name}" in hashes
 
 
-def test_read_returns_empty_for_missing_invalid_and_truncated_cache(tmp_path: Path) -> None:
+def test_read_returns_empty_for_missing_invalid_and_truncated_cache(
+    tmp_path: Path,
+) -> None:
     """Verify read safely handles absent or malformed cache data."""
     root = tmp_path / "proj"
     _init_en_project(root)

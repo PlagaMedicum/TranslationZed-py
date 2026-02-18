@@ -5,7 +5,8 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
-from translationzed_py.core.app_config import LEGACY_CACHE_DIR, load as _load_app_config
+from translationzed_py.core.app_config import LEGACY_CACHE_DIR
+from translationzed_py.core.app_config import load as _load_app_config
 from translationzed_py.core.model import Status
 from translationzed_py.core.status_cache import (
     _HEADER_V2,
@@ -105,7 +106,9 @@ def test_read_rows_any_parses_v5_and_legacy_payloads(tmp_path: Path) -> None:
     assert _read_rows_any(b"\x01\x00\x00") is None
 
 
-def test_last_opened_and_has_drafts_handle_multiple_header_styles(tmp_path: Path) -> None:
+def test_last_opened_and_has_drafts_handle_multiple_header_styles(
+    tmp_path: Path,
+) -> None:
     """Verify header readers support V5 and fallback legacy V1 metadata."""
     v5_with_drafts = tmp_path / "with_drafts.bin"
     _write_rows(v5_with_drafts, [(1, Status.TRANSLATED, "x", None)], 123, hash_bits=64)
@@ -113,7 +116,9 @@ def test_last_opened_and_has_drafts_handle_multiple_header_styles(tmp_path: Path
     assert read_has_drafts_from_path(v5_with_drafts) is True
 
     v5_without_drafts = tmp_path / "without_drafts.bin"
-    _write_rows(v5_without_drafts, [(1, Status.TRANSLATED, None, None)], 9, hash_bits=64)
+    _write_rows(
+        v5_without_drafts, [(1, Status.TRANSLATED, None, None)], 9, hash_bits=64
+    )
     assert read_has_drafts_from_path(v5_without_drafts) is False
 
     v1_with_last_opened = tmp_path / "v1_header.bin"

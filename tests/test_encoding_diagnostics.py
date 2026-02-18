@@ -111,7 +111,9 @@ def test_encoding_helpers_detect_bom_and_match_declared_charset() -> None:
     assert _bom_matches_declared("other", "UTF-8")
 
 
-def test_scan_file_reports_read_error_when_file_cannot_be_opened(tmp_path: Path) -> None:
+def test_scan_file_reports_read_error_when_file_cannot_be_opened(
+    tmp_path: Path,
+) -> None:
     """Verify scan file returns read_error issues for missing files."""
     missing = tmp_path / "missing.txt"
     issues = _scan_file(path=missing, locale="EN", declared="UTF-8")
