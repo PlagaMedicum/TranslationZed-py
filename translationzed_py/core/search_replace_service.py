@@ -1,3 +1,5 @@
+"""Search replace service module."""
+
 from __future__ import annotations
 
 import re
@@ -17,12 +19,16 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class ReplaceAllPlan:
+    """Represent ReplaceAllPlan."""
+
     total: int
     counts: list[tuple[str, int]]
 
 
 @dataclass(frozen=True, slots=True)
 class ReplaceRequest:
+    """Represent ReplaceRequest."""
+
     pattern: re.Pattern[str]
     replacement: str
     use_regex: bool
@@ -32,6 +38,8 @@ class ReplaceRequest:
 
 @dataclass(frozen=True, slots=True)
 class ReplaceAllRunPlan:
+    """Represent ReplaceAllRunPlan."""
+
     run_replace: bool
     show_confirmation: bool
     scope_label: str
@@ -40,12 +48,16 @@ class ReplaceAllRunPlan:
 
 @dataclass(frozen=True, slots=True)
 class ReplaceAllFileCountCallbacks:
+    """Represent ReplaceAllFileCountCallbacks."""
+
     parse_file: Callable[[Path], ParsedFile]
     read_cache: Callable[[Path], Mapping[int, CacheEntry]]
 
 
 @dataclass(frozen=True, slots=True)
 class ReplaceAllFileApplyCallbacks:
+    """Represent ReplaceAllFileApplyCallbacks."""
+
     parse_file: Callable[[Path], ParsedFile]
     read_cache: Callable[[Path], Mapping[int, CacheEntry]]
     write_cache: Callable[[Path, Iterable[Entry], set[str], Mapping[str, str]], object]
@@ -53,12 +65,16 @@ class ReplaceAllFileApplyCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class ReplaceAllFileApplyResult:
+    """Represent ReplaceAllFileApplyResult."""
+
     changed_keys: set[str]
     changed_any: bool
 
 
 @dataclass(frozen=True, slots=True)
 class ReplaceAllRowsCallbacks:
+    """Represent ReplaceAllRowsCallbacks."""
+
     row_count: Callable[[], int]
     read_text: Callable[[int], str | None]
     write_text: Callable[[int, str], object]
@@ -66,21 +82,30 @@ class ReplaceAllRowsCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class ReplaceAllRowsApplyResult:
+    """Represent ReplaceAllRowsApplyResult."""
+
     changed_rows: int
 
 
 @dataclass(frozen=True, slots=True)
 class ReplaceCurrentRowCallbacks:
+    """Represent ReplaceCurrentRowCallbacks."""
+
     read_text: Callable[[int], str | None]
     write_text: Callable[[int, str], object]
 
 
 class ReplaceRequestError(Exception):
+    """Represent ReplaceRequestError."""
+
     pass
 
 
 class ReplaceAllFileParseError(Exception):
+    """Represent ReplaceAllFileParseError."""
+
     def __init__(self, *, path: Path, original: Exception) -> None:
+        """Initialize the instance."""
         super().__init__(str(original))
         self.path = path
         self.original = original
@@ -88,6 +113,8 @@ class ReplaceAllFileParseError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class SearchPanelItem:
+    """Represent SearchPanelItem."""
+
     file: Path
     row: int
     label: str
@@ -95,6 +122,8 @@ class SearchPanelItem:
 
 @dataclass(frozen=True, slots=True)
 class SearchPanelPlan:
+    """Represent SearchPanelPlan."""
+
     status_message: str
     items: tuple[SearchPanelItem, ...]
     truncated: bool
@@ -102,6 +131,8 @@ class SearchPanelPlan:
 
 @dataclass(frozen=True, slots=True)
 class SearchRunPlan:
+    """Represent SearchRunPlan."""
+
     run_search: bool
     query: str
     use_regex: bool
@@ -116,6 +147,8 @@ class SearchRunPlan:
 
 @dataclass(frozen=True, slots=True)
 class SearchRowsCacheKey:
+    """Represent SearchRowsCacheKey."""
+
     path: Path
     include_source: bool
     include_value: bool
@@ -123,6 +156,8 @@ class SearchRowsCacheKey:
 
 @dataclass(frozen=True, slots=True)
 class SearchRowsCacheStamp:
+    """Represent SearchRowsCacheStamp."""
+
     file_mtime_ns: int
     cache_mtime_ns: int
     source_mtime_ns: int
@@ -130,6 +165,8 @@ class SearchRowsCacheStamp:
 
 @dataclass(frozen=True, slots=True)
 class SearchRowsCacheLookupPlan:
+    """Represent SearchRowsCacheLookupPlan."""
+
     key: SearchRowsCacheKey
     stamp: SearchRowsCacheStamp
     use_cached_rows: bool
@@ -137,11 +174,15 @@ class SearchRowsCacheLookupPlan:
 
 @dataclass(frozen=True, slots=True)
 class SearchRowsCacheStorePlan:
+    """Represent SearchRowsCacheStorePlan."""
+
     should_store_rows: bool
 
 
 @dataclass(frozen=True, slots=True)
 class SearchRowsCacheStampCallbacks:
+    """Represent SearchRowsCacheStampCallbacks."""
+
     file_mtime_ns: Callable[[Path], int | None]
     cache_mtime_ns: Callable[[Path], int]
     source_mtime_ns: Callable[[Path], int]
@@ -149,12 +190,16 @@ class SearchRowsCacheStampCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class SearchRowsSourcePlan:
+    """Represent SearchRowsSourcePlan."""
+
     has_rows: bool
     use_active_model_rows: bool
 
 
 @dataclass(frozen=True, slots=True)
 class SearchRowsFileCallbacks:
+    """Represent SearchRowsFileCallbacks."""
+
     parse_eager: Callable[[Path, str], ParsedFile]
     parse_lazy: Callable[[Path, str], ParsedFile]
     read_cache: Callable[[Path], Mapping[int, CacheEntry]]
@@ -165,18 +210,24 @@ class SearchRowsFileCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class SearchRowsBuildResult:
+    """Represent SearchRowsBuildResult."""
+
     rows: Iterable[SearchRow]
     entry_count: int
 
 
 @dataclass(frozen=True, slots=True)
 class SearchMatchOpenPlan:
+    """Represent SearchMatchOpenPlan."""
+
     open_target_file: bool
     target_file: Path | None
 
 
 @dataclass(frozen=True, slots=True)
 class SearchMatchApplyPlan:
+    """Represent SearchMatchApplyPlan."""
+
     select_in_table: bool
     target_row: int
     target_column: int
@@ -184,6 +235,8 @@ class SearchMatchApplyPlan:
 
 @dataclass(frozen=True, slots=True)
 class SearchReplaceService:
+    """Represent SearchReplaceService."""
+
     def scope_files(
         self,
         *,
@@ -193,6 +246,7 @@ class SearchReplaceService:
         selected_locales: Iterable[str],
         files_for_locale: Callable[[str], list[Path]],
     ) -> list[Path]:
+        """Execute scope files."""
         return scope_files(
             scope=scope,
             current_file=current_file,
@@ -202,6 +256,7 @@ class SearchReplaceService:
         )
 
     def search_spec_for_column(self, column: int) -> tuple[SearchField, bool, bool]:
+        """Execute search spec for column."""
         return search_spec_for_column(column)
 
     def find_match_in_rows(
@@ -215,6 +270,7 @@ class SearchReplaceService:
         direction: int,
         case_sensitive: bool,
     ) -> Match | None:
+        """Find match in rows."""
         return find_match_in_rows(
             rows,
             query,
@@ -235,6 +291,7 @@ class SearchReplaceService:
         wrap: bool,
         find_in_file: Callable[[Path, int], Match | None],
     ) -> Match | None:
+        """Execute search across files."""
         return search_across_files(
             files=files,
             anchor_path=anchor_path,
@@ -253,6 +310,7 @@ class SearchReplaceService:
         count_in_current: Callable[[], int | None],
         count_in_file: Callable[[Path], int | None],
     ) -> ReplaceAllPlan | None:
+        """Build replace all plan."""
         return build_replace_all_plan(
             files=files,
             current_file=current_file,
@@ -269,6 +327,7 @@ class SearchReplaceService:
         use_regex: bool,
         case_sensitive: bool,
     ) -> ReplaceRequest | None:
+        """Build replace request."""
         return build_replace_request(
             query=query,
             replacement=replacement,
@@ -288,6 +347,7 @@ class SearchReplaceService:
         count_in_current: Callable[[], int | None],
         count_in_file: Callable[[Path], int | None],
     ) -> ReplaceAllRunPlan | None:
+        """Build replace all run plan."""
         return build_replace_all_run_plan(
             scope=scope,
             current_locale=current_locale,
@@ -307,6 +367,7 @@ class SearchReplaceService:
         apply_in_current: Callable[[], bool],
         apply_in_file: Callable[[Path], bool],
     ) -> bool:
+        """Apply replace all."""
         return apply_replace_all(
             files=files,
             current_file=current_file,
@@ -321,6 +382,7 @@ class SearchReplaceService:
         request: ReplaceRequest,
         callbacks: ReplaceCurrentRowCallbacks,
     ) -> bool:
+        """Apply replace in row."""
         return apply_replace_in_row(
             row=row,
             request=request,
@@ -339,6 +401,7 @@ class SearchReplaceService:
         callbacks: ReplaceAllFileCountCallbacks,
         hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
     ) -> int:
+        """Count replace all in file."""
         return count_replace_all_in_file(
             path,
             pattern=pattern,
@@ -362,6 +425,7 @@ class SearchReplaceService:
         callbacks: ReplaceAllFileApplyCallbacks,
         hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
     ) -> ReplaceAllFileApplyResult:
+        """Apply replace all in file."""
         return apply_replace_all_in_file(
             path,
             pattern=pattern,
@@ -383,6 +447,7 @@ class SearchReplaceService:
         has_group_ref: bool,
         callbacks: ReplaceAllRowsCallbacks,
     ) -> int:
+        """Count replace all in rows."""
         return count_replace_all_in_rows(
             pattern=pattern,
             replacement=replacement,
@@ -402,6 +467,7 @@ class SearchReplaceService:
         has_group_ref: bool,
         callbacks: ReplaceAllRowsCallbacks,
     ) -> ReplaceAllRowsApplyResult:
+        """Apply replace all in rows."""
         return apply_replace_all_in_rows(
             pattern=pattern,
             replacement=replacement,
@@ -412,6 +478,7 @@ class SearchReplaceService:
         )
 
     def search_result_label(self, *, match: Match, root: Path) -> str:
+        """Execute search result label."""
         return search_result_label(match=match, root=root)
 
     def build_search_panel_plan(
@@ -422,6 +489,7 @@ class SearchReplaceService:
         result_limit: int,
         iter_matches_for_file: Callable[[Path], Iterable[Match]],
     ) -> SearchPanelPlan:
+        """Build search panel plan."""
         return build_search_panel_plan(
             files=files,
             root=root,
@@ -440,6 +508,7 @@ class SearchReplaceService:
         current_row: int | None,
         direction: int,
     ) -> SearchRunPlan:
+        """Build search run plan."""
         return build_search_run_plan(
             query_text=query_text,
             column=column,
@@ -461,6 +530,7 @@ class SearchReplaceService:
         source_mtime_ns: int,
         cached_stamp: SearchRowsCacheStamp | None,
     ) -> SearchRowsCacheLookupPlan:
+        """Build rows cache lookup plan."""
         return build_rows_cache_lookup_plan(
             path=path,
             include_source=include_source,
@@ -479,6 +549,7 @@ class SearchReplaceService:
         include_value: bool,
         callbacks: SearchRowsCacheStampCallbacks,
     ) -> SearchRowsCacheStamp | None:
+        """Collect rows cache stamp."""
         return collect_rows_cache_stamp(
             path=path,
             include_source=include_source,
@@ -493,6 +564,7 @@ class SearchReplaceService:
         entry_count: int,
         cache_row_limit: int,
     ) -> SearchRowsCacheStorePlan:
+        """Build rows cache store plan."""
         return build_rows_cache_store_plan(
             rows_materialized=rows_materialized,
             entry_count=entry_count,
@@ -506,6 +578,7 @@ class SearchReplaceService:
         is_current_file: bool,
         has_current_model: bool,
     ) -> SearchRowsSourcePlan:
+        """Build rows source plan."""
         return build_rows_source_plan(
             locale_known=locale_known,
             is_current_file=is_current_file,
@@ -524,6 +597,7 @@ class SearchReplaceService:
         callbacks: SearchRowsFileCallbacks,
         hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
     ) -> SearchRowsBuildResult | None:
+        """Load search rows from file."""
         return load_search_rows_from_file(
             path=path,
             encoding=encoding,
@@ -549,6 +623,7 @@ class SearchReplaceService:
         cache_row_limit: int,
         hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
     ) -> SearchRowsBuildResult:
+        """Build search rows."""
         return build_search_rows(
             path=path,
             entries=entries,
@@ -569,6 +644,7 @@ class SearchReplaceService:
         match_file: Path | None,
         current_file: Path | None,
     ) -> SearchMatchOpenPlan:
+        """Build match open plan."""
         return build_match_open_plan(
             has_match=has_match,
             match_file=match_file,
@@ -586,6 +662,7 @@ class SearchReplaceService:
         row_count: int,
         column: int,
     ) -> SearchMatchApplyPlan:
+        """Build match apply plan."""
         return build_match_apply_plan(
             has_match=has_match,
             match_file=match_file,
@@ -605,6 +682,7 @@ def scope_files(
     selected_locales: Iterable[str],
     files_for_locale: Callable[[str], list[Path]],
 ) -> list[Path]:
+    """Execute scope files."""
     if current_file is None:
         return []
     if scope == "FILE":
@@ -620,6 +698,7 @@ def scope_files(
 
 
 def search_result_label(*, match: Match, root: Path) -> str:
+    """Execute search result label."""
     try:
         rel = match.file.relative_to(root).as_posix()
     except ValueError:
@@ -638,6 +717,7 @@ def build_search_panel_plan(
     result_limit: int,
     iter_matches_for_file: Callable[[Path], Iterable[Match]],
 ) -> SearchPanelPlan:
+    """Build search panel plan."""
     limit = max(1, int(result_limit))
     items: list[SearchPanelItem] = []
     truncated = False
@@ -684,6 +764,7 @@ def build_search_run_plan(
     current_row: int | None,
     direction: int,
 ) -> SearchRunPlan:
+    """Build search run plan."""
     query = query_text.strip()
     if not query:
         return SearchRunPlan(
@@ -737,6 +818,7 @@ def build_rows_cache_lookup_plan(
     source_mtime_ns: int,
     cached_stamp: SearchRowsCacheStamp | None,
 ) -> SearchRowsCacheLookupPlan:
+    """Build rows cache lookup plan."""
     key = SearchRowsCacheKey(
         path=path,
         include_source=include_source,
@@ -761,6 +843,7 @@ def collect_rows_cache_stamp(
     include_value: bool,
     callbacks: SearchRowsCacheStampCallbacks,
 ) -> SearchRowsCacheStamp | None:
+    """Collect rows cache stamp."""
     file_mtime_ns = callbacks.file_mtime_ns(path)
     if file_mtime_ns is None:
         return None
@@ -779,6 +862,7 @@ def build_rows_cache_store_plan(
     entry_count: int,
     cache_row_limit: int,
 ) -> SearchRowsCacheStorePlan:
+    """Build rows cache store plan."""
     return SearchRowsCacheStorePlan(
         should_store_rows=rows_materialized and entry_count <= cache_row_limit
     )
@@ -790,6 +874,7 @@ def build_rows_source_plan(
     is_current_file: bool,
     has_current_model: bool,
 ) -> SearchRowsSourcePlan:
+    """Build rows source plan."""
     if not locale_known:
         return SearchRowsSourcePlan(
             has_rows=False,
@@ -812,6 +897,7 @@ def load_search_rows_from_file(
     callbacks: SearchRowsFileCallbacks,
     hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
 ) -> SearchRowsBuildResult | None:
+    """Load search rows from file."""
     try:
         parsed = (
             callbacks.parse_lazy(path, encoding)
@@ -856,9 +942,11 @@ def build_search_rows(
     cache_row_limit: int,
     hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
 ) -> SearchRowsBuildResult:
+    """Build search rows."""
     use_cache = include_value and bool(cache_map)
 
     def _iter_rows() -> Iterable[SearchRow]:
+        """Execute iter rows."""
         for idx, entry in enumerate(entries):
             key = entry.key
             value = ""
@@ -891,6 +979,7 @@ def build_search_rows(
 
 
 def _empty_source_lookup(_key: str) -> str:
+    """Execute empty source lookup."""
     return ""
 
 
@@ -900,6 +989,7 @@ def build_match_open_plan(
     match_file: Path | None,
     current_file: Path | None,
 ) -> SearchMatchOpenPlan:
+    """Build match open plan."""
     if not has_match or match_file is None:
         return SearchMatchOpenPlan(open_target_file=False, target_file=None)
     if current_file is None or match_file != current_file:
@@ -917,6 +1007,7 @@ def build_match_apply_plan(
     row_count: int,
     column: int,
 ) -> SearchMatchApplyPlan:
+    """Build match apply plan."""
     can_select = bool(
         has_match
         and has_current_model
@@ -943,6 +1034,7 @@ def build_replace_all_run_plan(
     count_in_current: Callable[[], int | None],
     count_in_file: Callable[[Path], int | None],
 ) -> ReplaceAllRunPlan | None:
+    """Build replace all run plan."""
     if scope == "FILE" or len(files) <= 1:
         return ReplaceAllRunPlan(
             run_replace=True,
@@ -993,6 +1085,7 @@ def build_replace_request(
     use_regex: bool,
     case_sensitive: bool,
 ) -> ReplaceRequest | None:
+    """Build replace request."""
     if not query:
         return None
     flags = re.MULTILINE
@@ -1021,6 +1114,7 @@ def apply_replace_in_row(
     request: ReplaceRequest,
     callbacks: ReplaceCurrentRowCallbacks,
 ) -> bool:
+    """Apply replace in row."""
     text = callbacks.read_text(row)
     raw_text = "" if text is None else str(text)
     changed, new_text = replace_text(
@@ -1038,6 +1132,7 @@ def apply_replace_in_row(
 
 
 def prioritize_current_file(files: list[Path], current_file: Path | None) -> list[Path]:
+    """Execute prioritize current file."""
     if current_file is None or current_file not in files:
         return list(files)
     return [current_file, *[path for path in files if path != current_file]]
@@ -1049,6 +1144,7 @@ def scope_label(
     current_locale: str | None,
     selected_locale_count: int,
 ) -> str:
+    """Execute scope label."""
     if scope == "LOCALE":
         return f"Locale {current_locale}" if current_locale else "Locale"
     if scope == "POOL":
@@ -1057,6 +1153,7 @@ def scope_label(
 
 
 def search_spec_for_column(column: int) -> tuple[SearchField, bool, bool]:
+    """Execute search spec for column."""
     if column == 0:
         return SearchField.KEY, False, False
     if column == 1:
@@ -1065,12 +1162,14 @@ def search_spec_for_column(column: int) -> tuple[SearchField, bool, bool]:
 
 
 def anchor_row(current_row: int | None, direction: int) -> int:
+    """Execute anchor row."""
     if current_row is not None:
         return current_row
     return -1 if direction > 0 else sys.maxsize
 
 
 def fallback_row(direction: int) -> int:
+    """Execute fallback row."""
     return -1 if direction > 0 else sys.maxsize
 
 
@@ -1084,6 +1183,7 @@ def find_match_in_rows(
     direction: int,
     case_sensitive: bool = False,
 ) -> Match | None:
+    """Find match in rows."""
     if direction >= 0:
         for match in iter_matches(
             rows,
@@ -1119,6 +1219,7 @@ def replace_text(
     has_group_ref: bool,
     mode: Literal["single", "all"],
 ) -> tuple[bool, str]:
+    """Execute replace text."""
     if mode == "single":
         return _replace_single(
             text,
@@ -1147,6 +1248,7 @@ def _replace_single(
     matches_empty: bool,
     has_group_ref: bool,
 ) -> tuple[bool, str]:
+    """Execute replace single."""
     if not pattern.search(text):
         return False, text
     if matches_empty and not has_group_ref:
@@ -1155,6 +1257,7 @@ def _replace_single(
         template = _regex_template(replacement)
 
         def _expander(match: re.Match[str]) -> str:
+            """Execute expander."""
             return match.expand(template)
 
         new_text = pattern.sub(_expander, text, count=1)
@@ -1172,6 +1275,7 @@ def _replace_all(
     matches_empty: bool,
     has_group_ref: bool,
 ) -> tuple[bool, str]:
+    """Execute replace all."""
     if not text:
         return False, text
     if matches_empty and not has_group_ref:
@@ -1184,6 +1288,7 @@ def _replace_all(
             count = 1 if matches_empty else 0
 
             def _expander(match: re.Match[str]) -> str:
+                """Execute expander."""
                 return match.expand(template)
 
             new_text = pattern.sub(_expander, text, count=count)
@@ -1193,6 +1298,7 @@ def _replace_all(
 
 
 def _regex_template(replacement: str) -> str:
+    """Execute regex template."""
     return re.sub(r"\$(\d+)", r"\\g<\1>", replacement)
 
 
@@ -1205,6 +1311,7 @@ def search_across_files(
     wrap: bool,
     find_in_file: Callable[[Path, int], Match | None],
 ) -> Match | None:
+    """Execute search across files."""
     if not files:
         return None
     if anchor_path not in files:
@@ -1249,6 +1356,7 @@ def build_replace_all_plan(
     count_in_current: Callable[[], int | None],
     count_in_file: Callable[[Path], int | None],
 ) -> ReplaceAllPlan | None:
+    """Build replace all plan."""
     total = 0
     counts: list[tuple[str, int]] = []
     for path in files:
@@ -1271,6 +1379,7 @@ def apply_replace_all(
     apply_in_current: Callable[[], bool],
     apply_in_file: Callable[[Path], bool],
 ) -> bool:
+    """Apply replace all."""
     if current_file and current_file in files and not apply_in_current():
         return False
     for path in files:
@@ -1292,6 +1401,7 @@ def count_replace_all_in_file(
     callbacks: ReplaceAllFileCountCallbacks,
     hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
 ) -> int:
+    """Count replace all in file."""
     parsed, cache_map = _load_replace_file(
         path, callbacks.parse_file, callbacks.read_cache
     )
@@ -1328,6 +1438,7 @@ def apply_replace_all_in_file(
     callbacks: ReplaceAllFileApplyCallbacks,
     hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
 ) -> ReplaceAllFileApplyResult:
+    """Apply replace all in file."""
     parsed, cache_map = _load_replace_file(
         path, callbacks.parse_file, callbacks.read_cache
     )
@@ -1382,6 +1493,7 @@ def count_replace_all_in_rows(
     has_group_ref: bool,
     callbacks: ReplaceAllRowsCallbacks,
 ) -> int:
+    """Count replace all in rows."""
     count = 0
     for row in range(callbacks.row_count()):
         text = callbacks.read_text(row)
@@ -1409,6 +1521,7 @@ def apply_replace_all_in_rows(
     has_group_ref: bool,
     callbacks: ReplaceAllRowsCallbacks,
 ) -> ReplaceAllRowsApplyResult:
+    """Apply replace all in rows."""
     changed_rows = 0
     for row in range(callbacks.row_count()):
         text = callbacks.read_text(row)
@@ -1434,6 +1547,7 @@ def _load_replace_file(
     parse_file: Callable[[Path], ParsedFile],
     read_cache: Callable[[Path], Mapping[int, CacheEntry]],
 ) -> tuple[ParsedFile, Mapping[int, CacheEntry]]:
+    """Load replace file."""
     try:
         parsed = parse_file(path)
     except Exception as exc:  # pragma: no cover - adapter handles/reporting
@@ -1447,6 +1561,7 @@ def _resolve_entry_overlay(
     cache_map: Mapping[int, CacheEntry],
     hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
 ) -> tuple[int, str | None, Status]:
+    """Resolve entry overlay."""
     key_hash = hash_for_entry(entry, cache_map)
     cache = cache_map.get(key_hash)
     value = cache.value if cache and cache.value is not None else entry.value
