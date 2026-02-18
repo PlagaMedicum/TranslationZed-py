@@ -49,7 +49,7 @@ class _DialogStub:
     """Replace-files dialog stub with configurable confirmation result."""
 
     _confirm = True
-    _instances: list["_DialogStub"] = []
+    _instances: list[_DialogStub] = []
 
     def __init__(self, counts, scope_label: str, _parent) -> None:  # type: ignore[no-untyped-def]
         self.counts = list(counts)
@@ -130,15 +130,25 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
     win._search_replace_service = service  # type: ignore[assignment]
     win._current_pf = SimpleNamespace(path=current_path)
     monkeypatch.setattr(win, "_prepare_replace_request", lambda: request_box["value"])
-    monkeypatch.setattr(win, "_files_for_scope", lambda _scope: list(files_box["value"]))
-    monkeypatch.setattr(win, "_replace_all_count_in_model", lambda *_args: count_hits.append("model") or 2)
+    monkeypatch.setattr(
+        win, "_files_for_scope", lambda _scope: list(files_box["value"])
+    )
+    monkeypatch.setattr(
+        win,
+        "_replace_all_count_in_model",
+        lambda *_args: count_hits.append("model") or 2,
+    )
     monkeypatch.setattr(
         win,
         "_replace_all_count_in_file",
         lambda *_args: count_hits.append("file") or 3,
     )
-    monkeypatch.setattr(win, "_replace_all_in_model", lambda *_args: apply_hits.append("model") or True)
-    monkeypatch.setattr(win, "_replace_all_in_file", lambda *_args: apply_hits.append("file") or True)
+    monkeypatch.setattr(
+        win, "_replace_all_in_model", lambda *_args: apply_hits.append("model") or True
+    )
+    monkeypatch.setattr(
+        win, "_replace_all_in_file", lambda *_args: apply_hits.append("file") or True
+    )
     monkeypatch.setattr(win, "_schedule_search", lambda: schedule_hits.append("search"))
     monkeypatch.setattr(mw, "ReplaceFilesDialog", _DialogStub)
     _DialogStub._instances.clear()
@@ -203,7 +213,18 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
     assert service.plan_calls == 5
     assert service.apply_calls == 2
     assert schedule_hits == ["search"]
-    assert count_hits == ["model", "file", "model", "file", "model", "file", "model", "file", "model", "file"]
+    assert count_hits == [
+        "model",
+        "file",
+        "model",
+        "file",
+        "model",
+        "file",
+        "model",
+        "file",
+        "model",
+        "file",
+    ]
     assert apply_hits == ["model", "file", "model", "file"]
     win._current_model = None
     win._current_pf = None
@@ -241,8 +262,16 @@ def test_replace_helpers_cover_error_and_success_branches(
             has_group_ref=False,
         ),
     )
-    monkeypatch.setattr(win, "_report_parse_error", lambda path, exc: parse_errors.append((path, str(exc))))
-    monkeypatch.setattr(win.fs_model, "set_dirty", lambda path, value: dirty_calls.append((path, bool(value))))
+    monkeypatch.setattr(
+        win,
+        "_report_parse_error",
+        lambda path, exc: parse_errors.append((path, str(exc))),
+    )
+    monkeypatch.setattr(
+        win.fs_model,
+        "set_dirty",
+        lambda path, value: dirty_calls.append((path, bool(value))),
+    )
 
     mode = {"count_file": "parse", "apply_file": "parse"}
 
@@ -260,7 +289,9 @@ def test_replace_helpers_cover_error_and_success_branches(
         @staticmethod
         def count_replace_all_in_file(path, **_kwargs):  # type: ignore[no-untyped-def]
             if mode["count_file"] == "parse":
-                raise mw._ReplaceAllFileParseError(path=path, original=ValueError("count-parse-fail"))
+                raise mw._ReplaceAllFileParseError(
+                    path=path, original=ValueError("count-parse-fail")
+                )
             raise re.error("count-file-regex-fail")
 
         @staticmethod
@@ -270,7 +301,9 @@ def test_replace_helpers_cover_error_and_success_branches(
         @staticmethod
         def apply_replace_all_in_file(path, **_kwargs):  # type: ignore[no-untyped-def]
             if mode["apply_file"] == "parse":
-                raise mw._ReplaceAllFileParseError(path=path, original=ValueError("apply-parse-fail"))
+                raise mw._ReplaceAllFileParseError(
+                    path=path, original=ValueError("apply-parse-fail")
+                )
             if mode["apply_file"] == "regex":
                 raise re.error("apply-file-regex-fail")
             return SimpleNamespace(changed_any=mode["apply_file"] == "changed")
@@ -401,8 +434,12 @@ def test_merge_view_apply_and_active_state_cover_selection_paths(
     _WarningSink.warnings.clear()
 
     rows = [
-        SimpleNamespace(key="A", source_value="S-A", original_value="O-A", cache_value="C-A"),
-        SimpleNamespace(key="B", source_value="S-B", original_value="O-B", cache_value="C-B"),
+        SimpleNamespace(
+            key="A", source_value="S-A", original_value="O-A", cache_value="C-A"
+        ),
+        SimpleNamespace(
+            key="B", source_value="S-B", original_value="O-B", cache_value="C-B"
+        ),
     ]
     path = root / "BE" / "ui.txt"
     win._build_merge_view(path, rows)
@@ -485,7 +522,8 @@ def test_copy_cut_and_paste_cover_row_and_selection_macro_paths(
     sel.clearSelection()
     sel.select(
         model.index(0, 0),
-        QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows,
+        QItemSelectionModel.SelectionFlag.Select
+        | QItemSelectionModel.SelectionFlag.Rows,
     )
     win._copy_selection()
     assert clipboard.text() == "KEY_0\tSource 0\tValue 0\tOK"
@@ -549,9 +587,15 @@ def test_wrap_mode_and_large_file_mode_cover_toggle_and_tooltip_paths(
     qtbot.addWidget(win)
 
     wrap_calls: list[str] = []
-    monkeypatch.setattr(win, "_apply_row_height_mode", lambda: wrap_calls.append("row_height"))
-    monkeypatch.setattr(win, "_clear_row_height_cache", lambda: wrap_calls.append("clear_cache"))
-    monkeypatch.setattr(win, "_schedule_row_resize", lambda: wrap_calls.append("resize"))
+    monkeypatch.setattr(
+        win, "_apply_row_height_mode", lambda: wrap_calls.append("row_height")
+    )
+    monkeypatch.setattr(
+        win, "_clear_row_height_cache", lambda: wrap_calls.append("clear_cache")
+    )
+    monkeypatch.setattr(
+        win, "_schedule_row_resize", lambda: wrap_calls.append("resize")
+    )
 
     win._wrap_text = False
     win._wrap_text_user = True
@@ -568,7 +612,9 @@ def test_wrap_mode_and_large_file_mode_cover_toggle_and_tooltip_paths(
 
     toggle_calls: list[str] = []
     monkeypatch.setattr(win, "_apply_wrap_mode", lambda: toggle_calls.append("wrap"))
-    monkeypatch.setattr(win, "_persist_preferences", lambda: toggle_calls.append("persist"))
+    monkeypatch.setattr(
+        win, "_persist_preferences", lambda: toggle_calls.append("persist")
+    )
     win._toggle_wrap_text(False)
     assert win._wrap_text_user is False
     assert toggle_calls == ["wrap", "persist"]

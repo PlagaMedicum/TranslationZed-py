@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -32,7 +31,9 @@ def _make_project(tmp_path: Path) -> Path:
 class _Future:
     """Small future stub with configurable done/result/exception behavior."""
 
-    def __init__(self, *, done: bool, result=None, error: Exception | None = None) -> None:
+    def __init__(
+        self, *, done: bool, result=None, error: Exception | None = None
+    ) -> None:
         self._done = done
         self._result = result
         self._error = error
@@ -140,7 +141,9 @@ def test_start_and_poll_tm_rebuild_cover_running_failure_and_success_paths(
     _MessageBox._warnings.clear()
 
     shown: list[tuple[str, int]] = []
-    monkeypatch.setattr(win.statusBar(), "showMessage", lambda text, ms=0: shown.append((text, ms)))
+    monkeypatch.setattr(
+        win.statusBar(), "showMessage", lambda text, ms=0: shown.append((text, ms))
+    )
 
     win._tm_store = None
     win._start_tm_rebuild(["BE"], interactive=True, force=False)
@@ -178,7 +181,9 @@ def test_start_and_poll_tm_rebuild_cover_running_failure_and_success_paths(
         "_Workflow",
         (),
         {
-            "collect_rebuild_locales": staticmethod(lambda **_kwargs: ([_Spec()], "utf-8")),
+            "collect_rebuild_locales": staticmethod(
+                lambda **_kwargs: ([_Spec()], "utf-8")
+            ),
             "rebuild_project_tm": staticmethod(lambda *_args, **_kwargs: None),
             "clear_cache": staticmethod(lambda: shown.append(("clear", 0))),
             "format_rebuild_status": staticmethod(lambda _result: "rebuilt"),
@@ -191,7 +196,9 @@ def test_start_and_poll_tm_rebuild_cover_running_failure_and_success_paths(
     assert win._tm_rebuild_timer.isActive() is True
 
     progress: list[bool] = []
-    monkeypatch.setattr(win, "_set_tm_progress_visible", lambda visible: progress.append(bool(visible)))
+    monkeypatch.setattr(
+        win, "_set_tm_progress_visible", lambda visible: progress.append(bool(visible))
+    )
     win._tm_rebuild_future = None
     win._tm_query_future = None
     win._poll_tm_rebuild()
@@ -206,7 +213,9 @@ def test_start_and_poll_tm_rebuild_cover_running_failure_and_success_paths(
     assert any(title == "TM rebuild failed" for title, _ in _MessageBox._warnings)
 
     finished: list[TMRebuildResult] = []
-    monkeypatch.setattr(win, "_finish_tm_rebuild", lambda result: finished.append(result))
+    monkeypatch.setattr(
+        win, "_finish_tm_rebuild", lambda result: finished.append(result)
+    )
     result = TMRebuildResult(files=1, entries=2)
     win._tm_rebuild_future = _Future(done=True, result=result)
     win._poll_tm_rebuild()
@@ -224,7 +233,11 @@ def test_finish_rebuild_open_preferences_show_about_and_theme_reactivity(
     qtbot.addWidget(win)
 
     status_msgs: list[tuple[str, int]] = []
-    monkeypatch.setattr(win.statusBar(), "showMessage", lambda text, ms=0: status_msgs.append((text, ms)))
+    monkeypatch.setattr(
+        win.statusBar(),
+        "showMessage",
+        lambda text, ms=0: status_msgs.append((text, ms)),
+    )
 
     updates: list[str] = []
     win._tm_workflow = type(
@@ -236,7 +249,9 @@ def test_finish_rebuild_open_preferences_show_about_and_theme_reactivity(
         },
     )()
     win._left_stack.setCurrentIndex(1)
-    monkeypatch.setattr(win, "_update_tm_suggestions", lambda: updates.append("suggest"))
+    monkeypatch.setattr(
+        win, "_update_tm_suggestions", lambda: updates.append("suggest")
+    )
     win._finish_tm_rebuild(TMRebuildResult(files=2, entries=3))
     assert updates == ["clear", "suggest"]
     assert status_msgs[-1] == ("done", 8000)
@@ -254,9 +269,19 @@ def test_finish_rebuild_open_preferences_show_about_and_theme_reactivity(
             return 0
 
     monkeypatch.setattr(mw, "PreferencesDialog", _PrefsDialogReject)
-    monkeypatch.setattr(win, "_apply_preferences", lambda values: applied.append(dict(values)))
+    monkeypatch.setattr(
+        win, "_apply_preferences", lambda values: applied.append(dict(values))
+    )
     monkeypatch.setattr(win, "_ensure_tm_store", lambda: True)
-    win._tm_store = type("_Store", (), {"list_import_files": staticmethod(lambda: (_ for _ in ()).throw(RuntimeError("nope")))})()
+    win._tm_store = type(
+        "_Store",
+        (),
+        {
+            "list_import_files": staticmethod(
+                lambda: (_ for _ in ()).throw(RuntimeError("nope"))
+            )
+        },
+    )()
     win._open_preferences()
     assert applied == []
 

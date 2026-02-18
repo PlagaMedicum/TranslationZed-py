@@ -34,7 +34,7 @@ class _FakeMessageBox:
 
     Warning = 1
     Information = 2
-    _instances: list["_FakeMessageBox"] = []
+    _instances: list[_FakeMessageBox] = []
 
     def __init__(self, *_args, **_kwargs) -> None:
         self.icon = None
@@ -99,7 +99,7 @@ def test_apply_tm_sync_report_renders_issue_summary_and_refreshes_tm_panel(
     assert len(_FakeMessageBox._instances) == 1
     msg = _FakeMessageBox._instances[0]
     assert msg.icon == _FakeMessageBox.Warning
-    assert "TM import sync" == msg.title
+    assert msg.title == "TM import sync"
     assert "Imported 1 file(s)," in msg.text
     assert "Failures:" in msg.details
     assert "Pending mapping:" in msg.details
@@ -144,7 +144,10 @@ def test_apply_tm_sync_report_renders_summary_and_no_change_messages(
     assert _FakeMessageBox._instances[0].icon == _FakeMessageBox.Information
     assert "Imported 1 file(s)," in _FakeMessageBox._instances[0].text
     assert "Imported:" in _FakeMessageBox._instances[0].details
-    assert "No TM files changed (already up to date)." in _FakeMessageBox._instances[1].text
+    assert (
+        "No TM files changed (already up to date)."
+        in _FakeMessageBox._instances[1].text
+    )
     assert "Checked:" in _FakeMessageBox._instances[1].details
 
 
@@ -160,10 +163,16 @@ def test_sync_tm_import_folder_handles_mkdir_errors_for_interactive_and_non_inte
     monkeypatch.setattr(win, "_ensure_tm_store", lambda: True)
     tm_dir = root / ".tm-import"
     monkeypatch.setattr(win, "_tm_import_dir_path", lambda: tm_dir)
-    monkeypatch.setattr(tm_dir.__class__, "mkdir", lambda _self, **_kwargs: (_ for _ in ()).throw(OSError("denied")))
+    monkeypatch.setattr(
+        tm_dir.__class__,
+        "mkdir",
+        lambda _self, **_kwargs: (_ for _ in ()).throw(OSError("denied")),
+    )
 
     shown: list[tuple[str, int]] = []
-    monkeypatch.setattr(win.statusBar(), "showMessage", lambda text, ms=0: shown.append((text, ms)))
+    monkeypatch.setattr(
+        win.statusBar(), "showMessage", lambda text, ms=0: shown.append((text, ms))
+    )
     monkeypatch.setattr(mw, "QMessageBox", _FakeMessageBox)
 
     win._sync_tm_import_folder(interactive=True)

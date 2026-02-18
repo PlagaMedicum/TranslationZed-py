@@ -90,21 +90,29 @@ def test_init_prefetch_replace_and_changed_row_helpers() -> None:
     assert isinstance(model._dark_palette_active(), bool)
 
 
-def test_dark_palette_active_without_qapp_and_source_lookup_empty_entries(monkeypatch) -> None:
+def test_dark_palette_active_without_qapp_and_source_lookup_empty_entries(
+    monkeypatch,
+) -> None:
     """Verify dark palette returns false without app and source lookup handles empties."""
-    monkeypatch.setattr("translationzed_py.gui.entry_model.QApplication.instance", lambda: None)
+    monkeypatch.setattr(
+        "translationzed_py.gui.entry_model.QApplication.instance", lambda: None
+    )
     model = TranslationModel(_parsed([]))
     assert model._dark_palette_active() is False
     model.set_source_lookup(source_values={"A": "B"}, source_by_row=["B"])
 
 
-def test_length_preview_and_tooltip_paths_cover_exception_and_fallback_branches() -> None:
+def test_length_preview_and_tooltip_paths_cover_exception_and_fallback_branches() -> (
+    None
+):
     """Verify text-length, preview, and tooltip helpers handle exceptional inputs."""
 
     class _SourceRows:
         """Source rows stub with length/preview helpers that may fail."""
 
-        def __init__(self, values: list[str], *, fail_length: bool, fail_preview: bool) -> None:
+        def __init__(
+            self, values: list[str], *, fail_length: bool, fail_preview: bool
+        ) -> None:
             self._values = values
             self._fail_length = fail_length
             self._fail_preview = fail_preview
@@ -224,7 +232,9 @@ def test_length_preview_and_tooltip_paths_cover_exception_and_fallback_branches(
 def test_data_header_and_setdata_branches(qapp) -> None:
     """Verify data accessors, header writes, and setData branch behavior."""
     _ = qapp
-    model = TranslationModel(_parsed([_entry("K1", "value1", status=Status.TRANSLATED)]))
+    model = TranslationModel(
+        _parsed([_entry("K1", "value1", status=Status.TRANSLATED)])
+    )
     model._source_values = {"K1": "source1"}
 
     assert model.data(QModelIndex()) is None
@@ -267,7 +277,9 @@ def test_tooltip_paths_with_large_content_use_limiting_logic(qapp) -> None:
     _ = qapp
     long_source = "s" * 1200
     long_value = "v" * 6000
-    model = TranslationModel(_parsed([_entry("L", long_value)]), source_values={"L": long_source})
+    model = TranslationModel(
+        _parsed([_entry("L", long_value)]), source_values={"L": long_source}
+    )
 
     source_tip = model._tooltip_source(0)
     value_tip = model._tooltip_value(0)
@@ -329,7 +341,9 @@ def test_remaining_entry_model_source_and_preview_success_paths() -> None:
     assert model._preview_value_raw(0, 4) == ("valu", 5)
 
     entries_with_no_value = _Entries([_entry("C", "")])
-    model_empty = TranslationModel(_parsed(entries_with_no_value), source_values={"C": ""})
+    model_empty = TranslationModel(
+        _parsed(entries_with_no_value), source_values={"C": ""}
+    )
     assert model_empty._tooltip_source(0) == ""
     assert model_empty._tooltip_value(0) == ""
 

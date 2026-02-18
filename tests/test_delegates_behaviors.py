@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 pytest.importorskip("PySide6")
@@ -19,7 +17,13 @@ from PySide6.QtGui import (
     QTextDocument,
     QTextOption,
 )
-from PySide6.QtWidgets import QComboBox, QStyle, QStyleOptionViewItem, QTableView, QWidget
+from PySide6.QtWidgets import (
+    QComboBox,
+    QStyle,
+    QStyleOptionViewItem,
+    QTableView,
+    QWidget,
+)
 
 from translationzed_py.core.model import Status
 from translationzed_py.gui.delegates import (
@@ -133,7 +137,9 @@ def test_multiline_delegate_editor_update_and_geometry_paths(qtbot) -> None:
     assert non_plain.geometry().height() == 20
 
 
-def test_palette_cache_key_and_visual_helpers_cover_fallback_branches(monkeypatch) -> None:
+def test_palette_cache_key_and_visual_helpers_cover_fallback_branches(
+    monkeypatch,
+) -> None:
     """Verify visual helper functions cover whitespace and palette-key fallback paths."""
 
     class _BrokenPalette:
@@ -187,7 +193,9 @@ def test_palette_cache_key_and_visual_helpers_cover_fallback_branches(monkeypatc
     highlighter.rehighlight()
 
 
-def test_visual_delegate_cache_editor_sizehint_and_paint_paths(qtbot, monkeypatch) -> None:
+def test_visual_delegate_cache_editor_sizehint_and_paint_paths(
+    qtbot, monkeypatch
+) -> None:
     """Verify visual delegate cache, editor setup, size hints, and paint branches."""
     view = QTableView()
     qtbot.addWidget(view)
@@ -307,7 +315,9 @@ def test_visual_delegate_cache_editor_sizehint_and_paint_paths(qtbot, monkeypatc
     assert isinstance(widget_editor, QWidget)
 
 
-def test_visual_delegate_set_editor_data_non_plain_and_optimize_branch(qtbot, monkeypatch) -> None:
+def test_visual_delegate_set_editor_data_non_plain_and_optimize_branch(
+    qtbot, monkeypatch
+) -> None:
     """Verify visual delegate setEditorData handles non-plain and optimize branches."""
     view = QTableView()
     qtbot.addWidget(view)

@@ -31,7 +31,7 @@ class _MsgBox:
     """Minimal QMessageBox stub for warning-dialog assertions."""
 
     Warning = 1
-    _instances: list["_MsgBox"] = []
+    _instances: list[_MsgBox] = []
 
     def __init__(self, *_args, **_kwargs) -> None:
         self.title = ""
@@ -70,14 +70,28 @@ def test_apply_preferences_updates_state_and_triggers_follow_up_actions(
     win._current_model = object()  # type: ignore[assignment]
 
     calls: list[str] = []
-    monkeypatch.setattr(win, "_apply_theme_mode", lambda *_args, **_kwargs: calls.append("theme"))
-    monkeypatch.setattr(win, "_update_render_cost_flags", lambda: calls.append("render"))
-    monkeypatch.setattr(win, "_update_large_file_mode", lambda: calls.append("large_mode"))
+    monkeypatch.setattr(
+        win, "_apply_theme_mode", lambda *_args, **_kwargs: calls.append("theme")
+    )
+    monkeypatch.setattr(
+        win, "_update_render_cost_flags", lambda: calls.append("render")
+    )
+    monkeypatch.setattr(
+        win, "_update_large_file_mode", lambda: calls.append("large_mode")
+    )
     monkeypatch.setattr(win, "_apply_wrap_mode", lambda: calls.append("wrap"))
-    monkeypatch.setattr(win, "_apply_text_visual_options", lambda: calls.append("visual"))
-    monkeypatch.setattr(win, "_set_qa_findings", lambda _rows: calls.append("qa_findings"))
-    monkeypatch.setattr(win, "_set_qa_panel_message", lambda _msg: calls.append("qa_msg"))
-    monkeypatch.setattr(win, "_apply_tm_preferences_actions", lambda _values: calls.append("tm_actions"))
+    monkeypatch.setattr(
+        win, "_apply_text_visual_options", lambda: calls.append("visual")
+    )
+    monkeypatch.setattr(
+        win, "_set_qa_findings", lambda _rows: calls.append("qa_findings")
+    )
+    monkeypatch.setattr(
+        win, "_set_qa_panel_message", lambda _msg: calls.append("qa_msg")
+    )
+    monkeypatch.setattr(
+        win, "_apply_tm_preferences_actions", lambda _values: calls.append("tm_actions")
+    )
     monkeypatch.setattr(win, "_schedule_search", lambda *_args: calls.append("search"))
     monkeypatch.setattr(win, "_persist_preferences", lambda: calls.append("persist"))
     monkeypatch.setattr(win, "_resolve_pending_tmx", lambda: calls.append("resolve"))
@@ -90,7 +104,9 @@ def test_apply_preferences_updates_state_and_triggers_follow_up_actions(
         lambda **_kwargs: calls.append("sync_tm"),
     )
     monkeypatch.setattr(win, "_schedule_tm_update", lambda: calls.append("tm_update"))
-    monkeypatch.setattr(win, "_update_replace_enabled", lambda *_args: calls.append("replace"))
+    monkeypatch.setattr(
+        win, "_update_replace_enabled", lambda *_args: calls.append("replace")
+    )
     monkeypatch.setattr(win, "_update_status_bar", lambda: calls.append("status"))
     monkeypatch.setattr(
         mw,
@@ -100,7 +116,9 @@ def test_apply_preferences_updates_state_and_triggers_follow_up_actions(
             current != (False, False, False, False, False, False, False),
         ),
     )
-    monkeypatch.setattr(mw, "_apply_source_ref_preferences_for_window", lambda _win, _values: None)
+    monkeypatch.setattr(
+        mw, "_apply_source_ref_preferences_for_window", lambda _win, _values: None
+    )
 
     values = {
         "theme_mode": "LIGHT",
@@ -153,7 +171,9 @@ def test_apply_tm_preferences_actions_handles_empty_store_guard_sync_and_failure
     _MsgBox._instances.clear()
 
     class _Actions:
-        def __init__(self, *, empty: bool, remove_paths: set[str] | None = None) -> None:
+        def __init__(
+            self, *, empty: bool, remove_paths: set[str] | None = None
+        ) -> None:
             self._empty = empty
             self.remove_paths = set(remove_paths or set())
 

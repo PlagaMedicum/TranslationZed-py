@@ -9,7 +9,6 @@ from types import SimpleNamespace
 from translationzed_py.core.model import Entry, Status
 from translationzed_py.core.project_scanner import LocaleMeta
 from translationzed_py.core.status_cache import (
-    LEGACY_CACHE_DIR,
     _HEADER_V1,
     _HEADER_V2,
     _HEADER_V5,
@@ -18,6 +17,7 @@ from translationzed_py.core.status_cache import (
     _MAGIC_V3,
     _MAGIC_V4,
     _MAGIC_V5,
+    LEGACY_CACHE_DIR,
     _cache_roots,
     _migrate_cache_path,
     _original_path_from_cache,
@@ -97,7 +97,9 @@ def test_migrate_cache_path_guard_returns_cover_failure_conditions(
     )
     assert _migrate_cache_path(root, cache, locales) is False
 
-    monkeypatch.setattr("translationzed_py.core.status_cache._read_rows_any", lambda _data: parsed_16)
+    monkeypatch.setattr(
+        "translationzed_py.core.status_cache._read_rows_any", lambda _data: parsed_16
+    )
     monkeypatch.setattr(
         "translationzed_py.core.status_cache._original_path_from_cache",
         lambda _root, _cache: None,
@@ -163,7 +165,9 @@ def test_migrate_paths_and_all_cover_skip_and_empty_legacy_sets(
     cfg = _cfg(en_hash_filename="hash.bin")
     calls: list[Path] = []
 
-    monkeypatch.setattr("translationzed_py.core.status_cache._load_app_config", lambda _root: cfg)
+    monkeypatch.setattr(
+        "translationzed_py.core.status_cache._load_app_config", lambda _root: cfg
+    )
     monkeypatch.setattr(
         "translationzed_py.core.status_cache._migrate_cache_path",
         lambda _root, path, _locales: calls.append(path) or False,
@@ -177,8 +181,13 @@ def test_migrate_paths_and_all_cover_skip_and_empty_legacy_sets(
     assert migrated == 0
     assert calls == [root / "a.bin", root / "b.bin"]
 
-    monkeypatch.setattr("translationzed_py.core.status_cache.legacy_cache_paths", lambda _root: [])
-    monkeypatch.setattr("translationzed_py.core.project_scanner.scan_root", lambda _root: {"EN": object()})
+    monkeypatch.setattr(
+        "translationzed_py.core.status_cache.legacy_cache_paths", lambda _root: []
+    )
+    monkeypatch.setattr(
+        "translationzed_py.core.project_scanner.scan_root",
+        lambda _root: {"EN": object()},
+    )
     assert migrate_all(root, locales=None) == 0
 
 
@@ -204,7 +213,9 @@ def test_read_rows_any_truncated_magic_branches_and_legacy_status_skip() -> None
     assert parsed.rows == []
 
 
-def test_readers_cover_header_fallback_and_oserror_paths(monkeypatch, tmp_path: Path) -> None:
+def test_readers_cover_header_fallback_and_oserror_paths(
+    monkeypatch, tmp_path: Path
+) -> None:
     """Verify header readers hit OSError, short-header, unknown-magic, and fallback cases."""
     missing = tmp_path / "missing.bin"
     assert read_last_opened_from_path(missing) == 0
@@ -236,7 +247,9 @@ def test_readers_cover_header_fallback_and_oserror_paths(monkeypatch, tmp_path: 
     assert read_last_opened_from_path(v1_header_only) == 0
 
     with monkeypatch.context() as m:
-        m.setattr(Path, "read_bytes", lambda _self: (_ for _ in ()).throw(OSError("boom")))
+        m.setattr(
+            Path, "read_bytes", lambda _self: (_ for _ in ()).throw(OSError("boom"))
+        )
         assert read_has_drafts_from_path(unknown) is False
 
     unparsable = tmp_path / "unparsable.bin"

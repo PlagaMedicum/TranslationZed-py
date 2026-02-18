@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from io import StringIO
 
-from translationzed_py.gui.perf_trace import PerfTrace, _DEFAULT_CATEGORIES, _parse_categories
+from translationzed_py.gui.perf_trace import (
+    _DEFAULT_CATEGORIES,
+    PerfTrace,
+    _parse_categories,
+)
 
 
 def test_parse_categories_accepts_switches_and_filters_unknown_values() -> None:
@@ -50,8 +54,12 @@ def test_start_stop_and_record_manage_bucket_lifecycle(monkeypatch) -> None:
 
     start_times = iter([10.0, 10.005])
     monotonic_times = iter([100.0, 100.0, 100.0, 100.0])
-    monkeypatch.setattr("translationzed_py.gui.perf_trace.time.perf_counter", lambda: next(start_times))
-    monkeypatch.setattr("translationzed_py.gui.perf_trace.time.monotonic", lambda: next(monotonic_times))
+    monkeypatch.setattr(
+        "translationzed_py.gui.perf_trace.time.perf_counter", lambda: next(start_times)
+    )
+    monkeypatch.setattr(
+        "translationzed_py.gui.perf_trace.time.monotonic", lambda: next(monotonic_times)
+    )
 
     assert trace.start("layout") is None
     start = trace.start("paint")
@@ -65,7 +73,9 @@ def test_start_stop_and_record_manage_bucket_lifecycle(monkeypatch) -> None:
     assert trace._buckets == {}
 
 
-def test_record_handles_disabled_trace_unit_mismatch_and_empty_flush(monkeypatch) -> None:
+def test_record_handles_disabled_trace_unit_mismatch_and_empty_flush(
+    monkeypatch,
+) -> None:
     """Verify disabled mode, unit mismatch, and explicit empty flush behavior."""
     disabled = PerfTrace(set())
     assert disabled.enabled is False
@@ -79,7 +89,9 @@ def test_record_handles_disabled_trace_unit_mismatch_and_empty_flush(monkeypatch
     trace._last_flush = 100.0
 
     monotonic_times = iter([101.0, 102.0])
-    monkeypatch.setattr("translationzed_py.gui.perf_trace.time.monotonic", lambda: next(monotonic_times))
+    monkeypatch.setattr(
+        "translationzed_py.gui.perf_trace.time.monotonic", lambda: next(monotonic_times)
+    )
 
     trace.record("paint", 6.0, items=-10, unit="rows")
     trace.record("paint", 4.0, items=2, unit="files")

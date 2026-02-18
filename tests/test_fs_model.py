@@ -52,7 +52,9 @@ def test_lazy_model_loads_locale_on_index_and_applies_pending_dirty(
     assert str(target_file) not in model._pending_dirty
 
 
-def test_ensure_loaded_handles_invalid_index_and_missing_item(tmp_path, monkeypatch) -> None:
+def test_ensure_loaded_handles_invalid_index_and_missing_item(
+    tmp_path, monkeypatch
+) -> None:
     """Verify ensure-loaded exits safely for invalid indexes and missing items."""
     root = tmp_path / "project"
     root.mkdir()

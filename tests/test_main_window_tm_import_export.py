@@ -93,7 +93,11 @@ def test_check_en_hash_cache_paths_include_exception_empty_and_mismatch_ack(
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
 
-    monkeypatch.setattr(mw, "_compute_en_hashes", lambda _root: (_ for _ in ()).throw(RuntimeError("fail")))
+    monkeypatch.setattr(
+        mw,
+        "_compute_en_hashes",
+        lambda _root: (_ for _ in ()).throw(RuntimeError("fail")),
+    )
     assert win._check_en_hash_cache() is True
 
     monkeypatch.setattr(mw, "_compute_en_hashes", lambda _root: {})
@@ -102,7 +106,9 @@ def test_check_en_hash_cache_paths_include_exception_empty_and_mismatch_ack(
     writes: list[dict[str, str]] = []
     monkeypatch.setattr(mw, "_compute_en_hashes", lambda _root: {"a": "1"})
     monkeypatch.setattr(mw, "_read_en_hash_cache", lambda _root: {})
-    monkeypatch.setattr(mw, "_write_en_hash_cache", lambda _root, data: writes.append(dict(data)))
+    monkeypatch.setattr(
+        mw, "_write_en_hash_cache", lambda _root, data: writes.append(dict(data))
+    )
     assert win._check_en_hash_cache() is True
     assert writes[-1] == {"a": "1"}
 
@@ -111,7 +117,9 @@ def test_check_en_hash_cache_paths_include_exception_empty_and_mismatch_ack(
     assert win._check_en_hash_cache() is True
 
 
-def test_prompt_write_original_returns_yes_no_or_cancel(qtbot, tmp_path, monkeypatch) -> None:
+def test_prompt_write_original_returns_yes_no_or_cancel(
+    qtbot, tmp_path, monkeypatch
+) -> None:
     """Verify prompt write helper maps message-box result to yes/no/cancel strings."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])

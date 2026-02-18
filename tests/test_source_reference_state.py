@@ -1,13 +1,12 @@
 """Test module for source reference state."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
-from pathlib import Path
-
 from translationzed_py.gui.source_reference_state import (
-    apply_source_reference_preferences_for_window,
     apply_source_reference_mode_change,
     apply_source_reference_preferences,
+    apply_source_reference_preferences_for_window,
     handle_source_reference_changed,
     normalize_source_reference_fallback_policy,
     refresh_source_reference_from_window,
@@ -133,7 +132,9 @@ def test_refresh_source_reference_from_window_applies_lookup_to_current_model() 
     assert calls == ["sync", "status", "search"]
 
 
-def test_handle_source_reference_changed_returns_when_mode_unchanged(monkeypatch) -> None:
+def test_handle_source_reference_changed_returns_when_mode_unchanged(
+    monkeypatch,
+) -> None:
     """Verify source reference change handler exits when selection does not change mode."""
     win = SimpleNamespace(
         source_ref_combo=object(),
@@ -142,8 +143,12 @@ def test_handle_source_reference_changed_returns_when_mode_unchanged(monkeypatch
         _source_reference_mode="EN",
         _source_reference_file_overrides={},
         _prefs_extras={},
-        _search_rows_cache=SimpleNamespace(clear=lambda: (_ for _ in ()).throw(RuntimeError("should not clear"))),
-        _persist_preferences=lambda: (_ for _ in ()).throw(RuntimeError("should not persist")),
+        _search_rows_cache=SimpleNamespace(
+            clear=lambda: (_ for _ in ()).throw(RuntimeError("should not clear"))
+        ),
+        _persist_preferences=lambda: (_ for _ in ()).throw(
+            RuntimeError("should not persist")
+        ),
     )
     monkeypatch.setattr(
         "translationzed_py.gui.source_reference_ui.source_reference_mode_from_combo",

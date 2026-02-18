@@ -34,7 +34,9 @@ def _make_project(tmp_path: Path) -> Path:
     return root
 
 
-def test_tree_and_detail_panel_toggles_update_layout_hooks(qtbot, tmp_path, monkeypatch) -> None:
+def test_tree_and_detail_panel_toggles_update_layout_hooks(
+    qtbot, tmp_path, monkeypatch
+) -> None:
     """Verify panel toggles update splitter layout and fire expected hooks."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -47,7 +49,9 @@ def test_tree_and_detail_panel_toggles_update_layout_hooks(qtbot, tmp_path, monk
 
     monkeypatch.setattr(win, "_apply_table_layout", lambda: calls.append("layout"))
     monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: calls.append("reflow"))
-    monkeypatch.setattr(win, "_sync_detail_editors", lambda: calls.append("sync_detail"))
+    monkeypatch.setattr(
+        win, "_sync_detail_editors", lambda: calls.append("sync_detail")
+    )
     monkeypatch.setattr(
         win,
         "_commit_detail_translation",
@@ -73,7 +77,9 @@ def test_tree_and_detail_panel_toggles_update_layout_hooks(qtbot, tmp_path, monk
     assert "commit_detail" in calls
 
 
-def test_splitter_move_handlers_persist_sizes_and_schedule_work(qtbot, tmp_path, monkeypatch) -> None:
+def test_splitter_move_handlers_persist_sizes_and_schedule_work(
+    qtbot, tmp_path, monkeypatch
+) -> None:
     """Verify splitter move handlers track widths/heights and schedule persistence."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -81,7 +87,9 @@ def test_splitter_move_handlers_persist_sizes_and_schedule_work(qtbot, tmp_path,
     win.show()
 
     calls: list[str] = []
-    monkeypatch.setattr(win, "_schedule_tree_width_persist", lambda: calls.append("persist"))
+    monkeypatch.setattr(
+        win, "_schedule_tree_width_persist", lambda: calls.append("persist")
+    )
     monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: calls.append("reflow"))
 
     win._detail_panel.setVisible(False)

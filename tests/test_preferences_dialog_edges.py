@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QListWidgetItem
 
 from translationzed_py.gui.preferences_dialog import (
-    PreferencesDialog,
     _TM_IS_PENDING_ROLE,
     _TM_PATH_ROLE,
     _TM_SEGMENT_COUNT_ROLE,
     _TM_STATUS_ROLE,
+    PreferencesDialog,
 )
 
 
@@ -163,7 +160,9 @@ def test_update_tm_action_state_request_flags_and_browse_helpers(
     picked_tm = tmp_path / "picked-tm"
     monkeypatch.setattr(
         "translationzed_py.gui.preferences_dialog.QFileDialog.getExistingDirectory",
-        lambda _self, title, _start: str(picked_root if "Project Root" in title else picked_tm),
+        lambda _self, title, _start: str(
+            picked_root if "Project Root" in title else picked_tm
+        ),
     )
     dialog._browse_root()
     dialog._browse_tm_import_dir()

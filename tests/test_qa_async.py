@@ -246,7 +246,9 @@ def test_poll_scan_ignores_stale_result_and_applies_current_result() -> None:
     stale_win = _Win()
     stale_path = Path("/tmp/project/RU/ui.txt")
     stale_finding = QAFinding(file=stale_path, row=3, code="qa.newlines", excerpt="bad")
-    stale_win._qa_scan_future = _Future(done=True, payload=(stale_path, [stale_finding]))
+    stale_win._qa_scan_future = _Future(
+        done=True, payload=(stale_path, [stale_finding])
+    )
     qa_async.poll_scan(stale_win)
     assert stale_win.findings_history == []
     assert stale_win.auto_mark_history == []
