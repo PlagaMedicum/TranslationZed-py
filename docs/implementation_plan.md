@@ -803,6 +803,12 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] `make verify` remains local primary gate with explicit auto-fix warning.
      - [✓] CI runs strict non-mutating gate and publishes verification artifacts.
      - [✓] Canonical docs updated to match implemented tooling behavior.
+   - **Current verification snapshot (2026-02-18)**:
+     - [✓] Core coverage gate is met in strict run:
+       `pytest -q tests --cov=translationzed_py.core --cov-report=term-missing:skip-covered`
+       reports **95.0%**.
+     - [→] Whole-package `make test-cov` remains below target at **79.8%**
+       (GUI-heavy gap), so phase-two work is focused on GUI automation expansion.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
