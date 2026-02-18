@@ -1,3 +1,5 @@
+"""Tmx io module."""
+
 from __future__ import annotations
 
 import ast
@@ -52,28 +54,34 @@ _CSV_TARGET_LOCALE_HEADERS = frozenset(
 
 
 def _lang_value(elem: ET.Element) -> str:
+    """Execute lang value."""
     return elem.attrib.get(_XML_LANG) or elem.attrib.get("xml:lang") or ""
 
 
 def _local_name(tag: str) -> str:
+    """Execute local name."""
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
 def _seg_text(elem: ET.Element | None) -> str:
+    """Execute seg text."""
     if elem is None:
         return ""
     return "".join(elem.itertext())
 
 
 def _normalize_locale_tag(value: str) -> str:
+    """Normalize locale tag."""
     return value.strip().lower().replace("_", "-")
 
 
 def _locale_base(value: str) -> str:
+    """Execute locale base."""
     return value.split("-", 1)[0] if value else ""
 
 
 def _locale_matches(raw: str, normalized: str, base: str) -> bool:
+    """Execute locale matches."""
     value = _normalize_locale_tag(raw)
     if not value:
         return False
@@ -81,6 +89,7 @@ def _locale_matches(raw: str, normalized: str, base: str) -> bool:
 
 
 def supported_tm_import_suffixes() -> tuple[str, ...]:
+    """Execute supported tm import suffixes."""
     return _SUPPORTED_TM_IMPORT_SUFFIXES
 
 
@@ -89,6 +98,7 @@ def iter_tm_pairs(
     source_locale: str,
     target_locale: str,
 ) -> Iterator[tuple[str, str]]:
+    """Execute iter tm pairs."""
     suffix = path.suffix.lower()
     if suffix == ".tmx":
         yield from iter_tmx_pairs(path, source_locale, target_locale)
@@ -117,6 +127,7 @@ def iter_tm_pairs(
 def iter_tmx_pairs(
     path: Path, source_locale: str, target_locale: str
 ) -> Iterator[tuple[str, str]]:
+    """Execute iter tmx pairs."""
     source_locale = _normalize_locale_tag(source_locale)
     target_locale = _normalize_locale_tag(target_locale)
     if not source_locale or not target_locale:
@@ -157,6 +168,7 @@ def write_tmx(
     source_locale: str,
     target_locale: str,
 ) -> None:
+    """Write tmx."""
     source_locale = source_locale.strip()
     target_locale = target_locale.strip()
     with path.open("w", encoding="utf-8") as handle:
@@ -185,6 +197,7 @@ def write_tmx(
 
 
 def detect_tm_languages(path: Path, *, limit: int = 2000) -> set[str]:
+    """Execute detect tm languages."""
     suffix = path.suffix.lower()
     if suffix == ".tmx":
         return detect_tmx_languages(path, limit=limit)
@@ -204,6 +217,7 @@ def detect_tm_languages(path: Path, *, limit: int = 2000) -> set[str]:
 
 
 def detect_tmx_languages(path: Path, *, limit: int = 2000) -> set[str]:
+    """Execute detect tmx languages."""
     langs: set[str] = set()
     count = 0
     for _event, elem in ET.iterparse(path, events=("end",)):
@@ -224,6 +238,7 @@ def iter_xliff_pairs(
     source_locale: str,
     target_locale: str,
 ) -> Iterator[tuple[str, str]]:
+    """Execute iter xliff pairs."""
     source_locale_norm = _normalize_locale_tag(source_locale)
     target_locale_norm = _normalize_locale_tag(target_locale)
     source_base = _locale_base(source_locale_norm)
@@ -301,10 +316,12 @@ def iter_xliff_pairs(
 
 
 def detect_xliff_languages(path: Path, *, limit: int = 2000) -> set[str]:
+    """Execute detect xliff languages."""
     langs: set[str] = set()
     count = 0
 
     def _add(value: str) -> None:
+        """Execute add."""
         if value.strip():
             langs.add(value.strip())
 
@@ -337,12 +354,14 @@ def iter_po_pairs(
     target_locale: str,
 ) -> Iterator[tuple[str, str]]:
     # Locale pair is resolved by import workflow; PO units carry msgid/msgstr pairs.
+    """Execute iter po pairs."""
     _ = source_locale, target_locale
     pairs, _langs = _parse_po(path)
     yield from pairs
 
 
 def detect_po_languages(path: Path) -> set[str]:
+    """Execute detect po languages."""
     _pairs, langs = _parse_po(path)
     return langs
 
@@ -353,6 +372,7 @@ def iter_mo_pairs(
     target_locale: str,
 ) -> Iterator[tuple[str, str]]:
     # Locale pair is resolved by import workflow; MO units are msgid/msgstr catalog rows.
+    """Execute iter mo pairs."""
     _ = source_locale, target_locale
     pairs_by_source: dict[str, str] = {}
     for raw_key, raw_value in _read_mo_catalog(path).items():
@@ -365,6 +385,7 @@ def iter_mo_pairs(
 
 
 def detect_mo_languages(path: Path) -> set[str]:
+    """Execute detect mo languages."""
     langs: set[str] = set()
     metadata = _mo_target_text(_read_mo_catalog(path).get("", ""))
     if not metadata:
@@ -393,6 +414,7 @@ def iter_xml_pairs(
     source_locale: str,
     target_locale: str,
 ) -> Iterator[tuple[str, str]]:
+    """Execute iter xml pairs."""
     source_locale_norm = _normalize_locale_tag(source_locale)
     target_locale_norm = _normalize_locale_tag(target_locale)
     source_base = _locale_base(source_locale_norm)
@@ -433,6 +455,7 @@ def iter_xml_pairs(
 
 
 def detect_xml_languages(path: Path, *, limit: int = 2000) -> set[str]:
+    """Execute detect xml languages."""
     langs: set[str] = set()
     for count, (_event, elem) in enumerate(
         ET.iterparse(path, events=("start",)), start=1
@@ -464,6 +487,7 @@ def iter_xlsx_pairs(
     target_locale: str,
 ) -> Iterator[tuple[str, str]]:
     # Locale pair is resolved by import workflow; XLSX rows are source/target columns.
+    """Execute iter xlsx pairs."""
     _ = source_locale, target_locale
     with zipfile.ZipFile(path) as archive:
         rows = _iter_xlsx_rows(archive)
@@ -484,6 +508,7 @@ def iter_xlsx_pairs(
 
 
 def detect_xlsx_languages(path: Path, *, limit: int = 2000) -> set[str]:
+    """Execute detect xlsx languages."""
     langs: set[str] = set()
     with zipfile.ZipFile(path) as archive:
         rows = _iter_xlsx_rows(archive)
@@ -515,6 +540,7 @@ def iter_csv_pairs(
     target_locale: str,
 ) -> Iterator[tuple[str, str]]:
     # Locale pair is resolved by import workflow; CSV units are source/target columns.
+    """Execute iter csv pairs."""
     _ = source_locale, target_locale
     with path.open("r", encoding="utf-8-sig", errors="replace", newline="") as handle:
         reader = csv.reader(handle)
@@ -535,6 +561,7 @@ def iter_csv_pairs(
 
 
 def detect_csv_languages(path: Path, *, limit: int = 2000) -> set[str]:
+    """Execute detect csv languages."""
     langs: set[str] = set()
     with path.open("r", encoding="utf-8-sig", errors="replace", newline="") as handle:
         reader = csv.reader(handle)
@@ -561,6 +588,7 @@ def detect_csv_languages(path: Path, *, limit: int = 2000) -> set[str]:
 
 
 def _resolve_csv_column_indexes(row: list[str]) -> tuple[int, int, bool]:
+    """Resolve csv column indexes."""
     if not row:
         return 0, 1, False
     normalized = [_normalize_csv_header(cell) for cell in row]
@@ -577,10 +605,12 @@ def _resolve_csv_column_indexes(row: list[str]) -> tuple[int, int, bool]:
 
 
 def _normalize_csv_header(value: str) -> str:
+    """Normalize csv header."""
     return value.strip().lower().replace("-", "_")
 
 
 def _find_csv_header_index(row: list[str], labels: frozenset[str]) -> int | None:
+    """Find csv header index."""
     for idx, value in enumerate(row):
         if value in labels:
             return idx
@@ -588,12 +618,14 @@ def _find_csv_header_index(row: list[str], labels: frozenset[str]) -> int | None
 
 
 def _csv_value(row: list[str], idx: int) -> str:
+    """Execute csv value."""
     if idx < 0 or idx >= len(row):
         return ""
     return row[idx].strip()
 
 
 def _iter_xlsx_rows(archive: zipfile.ZipFile) -> Iterator[list[str]]:
+    """Execute iter xlsx rows."""
     shared_strings = _read_xlsx_shared_strings(archive)
     sheet_path = _first_xlsx_sheet_path(archive)
     with archive.open(sheet_path) as handle:
@@ -617,6 +649,7 @@ def _iter_xlsx_rows(archive: zipfile.ZipFile) -> Iterator[list[str]]:
 
 
 def _read_xlsx_shared_strings(archive: zipfile.ZipFile) -> list[str]:
+    """Read xlsx shared strings."""
     if "xl/sharedStrings.xml" not in archive.namelist():
         return []
     values: list[str] = []
@@ -630,6 +663,7 @@ def _read_xlsx_shared_strings(archive: zipfile.ZipFile) -> list[str]:
 
 
 def _first_xlsx_sheet_path(archive: zipfile.ZipFile) -> str:
+    """Execute first xlsx sheet path."""
     fallback = sorted(
         name
         for name in archive.namelist()
@@ -667,6 +701,7 @@ def _first_xlsx_sheet_path(archive: zipfile.ZipFile) -> str:
 
 
 def _xlsx_col_from_ref(cell_ref: str) -> int:
+    """Execute xlsx col from ref."""
     letters = ""
     for char in cell_ref.strip():
         if char.isalpha():
@@ -682,6 +717,7 @@ def _xlsx_col_from_ref(cell_ref: str) -> int:
 
 
 def _xlsx_cell_text(cell: ET.Element, shared_strings: list[str]) -> str:
+    """Execute xlsx cell text."""
     cell_type = cell.attrib.get("t", "")
     if cell_type == "inlineStr":
         for child in cell:
@@ -710,6 +746,7 @@ def _xlsx_cell_text(cell: ET.Element, shared_strings: list[str]) -> str:
 def _xml_source_target_children(
     elem: ET.Element,
 ) -> tuple[ET.Element | None, ET.Element | None]:
+    """Execute xml source target children."""
     source_elem: ET.Element | None = None
     target_elem: ET.Element | None = None
     for child in elem:
@@ -723,6 +760,7 @@ def _xml_source_target_children(
 
 
 def _xml_lang_hint(elem: ET.Element, *, source: bool) -> str:
+    """Execute xml lang hint."""
     key_candidates = (
         ("source-language", "srcLang", "source_locale", "source_lang")
         if source
@@ -736,12 +774,14 @@ def _xml_lang_hint(elem: ET.Element, *, source: bool) -> str:
 
 
 def _read_mo_catalog(path: Path) -> dict[object, object]:
+    """Read mo catalog."""
     with path.open("rb") as handle:
         catalog = getattr(gettext.GNUTranslations(handle), "_catalog", {})
     return catalog if isinstance(catalog, dict) else {}
 
 
 def _mo_source_text(value: object) -> str:
+    """Execute mo source text."""
     if isinstance(value, tuple):
         if not value:
             return ""
@@ -754,6 +794,7 @@ def _mo_source_text(value: object) -> str:
 
 
 def _mo_target_text(value: object) -> str:
+    """Execute mo target text."""
     if isinstance(value, str):
         return value.strip()
     if isinstance(value, tuple):
@@ -764,6 +805,7 @@ def _mo_target_text(value: object) -> str:
 
 
 def _parse_po(path: Path) -> tuple[list[tuple[str, str]], set[str]]:
+    """Parse po."""
     pairs: list[tuple[str, str]] = []
     langs: set[str] = set()
     entry_msgid: list[str] = []
@@ -771,6 +813,7 @@ def _parse_po(path: Path) -> tuple[list[tuple[str, str]], set[str]]:
     current_field: tuple[str, int] | None = None
 
     def _append_to_current(fragment: str) -> None:
+        """Execute append to current."""
         nonlocal entry_msgid, entry_msgstr, current_field
         if current_field is None:
             return
@@ -781,6 +824,7 @@ def _parse_po(path: Path) -> tuple[list[tuple[str, str]], set[str]]:
         entry_msgstr.setdefault(index, []).append(fragment)
 
     def _parse_header_languages(text: str) -> None:
+        """Parse header languages."""
         nonlocal langs
         for raw in text.splitlines():
             if ":" not in raw:
@@ -794,6 +838,7 @@ def _parse_po(path: Path) -> tuple[list[tuple[str, str]], set[str]]:
                 langs.add(value)
 
     def _finalize_entry() -> None:
+        """Execute finalize entry."""
         nonlocal entry_msgid, entry_msgstr, current_field, pairs
         msgid = "".join(entry_msgid)
         msgstr = "".join(entry_msgstr.get(0, []))
@@ -858,6 +903,7 @@ def _parse_po(path: Path) -> tuple[list[tuple[str, str]], set[str]]:
 
 
 def _parse_po_quoted(value: str) -> str:
+    """Parse po quoted."""
     raw = value.strip()
     if not raw:
         return ""
