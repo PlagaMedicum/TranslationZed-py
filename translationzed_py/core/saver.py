@@ -1,3 +1,5 @@
+"""Persist translation edits back to locale files atomically."""
+
 from __future__ import annotations
 
 from .atomic_io import write_bytes_atomic
