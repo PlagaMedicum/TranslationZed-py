@@ -2,7 +2,14 @@
 
 from pathlib import Path
 
-from translationzed_py.core.search import SearchField, SearchRow, search
+from translationzed_py.core.search import (
+    SearchField,
+    SearchRow,
+    _build_preview,
+    _find_literal_span,
+    _matches_literal,
+    search,
+)
 
 
 def test_search_plain_text():
@@ -62,3 +69,48 @@ def test_search_preview_is_one_line_and_present_for_literal_match():
     assert len(matches) == 1
     assert "Needle" in matches[0].preview
     assert "\n" not in matches[0].preview
+
+
+def test_search_returns_empty_for_empty_query_and_invalid_regex():
+    """Verify search returns no results for empty and invalid patterns."""
+    rows = [SearchRow(Path("A.txt"), 0, "KEY_ONE", "Source", "Value")]
+    assert search(rows, "", SearchField.KEY, False) == []
+    assert search(rows, "(", SearchField.KEY, True) == []
+
+
+def test_search_case_sensitive_toggle_applies_to_literal_queries():
+    """Verify search literal mode honors case-sensitive toggles."""
+    rows = [SearchRow(Path("A.txt"), 0, "KEY_ONE", "Needle", "Value")]
+    assert search(rows, "needle", SearchField.SOURCE, False, case_sensitive=True) == []
+    assert search(rows, "needle", SearchField.SOURCE, False, case_sensitive=False)
+
+
+def test_matches_literal_rejects_short_or_misaligned_token_queries():
+    """Verify literal matcher composition rules reject weak phrase matches."""
+    assert _matches_literal("alphabet", "a b") is False
+    assert _matches_literal("alpha beta gamma", "beta alpha") is False
+    assert _matches_literal("alpha beta gamma", "alpha gamma") is True
+
+
+def test_find_literal_span_handles_direct_partial_and_fallback_paths():
+    """Verify literal span finder covers direct and fallback paths."""
+    assert _find_literal_span("", "needle") == (0, 0)
+    assert _find_literal_span("alpha beta", "beta") == (6, 4)
+    assert _find_literal_span("alpha beta gamma", "alpha delta") == (0, 5)
+    assert _find_literal_span("alpha beta", "delta gamma") == (0, 10)
+    assert _find_literal_span("alpha beta", "   ") == (0, 0)
+
+
+def test_build_preview_adds_ellipsis_and_compacts_whitespace():
+    """Verify preview builder compacts text and applies edge ellipses."""
+    text = (
+        "prefix segment one two three "
+        "needle token appears here "
+        "with trailing details and tail"
+    )
+    preview = _build_preview(text, start=28, length=6, width=24)
+    assert preview.startswith("…")
+    assert preview.endswith("…")
+    assert "\n" not in preview
+
+    assert _build_preview("", start=0, length=0, width=10) == ""
