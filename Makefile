@@ -9,10 +9,11 @@ BENCH_CURRENT ?= $(ARTIFACTS)/bench/bench.json
 .PHONY: venv install precommit fmt fmt-check lint lint-check typecheck arch-check \
 	test test-cov test-perf perf-advisory check check-local verify verify-ci verify-ci-core verify-core \
 	verify-heavy verify-fast release-check release-check-if-tag release-dry-run \
-	security docstyle docs-build bench bench-check test-mutation \
+	security docstyle docs-build bench bench-check bench-advisory test-mutation \
 	run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
 
+# ─── Environment/bootstrap ─────────────────────────────────────────────────────
 ## create .venv and populate dev deps (one-off)
 venv:
 	PY=$(PY) VENV=$(VENV) bash scripts/venv.sh
@@ -25,6 +26,7 @@ install:
 precommit: venv
 	VENV=$(VENV) bash scripts/precommit.sh
 
+# ─── Quality families ──────────────────────────────────────────────────────────
 fmt:
 	VENV=$(VENV) bash scripts/fmt.sh
 
@@ -81,15 +83,17 @@ diagnose-encoding:
 test-readonly-clean:
 	VENV=$(VENV) bash scripts/test_readonly_clean.sh
 
+# ─── Fast dev gates ────────────────────────────────────────────────────────────
 ## strict non-mutating quality gate (check-only) for CI
 check: fmt-check lint-check typecheck arch-check test
 
 ## local quality gate (allows auto-fix)
 check-local: fmt lint typecheck arch-check test
 
+# ─── Verification umbrella gates ───────────────────────────────────────────────
 ## full local verification core (auto-fix + warning policy)
 verify-core: clean-cache clean-config fmt lint typecheck arch-check test-cov perf-advisory \
-	test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build bench
+	bench-advisory test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build
 
 ## local perf gates are advisory; strict blocking lives in verify-ci
 perf-advisory:
@@ -98,6 +102,12 @@ perf-advisory:
 	}
 	@$(MAKE) perf-scenarios || { \
 		echo "verify warning: perf-scenarios failed (advisory in local verify)."; \
+	}
+
+## local benchmark regression is advisory; strict blocking lives in verify-ci
+bench-advisory:
+	@$(MAKE) bench-check BENCH_COMPARE_MODE=warn || { \
+		echo "verify warning: bench-check failed (advisory in local verify)."; \
 	}
 
 ## full local verification (auto-fix allowed, warn if tracked files changed)
@@ -138,6 +148,7 @@ verify-heavy: verify-ci test-mutation
 ## fastest strict developer gate
 verify-fast: check
 
+# ─── Release gates ─────────────────────────────────────────────────────────────
 ## run release-check only when TAG is provided (keeps verify single-command friendly)
 release-check-if-tag:
 	@if [ -n "$(TAG)" ]; then \
@@ -160,6 +171,7 @@ release-dry-run:
 	$(MAKE) verify TAG=$(TAG)
 	$(MAKE) release-check TAG=$(TAG)
 
+# ─── Utilities ─────────────────────────────────────────────────────────────────
 ## run perf scenarios against fixture translation files
 perf-scenarios:
 	VENV=$(VENV) bash scripts/perf_scenarios.sh $(ARGS)
@@ -168,6 +180,7 @@ perf-scenarios:
 run:
 	VENV=$(VENV) bash scripts/run.sh $(ARGS)
 
+# ─── Maintenance/packaging ─────────────────────────────────────────────────────
 clean:
 	bash scripts/clean.sh
 
