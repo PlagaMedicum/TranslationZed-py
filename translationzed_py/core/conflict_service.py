@@ -1,3 +1,5 @@
+"""Conflict service module."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
@@ -9,6 +11,8 @@ from .model import EntrySequence, Status
 
 @dataclass(frozen=True, slots=True)
 class ConflictMergeRow:
+    """Represent ConflictMergeRow."""
+
     key: str
     source_value: str
     original_value: str
@@ -17,6 +21,8 @@ class ConflictMergeRow:
 
 @dataclass(frozen=True, slots=True)
 class ConflictCachePlan:
+    """Represent ConflictCachePlan."""
+
     changed_keys: frozenset[str]
     original_values: dict[str, str]
     force_original: frozenset[str]
@@ -24,6 +30,8 @@ class ConflictCachePlan:
 
 @dataclass(frozen=True, slots=True)
 class ConflictMergePlan:
+    """Represent ConflictMergePlan."""
+
     changed_keys: frozenset[str]
     original_values: dict[str, str]
     force_original: frozenset[str]
@@ -33,6 +41,8 @@ class ConflictMergePlan:
 
 @dataclass(frozen=True, slots=True)
 class ConflictResolution:
+    """Represent ConflictResolution."""
+
     changed_keys: frozenset[str]
     original_values: dict[str, str]
     force_original: frozenset[str]
@@ -42,6 +52,8 @@ class ConflictResolution:
 
 @dataclass(frozen=True, slots=True)
 class ConflictPersistPlan:
+    """Represent ConflictPersistPlan."""
+
     changed_keys: frozenset[str]
     original_values: dict[str, str]
     force_original: frozenset[str]
@@ -52,6 +64,8 @@ class ConflictPersistPlan:
 
 @dataclass(frozen=True, slots=True)
 class ConflictPersistCallbacks:
+    """Represent ConflictPersistCallbacks."""
+
     write_cache: Callable[[ConflictPersistPlan], object]
     mark_file_clean: Callable[[], object]
     clear_conflicts: Callable[[], object]
@@ -60,6 +74,8 @@ class ConflictPersistCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class ConflictMergeExecution:
+    """Represent ConflictMergeExecution."""
+
     resolved: bool
     immediate_result: bool | None
     resolution: ConflictResolution | None
@@ -67,18 +83,24 @@ class ConflictMergeExecution:
 
 @dataclass(frozen=True, slots=True)
 class ConflictResolutionRunPlan:
+    """Represent ConflictResolutionRunPlan."""
+
     run_resolution: bool
     immediate_result: bool | None
 
 
 @dataclass(frozen=True, slots=True)
 class ConflictPromptPlan:
+    """Represent ConflictPromptPlan."""
+
     require_dialog: bool
     immediate_result: bool | None
 
 
 @dataclass(frozen=True, slots=True)
 class ConflictWorkflowService:
+    """Represent ConflictWorkflowService."""
+
     def resolve_drop_cache(
         self,
         *,
@@ -86,6 +108,7 @@ class ConflictWorkflowService:
         baseline_values: Mapping[str, str],
         conflict_originals: Mapping[str, str],
     ) -> ConflictResolution:
+        """Resolve drop cache."""
         plan = drop_cache_plan(
             changed_keys=changed_keys,
             baseline_values=baseline_values,
@@ -106,6 +129,7 @@ class ConflictWorkflowService:
         baseline_values: Mapping[str, str],
         conflict_originals: Mapping[str, str],
     ) -> ConflictResolution:
+        """Resolve drop original."""
         plan = drop_original_plan(
             changed_keys=changed_keys,
             baseline_values=baseline_values,
@@ -128,6 +152,7 @@ class ConflictWorkflowService:
         cache_values: Mapping[str, str],
         resolutions: Mapping[str, tuple[str, Literal["original", "cache"]]],
     ) -> ConflictResolution:
+        """Resolve merge."""
         plan = merge_plan(
             changed_keys=changed_keys,
             baseline_values=baseline_values,
@@ -149,6 +174,7 @@ class ConflictWorkflowService:
         *,
         resolution: ConflictResolution,
     ) -> bool:
+        """Apply resolution."""
         return apply_entry_updates(
             entries,
             value_updates=resolution.value_updates,
@@ -162,6 +188,7 @@ class ConflictWorkflowService:
         is_current_file: bool,
         for_save: bool,
     ) -> ConflictPromptPlan:
+        """Build prompt plan."""
         return build_prompt_plan(
             has_conflicts=has_conflicts,
             is_current_file=is_current_file,
@@ -171,6 +198,7 @@ class ConflictWorkflowService:
     def normalize_choice(
         self, choice: str | None
     ) -> Literal["drop_cache", "drop_original", "merge", "cancel"]:
+        """Normalize choice."""
         return normalize_choice(choice)
 
     def execute_choice(
@@ -181,6 +209,7 @@ class ConflictWorkflowService:
         on_drop_original: Callable[[], bool],
         on_merge: Callable[[], bool],
     ) -> bool:
+        """Execute execute choice."""
         return execute_choice(
             choice,
             on_drop_cache=on_drop_cache,
@@ -189,6 +218,7 @@ class ConflictWorkflowService:
         )
 
     def build_persist_plan(self, resolution: ConflictResolution) -> ConflictPersistPlan:
+        """Build persist plan."""
         return build_persist_plan(resolution)
 
     def execute_persist_resolution(
@@ -197,6 +227,7 @@ class ConflictWorkflowService:
         resolution: ConflictResolution,
         callbacks: ConflictPersistCallbacks,
     ) -> bool:
+        """Execute execute persist resolution."""
         return execute_persist_resolution(
             resolution=resolution,
             callbacks=callbacks,
@@ -215,6 +246,7 @@ class ConflictWorkflowService:
             Mapping[str, tuple[str, Literal["original", "cache"]]] | None,
         ],
     ) -> ConflictMergeExecution:
+        """Execute execute merge resolution."""
         return execute_merge_resolution(
             entries=entries,
             changed_keys=changed_keys,
@@ -233,6 +265,7 @@ class ConflictWorkflowService:
         is_current_file: bool,
         conflict_count: int,
     ) -> ConflictResolutionRunPlan:
+        """Build resolution run plan."""
         return build_resolution_run_plan(
             action=action,
             has_current_file=has_current_file,
@@ -247,6 +280,7 @@ def build_merge_rows(
     conflict_originals: Mapping[str, str],
     sources: Mapping[str, str],
 ) -> tuple[list[ConflictMergeRow], dict[str, str]]:
+    """Build merge rows."""
     cache_values = {
         entry.key: entry.value for entry in entries if entry.key in conflict_originals
     }
@@ -268,6 +302,7 @@ def drop_cache_plan(
     baseline_values: Mapping[str, str],
     conflict_keys: Iterable[str],
 ) -> ConflictCachePlan:
+    """Execute drop cache plan."""
     remaining_changed = set(changed_keys) - set(conflict_keys)
     return ConflictCachePlan(
         changed_keys=frozenset(remaining_changed),
@@ -282,6 +317,7 @@ def drop_original_plan(
     baseline_values: Mapping[str, str],
     conflict_originals: Mapping[str, str],
 ) -> ConflictCachePlan:
+    """Execute drop original plan."""
     originals = dict(baseline_values)
     originals.update(conflict_originals)
     return ConflictCachePlan(
@@ -299,6 +335,7 @@ def merge_plan(
     cache_values: Mapping[str, str],
     resolutions: Mapping[str, tuple[str, Literal["original", "cache"]]],
 ) -> ConflictMergePlan:
+    """Execute merge plan."""
     merged_changed = set(changed_keys)
     originals = dict(baseline_values)
     keep_conflict: set[str] = set()
@@ -333,6 +370,7 @@ def apply_entry_updates(
     value_updates: Mapping[str, str],
     status_updates: Mapping[str, Status],
 ) -> bool:
+    """Apply entry updates."""
     if not value_updates and not status_updates:
         return False
     updated = False
@@ -363,6 +401,7 @@ def build_prompt_plan(
     is_current_file: bool,
     for_save: bool,
 ) -> ConflictPromptPlan:
+    """Build prompt plan."""
     if not has_conflicts:
         return ConflictPromptPlan(require_dialog=False, immediate_result=True)
     if not is_current_file:
@@ -374,6 +413,7 @@ def build_prompt_plan(
 
 
 def build_persist_plan(resolution: ConflictResolution) -> ConflictPersistPlan:
+    """Build persist plan."""
     return ConflictPersistPlan(
         changed_keys=resolution.changed_keys,
         original_values=resolution.original_values,
@@ -389,6 +429,7 @@ def execute_persist_resolution(
     resolution: ConflictResolution,
     callbacks: ConflictPersistCallbacks,
 ) -> bool:
+    """Execute execute persist resolution."""
     plan = build_persist_plan(resolution)
     callbacks.write_cache(plan)
     if plan.mark_file_clean:
@@ -408,6 +449,7 @@ def build_resolution_run_plan(
     is_current_file: bool,
     conflict_count: int,
 ) -> ConflictResolutionRunPlan:
+    """Build resolution run plan."""
     if not has_current_file or not has_current_model or not is_current_file:
         return ConflictResolutionRunPlan(
             run_resolution=False,
@@ -436,6 +478,7 @@ def execute_merge_resolution(
         Mapping[str, tuple[str, Literal["original", "cache"]]] | None,
     ],
 ) -> ConflictMergeExecution:
+    """Execute execute merge resolution."""
     if not conflict_originals:
         return ConflictMergeExecution(
             resolved=False,
@@ -483,6 +526,7 @@ def execute_choice(
     on_drop_original: Callable[[], bool],
     on_merge: Callable[[], bool],
 ) -> bool:
+    """Execute execute choice."""
     action = normalize_choice(choice)
     if action == "drop_cache":
         return on_drop_cache()
@@ -496,6 +540,7 @@ def execute_choice(
 def normalize_choice(
     choice: str | None,
 ) -> Literal["drop_cache", "drop_original", "merge", "cancel"]:
+    """Normalize choice."""
     if choice == "drop_cache":
         return "drop_cache"
     if choice == "drop_original":
