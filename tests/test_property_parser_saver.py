@@ -1,3 +1,5 @@
+"""Test module for property parser saver."""
+
 from __future__ import annotations
 
 import string

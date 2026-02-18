@@ -1,3 +1,5 @@
+"""Test module for project session."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,6 +45,7 @@ def _touch(path: Path, text: str = "x") -> None:
 
 
 def test_collect_draft_files_filters_by_opened_and_locale(tmp_path: Path) -> None:
+    """Verify collect draft files filters by opened and locale."""
     root = tmp_path / "proj"
     _touch(root / "BE" / "a.txt")
     _touch(root / "BE" / "b.txt")
@@ -69,6 +72,7 @@ def test_collect_draft_files_filters_by_opened_and_locale(tmp_path: Path) -> Non
 
 
 def test_collect_draft_files_skips_missing_originals(tmp_path: Path) -> None:
+    """Verify collect draft files skips missing originals."""
     root = tmp_path / "proj"
     _touch(root / ".tzp" / "cache" / "BE" / "ghost.bin")
 
@@ -83,6 +87,7 @@ def test_collect_draft_files_skips_missing_originals(tmp_path: Path) -> None:
 
 
 def test_find_last_opened_file_selects_latest_timestamp(tmp_path: Path) -> None:
+    """Verify find last opened file selects latest timestamp."""
     root = tmp_path / "proj"
     _touch(root / "BE" / "a.txt")
     _touch(root / "BE" / "b.txt")
@@ -108,6 +113,7 @@ def test_find_last_opened_file_selects_latest_timestamp(tmp_path: Path) -> None:
 def test_find_last_opened_file_returns_none_without_selected_locales(
     tmp_path: Path,
 ) -> None:
+    """Verify find last opened file returns none without selected locales."""
     root = tmp_path / "proj"
     _touch(root / ".tzp" / "cache" / "BE" / "a.bin")
     best, scanned = find_last_opened_file(
@@ -123,6 +129,7 @@ def test_find_last_opened_file_returns_none_without_selected_locales(
 
 
 def test_collect_draft_files_reads_legacy_cache_dir(tmp_path: Path) -> None:
+    """Verify collect draft files reads legacy cache dir."""
     root = tmp_path / "proj"
     _touch(root / "BE" / "a.txt")
     legacy_cache = root / ".tzp-cache" / "BE" / "a.bin"
@@ -141,6 +148,7 @@ def test_collect_draft_files_reads_legacy_cache_dir(tmp_path: Path) -> None:
 
 
 def test_collect_orphan_cache_paths_filters_warned_locales(tmp_path: Path) -> None:
+    """Verify collect orphan cache paths filters warned locales."""
     root = tmp_path / "proj"
     _touch(root / ".tzp" / "cache" / "BE" / "orphan.bin")
     _touch(root / ".tzp-cache" / "RU" / "legacy_orphan.bin")
@@ -161,6 +169,7 @@ def test_collect_orphan_cache_paths_filters_warned_locales(tmp_path: Path) -> No
 
 
 def test_project_session_service_delegates_to_helpers(tmp_path: Path) -> None:
+    """Verify project session service delegates to helpers."""
     root = tmp_path / "proj"
     _touch(root / "BE" / "a.txt")
     cache_path = root / ".tzp" / "cache" / "BE" / "a.bin"
@@ -306,6 +315,7 @@ def test_project_session_service_delegates_to_helpers(tmp_path: Path) -> None:
 
 
 def test_normalize_selected_locales_filters_source_unknown_and_duplicates() -> None:
+    """Verify normalize selected locales filters source unknown and duplicates."""
     selected = normalize_selected_locales(
         requested_locales=["", "EN", "BE", "BE", "RU", "XX", "RU"],
         available_locales=["EN", "BE", "RU"],
@@ -315,6 +325,7 @@ def test_normalize_selected_locales_filters_source_unknown_and_duplicates() -> N
 
 
 def test_use_lazy_tree_requires_more_than_one_locale() -> None:
+    """Verify use lazy tree requires more than one locale."""
     assert use_lazy_tree([]) is False
     assert use_lazy_tree(["BE"]) is False
     assert use_lazy_tree(["BE", ""]) is False
@@ -322,6 +333,7 @@ def test_use_lazy_tree_requires_more_than_one_locale() -> None:
 
 
 def test_resolve_requested_locales_uses_explicit_request() -> None:
+    """Verify resolve requested locales uses explicit request."""
     selected = resolve_requested_locales(
         requested_locales=["RU", "BE"],
         last_locales=["BE"],
@@ -333,6 +345,7 @@ def test_resolve_requested_locales_uses_explicit_request() -> None:
 
 
 def test_resolve_requested_locales_prefers_last_locales_in_smoke_mode() -> None:
+    """Verify resolve requested locales prefers last locales in smoke mode."""
     selected = resolve_requested_locales(
         requested_locales=None,
         last_locales=["EN", "RU", "RU"],
@@ -344,6 +357,7 @@ def test_resolve_requested_locales_prefers_last_locales_in_smoke_mode() -> None:
 
 
 def test_resolve_requested_locales_uses_first_available_in_smoke_mode() -> None:
+    """Verify resolve requested locales uses first available in smoke mode."""
     selected = resolve_requested_locales(
         requested_locales=None,
         last_locales=[],
@@ -355,6 +369,7 @@ def test_resolve_requested_locales_uses_first_available_in_smoke_mode() -> None:
 
 
 def test_resolve_requested_locales_returns_none_without_smoke_mode() -> None:
+    """Verify resolve requested locales returns none without smoke mode."""
     selected = resolve_requested_locales(
         requested_locales=None,
         last_locales=["BE"],
@@ -366,6 +381,7 @@ def test_resolve_requested_locales_returns_none_without_smoke_mode() -> None:
 
 
 def test_build_locale_selection_plan_deduplicates_and_flags_change() -> None:
+    """Verify build locale selection plan deduplicates and flags change."""
     plan = build_locale_selection_plan(
         requested_locales=["EN", "RU", "RU", "BE", "XX"],
         available_locales=["EN", "BE", "RU"],
@@ -380,6 +396,7 @@ def test_build_locale_selection_plan_deduplicates_and_flags_change() -> None:
 
 
 def test_build_locale_selection_plan_marks_no_change() -> None:
+    """Verify build locale selection plan marks no change."""
     plan = build_locale_selection_plan(
         requested_locales=["BE"],
         available_locales=["EN", "BE", "RU"],
@@ -394,6 +411,7 @@ def test_build_locale_selection_plan_marks_no_change() -> None:
 
 
 def test_build_locale_selection_plan_returns_none_when_empty() -> None:
+    """Verify build locale selection plan returns none when empty."""
     plan = build_locale_selection_plan(
         requested_locales=["EN", "", "XX"],
         available_locales=["EN", "BE", "RU"],
@@ -404,6 +422,7 @@ def test_build_locale_selection_plan_returns_none_when_empty() -> None:
 
 
 def test_build_orphan_cache_warning_truncates_preview(tmp_path: Path) -> None:
+    """Verify build orphan cache warning truncates preview."""
     root = tmp_path / "proj"
     orphan_paths = [
         root / ".tzp" / "cache" / "BE" / "a.bin",
@@ -423,6 +442,7 @@ def test_build_orphan_cache_warning_truncates_preview(tmp_path: Path) -> None:
 
 
 def test_build_cache_migration_schedule_plan_variants(tmp_path: Path) -> None:
+    """Verify build cache migration schedule plan variants."""
     root = tmp_path / "proj"
     path_a = root / ".tzp-cache" / "BE" / "a.bin"
     path_b = root / ".tzp-cache" / "BE" / "b.bin"
@@ -458,6 +478,7 @@ def test_build_cache_migration_schedule_plan_variants(tmp_path: Path) -> None:
 
 
 def test_build_cache_migration_batch_plan_variants(tmp_path: Path) -> None:
+    """Verify build cache migration batch plan variants."""
     root = tmp_path / "proj"
     path_a = root / ".tzp-cache" / "BE" / "a.bin"
     path_b = root / ".tzp-cache" / "BE" / "b.bin"
@@ -488,6 +509,7 @@ def test_build_cache_migration_batch_plan_variants(tmp_path: Path) -> None:
 
 
 def test_execute_cache_migration_schedule_immediate_success(tmp_path: Path) -> None:
+    """Verify execute cache migration schedule immediate success."""
     root = tmp_path / "proj"
     legacy = root / ".tzp-cache" / "BE" / "a.bin"
     calls: list[str] = []
@@ -509,6 +531,7 @@ def test_execute_cache_migration_schedule_immediate_success(tmp_path: Path) -> N
 
 
 def test_execute_cache_migration_schedule_batched_starts_timer(tmp_path: Path) -> None:
+    """Verify execute cache migration schedule batched starts timer."""
     root = tmp_path / "proj"
     a = root / ".tzp-cache" / "BE" / "a.bin"
     b = root / ".tzp-cache" / "BE" / "b.bin"
@@ -531,6 +554,7 @@ def test_execute_cache_migration_schedule_batched_starts_timer(tmp_path: Path) -
 
 
 def test_execute_cache_migration_batch_success(tmp_path: Path) -> None:
+    """Verify execute cache migration batch success."""
     root = tmp_path / "proj"
     a = root / ".tzp-cache" / "BE" / "a.bin"
     b = root / ".tzp-cache" / "BE" / "b.bin"
@@ -554,6 +578,7 @@ def test_execute_cache_migration_batch_success(tmp_path: Path) -> None:
 
 
 def test_execute_cache_migration_batch_stop_and_status(tmp_path: Path) -> None:
+    """Verify execute cache migration batch stop and status."""
     calls: list[str] = []
     execution = execute_cache_migration_batch(
         pending_paths=[],
@@ -574,6 +599,7 @@ def test_execute_cache_migration_batch_stop_and_status(tmp_path: Path) -> None:
 
 
 def test_execute_cache_migration_batch_failure_warns_and_stops(tmp_path: Path) -> None:
+    """Verify execute cache migration batch failure warns and stops."""
     root = tmp_path / "proj"
     a = root / ".tzp-cache" / "BE" / "a.bin"
     calls: list[str] = []
@@ -600,6 +626,7 @@ def test_execute_cache_migration_batch_failure_warns_and_stops(tmp_path: Path) -
 
 
 def test_build_locale_switch_plan_marks_apply_for_changed_selection() -> None:
+    """Verify build locale switch plan marks apply for changed selection."""
     plan = build_locale_switch_plan(
         requested_locales=["EN", "RU", "BE"],
         available_locales=["EN", "BE", "RU"],
@@ -617,6 +644,7 @@ def test_build_locale_switch_plan_marks_apply_for_changed_selection() -> None:
 
 
 def test_build_locale_switch_plan_marks_no_apply_for_same_selection() -> None:
+    """Verify build locale switch plan marks no apply for same selection."""
     plan = build_locale_switch_plan(
         requested_locales=["BE"],
         available_locales=["EN", "BE", "RU"],
@@ -634,6 +662,7 @@ def test_build_locale_switch_plan_marks_no_apply_for_same_selection() -> None:
 
 
 def test_build_locale_switch_plan_returns_none_when_selection_empty() -> None:
+    """Verify build locale switch plan returns none when selection empty."""
     plan = build_locale_switch_plan(
         requested_locales=["EN", "", "XX"],
         available_locales=["EN", "BE", "RU"],
@@ -644,6 +673,7 @@ def test_build_locale_switch_plan_returns_none_when_selection_empty() -> None:
 
 
 def test_build_locale_reset_plan_defaults() -> None:
+    """Verify build locale reset plan defaults."""
     plan = build_locale_reset_plan()
     assert plan == LocaleResetPlan(
         clear_files_by_locale=True,
@@ -659,6 +689,7 @@ def test_build_locale_reset_plan_defaults() -> None:
 
 
 def test_apply_locale_reset_plan_executes_all_enabled_callbacks() -> None:
+    """Verify apply locale reset plan executes all enabled callbacks."""
     plan = LocaleResetPlan(
         clear_files_by_locale=True,
         clear_opened_files=True,
@@ -697,6 +728,7 @@ def test_apply_locale_reset_plan_executes_all_enabled_callbacks() -> None:
 
 
 def test_apply_locale_reset_plan_skips_disabled_callbacks() -> None:
+    """Verify apply locale reset plan skips disabled callbacks."""
     plan = LocaleResetPlan(
         clear_files_by_locale=False,
         clear_opened_files=True,
@@ -725,6 +757,7 @@ def test_apply_locale_reset_plan_skips_disabled_callbacks() -> None:
 
 
 def test_build_post_locale_startup_plan_for_non_empty_locales() -> None:
+    """Verify build post locale startup plan for non empty locales."""
     plan = build_post_locale_startup_plan(selected_locales=["BE", "RU"])
     assert plan == PostLocaleStartupPlan(
         should_schedule=True,
@@ -735,6 +768,7 @@ def test_build_post_locale_startup_plan_for_non_empty_locales() -> None:
 
 
 def test_build_post_locale_startup_plan_for_empty_locales() -> None:
+    """Verify build post locale startup plan for empty locales."""
     plan = build_post_locale_startup_plan(selected_locales=["", ""])
     assert plan == PostLocaleStartupPlan(
         should_schedule=False,
@@ -745,6 +779,7 @@ def test_build_post_locale_startup_plan_for_empty_locales() -> None:
 
 
 def test_run_post_locale_startup_tasks_executes_enabled_tasks_in_order() -> None:
+    """Verify run post locale startup tasks executes enabled tasks in order."""
     plan = PostLocaleStartupPlan(
         should_schedule=True,
         run_cache_scan=True,
@@ -762,6 +797,7 @@ def test_run_post_locale_startup_tasks_executes_enabled_tasks_in_order() -> None
 
 
 def test_run_post_locale_startup_tasks_skips_disabled_plan() -> None:
+    """Verify run post locale startup tasks skips disabled plan."""
     plan = PostLocaleStartupPlan(
         should_schedule=False,
         run_cache_scan=True,
@@ -779,6 +815,7 @@ def test_run_post_locale_startup_tasks_skips_disabled_plan() -> None:
 
 
 def test_build_tree_rebuild_plan_for_single_locale() -> None:
+    """Verify build tree rebuild plan for single locale."""
     plan = build_tree_rebuild_plan(
         selected_locales=["BE"],
         resize_splitter=False,
@@ -792,6 +829,7 @@ def test_build_tree_rebuild_plan_for_single_locale() -> None:
 
 
 def test_build_tree_rebuild_plan_for_multiple_locales() -> None:
+    """Verify build tree rebuild plan for multiple locales."""
     plan = build_tree_rebuild_plan(
         selected_locales=["BE", "RU"],
         resize_splitter=True,
@@ -805,6 +843,7 @@ def test_build_tree_rebuild_plan_for_multiple_locales() -> None:
 
 
 def test_build_tree_rebuild_plan_ignores_empty_values() -> None:
+    """Verify build tree rebuild plan ignores empty values."""
     plan = build_tree_rebuild_plan(
         selected_locales=["", "RU", ""],
         resize_splitter=True,

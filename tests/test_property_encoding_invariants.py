@@ -1,3 +1,5 @@
+"""Test module for property encoding invariants."""
+
 from __future__ import annotations
 
 import tempfile

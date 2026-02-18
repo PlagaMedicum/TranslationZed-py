@@ -1,3 +1,5 @@
+"""Test module for perf budgets."""
+
 import gc
 import os
 import time
@@ -73,6 +75,7 @@ def _assert_budget(label: str, elapsed_ms: float, budget_ms: float) -> None:
 
 
 def test_perf_large_file_open(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf large file open."""
     count = int(os.getenv("TZP_PERF_OPEN_ENTRIES", "8000"))
     budget_ms = _budget_ms("TZP_PERF_OPEN_MS", 2000.0)
     path = tmp_path / "Large.txt"
@@ -91,6 +94,7 @@ def test_perf_large_file_open(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_multi_file_search(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf multi file search."""
     files = int(os.getenv("TZP_PERF_SEARCH_FILES", "4"))
     count = int(os.getenv("TZP_PERF_SEARCH_ENTRIES", "3000"))
     budget_ms = _budget_ms("TZP_PERF_SEARCH_MS", 2000.0)
@@ -122,6 +126,7 @@ def test_perf_multi_file_search(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_parse_eager(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf parse eager."""
     count = int(os.getenv("TZP_PERF_EAGER_ENTRIES", "4000"))
     budget_ms = _budget_ms("TZP_PERF_EAGER_MS", 2000.0)
     path = tmp_path / "Eager.txt"
@@ -137,6 +142,7 @@ def test_perf_parse_eager(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_cache_write(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf cache write."""
     count = int(os.getenv("TZP_PERF_CACHE_ENTRIES", "8000"))
     budget_ms = _budget_ms("TZP_PERF_CACHE_MS", 1500.0)
     root = tmp_path / "root"
@@ -156,6 +162,7 @@ def test_perf_cache_write(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_cache_read(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf cache read."""
     count = int(os.getenv("TZP_PERF_CACHE_READ_ENTRIES", "8000"))
     budget_ms = _budget_ms("TZP_PERF_CACHE_READ_MS", 1500.0)
     root = tmp_path / "root"
@@ -175,6 +182,7 @@ def test_perf_cache_read(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_cache_header_scan(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf cache header scan."""
     files = int(os.getenv("TZP_PERF_CACHE_HEADER_FILES", "300"))
     budget_ms = _budget_ms("TZP_PERF_CACHE_HEADER_MS", 800.0)
     root = tmp_path / "root"
@@ -201,6 +209,7 @@ def test_perf_cache_header_scan(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_lazy_prefetch(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf lazy prefetch."""
     count = int(os.getenv("TZP_PERF_PREFETCH_ENTRIES", "8000"))
     window = int(os.getenv("TZP_PERF_PREFETCH_WINDOW", "400"))
     budget_ms = _budget_ms("TZP_PERF_PREFETCH_MS", 800.0)
@@ -221,6 +230,7 @@ def test_perf_lazy_prefetch(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_lazy_preview(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf lazy preview."""
     length = int(os.getenv("TZP_PERF_PREVIEW_LEN", "200000"))
     limit = int(os.getenv("TZP_PERF_PREVIEW_LIMIT", "200"))
     budget_ms = _budget_ms("TZP_PERF_PREVIEW_MS", 50.0)
@@ -246,6 +256,7 @@ def test_perf_lazy_preview(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_max_value_length(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf max value length."""
     count = int(os.getenv("TZP_PERF_MAXLEN_ENTRIES", "20000"))
     long_len = int(os.getenv("TZP_PERF_MAXLEN_VALUE", "10000"))
     budget_ms = _budget_ms("TZP_PERF_MAXLEN_MS", 200.0)
@@ -270,6 +281,7 @@ def test_perf_max_value_length(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_hash_index(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf hash index."""
     count = int(os.getenv("TZP_PERF_HASH_INDEX_ENTRIES", "20000"))
     budget_ms = _budget_ms("TZP_PERF_HASH_INDEX_MS", 800.0)
     path = tmp_path / "Large.txt"
@@ -287,6 +299,7 @@ def test_perf_hash_index(tmp_path: Path, perf_recorder) -> None:
 
 
 def test_perf_session_collect_draft_files(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf session collect draft files."""
     files = int(os.getenv("TZP_PERF_SESSION_DRAFT_FILES", "2000"))
     budget_ms = _budget_ms("TZP_PERF_SESSION_DRAFT_MS", 1200.0)
     root = tmp_path / "root"
@@ -326,6 +339,7 @@ def test_perf_session_collect_draft_files(tmp_path: Path, perf_recorder) -> None
 
 
 def test_perf_session_find_last_opened(tmp_path: Path, perf_recorder) -> None:
+    """Verify perf session find last opened."""
     files = int(os.getenv("TZP_PERF_SESSION_LAST_OPENED_FILES", "2000"))
     budget_ms = _budget_ms("TZP_PERF_SESSION_LAST_OPENED_MS", 1200.0)
     root = tmp_path / "root"

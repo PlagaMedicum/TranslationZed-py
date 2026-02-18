@@ -1,3 +1,5 @@
+"""Test module for preferences service."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,6 +16,7 @@ from translationzed_py.core.preferences_service import (
 
 
 def test_resolve_startup_root_prefers_cli_project(tmp_path: Path) -> None:
+    """Verify resolve startup root prefers cli project."""
     cli_project = tmp_path / "cli_root"
     cli_project.mkdir(parents=True)
     saved_default = tmp_path / "saved_default"
@@ -28,6 +31,7 @@ def test_resolve_startup_root_prefers_cli_project(tmp_path: Path) -> None:
 
 
 def test_resolve_startup_root_uses_saved_default_when_existing(tmp_path: Path) -> None:
+    """Verify resolve startup root uses saved default when existing."""
     saved_default = tmp_path / "saved_default"
     saved_default.mkdir(parents=True)
     resolved = resolve_startup_root(
@@ -42,6 +46,7 @@ def test_resolve_startup_root_uses_saved_default_when_existing(tmp_path: Path) -
 def test_resolve_startup_root_requires_picker_when_default_missing(
     tmp_path: Path,
 ) -> None:
+    """Verify resolve startup root requires picker when default missing."""
     resolved = resolve_startup_root(
         project_root=None,
         saved_default_root=str(tmp_path / "missing"),
@@ -52,12 +57,14 @@ def test_resolve_startup_root_requires_picker_when_default_missing(
 
 
 def test_normalize_scope_falls_back_to_file() -> None:
+    """Verify normalize scope falls back to file."""
     assert normalize_scope("LOCALE") == "LOCALE"
     assert normalize_scope("pool") == "POOL"
     assert normalize_scope("invalid") == "FILE"
 
 
 def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
+    """Verify resolve qa preferences updates flags and change marker."""
     current = (True, True, False, False, False, False, False)
     updated, changed = resolve_qa_preferences(
         {
@@ -80,12 +87,14 @@ def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
 
 
 def test_preferences_service_normalize_scope_delegates_helper() -> None:
+    """Verify preferences service normalize scope delegates helper."""
     service = PreferencesService()
     assert service.normalize_scope("locale") == "LOCALE"
     assert service.normalize_scope("bad") == "FILE"
 
 
 def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
+    """Verify normalize loaded preferences applies layout reset policy."""
     raw = {
         "prompt_write_on_exit": True,
         "wrap_text": True,
@@ -141,6 +150,7 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
 
 
 def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
+    """Verify build persist payload normalizes scope and copies mutables."""
     locales = ["BE", "RU"]
     extras = {"A": "1"}
     payload = build_persist_payload(
@@ -183,6 +193,7 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
 def test_preferences_service_load_normalized_bootstraps_settings(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify preferences service load normalized bootstraps settings."""
     monkeypatch.chdir(tmp_path)
     service = PreferencesService()
 
@@ -208,6 +219,7 @@ def test_preferences_service_load_normalized_bootstraps_settings(
 def test_preferences_service_persist_main_window_preferences(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify preferences service persist main window preferences."""
     monkeypatch.chdir(tmp_path)
     default_root = tmp_path / "project"
     default_root.mkdir(parents=True)
@@ -253,6 +265,7 @@ def test_preferences_service_persist_main_window_preferences(
 def test_preferences_service_resolve_startup_uses_saved_default(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify preferences service resolve startup uses saved default."""
     monkeypatch.chdir(tmp_path)
     default_root = tmp_path / "workspace"
     default_root.mkdir(parents=True)

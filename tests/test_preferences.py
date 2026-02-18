@@ -1,3 +1,5 @@
+"""Test module for preferences."""
+
 from pathlib import Path
 
 from translationzed_py.core import preferences
@@ -6,6 +8,7 @@ from translationzed_py.core import preferences
 def test_load_is_pure_read_for_missing_settings_env(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify load is pure read for missing settings env."""
     monkeypatch.chdir(tmp_path)
     prefs = preferences.load(tmp_path)
 
@@ -30,6 +33,7 @@ def test_load_is_pure_read_for_missing_settings_env(
 def test_ensure_defaults_bootstraps_missing_settings_env(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify ensure defaults bootstraps missing settings env."""
     monkeypatch.chdir(tmp_path)
     prefs = preferences.ensure_defaults(tmp_path)
     assert prefs["prompt_write_on_exit"] is True
@@ -67,6 +71,7 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
 def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify ensure defaults backfills missing keys and preserves extras."""
     monkeypatch.chdir(tmp_path)
     legacy_path = tmp_path / ".tzp-config" / "settings.env"
     legacy_path.parent.mkdir(parents=True, exist_ok=True)
@@ -108,6 +113,7 @@ def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
 def test_load_reads_legacy_settings_without_writing(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify load reads legacy settings without writing."""
     monkeypatch.chdir(tmp_path)
     legacy_path = tmp_path / ".tzp-config" / "settings.env"
     legacy_path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,6 +133,7 @@ def test_load_reads_legacy_settings_without_writing(
 def test_ensure_defaults_reroutes_legacy_tm_import_dir_value(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify ensure defaults reroutes legacy tm import dir value."""
     monkeypatch.chdir(tmp_path)
     legacy_path = tmp_path / ".tzp-config" / "settings.env"
     legacy_path.parent.mkdir(parents=True, exist_ok=True)
@@ -146,6 +153,7 @@ def test_ensure_defaults_reroutes_legacy_tm_import_dir_value(
 def test_ensure_defaults_migrates_root_imported_tms_into_tms(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify ensure defaults migrates root imported tms into tms."""
     monkeypatch.chdir(tmp_path)
     old_dir = tmp_path / "imported_tms"
     old_dir.mkdir(parents=True, exist_ok=True)
@@ -163,6 +171,7 @@ def test_ensure_defaults_migrates_root_imported_tms_into_tms(
 def test_ensure_defaults_canonicalizes_relative_tm_import_dir(
     tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify ensure defaults canonicalizes relative tm import dir."""
     monkeypatch.chdir(tmp_path)
     cfg_path = tmp_path / ".tzp" / "config" / "settings.env"
     cfg_path.parent.mkdir(parents=True, exist_ok=True)

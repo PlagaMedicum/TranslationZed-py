@@ -1,3 +1,5 @@
+"""Test module for project scanner."""
+
 from pathlib import Path
 
 import pytest
@@ -11,6 +13,7 @@ from translationzed_py.core import (
 
 
 def test_scan_root_discovers_locales(tmp_path: Path) -> None:
+    """Verify scan root discovers locales."""
     root = tmp_path / "project"
     root.mkdir()
     for loc in ("EN", "EN UK", "PTBR"):
@@ -30,6 +33,7 @@ def test_scan_root_discovers_locales(tmp_path: Path) -> None:
 
 
 def test_scan_root_reads_language_txt(prod_like_root: Path) -> None:
+    """Verify scan root reads language txt."""
     locales = scan_root(prod_like_root)
     assert locales["EN"].display_name == "English"
     assert locales["EN"].charset.upper() == "UTF-8"
@@ -38,6 +42,7 @@ def test_scan_root_reads_language_txt(prod_like_root: Path) -> None:
 
 
 def test_scan_root_requires_language_txt(tmp_path: Path) -> None:
+    """Verify scan root requires language txt."""
     root = tmp_path / "project"
     root.mkdir()
     (root / "EN").mkdir()
@@ -46,6 +51,7 @@ def test_scan_root_requires_language_txt(tmp_path: Path) -> None:
 
 
 def test_scan_root_requires_charset(tmp_path: Path) -> None:
+    """Verify scan root requires charset."""
     root = tmp_path / "project"
     root.mkdir()
     (root / "EN").mkdir()
@@ -55,6 +61,7 @@ def test_scan_root_requires_charset(tmp_path: Path) -> None:
 
 
 def test_scan_root_with_errors_skips_invalid(tmp_path: Path) -> None:
+    """Verify scan root with errors skips invalid."""
     root = tmp_path / "project"
     root.mkdir()
     (root / "EN").mkdir()
@@ -71,6 +78,7 @@ def test_scan_root_with_errors_skips_invalid(tmp_path: Path) -> None:
 def test_list_translatable_files_excludes_non_translatables(
     prod_like_root: Path,
 ) -> None:
+    """Verify list translatable files excludes non translatables."""
     en_path = prod_like_root / "EN"
     files = list_translatable_files(en_path)
     names = {p.name for p in files}
@@ -80,6 +88,7 @@ def test_list_translatable_files_excludes_non_translatables(
 
 
 def test_list_translatable_files_ignores_tvradio(prod_like_root: Path) -> None:
+    """Verify list translatable files ignores tvradio."""
     root = prod_like_root
     locales = scan_root(root)
     assert "_TVRADIO_TRANSLATIONS" not in locales
