@@ -1,3 +1,5 @@
+"""Save exit flow module."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -8,6 +10,8 @@ from typing import Literal
 
 @dataclass(frozen=True, slots=True)
 class SaveBatchOutcome:
+    """Represent SaveBatchOutcome."""
+
     aborted: bool
     failures: tuple[Path, ...]
     saved_any: bool
@@ -15,6 +19,8 @@ class SaveBatchOutcome:
 
 @dataclass(frozen=True, slots=True)
 class SaveBatchRenderPlan:
+    """Represent SaveBatchRenderPlan."""
+
     aborted: bool
     warning_message: str | None
     set_saved_status: bool
@@ -22,9 +28,12 @@ class SaveBatchRenderPlan:
 
 @dataclass(frozen=True, slots=True)
 class SaveExitFlowService:
+    """Represent SaveExitFlowService."""
+
     def build_save_dialog_labels(
         self, files: Sequence[Path], *, root: Path
     ) -> tuple[str, ...]:
+        """Build save dialog labels."""
         return build_save_dialog_labels(files, root=root)
 
     def apply_save_dialog_selection(
@@ -34,6 +43,7 @@ class SaveExitFlowService:
         labels: Sequence[str],
         selected_labels: Sequence[str] | None,
     ) -> tuple[Path, ...]:
+        """Apply save dialog selection."""
         return apply_save_dialog_selection(
             files=files,
             labels=labels,
@@ -43,6 +53,7 @@ class SaveExitFlowService:
     def build_save_batch_render_plan(
         self, *, outcome: SaveBatchOutcome, root: Path
     ) -> SaveBatchRenderPlan:
+        """Build save batch render plan."""
         return build_save_batch_render_plan(outcome=outcome, root=root)
 
     def apply_write_original_flow(
@@ -54,6 +65,7 @@ class SaveExitFlowService:
         save_all: Callable[[list[Path]], None],
         notify_nothing_to_write: Callable[[], None],
     ) -> None:
+        """Apply write original flow."""
         apply_write_original_flow(
             write_cache=write_cache,
             list_draft_files=list_draft_files,
@@ -71,6 +83,7 @@ class SaveExitFlowService:
         choose_action: Callable[[list[Path]], Literal["cancel", "write", "cache"]],
         save_all: Callable[[Sequence[Path]], None],
     ) -> bool:
+        """Determine whether accept close."""
         return should_accept_close(
             prompt_write_on_exit=prompt_write_on_exit,
             write_cache=write_cache,
@@ -87,6 +100,7 @@ class SaveExitFlowService:
         save_current: Callable[[], bool],
         save_from_cache: Callable[[Path], bool],
     ) -> SaveBatchOutcome:
+        """Run save batch flow."""
         return run_save_batch_flow(
             files=files,
             current_file=current_file,
@@ -96,6 +110,7 @@ class SaveExitFlowService:
 
 
 def build_save_dialog_labels(files: Sequence[Path], *, root: Path) -> tuple[str, ...]:
+    """Build save dialog labels."""
     labels: list[str] = []
     for path in files:
         try:
@@ -111,6 +126,7 @@ def apply_save_dialog_selection(
     labels: Sequence[str],
     selected_labels: Sequence[str] | None,
 ) -> tuple[Path, ...]:
+    """Apply save dialog selection."""
     if selected_labels is None:
         return tuple(files)
     selected = set(selected_labels)
@@ -120,6 +136,7 @@ def apply_save_dialog_selection(
 
 
 def format_save_failures(*, failures: Sequence[Path], root: Path) -> str:
+    """Format save failures."""
     lines: list[str] = []
     for path in failures:
         try:
@@ -132,6 +149,7 @@ def format_save_failures(*, failures: Sequence[Path], root: Path) -> str:
 def build_save_batch_render_plan(
     *, outcome: SaveBatchOutcome, root: Path
 ) -> SaveBatchRenderPlan:
+    """Build save batch render plan."""
     if outcome.aborted:
         return SaveBatchRenderPlan(
             aborted=True,
@@ -202,6 +220,7 @@ def run_save_batch_flow(
     save_current: Callable[[], bool],
     save_from_cache: Callable[[Path], bool],
 ) -> SaveBatchOutcome:
+    """Run save batch flow."""
     if not files:
         return SaveBatchOutcome(aborted=False, failures=(), saved_any=False)
 
