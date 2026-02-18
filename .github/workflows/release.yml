@@ -7,6 +7,7 @@ on:
   push:
     tags:
       - "v*"
+      - "!v*-rc*"
   workflow_dispatch:
     inputs:
       tag:
@@ -48,14 +49,8 @@ jobs:
               sys.exit(2)
           print(f"Release tag: {tag}")
           PY
-      - name: Encoding integrity suite
-        run: make test-encoding-integrity
-      - name: Encoding diagnostics (fixture corpus)
-        run: make diagnose-encoding
-      - name: Verify project quality gates
-        run: make verify
-      - name: Validate release tag/version/changelog alignment
-        run: make release-check TAG=${{ env.RELEASE_TAG }}
+      - name: Verify project quality gates (strict)
+        run: make verify-ci TAG=${{ env.RELEASE_TAG }} BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20
 
   build:
     needs: preflight

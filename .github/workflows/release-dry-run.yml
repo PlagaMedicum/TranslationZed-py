@@ -47,8 +47,8 @@ jobs:
               sys.exit(2)
           print(f"RC tag: {tag}")
           PY
-      - name: Run local RC gates
-        run: make release-dry-run TAG=${{ env.RC_TAG }}
+      - name: Run strict RC verification gates
+        run: make verify-ci TAG=${{ env.RC_TAG }} BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20
 
   build:
     needs: preflight
