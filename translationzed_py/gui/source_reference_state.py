@@ -1,3 +1,5 @@
+"""Source reference state module."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, MutableMapping
@@ -15,6 +17,7 @@ _FALLBACK_TARGET_THEN_EN = "TARGET_THEN_EN"
 def _window_available_source_reference_locales(
     win: object, *, exclude_locale: str | None = None
 ) -> tuple[str, ...]:
+    """Execute window available source reference locales."""
     excluded = str(exclude_locale or "").strip().upper()
     out = ["EN"]
     for locale in getattr(win, "_selected_locales", ()):
@@ -27,6 +30,7 @@ def _window_available_source_reference_locales(
 def normalize_source_reference_fallback_policy(
     value: object, *, default: str = _FALLBACK_EN_THEN_TARGET
 ) -> str:
+    """Normalize source reference fallback policy."""
     raw = str(value).strip().upper()
     if raw in {_FALLBACK_EN_THEN_TARGET, _FALLBACK_TARGET_THEN_EN}:
         return raw
@@ -34,6 +38,7 @@ def normalize_source_reference_fallback_policy(
 
 
 def source_reference_fallback_pair(locale: str | None, policy: str) -> tuple[str, str]:
+    """Execute source reference fallback pair."""
     target = normalize_source_reference_mode(locale, default="EN")
     normalized = normalize_source_reference_fallback_policy(policy)
     if normalized == _FALLBACK_TARGET_THEN_EN:
@@ -51,6 +56,7 @@ def effective_source_reference_mode(
     available_locales: Iterable[str],
     fallback_policy: str = _FALLBACK_EN_THEN_TARGET,
 ) -> str:
+    """Execute effective source reference mode."""
     requested = normalize_source_reference_mode(default_mode, default="EN")
     default_locale, fallback_locale = source_reference_fallback_pair(
         locale, fallback_policy
@@ -73,6 +79,7 @@ def apply_source_reference_mode_change(
     overrides: MutableMapping[str, str],  # kept for call-shape stability
     extras: MutableMapping[str, str],
 ) -> tuple[str, bool]:
+    """Apply source reference mode change."""
     _ = (root, current_path, overrides)
     normalized_mode = normalize_source_reference_mode(mode, default="EN")
     if normalized_mode == default_mode:
@@ -88,6 +95,7 @@ def apply_source_reference_preferences(
     overrides: MutableMapping[str, str],  # kept for call-shape stability
     extras: MutableMapping[str, str],
 ) -> tuple[str, bool]:
+    """Apply source reference preferences."""
     _ = overrides
     policy = normalize_source_reference_fallback_policy(
         values.get("source_reference_fallback_policy", current_fallback_policy),
@@ -100,6 +108,7 @@ def apply_source_reference_preferences(
 
 
 def refresh_source_reference_from_window(win: object) -> None:
+    """Refresh source reference from window."""
     current_pf = getattr(win, "_current_pf", None)
     current_model = getattr(win, "_current_model", None)
     if current_pf is None or current_model is None:
@@ -123,6 +132,7 @@ def refresh_source_reference_from_window(win: object) -> None:
 def effective_source_reference_mode_for_window(
     win: object, path: Path, locale: str | None
 ) -> str:
+    """Execute effective source reference mode for window."""
     return effective_source_reference_mode(
         root=win._root,
         path=path,
@@ -137,6 +147,7 @@ def effective_source_reference_mode_for_window(
 
 
 def sync_source_reference_override_ui_for_window(win: object) -> None:
+    """Synchronize source reference override ui for window."""
     from .source_reference_ui import sync_source_reference_combo
 
     current_path = win._current_pf.path if win._current_pf else None
@@ -163,6 +174,7 @@ def sync_source_reference_override_ui_for_window(win: object) -> None:
 
 
 def sync_source_reference_mode_for_window(win: object, *, persist: bool) -> None:
+    """Synchronize source reference mode for window."""
     from .source_reference_ui import sync_source_reference_combo
 
     selected_locale = win._selected_locales[0] if win._selected_locales else "EN"
@@ -191,6 +203,7 @@ def sync_source_reference_mode_for_window(win: object, *, persist: bool) -> None
 
 
 def handle_source_reference_changed(win: object, index: int) -> None:
+    """Handle source reference changed."""
     from .source_reference_ui import source_reference_mode_from_combo
 
     mode = source_reference_mode_from_combo(win.source_ref_combo, index)
@@ -213,6 +226,7 @@ def handle_source_reference_changed(win: object, index: int) -> None:
 def apply_source_reference_preferences_for_window(
     win: object, values: Mapping[str, object]
 ) -> bool:
+    """Apply source reference preferences for window."""
     policy, changed = apply_source_reference_preferences(
         values=values,
         current_fallback_policy=win._source_reference_fallback_policy,

@@ -1,3 +1,5 @@
+"""Dialogs module."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -35,6 +37,7 @@ class LocaleChooserDialog(QDialog):
         *,
         preselected: Iterable[str] | None = None,
     ) -> None:
+        """Initialize the instance."""
         super().__init__(parent)
         self.setWindowTitle("Select locales")
         self.setModal(True)
@@ -74,9 +77,11 @@ class LocaleChooserDialog(QDialog):
         main_layout.addWidget(buttons)
 
     def selected_codes(self) -> list[str]:
+        """Execute selected codes."""
         return [code for code, box in self._boxes.items() if box.isChecked()]
 
     def _rebuild_order(self) -> None:
+        """Execute rebuild order."""
         checked = {code for code, box in self._items if box.isChecked()}
         ordered = sorted(
             self._items,
@@ -96,6 +101,7 @@ class SaveFilesDialog(QDialog):
     """Prompt listing files that will be written to originals."""
 
     def __init__(self, files: Iterable[str], parent=None) -> None:
+        """Initialize the instance."""
         super().__init__(parent)
         self.setWindowTitle("Write original files")
         self.setModal(True)
@@ -138,13 +144,16 @@ class SaveFilesDialog(QDialog):
         main_layout.addWidget(buttons)
 
     def _set_choice(self, choice: str) -> None:
+        """Set choice."""
         self._choice = choice
         self.accept()
 
     def choice(self) -> str:
+        """Execute choice."""
         return self._choice
 
     def selected_files(self) -> list[str]:
+        """Execute selected files."""
         selected: list[str] = []
         for idx in range(self._list.count()):
             item = self._list.item(idx)
@@ -153,12 +162,15 @@ class SaveFilesDialog(QDialog):
         return selected
 
     def _select_all(self) -> None:
+        """Execute select all."""
         self._set_all_checks(Qt.CheckState.Checked)
 
     def _select_none(self) -> None:
+        """Execute select none."""
         self._set_all_checks(Qt.CheckState.Unchecked)
 
     def _set_all_checks(self, state: Qt.CheckState) -> None:
+        """Set all checks."""
         for idx in range(self._list.count()):
             self._list.item(idx).setCheckState(state)
 
@@ -176,6 +188,7 @@ class TmLanguageDialog(QDialog):
         title: str = "TM language pair",
         allow_skip_all: bool = False,
     ) -> None:
+        """Initialize the instance."""
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setModal(True)
@@ -223,15 +236,19 @@ class TmLanguageDialog(QDialog):
         layout.addWidget(buttons)
 
     def source_locale(self) -> str:
+        """Execute source locale."""
         return self._source_combo.currentText().strip()
 
     def target_locale(self) -> str:
+        """Execute target locale."""
         return self._target_combo.currentText().strip()
 
     def skip_all_requested(self) -> bool:
+        """Execute skip all requested."""
         return self._skip_all
 
     def _skip_all_now(self) -> None:
+        """Execute skip all now."""
         self._skip_all = True
         self.reject()
 
@@ -245,6 +262,7 @@ class ReplaceFilesDialog(QDialog):
         scope_label: str,
         parent=None,
     ) -> None:
+        """Initialize the instance."""
         super().__init__(parent)
         self.setWindowTitle("Replace in multiple files")
         self.setModal(True)
@@ -272,10 +290,12 @@ class ReplaceFilesDialog(QDialog):
         main_layout.addWidget(buttons)
 
     def _confirm(self) -> None:
+        """Execute confirm."""
         self._confirmed = True
         self.accept()
 
     def confirmed(self) -> bool:
+        """Execute confirmed."""
         return self._confirmed
 
 
@@ -283,6 +303,7 @@ class ConflictChoiceDialog(QDialog):
     """Prompt when cached drafts conflict with current file values."""
 
     def __init__(self, file_label: str, count: int, parent=None) -> None:
+        """Initialize the instance."""
         super().__init__(parent)
         self.setWindowTitle("Translation conflict")
         self.setModal(True)
@@ -308,18 +329,22 @@ class ConflictChoiceDialog(QDialog):
         layout.addWidget(buttons)
 
     def _set_choice(self, choice: str) -> None:
+        """Set choice."""
         self._choice = choice
         self.accept()
 
     def choice(self) -> str | None:
+        """Execute choice."""
         return self._choice
 
     def reject(self) -> None:  # noqa: N802
+        """Execute reject."""
         if self._choice is None:
             return
         super().reject()
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        """Execute closeEvent."""
         if self._choice is None:
             event.ignore()
             return
@@ -330,6 +355,7 @@ class AboutDialog(QDialog):
     """About dialog with GPL notice and license text."""
 
     def __init__(self, parent=None) -> None:
+        """Initialize the instance."""
         super().__init__(parent)
         self.setWindowTitle("About TranslationZed-Py")
         self.setModal(True)
@@ -381,6 +407,7 @@ class AboutDialog(QDialog):
         layout.addWidget(self._license_text)
 
         def _toggle_license(checked: bool) -> None:
+            """Execute toggle license."""
             self._license_text.setVisible(checked)
             toggle.setArrowType(Qt.DownArrow if checked else Qt.RightArrow)
 
@@ -393,6 +420,7 @@ class AboutDialog(QDialog):
         layout.addWidget(buttons)
 
     def _read_license(self) -> str:
+        """Read license."""
         try:
             root = Path(__file__).resolve().parents[2]
             return (root / "LICENSE").read_text(encoding="utf-8")

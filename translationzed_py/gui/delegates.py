@@ -1,3 +1,5 @@
+"""Delegates module."""
+
 from __future__ import annotations
 
 import re
@@ -46,6 +48,7 @@ class StatusDelegate(QStyledItemDelegate):
     """Combo-box editor for the Status column."""
 
     def createEditor(self, parent, _option, _index):  # noqa: N802
+        """Execute createEditor."""
         combo = QComboBox(parent)
         for st in STATUS_ORDER:
             combo.addItem(st.label(), st)
@@ -53,6 +56,7 @@ class StatusDelegate(QStyledItemDelegate):
         return combo
 
     def setEditorData(self, editor, index):  # noqa: N802
+        """Execute setEditorData."""
         if not isinstance(editor, QComboBox):
             return
         raw = index.data(Qt.EditRole)
@@ -72,6 +76,7 @@ class StatusDelegate(QStyledItemDelegate):
         editor.setCurrentIndex(-1)
 
     def setModelData(self, editor, model, index):  # noqa: N802
+        """Execute setModelData."""
         if not isinstance(editor, QComboBox):
             return
         status = editor.currentData()
@@ -88,6 +93,7 @@ class KeyDelegate(QStyledItemDelegate):
     """Right-align keys and elide the left side when column is narrow."""
 
     def initStyleOption(self, option, index):  # noqa: N802
+        """Execute initStyleOption."""
         super().initStyleOption(option, index)
         option.displayAlignment = Qt.AlignRight | Qt.AlignVCenter
         option.textElideMode = Qt.ElideLeft
@@ -97,12 +103,18 @@ class MultiLineEditDelegate(QStyledItemDelegate):
     """Expandable editor for multi-line text (editable or read-only)."""
 
     def __init__(self, parent=None, *, read_only: bool = False) -> None:
+        """Initialize the instance."""
         super().__init__(parent)
         self._read_only = read_only
 
     def createEditor(self, parent, _option, _index):  # noqa: N802
+        """Execute createEditor."""
+
         class _ScrollSafePlainTextEdit(QPlainTextEdit):
+            """Represent ScrollSafePlainTextEdit."""
+
             def wheelEvent(self, event):  # noqa: N802
+                """Execute wheelEvent."""
                 super().wheelEvent(event)
                 event.accept()
 
@@ -115,6 +127,7 @@ class MultiLineEditDelegate(QStyledItemDelegate):
         return editor
 
     def setEditorData(self, editor, index):  # noqa: N802
+        """Execute setEditorData."""
         if isinstance(editor, QPlainTextEdit):
             editor.setPlainText(str(index.data(Qt.EditRole) or ""))
             editor.moveCursor(QTextCursor.Start)
@@ -125,6 +138,7 @@ class MultiLineEditDelegate(QStyledItemDelegate):
         super().setEditorData(editor, index)
 
     def setModelData(self, editor, model, index):  # noqa: N802
+        """Execute setModelData."""
         if isinstance(editor, QPlainTextEdit):
             if not self._read_only:
                 model.setData(index, editor.toPlainText(), Qt.EditRole)
@@ -132,6 +146,7 @@ class MultiLineEditDelegate(QStyledItemDelegate):
         super().setModelData(editor, model, index)
 
     def updateEditorGeometry(self, editor, option, _index):  # noqa: N802
+        """Execute updateEditorGeometry."""
         rect = option.rect
         view = editor.parent()
         if hasattr(view, "viewport"):
@@ -182,6 +197,8 @@ _WS_REPEAT_BG_SELECTED = QColor("#ffffff")
 
 @dataclass(frozen=True, slots=True)
 class _VisualFormats:
+    """Represent VisualFormats."""
+
     tag: QTextCharFormat
     escape: QTextCharFormat
     ws_glyph: QTextCharFormat
@@ -190,6 +207,8 @@ class _VisualFormats:
 
 @dataclass(frozen=True, slots=True)
 class _DocCacheEntry:
+    """Represent DocCacheEntry."""
+
     text: str
     width: int
     height: int
@@ -197,18 +216,21 @@ class _DocCacheEntry:
 
 
 def _is_dark_palette(palette: QPalette) -> bool:
+    """Return whether dark palette."""
     base = palette.color(QPalette.Base)
     text = palette.color(QPalette.Text)
     return text.lightness() > base.lightness()
 
 
 def _alpha(color: QColor, value: int) -> QColor:
+    """Execute alpha."""
     out = QColor(color)
     out.setAlpha(value)
     return out
 
 
 def _palette_cache_key(palette: QPalette) -> int | tuple[int, int, int, int]:
+    """Execute palette cache key."""
     key_attr = getattr(palette, "cacheKey", None)
     if callable(key_attr):
         try:
@@ -228,6 +250,7 @@ def _build_visual_formats(
     *,
     selected: bool,
 ) -> _VisualFormats:
+    """Build visual formats."""
     dark = _is_dark_palette(palette)
     tag_color = _TAG_DARK if dark else _TAG_LIGHT
     escape_color = _ESCAPE_DARK if dark else _ESCAPE_LIGHT
@@ -261,6 +284,7 @@ def _build_visual_formats(
 
 
 def _apply_whitespace_option(doc: QTextDocument, enabled: bool) -> None:
+    """Apply whitespace option."""
     option = doc.defaultTextOption()
     flags = option.flags()
     if enabled:
@@ -284,6 +308,7 @@ def _apply_visual_formats(
     palette: QPalette,
     selected: bool,
 ) -> None:
+    """Apply visual formats."""
     if not text:
         return
     formats = _build_visual_formats(palette, selected=selected)
@@ -312,17 +337,21 @@ def _apply_visual_formats(
 
 
 class TextVisualHighlighter(QSyntaxHighlighter):
+    """Represent TextVisualHighlighter."""
+
     def __init__(
         self,
         doc: QTextDocument,
         options_provider: Callable[[], tuple[bool, bool, bool]],
         palette_provider: Callable[[], QPalette] | None = None,
     ):
+        """Initialize the instance."""
         super().__init__(doc)
         self._options_provider = options_provider
         self._palette_provider = palette_provider or QApplication.palette
 
     def highlightBlock(self, text: str) -> None:  # noqa: N802
+        """Execute highlightBlock."""
         show_ws, highlight, optimize = self._options_provider()
         if optimize and self.document().characterCount() >= MAX_VISUAL_CHARS:
             show_ws = False
@@ -357,12 +386,14 @@ class VisualTextDelegate(MultiLineEditDelegate):
         read_only: bool = False,
         options_provider: Callable[[], tuple[bool, bool, bool]] | None = None,
     ) -> None:
+        """Initialize the instance."""
         super().__init__(parent, read_only=read_only)
         self._options_provider = options_provider or (lambda: (False, False, False))
         self._doc = QTextDocument()
         self._doc_cache: OrderedDict[tuple, _DocCacheEntry] = OrderedDict()
 
     def clear_visual_cache(self) -> None:
+        """Execute clear visual cache."""
         self._doc_cache.clear()
 
     def _get_cached_doc(
@@ -376,6 +407,7 @@ class VisualTextDelegate(MultiLineEditDelegate):
         highlight: bool,
         selected: bool,
     ) -> _DocCacheEntry:
+        """Return cached doc."""
         cache_key = (
             text,
             width,
@@ -419,6 +451,7 @@ class VisualTextDelegate(MultiLineEditDelegate):
         return entry
 
     def createEditor(self, parent, _option, _index):  # noqa: N802
+        """Execute createEditor."""
         editor = super().createEditor(parent, _option, _index)
         if isinstance(editor, QPlainTextEdit):
             show_ws, _highlight, _optimize = self._options_provider()
@@ -431,6 +464,7 @@ class VisualTextDelegate(MultiLineEditDelegate):
         return editor
 
     def setEditorData(self, editor, index):  # noqa: N802
+        """Execute setEditorData."""
         super().setEditorData(editor, index)
         if not isinstance(editor, QPlainTextEdit):
             return
@@ -441,6 +475,7 @@ class VisualTextDelegate(MultiLineEditDelegate):
         _apply_whitespace_option(editor.document(), show_ws)
 
     def sizeHint(self, option, index):  # noqa: N802
+        """Execute sizeHint."""
         text = index.data(Qt.DisplayRole)
         if isinstance(text, str) and len(text) > _MAX_RENDER_CHARS:
             line_height = option.fontMetrics.lineSpacing()
@@ -466,6 +501,7 @@ class VisualTextDelegate(MultiLineEditDelegate):
         return QSize(0, height)
 
     def paint(self, painter, option, index):  # noqa: N802
+        """Execute paint."""
         perf_trace = PERF_TRACE
         start = perf_trace.start("paint")
         try:

@@ -1,3 +1,5 @@
+"""Entry model module."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -47,6 +49,7 @@ class TranslationModel(QAbstractTableModel):
         source_values: Mapping[str, str] | None = None,
         source_by_row: Sequence[str] | None = None,
     ):
+        """Initialize the instance."""
         super().__init__()
         self._pf = pf
         if hasattr(pf.entries, "prefetch"):
@@ -68,6 +71,7 @@ class TranslationModel(QAbstractTableModel):
 
     # ---------------------------------------------------------------- helpers
     def _dark_palette_active(self) -> bool:
+        """Execute dark palette active."""
         app = QApplication.instance()
         if app is None:
             return False
@@ -77,20 +81,24 @@ class TranslationModel(QAbstractTableModel):
         return text.lightness() > base.lightness()
 
     def _status_background_color(self, status: Status) -> QColor | None:
+        """Execute status background color."""
         if self._dark_palette_active():
             return _BG_STATUS_DARK.get(status)
         return _BG_STATUS_LIGHT.get(status)
 
     def _missing_background_color(self) -> QColor:
+        """Execute missing background color."""
         if self._dark_palette_active():
             return _BG_MISSING_DARK
         return _BG_MISSING_LIGHT
 
     def _foreground_for_background(self, background: QColor) -> QColor:
         # Keep readable text regardless of status color brightness.
+        """Execute foreground for background."""
         return _FG_LIGHT_BG if background.lightness() >= 145 else _FG_DARK_BG
 
     def _cell_background(self, row: int, column: int, entry: Entry) -> QColor | None:
+        """Execute cell background."""
         if column == 0 and not (entry.key or ""):
             return self._missing_background_color()
         if column == 1:
@@ -105,7 +113,7 @@ class TranslationModel(QAbstractTableModel):
         return self._status_background_color(entry.status)
 
     def _replace_entry(self, row: int, entry: Entry, *, value_changed: bool) -> None:
-        """Called by EditValueCommand to swap immutable Entry objects."""
+        """Swap immutable Entry objects during value/status updates."""
         self._entries[row] = entry
         if value_changed:
             baseline = self._baseline_by_row.get(row)
@@ -156,6 +164,7 @@ class TranslationModel(QAbstractTableModel):
         return out
 
     def changed_keys(self) -> set[str]:
+        """Execute changed keys."""
         keys: set[str] = set()
         for row in self._baseline_by_row:
             if 0 <= row < len(self._entries):
@@ -204,11 +213,13 @@ class TranslationModel(QAbstractTableModel):
         return out
 
     def status_for_row(self, row: int) -> Status | None:
+        """Execute status for row."""
         if 0 <= row < len(self._entries):
             return self._entries[row].status
         return None
 
     def clear_changed_values(self) -> None:
+        """Execute clear changed values."""
         self._baseline_by_row.clear()
         self._changed_rows.clear()
         self._status_touched_rows.clear()
@@ -216,6 +227,7 @@ class TranslationModel(QAbstractTableModel):
         self._pf.dirty = False
 
     def set_preview_limit(self, limit: int | None) -> None:
+        """Set preview limit."""
         self._preview_limit = limit
 
     def set_source_lookup(
@@ -224,6 +236,7 @@ class TranslationModel(QAbstractTableModel):
         source_values: Mapping[str, str] | None = None,
         source_by_row: Sequence[str] | None = None,
     ) -> None:
+        """Set source lookup."""
         self._source_values = source_values or {}
         self._source_by_row = source_by_row
         if not self._entries:
@@ -237,6 +250,7 @@ class TranslationModel(QAbstractTableModel):
         )
 
     def max_value_length(self) -> int:
+        """Execute max value length."""
         cached = self._max_value_len
         if cached is not None:
             return cached
@@ -263,6 +277,7 @@ class TranslationModel(QAbstractTableModel):
         return max_len
 
     def _truncate_preview(self, text: str, limit: int, actual_len: int | None) -> str:
+        """Execute truncate preview."""
         if limit <= 0:
             return ""
         if actual_len is None:
@@ -274,6 +289,7 @@ class TranslationModel(QAbstractTableModel):
         return text[: max(0, limit - 1)] + "…"
 
     def _tooltip_limit_for_length(self, length: int) -> int | None:
+        """Execute tooltip limit for length."""
         if length <= 0:
             return None
         if length > _TOOLTIP_LARGE_THRESHOLD:
@@ -285,6 +301,7 @@ class TranslationModel(QAbstractTableModel):
     def _tooltip_apply_limit(
         self, text: str, actual_len: int, limit: int | None
     ) -> str:
+        """Execute tooltip apply limit."""
         if not text:
             return ""
         if limit is None:
@@ -295,14 +312,17 @@ class TranslationModel(QAbstractTableModel):
         return truncated + "\n...(truncated)"
 
     def _full_source_text(self, row: int) -> str:
+        """Execute full source text."""
         if self._source_by_row is not None and row < len(self._source_by_row):
             return self._source_by_row[row] or ""
         return self._source_values.get(self._entries[row].key, "") or ""
 
     def _full_value_text(self, row: int) -> str:
+        """Execute full value text."""
         return self._entries[row].value or ""
 
     def _source_length_at(self, row: int) -> int:
+        """Execute source length at."""
         if self._source_by_row is not None and row < len(self._source_by_row):
             source_row = self._source_by_row
             if hasattr(source_row, "length_at"):
@@ -317,6 +337,7 @@ class TranslationModel(QAbstractTableModel):
         return len(text) if text else 0
 
     def _value_length_at(self, row: int) -> int:
+        """Execute value length at."""
         entries = self._entries
         if hasattr(entries, "meta_at"):
             try:
@@ -330,6 +351,7 @@ class TranslationModel(QAbstractTableModel):
         return len(text) if text else 0
 
     def _preview_source_raw(self, row: int, limit: int) -> tuple[str, int]:
+        """Execute preview source raw."""
         actual_len = self._source_length_at(row)
         if self._source_by_row is not None and row < len(self._source_by_row):
             source_row = self._source_by_row
@@ -346,10 +368,12 @@ class TranslationModel(QAbstractTableModel):
         return preview[:limit], actual_len
 
     def _preview_source(self, row: int, limit: int) -> str:
+        """Execute preview source."""
         preview, actual_len = self._preview_source_raw(row, limit)
         return self._truncate_preview(preview, limit, actual_len)
 
     def _preview_value_raw(self, row: int, limit: int) -> tuple[str, int]:
+        """Execute preview value raw."""
         entries = self._entries
         actual_len = self._value_length_at(row)
         if hasattr(entries, "preview_at"):
@@ -363,10 +387,12 @@ class TranslationModel(QAbstractTableModel):
         return preview[:limit], actual_len or len(preview)
 
     def _preview_value(self, row: int, limit: int) -> str:
+        """Execute preview value."""
         preview, actual_len = self._preview_value_raw(row, limit)
         return self._truncate_preview(preview, limit, actual_len)
 
     def _tooltip_source(self, row: int) -> str:
+        """Execute tooltip source."""
         actual_len = self._source_length_at(row)
         if actual_len <= 0:
             return ""
@@ -377,6 +403,7 @@ class TranslationModel(QAbstractTableModel):
         return self._tooltip_apply_limit(preview, actual_len, limit)
 
     def _tooltip_value(self, row: int) -> str:
+        """Execute tooltip value."""
         actual_len = self._value_length_at(row)
         if actual_len <= 0:
             return ""
@@ -412,6 +439,7 @@ class TranslationModel(QAbstractTableModel):
             )
 
     def prefetch_rows(self, start: int, end: int) -> None:
+        """Execute prefetch rows."""
         if hasattr(self._entries, "prefetch"):
             self._entries.prefetch(start, end)
 
@@ -420,6 +448,7 @@ class TranslationModel(QAbstractTableModel):
         self,
         parent: QModelIndex | QPersistentModelIndex | None = None,
     ) -> int:
+        """Execute rowCount."""
         if parent and parent.isValid():
             return 0
         return len(self._entries)
@@ -428,11 +457,13 @@ class TranslationModel(QAbstractTableModel):
         self,
         parent: QModelIndex | QPersistentModelIndex | None = None,
     ) -> int:
+        """Execute columnCount."""
         if parent and parent.isValid():
             return 0
         return 4
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole):  # noqa: N802
+        """Execute data."""
         if not index.isValid():
             return None
 
@@ -501,6 +532,7 @@ class TranslationModel(QAbstractTableModel):
     def headerData(
         self, section: int, orientation: Qt.Orientation, role: int
     ):  # noqa: N802
+        """Execute headerData."""
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             return self._headers[section]
         return super().headerData(section, orientation, role)
@@ -512,6 +544,7 @@ class TranslationModel(QAbstractTableModel):
         value,
         role: int = Qt.EditRole,
     ) -> bool:
+        """Execute setHeaderData."""
         if (
             orientation == Qt.Horizontal
             and role == Qt.DisplayRole
@@ -526,12 +559,14 @@ class TranslationModel(QAbstractTableModel):
         return super().setHeaderData(section, orientation, value, role)
 
     def flags(self, index: QModelIndex):  # noqa: N802
+        """Execute flags."""
         base = super().flags(index)
         if index.column() in (2, 3):  # Translation & Status columns
             return base | Qt.ItemIsEditable
         return base
 
     def setData(self, index: QModelIndex, value, role=Qt.EditRole):  # noqa: N802
+        """Execute setData."""
         if role != Qt.EditRole:
             return False
 
