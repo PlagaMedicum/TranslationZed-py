@@ -279,3 +279,60 @@ def test_tooltip_paths_with_large_content_use_limiting_logic(qapp) -> None:
     assert app is not None
     palette = app.palette()
     assert isinstance(palette, QPalette)
+
+
+def test_remaining_entry_model_source_and_preview_success_paths() -> None:
+    """Verify remaining source/value length and preview success branches."""
+
+    class _SourceRows:
+        """Source rows with both preview_at and direct-index access."""
+
+        def __init__(self, values: list[str]) -> None:
+            self._values = values
+
+        def __len__(self) -> int:
+            return len(self._values)
+
+        def __getitem__(self, index: int) -> str:
+            return self._values[index]
+
+        def preview_at(self, index: int, limit: int) -> str:
+            return self._values[index][:limit]
+
+    class _Entries(list):
+        """Entries exposing meta_at/preview_at success paths."""
+
+        def meta_at(self, index: int):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(segments=(2, 3) if index == 0 else ())
+
+        def preview_at(self, index: int, limit: int) -> str:
+            return (self[index].value or "")[:limit]
+
+        def prefetch(self, _start: int, _end: int) -> None:
+            """Keep entry collection attached in model initialization."""
+
+    source_rows = _SourceRows(["source-a", "source-b"])
+    entries = _Entries([_entry("A", "value-a"), _entry("B", "value-b")])
+    model = TranslationModel(_parsed(entries), source_by_row=source_rows)
+
+    model._source_values = {"A": "fallback-source"}
+    model._source_by_row = None
+    assert model.text_lengths(0) == (len("fallback-source"), 5)
+    assert model.iter_search_rows().__next__().source == "fallback-source"
+
+    model._source_by_row = source_rows
+    assert model._full_source_text(0) == "source-a"
+    assert model._source_length_at(1) == len("source-b")
+    assert model._value_length_at(0) == 5
+    assert model._preview_source_raw(0, 4) == ("sour", len("source-a"))
+    assert model._preview_source_raw(1, 4) == ("sour", len("source-b"))
+    assert model._preview_value_raw(0, 4) == ("valu", 5)
+
+    entries_with_no_value = _Entries([_entry("C", "")])
+    model_empty = TranslationModel(_parsed(entries_with_no_value), source_values={"C": ""})
+    assert model_empty._tooltip_source(0) == ""
+    assert model_empty._tooltip_value(0) == ""
+
+    model_dark = TranslationModel(_parsed([_entry("D", "")]))
+    model_dark._dark_palette_active = lambda: True  # type: ignore[method-assign]
+    assert model_dark._missing_background_color() is not None
