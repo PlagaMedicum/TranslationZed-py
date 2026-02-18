@@ -1,5 +1,5 @@
 # TranslationZed-Py: Technical Notes (Current State)
-_Last updated: 2026-02-14_
+_Last updated: 2026-02-18_
 
 Purpose:
 - Keep short-lived diagnostics and implementation pressure points.
@@ -58,20 +58,23 @@ Scope:
   - Tooltip behavior is bounded (delay + truncation) to protect UI responsiveness.
 - Translation memory:
   - SQLite store is on-demand initialized and queried asynchronously.
-  - TMX import/export exists for current locale-pair workflow.
+  - Import supports TMX/XLIFF/XLF/PO/POT/CSV/MO/XML/XLSX; export remains TMX for locale pairs.
   - A8 cross-platform release-hardening baseline is green (CI matrix + dry-run artifacts).
+- Release baseline:
+  - v0.7.0 is shipped; docs/spec/plan should now treat v0.7 as completed baseline.
 
 ---
 
 ## 3) Current Pressure Points (still relevant)
 
 1) Post-A0 boundary regression risk:
-- A0 v0.6 scope is complete, but new features can still bypass service boundaries.
+- A0 baseline is complete, but new features can still bypass service boundaries.
 - Keep adapter-delegation tests mandatory for every new `main_window` workflow touchpoint.
 
 2) Performance regression risk:
 - Rendering-heavy files still require continuous perf guardrails.
 - Keep perf budgets + perf scenarios mandatory in `make verify`.
+- Keep benchmark baseline checks mandatory in CI (`make bench-check`).
 
 3) Documentation drift risk:
 - Derived docs can diverge from canonical specs without strict updates.
@@ -82,6 +85,7 @@ Scope:
 ## 4) Fixture and Benchmark Policy
 
 - CI/verify must run from repository fixtures only.
+- CI strict gate is `make verify-ci`; local umbrella gate is `make verify`.
 - External translation repositories are optional data sources for one-time fixture
   derivation, but they must not be required to execute tests or perf checks.
 - Canonical perf roots:
@@ -94,7 +98,7 @@ Scope:
 ## 5) Deferred Tracks
 
 - LanguageTool integration (explicitly deferred).
-- Extended translation QA checks (after TM import/export maturity and stabilization).
+- Extended translation QA rule packs (domain-specific/project-custom checks).
 - Optional low-level acceleration layer (C or Rust) for hot paths if Python-side
   optimizations no longer meet responsiveness goals.
 

@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.6.0-dev · 2026‑02‑16_
+_version 0.7.0 · 2026‑02‑18_
 
 ---
 ## 1  Actors
@@ -498,4 +498,4 @@ UNTOUCHED ──────────────────────▶ 
    `SOURCE_REFERENCE_FALLBACK_POLICY`.
 
 ---
-_Last updated: 2026-02-16 (v0.7.0)_
+_Last updated: 2026-02-18 (v0.7.0)_

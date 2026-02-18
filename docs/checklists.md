@@ -1,4 +1,4 @@
-_Last updated: 2026-02-16_
+_Last updated: 2026-02-18_
 
 # Checklists
 
@@ -11,8 +11,15 @@ avoid missing mandatory tasks.
   - Cleans non-fixture cache dirs (`.tzp/cache` + legacy `.tzp-cache`)
   - Cleans fixture config dirs only (`.tzp/config` + legacy `.tzp-config`);
     runtime-local user config is never auto-deleted
-  - Runs formatter, linter, typecheck, tests, encoding-integrity gate, diagnostics,
-    read-only repo-clean gate, and perf scenarios
+  - Runs full local verification families:
+    formatter/linter (auto-fix), typecheck, architecture guard, coverage gate,
+    perf tests (advisory warnings), benchmark run, security/docstyle/docs-build checks, encoding-integrity
+    gates, read-only repo-clean gate, and perf scenarios
+  - Warns (does not fail) when auto-fixers modify tracked files
+- **Run** `make verify-ci` before opening a PR when you need strict check-only parity
+  with CI (non-mutating, fail-on-drift)
+- **Run** `make verify-heavy` when you need full strict gates plus advisory mutation
+  report generation (`artifacts/mutation/*`)
 - **Update docs** whenever behavior, UX, or workflows change
   - Keep specs and plan in sync with implemented features
   - Add/adjust questions when requirements are unclear or changed
@@ -21,16 +28,18 @@ avoid missing mandatory tasks.
 
 ## Before pushing tags / releases
 
-- **Run** `make verify`
+- **Run** `make verify-ci`
 - **Run** `make release-dry-run TAG=vX.Y.Z-rcN` on the release-candidate commit
-  (`verify` + `release-check`) before creating/pushing the final tag
+  (`verify-ci` + `release-check`) before creating/pushing the final tag
 - **Trigger** GitHub Actions workflow **Release Dry Run** with `tag=vX.Y.Z-rcN`
   to validate matrix packaging/smoke artifacts without publishing a release
   - Alternative: push `vX.Y.Z-rcN` tag and the same dry-run workflow starts automatically
-  - Final `Release` workflow ignores RC tags (`v*-rc*`) to avoid accidental release publishing
+  - Final `Release` workflow ignores RC tags (`v*-rc*`) at trigger level to avoid accidental release publishing
 - **Run** `make test-encoding-integrity`
 - **Run** `make diagnose-encoding ARGS=\"<project-root>\"` for the release corpus
 - **Run** `make test-readonly-clean` to confirm read-only workflows do not mutate tracked files
+- **Run** `make bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20`
+  to enforce benchmark regression threshold against committed baseline
 - **Confirm** `make pack` completes on your platform
 - **Run** `make release-check TAG=vX.Y.Z`
 - **Check** `CHANGELOG.md` and version string(s)
@@ -45,9 +54,10 @@ avoid missing mandatory tasks.
   - `docs/testing_strategy.md`
   - `docs/tm_ranking_algorithm.md` (if TM ranking changed)
 
-## v0.7.0 release gate (current target)
+## v0.7.0 release gate (completed baseline)
 
-- **Current baseline status (2026-02-16)**:
+- **Current baseline status (2026-02-18)**:
+  - Completed and shipped on tag `v0.7.0`; keep this block as historical release evidence.
   - Final tag requires a green `v0.7.0-rcN` dry-run workflow for the same commit.
   - Final tag requires green CI matrix (`linux`, `windows`, `macos`) on release commit.
 
@@ -62,9 +72,19 @@ avoid missing mandatory tasks.
   - Large-file editing/scroll behavior within perf budgets.
 - **Verification**
   - `make verify` passes with fixture-backed perf scenarios.
+  - `make verify-ci` passes in strict check-only mode.
   - Manual smoke: open project, edit/save, conflict merge, TM suggestions/apply.
 - **Packaging**
   - `make pack` produces runnable artifact for release OS.
+
+## v0.8.0 release gate (next target)
+
+- Start from the same gates used for v0.7.0:
+  - green CI matrix (`linux`, `windows`, `macos`) on release commit;
+  - green RC dry-run workflow (`v0.8.0-rcN`) for the same commit;
+  - local `make verify` + `make release-check TAG=v0.8.0`.
+- Update this section only after scope and acceptance criteria are frozen in
+  `docs/implementation_plan.md`.
 
 ## CI troubleshooting
 

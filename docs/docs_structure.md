@@ -1,5 +1,5 @@
 # TranslationZed-Py — Documentation Structure
-_Last updated: 2026-02-14_
+_Last updated: 2026-02-18_
 
 ## 1) Purpose
 
@@ -45,7 +45,8 @@ changes should be propagated to keep docs coherent.
 
 - `docs/checklists.md`
   - Operational command checklist.
-  - Owns: pre-commit/pre-release/CI steps.
+  - Owns: pre-commit/pre-release/CI steps and verification command matrix
+    (`make verify`, `make verify-ci`, heavy lanes).
 
 - `docs/technical_notes_current_state.md`
   - Diagnostic notes and audit findings.

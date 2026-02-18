@@ -1,5 +1,5 @@
 # TranslationZed-Py — Architecture Overview
-_Last updated: 2026-02-14_
+_Last updated: 2026-02-18_
 
 ---
 
@@ -53,7 +53,7 @@ Dependency rule:
 
 ## 2.1) Application Services (As-Built)
 
-The v0.6 A0 extraction scope is complete; these workflows are service-owned
+The v0.7 baseline keeps A0 extraction scope complete; these workflows are service-owned
 and Qt-free:
 
 - `ProjectSessionService`: locale selection/switch planning, startup auto-open planning,
@@ -100,7 +100,8 @@ A0 guardrail (ongoing):
 - Dirty files indicated with a leading dot (●) in the tree.
 - Table displays **one file at a time**.
 - Status color + toolbar Status label for selected row.
-- EN base in Source column (EN is not editable).
+- Source column reference-locale mode (default EN) is selected from the Source
+  column header and applied globally across opened locales.
 
 ---
 

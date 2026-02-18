@@ -55,6 +55,16 @@ Run tests:
 make test
 ```
 
+Run full local verification (auto-fix + warning if files changed):
+```bash
+make verify
+```
+
+Run strict CI-equivalent verification (check-only, non-mutating):
+```bash
+make verify-ci
+```
+
 Notes:
 - A local config is stored in `.tzp/config/settings.env`.
 - Use `make run` without ARGS to open the default root (set on the first startup).

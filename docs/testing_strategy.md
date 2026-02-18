@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-16_
+_Last updated: 2026-02-18_
 
 ---
 
@@ -49,7 +49,10 @@ _Last updated: 2026-02-16_
 - Filename labels used for corpus temp paths sanitize Windows-invalid characters.
 - QA side panel adapter wiring: finding-list labels render correctly and click-to-row navigation opens target file/row.
 - QA checks integration: trailing/newline findings refresh via explicit **Run QA** action (manual mode by default), with optional background refresh when enabled.
-- QA auto-mark guard: `QA_AUTO_MARK_FOR_REVIEW=false` keeps status untouched; `true` mutates only affected **Untouched** rows to **For review**.
+- QA auto-mark guard:
+  - `QA_AUTO_MARK_FOR_REVIEW=false` keeps statuses untouched.
+  - `QA_AUTO_MARK_FOR_REVIEW=true` mutates affected **Untouched** rows to **For review**.
+  - `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true` additionally allows auto-mark on non-Untouched rows.
 - QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
 - QA same-as-source checks: opt-in `qa.same_source` findings and severity/group label rendering are validated in core + panel tests.
 - QA navigation checks: `F8`/`Shift+F8` next-prev traversal moves between findings with wrap and updates status-bar hint.
@@ -108,6 +111,8 @@ _Last updated: 2026-02-16_
   render-heavy paths must cap prefetch margins to reduce lazy decode spikes.
 - pytest always prints a **Performance** summary in terminal output,
   including `make verify`, to keep regressions visible.
+- Local `make verify` treats perf-budget failures as advisory warnings;
+  strict perf blocking is enforced in `make verify-ci` / release gates.
 
 ### 2.7 Real‑data performance scenarios (scripted)
 - `make perf-scenarios` runs perf checks against fixture files in
@@ -117,6 +122,30 @@ _Last updated: 2026-02-16_
   - `News_BE.txt`
 - Budgets are env‑tunable (`TZP_PERF_SCEN_*`); pass a different root path as
   `TZP_PERF_ROOT` or `make perf-scenarios ARGS="/path/to/root"`.
+
+### 2.8 Benchmark regression gate
+- `tests/benchmarks/test_core_benchmarks.py` provides benchmark-oriented perf
+  probes for parse/search hot paths.
+- Default pytest runs skip benchmark tests (`--benchmark-skip`) to keep regular
+  test latency stable.
+- `make bench` runs benchmark tests and writes JSON output under `artifacts/bench/`.
+- `make bench-check` compares current benchmark medians against committed
+  baseline `tests/benchmarks/baseline.json` using threshold
+  `BENCH_REGRESSION_THRESHOLD_PERCENT` (default 20%).
+- CI enforces benchmark regression in dedicated Linux job (`BENCH_COMPARE_MODE=fail`);
+  local verify path treats benchmark output as visibility-first.
+
+### 2.9 Property and mutation testing
+- Property-based tests (Hypothesis) are part of the default suite for:
+  - parser/saver round-trip invariants,
+  - encoding preservation invariants on save,
+  - literal search/replace transformation equivalence.
+- Mutation testing is configured for critical core modules:
+  `parser`, `saver`, `status_cache`, `project_session`, `save_exit_flow`,
+  `conflict_service`, `search_replace_service`.
+- Current mutation mode is **advisory** (`make test-mutation`): reports are
+  published without blocking until baseline quality is stabilized.
+- Tiered heavy lane entrypoint is `make verify-heavy` (`verify-ci` + advisory mutation).
 
 ---
 
@@ -296,50 +325,42 @@ They include:
 **Not covered yet (automation gaps, by layer):**
 
 **Unit (core) gaps**
-- `LazyEntries`: value decoding, caching/prefetch window, hash index (16/64), raw‑file path.
-- `parse_lazy` / streaming path: entry values match eager parse; window prefetch boundaries.
-- `status_cache`: v5 `has_drafts` header flag, `read_has_drafts_from_path()`, and `touch_last_opened()`;
-  ensure status‑only caches set `has_drafts = false`.
-- `preferences`: load/save round‑trip incl. extras, `SEARCH_SCOPE`, `REPLACE_SCOPE`, and unknown keys.
-- `search`: invalid regex returns no matches; empty query returns no matches.
-- `atomic_io`: atomic replace semantics + directory fsync attempt; temp file cleanup on failure.
-- `tm_store`: corpus-scale ranking drift tests (mixed-domain noise with many short tokens)
-  and query latency profiling under larger imported TM sets sized to production maximum segment count.
+- `atomic_io`: explicit fsync-failure simulation and temp-cleanup guarantees still need
+  deterministic fault-injection tests.
+- TM retrieval under larger imported corpora than committed fixtures should gain
+  extended stress-profile gates (tiered heavy lane).
 
 **Integration gaps**
-- Open-path write guard: prove saver/write paths are unreachable during read-only workflows.
-- Read-only encoding conflict diagnostics: verify report output without mutating files.
-- GUI warning flow for **malformed/missing `language.txt`**: locale is skipped and other locales open.
-- Orphan cache warning: dialog appears for selected locales; **purge** removes caches, **dismiss** keeps them.
-- Save is **blocked** while conflicts exist; conflict resolution unblocks save.
-- Replace‑all across File/Locale/Pool: confirmation list, cancel path, and per‑file counts.
-- Cache‑dirty dots driven by cache header `has_drafts` (startup + after edits).
-- Preferences persistence for UI state: tree width, column widths, view toggles, search/replace scopes.
-- TM import-folder sync: drop-in discovery, pending locale mapping, manual resolve flow, and stale-file cleanup.
-- Preferences TM tab actions: queued import, remove, and enable/disable interactions against TM store.
-- Detail panel large‑string guard: truncated preview + focus‑load full text; no truncated commit.
+- GUI warning flow for malformed/missing `language.txt`: locale skip + degraded-open UX
+  still needs direct GUI assertions.
+- Orphan cache warning dialog end-to-end purge/dismiss interaction remains partially
+  covered through adapter/service layers, not full UI path.
+- Preferences persistence for non-critical UI state (tree width/column widths/toggle
+  sets) lacks full integration matrix.
 
 **System / functional / regression / smoke gaps**
-- End‑to‑end cache lifecycle: edit → cache write → reopen → conflict detect → resolve → save → cache cleared.
-- Cross‑encoding regression: GUI edits + saves for cp1251/UTF‑16 + BOM‑less UTF‑16 with `language.txt`.
-- Makefile `verify` non‑destructive fixture cache rule (clean_cache whitelist) as a script‑level regression.
-- Explicit encoding gate target: `make test-encoding-integrity` + diagnostics
-  command `make diagnose-encoding`.
-- Read-only cleanliness gate: `make test-readonly-clean` snapshots tracked
-  `git status` and fails on any mutation after read-only workflows.
+- End‑to‑end cache lifecycle (edit -> reopen -> conflict -> resolve -> save -> cache clear)
+  should be captured as a single scenario test.
+- Mutation testing is advisory-only; no fail-under threshold is enforced yet.
 
 **Planned test expansions:**
 - Golden save fixtures derived from real PZ files (small slices) that include
   tricky comments/spacing/concat chains and raw tables.
 - Locale‑driven encoding save tests (write via GUI/controller and compare bytes).
-- Regression test suite for previously reported parse/saver failures (screenshots).
+- Regression suite for previously reported parse/saver failures (screenshots).
 - GUI tests for large‑string guards (delegate elide + detail panel lazy load).
-- Orphan cache warning + purge flow integration tests.
+- Full orphan-cache warning + purge/dismiss integration tests.
+- Mutation score ratchet from advisory to blocking threshold after baseline stabilization.
 
 ---
 
 ## 6) Coverage Goals
 
-- Core modules: target ≥ 95% line coverage.
+- Enforced ratchet baseline:
+  - Core modules (`translationzed_py/core`): **>=79%** line coverage.
+  - Whole package (`translationzed_py`): **>=72%** line coverage.
+- Long-term target:
+  - Core modules (`translationzed_py/core`): **>=95%** line coverage.
+  - Whole package (`translationzed_py`): **>=90%** line coverage.
 - GUI: smoke and integration coverage sufficient to validate wiring.
-- Cover **all known structure/encoding edge‑cases** found in production files.
+- Cover **all known structure/encoding edge-cases** found in production files.

@@ -1,5 +1,5 @@
 # TranslationZed-Py — Key Flows
-_Last updated: 2026-02-14_
+_Last updated: 2026-02-18_
 
 ---
 
@@ -137,4 +137,24 @@ Row selection change (multiple locales opened)
   -> render read-only locale variants list:
        session-order locale -> value + compact status tag (`U/T/FR/P`)
   -> if none found: explicit empty-state message
+```
+
+---
+
+## 9) Source Reference Switch + QA Run
+
+```
+User changes Source locale from Source column header selector
+  -> persist SOURCE_REFERENCE_MODE
+  -> clear source-search row cache
+  -> repaint Source column for current file
+  -> fallback order follows SOURCE_REFERENCE_FALLBACK_POLICY
+
+User presses Run QA (QA panel)
+  -> execute checks for current file in background
+  -> update compact QA list (<path>:<row> · <check-code> · <excerpt>)
+  -> if QA_AUTO_MARK_FOR_REVIEW=true:
+       - mark Untouched findings as For review
+       - include touched rows only when QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true
+  -> no file writes happen until explicit save
 ```

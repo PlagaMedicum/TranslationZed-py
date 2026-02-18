@@ -1,9 +1,9 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-16_
+_Last updated: 2026-02-18_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
-explicit dependencies, and acceptance criteria. v0.6.0 is shipped; this plan now
-anchors v0.7.0 implementation and subsequent expansion.
+explicit dependencies, and acceptance criteria. v0.7.0 is shipped; this plan now
+anchors v0.8.0 implementation and subsequent expansion.
 
 Legend:
 - [✓] done
@@ -212,7 +212,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
     (value + compact `U/T/FR/P` status tag per locale) in a compact side/bottom surface.
   - Variants are ordered by current session locale order.
   - Keep current EN-as-source editing model unchanged.
-- v0.7 progress:
+- v0.7 delivered:
   - Source column now supports reference-locale switching across project locales
     (Source column-header selector, default `EN`).
   - Selection persists via `SOURCE_REFERENCE_MODE` and falls back safely to
@@ -330,8 +330,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Primary TM operations are in Preferences -> TM tab
   - TM side panel retains rebuild as a quick-action glyph button
 
-### Step 30 — Translation QA checks (post‑TM) [≈ future]
-- Dependency: **complete TM import/export** before starting this step.
+### Step 30 — Translation QA checks (post‑TM) [✓]
+- Status: shipped in v0.7.0 baseline.
 - Touchpoints: new QA rules module, preferences UI, status/summary panel
 - Acceptance:
   - QA panel with per‑check **checkbox toggles** (MemoQ/Polyglot‑style):
@@ -340,6 +340,9 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
     - Missing escape sequences / code blocks
     - Translation equals Source
   - Checks are opt‑in per locale or project; results are non‑blocking warnings by default.
+  - Manual QA refresh is default (`Run QA`); background refresh is optional (`QA_AUTO_REFRESH`).
+  - Auto-mark defaults to Untouched rows only (`QA_AUTO_MARK_FOR_REVIEW`);
+    optional extension covers touched rows (`QA_AUTO_MARK_TOUCHED_FOR_REVIEW`).
 
 ### Step 31 — LanguageTool integration [≈ future]
 - Touchpoints: `core/languagetool.py`, Preferences, TM/QA suggestion surfaces
@@ -366,9 +369,9 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 
 ---
 
-## 4) v0.6 Focus Plan (draft, ordered)
+## 4) Historical v0.6 Focus Plan (completed)
 
-Release target: **v0.6.0**
+Historical release target: **v0.6.0**
 
 v0.6.0 exit criteria (must all be true):
 - [✓] `A0`, `A7`, and `C1` are completed (no `[→]`/`[ ]` for their v0.6 scope).
@@ -775,6 +778,33 @@ A8 [✓] **Cross-platform CI/release hardening**
      - [✓] Release workflow artifacts build successfully from that commit (without publishing final tag).
    - **Acceptance**: no OS-specific flaky failures in two consecutive dry-runs (`rc1`, `rc2`) from different commits.
 
+A9 [✓] **Verification-overhaul milestone**
+   - **Problem**: local/CI verification drift and partially enforced tooling contracts
+     increased manual QA load and allowed docs/tooling mismatch.
+   - **Target**: make verification-first workflow explicit:
+     - local umbrella gate (`make verify`) with auto-fix + warning policy,
+     - strict CI/release gate (`make verify-ci`) with non-mutating checks.
+   - **Implemented**:
+     - [✓] Make target split: `fmt`/`fmt-check`, `lint`/`lint-check`,
+       `test-cov`, `test-perf`, `bench`, `bench-check`, `security`,
+       `docstyle`, `docs-build`, `test-mutation`, `verify-heavy`.
+     - [✓] Coverage ratchet gates enforced: whole package >=72%, core >=79%;
+       long-term target documented as whole >=90%, core >=95%.
+     - [✓] Benchmark baseline + comparator added with 20% regression threshold
+       policy for CI.
+     - [✓] Script-level regression tests added for cleanup whitelist logic and
+       benchmark comparator behavior.
+     - [✓] Property-based tests added for parser/saver/search-replace invariants.
+     - [✓] Targeted mutation configuration added (advisory mode, artifact-first).
+     - [✓] CI workflow switched to strict `make verify-ci`; dedicated benchmark
+       regression job added; heavy tier lane added for scheduled/workflow-dispatch runs.
+     - [✓] Release preflight workflows switched to strict verification; final
+       release trigger now excludes RC tags at trigger level.
+   - **Acceptance**:
+     - [✓] `make verify` remains local primary gate with explicit auto-fix warning.
+     - [✓] CI runs strict non-mutating gate and publishes verification artifacts.
+     - [✓] Canonical docs updated to match implemented tooling behavior.
+
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
    - **Problem**: errors are only visible on inspection; no per‑cell visual guidance.
@@ -842,11 +872,11 @@ C1 [✓] **Translation memory** (Step 29).
      - [✓] Add short-query ranking acceptance cases for additional pairs (`Run/Rest`, `Make item/Make new item`) with low threshold guarantees.
      - [✓] Add preferences-side inline warning banner for zero-segment imported TMs (beside existing marker in list rows).
      - [✓] Add deferred import/export format adapters (XLSX) behind the same import-workflow contract.
-   - **Deferred**: LanguageTool API (post‑v0.6).
-C2 [✓] **Translation QA checks (post‑v0.6)** (Step 30).
+   - **Deferred**: LanguageTool API (post‑v0.7).
+C2 [✓] **Translation QA checks (shipped in v0.7)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes, placeholders) are easy to miss.
    - **Target**: opt‑in QA panel with per-check toggles; non-blocking warnings by default.
-   - **Infrastructure progress (v0.7 kickoff)**:
+   - **Infrastructure delivered (v0.7)**:
      - [✓] Core QA rule primitives added (`core/qa_rules.py`) with unit coverage.
      - [✓] QA preference keys added and persisted (`QA_CHECK_*`, `QA_AUTO_REFRESH`, `QA_AUTO_MARK_FOR_REVIEW`).
      - [✓] QA side-panel scaffolding wired (`Files/TM/Search/QA`), backed by
@@ -899,7 +929,7 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
 
 ## 5) Decisions (recorded)
 
-- **v0.6 priority order**: confirmed (Priority A/B/C as listed).
+- **v0.6 priority order**: historical and completed (Priority A/B/C as listed).
 - **Replace‑all confirmation**: modal dialog now; future sidebar is acceptable (VSCode‑style).
 - **Pool scope**: Pool = currently opened locales only (not entire root).
 - **Cache hash width**: **u64** key hashes (implemented).
@@ -910,7 +940,7 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
 
 ---
 
-## 6) Deferred Items (post‑v0.6)
+## 6) Deferred Items (post‑v0.7)
 
 - Source-column reference mode enhancements:
   advanced selector behavior (per-locale policy presets, multi-step fallback chains).

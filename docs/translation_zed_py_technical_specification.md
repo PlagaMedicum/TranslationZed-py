@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.6.0-dev · 2026-02-16**\
+**Version 0.7.0 · 2026-02-18**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -23,7 +23,7 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 
 ---
 
-## 2  Functional Scope (Current v0.6-dev)
+## 2  Functional Scope (Current v0.7.0)
 
 - Open an existing `ProjectZomboidTranslations` folder.
 - Detect locale sub‑folders in the repo root, ignoring `_TVRADIO_TRANSLATIONS`.
@@ -503,7 +503,7 @@ if dirty_files and not prompt_save():
 - Left Search side panel shows a minimal match list generated from current toolbar query/scope;
   each item is `<relative path>:<row> · <one-line excerpt>` and click navigates to that match.
   Relative paths in UI/report text are normalized to `/` separators on all platforms.
-- Left QA side panel (v0.7 in progress) uses core-provided finding DTOs and renders compact
+- Left QA side panel (shipped in v0.7.0) uses core-provided finding DTOs and renders compact
   rows (`<relative path>:<row> · <check-code> · <short excerpt>`); selecting an item
   navigates to file/row, and empty state is explicit when no findings exist.
   Current active checks: trailing-fragment mismatch (`qa.trailing`), newline-count
@@ -815,12 +815,39 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 
 ## 7  Quality & Tooling
 
-- **Coding style**: PEP‑8 + `ruff` autofix; 100 % type‑annotated (`mypy --strict`).
-- **Testing**: `pytest` + `pytest‑qt`; target ≥85 % coverage.
-- **Architecture guardrails**: GUI adapter tests ensure `main_window` delegates
-  open/switch/save/conflict/search orchestration to Qt-free services.
-- **Static analysis**: `bandit` (security) + `pydocstyle` (docstrings).
-- **Docs**: MkDocs site generated from `docs/`.
+- **Coding style**:
+  - local autofix path: `make fmt` + `make lint`,
+  - strict check-only path: `make fmt-check` + `make lint-check`,
+  - ruff target version aligned to project minimum Python support (`>=3.10`).
+- **Type safety**: `mypy --strict` on `translationzed_py` (`make typecheck`).
+- **Testing**:
+  - `pytest` + `pytest-qt`,
+  - coverage gates via `make test-cov`:
+    - enforced ratchet baseline:
+      - whole package: **>=72%**,
+      - `translationzed_py/core`: **>=79%**,
+    - long-term target:
+      - whole package: **>=90%**,
+      - `translationzed_py/core`: **>=95%**.
+- **Performance**:
+  - deterministic perf budget tests (`make test-perf`),
+  - fixture-backed scenario smoke (`make perf-scenarios`),
+  - benchmark suite (`pytest-benchmark`) with committed baseline and
+    regression threshold gate (`make bench-check`, default fail over +20% in CI),
+  - local `make verify` treats perf budget/scenario failures as advisory warnings;
+    strict blocking is enforced in `make verify-ci` and release workflows.
+- **Architecture guardrails**: GUI adapter tests + import/size architecture checks
+  (`make arch-check`) ensure `main_window` delegates workflow decisions to Qt-free services.
+- **Security/doc quality**:
+  - `make security`: bandit report artifact for all findings across `translationzed_py`, `tests`, and `scripts`,
+    plus medium/high severity+confidence gate on shipped code (`translationzed_py` + `scripts`)
+    with `B608` suppressed for known parameterized SQLite query patterns,
+  - `make docstyle`: repo-wide pydocstyle (PEP257 profile).
+- **Documentation build**: `make docs-build` runs MkDocs strict build (warnings fail).
+- **Gate contract**:
+  - local umbrella gate: `make verify` (auto-fix allowed; warns on tracked-file changes),
+  - CI/release strict gate: `make verify-ci` (non-mutating, fail-on-drift),
+  - heavy tier gate: `make verify-heavy` (`verify-ci` + advisory mutation run).
 
 ---
 
@@ -845,7 +872,7 @@ Current builds use **cache‑only** recovery:
 
 - **Wheel** (`pipx install translationzed‑py==0.1.*`).
 - **Standalone** (`pyinstaller --windowed --onefile`).  Separate spec files per OS with icon resources.
-- **macOS .app bundle** via `py2app` (optional post‑v0.6).
+- **macOS .app bundle** via `py2app` (optional post‑v0.7).
 
 ---
 
@@ -864,7 +891,7 @@ Current builds use **cache‑only** recovery:
   (Linux/Windows/macOS) and bundle LICENSE + README.
 - **CI**: GitHub Actions matrix (Linux/Windows/macOS) runs ruff, mypy, pytest; Linux runs Qt offscreen.
 
-## 13  Backlog (Post‑v0.6)
+## 13  Backlog (Post‑v0.7)
 
 1. English diff colours (NEW / REMOVED / MODIFIED).
 2. Item/Recipe template generator.
@@ -872,9 +899,9 @@ Current builds use **cache‑only** recovery:
 4. Automatic update check (GitHub Releases).
 5. Simple editor for location `description.txt` files.
 6. LanguageTool server API integration for grammar/spell suggestions.
-7. Translation QA checks (v0.7 in progress): side-panel scaffolding + QA preference keys are in place;
-   remaining rule execution/polish includes missing trailing characters, missing/extra newlines,
-   missing escapes/code blocks, and translation equals Source.
+7. Extended Translation QA rule packs (post-v0.7): domain-specific checks and
+   project-level custom rule sets beyond the shipped baseline (`qa.trailing`,
+   `qa.newlines`, `qa.tokens`, `qa.same_source`).
 8. Theme presets beyond `SYSTEM|LIGHT|DARK` (future).
 
 ## 14  Undo / Redo
@@ -905,11 +932,11 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ## 16  Spec Gaps To Resolve
 
-- v0.6 A0 extraction scope is complete: primary workflow decisions are delegated
+- v0.7 baseline keeps A0 extraction complete: primary workflow decisions are delegated
   to Qt-free services and `gui.main_window` acts as adapter/orchestrator for Qt concerns.
 - Clean-architecture boundary ownership needs stricter package-level enforcement; add a dependency
   matrix and keep adapter-delegation tests mandatory for new workflow slices
-  (deferred enforcement-gate automation in post-v0.6 work).
+  (deferred enforcement-gate automation in post-v0.7 work).
 - Module-level structure map is still shallow for some areas: add explicit responsibility + boundary
   notes for `core.lazy_entries`, `core.en_hash_cache`, `core.parse_utils`, and `gui.perf_trace`.
 - Derived docs (`flows`, `checklists`, `technical_notes_current_state`) must be kept synced to
@@ -917,4 +944,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-16 (v0.7.0)*
+*Last updated: 2026-02-18 (v0.7.0)*
