@@ -2,12 +2,14 @@
 
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QListWidgetItem
 
 from translationzed_py.core.conflict_service import (
     ConflictMergeExecution,
@@ -1590,3 +1592,289 @@ def test_select_match_delegates_match_selection_plans(qtbot, tmp_path, monkeypat
     monkeypatch.setattr(win, "_search_replace_service", _SpyService())
     assert win._select_match(match) is True
     assert calls == ["open", "apply"]
+
+
+def test_rows_from_model_handles_missing_context_and_active_model(
+    qtbot, tmp_path
+) -> None:
+    """Verify rows from model returns empty without context and delegates otherwise."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    assert tuple(win._rows_from_model()) == ()
+
+    calls: list[dict[str, object]] = []
+    expected_rows = [mw._SearchRow(file=target, row=0, key="UI_OK", source="", value="x")]
+
+    class _Model:
+        def iter_search_rows(self, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return expected_rows
+
+    win._current_model = _Model()  # type: ignore[assignment]
+    win._current_pf = SimpleNamespace(path=target)
+    rows = list(win._rows_from_model(include_source=False, include_value=True))
+    assert rows == expected_rows
+    assert calls == [{"include_source": False, "include_value": True}]
+    win._current_model = None
+    win._current_pf = None
+
+
+def test_rows_from_file_returns_empty_on_loader_failure_result(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify rows from file returns empty tuple/count when service returns None."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    calls: list[dict[str, object]] = []
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def load_search_rows_from_file(self, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return None
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    rows, count = win._rows_from_file(
+        target,
+        "XX",
+        include_source=True,
+        include_value=False,
+    )
+    assert tuple(rows) == ()
+    assert count == 0
+    assert calls and calls[0]["encoding"] == "utf-8"
+
+
+def test_cached_rows_from_file_stores_rows_and_prunes_lru(qtbot, tmp_path, monkeypatch):
+    """Verify cached rows store path and LRU eviction branch when cache exceeds max."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target_a = root / "BE" / "ui.txt"
+    target_b = root / "BE" / "other.txt"
+    target_b.write_text('UI_OTHER = "x"\n', encoding="utf-8")
+    stamp = SearchRowsCacheStamp(file_mtime_ns=1, cache_mtime_ns=0, source_mtime_ns=0)
+    win._search_cache_max = 1
+
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def collect_rows_cache_stamp(self, **_kwargs):  # type: ignore[no-untyped-def]
+            return stamp
+
+        def build_rows_cache_lookup_plan(
+            self, **kwargs
+        ) -> SearchRowsCacheLookupPlan:  # type: ignore[no-untyped-def]
+            return SearchRowsCacheLookupPlan(
+                key=SearchRowsCacheKey(
+                    path=kwargs["path"],
+                    include_source=kwargs["include_source"],
+                    include_value=kwargs["include_value"],
+                ),
+                stamp=stamp,
+                use_cached_rows=False,
+            )
+
+        def build_rows_cache_store_plan(
+            self, **_kwargs
+        ) -> SearchRowsCacheStorePlan:  # type: ignore[no-untyped-def]
+            return SearchRowsCacheStorePlan(should_store_rows=True)
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    monkeypatch.setattr(
+        win,
+        "_rows_from_file",
+        lambda path, *_args, **_kwargs: (
+            [mw._SearchRow(file=path, row=0, key="K", source="", value="V")],
+            1,
+        ),
+    )
+
+    rows_a = list(
+        win._cached_rows_from_file(
+            target_a,
+            "BE",
+            include_source=False,
+            include_value=False,
+        )
+    )
+    rows_b = list(
+        win._cached_rows_from_file(
+            target_b,
+            "BE",
+            include_source=False,
+            include_value=False,
+        )
+    )
+
+    assert rows_a and rows_a[0].file == target_a
+    assert rows_b and rows_b[0].file == target_b
+    assert len(win._search_rows_cache) == 1
+    only_key = next(iter(win._search_rows_cache.keys()))
+    assert only_key[0] == target_b
+
+
+def test_rows_mtime_helpers_cover_missing_paths_and_locale_fallback(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify row mtime helpers handle missing paths and same-locale source fallback."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    missing = root / "BE" / "missing.txt"
+    outside = tmp_path / "outside.txt"
+
+    assert win._file_mtime_for_rows(missing) is None
+    assert win._cache_mtime_for_rows(outside) == 0
+
+    monkeypatch.setattr(
+        mw,
+        "_effective_source_reference_mode_for_window",
+        lambda *_args, **_kwargs: "BE",
+    )
+    monkeypatch.setattr(
+        mw,
+        "_reference_path_for",
+        lambda *_args, **_kwargs: root / "EN" / "ui.txt",
+    )
+    assert win._source_mtime_for_rows(missing, "BE") == 0
+
+    monkeypatch.setattr(
+        mw,
+        "_effective_source_reference_mode_for_window",
+        lambda *_args, **_kwargs: "EN",
+    )
+    assert win._source_mtime_for_rows(root / "BE" / "ui.txt", "BE") > 0
+
+
+def test_search_rows_for_file_returns_empty_when_plan_has_no_rows(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify search rows for file returns empty when source plan has no rows."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    delegate = win._search_replace_service
+
+    class _SpyService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        @staticmethod
+        def build_rows_source_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SearchRowsSourcePlan(has_rows=False, use_active_model_rows=False)
+
+    monkeypatch.setattr(win, "_search_replace_service", _SpyService())
+    monkeypatch.setattr(
+        win,
+        "_cached_rows_from_file",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("cached rows must not be used when plan has no rows")
+        ),
+    )
+    rows = tuple(
+        win._search_rows_for_file(
+            target,
+            include_source=False,
+            include_value=False,
+        )
+    )
+    assert rows == ()
+
+
+def test_select_match_handles_open_target_fail_and_nonselect_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify select match returns False for invalid open target and no-select plans."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    missing = root / "BE" / "missing.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    win._search_column = 2
+
+    delegate = win._search_replace_service
+
+    class _OpenFailService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        @staticmethod
+        def build_match_open_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SearchMatchOpenPlan(open_target_file=True, target_file=missing)
+
+        @staticmethod
+        def build_match_apply_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            raise AssertionError("apply plan must not run when open target is invalid")
+
+    monkeypatch.setattr(win, "_search_replace_service", _OpenFailService())
+    assert win._select_match(Match(missing, 0)) is False
+
+    opened: list[Path] = []
+
+    class _NoSelectService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        @staticmethod
+        def build_match_open_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SearchMatchOpenPlan(open_target_file=True, target_file=target)
+
+        @staticmethod
+        def build_match_apply_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SearchMatchApplyPlan(
+                select_in_table=False,
+                target_row=0,
+                target_column=2,
+            )
+
+    monkeypatch.setattr(
+        win,
+        "_file_chosen",
+        lambda idx: opened.append(Path(idx.data(Qt.UserRole))),
+    )
+    win._current_pf = SimpleNamespace(path=target)
+    monkeypatch.setattr(win, "_search_replace_service", _NoSelectService())
+    assert win._select_match(Match(target, 0)) is False
+    assert opened == [target]
+
+
+def test_search_and_qa_result_openers_ignore_invalid_payloads(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify search/qa side-panel item openers ignore malformed payloads."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    selected: list[Match] = []
+    monkeypatch.setattr(win, "_select_match", lambda match: selected.append(match))
+
+    search_item = QListWidgetItem("bad search")
+    search_item.setData(Qt.UserRole, "bad")
+    win._open_search_result_item(search_item)
+    search_item.setData(Qt.UserRole, ("/tmp/x", "bad-row"))
+    win._open_search_result_item(search_item)
+
+    qa_item = QListWidgetItem("bad qa")
+    qa_item.setData(Qt.UserRole, "bad")
+    win._open_qa_result_item(qa_item)
+    qa_item.setData(Qt.UserRole, ("/tmp/x", "bad-row"))
+    win._open_qa_result_item(qa_item)
+
+    assert selected == []
