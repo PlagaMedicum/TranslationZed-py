@@ -1,3 +1,5 @@
+"""Provide low-level decoding and unescape helpers for parser internals."""
+
 from __future__ import annotations
 
 import codecs
