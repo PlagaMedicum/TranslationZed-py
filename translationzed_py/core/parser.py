@@ -1,3 +1,5 @@
+"""Tokenizer and parser pipeline for Project Zomboid translation files."""
+
 from __future__ import annotations
 
 import codecs
@@ -25,6 +27,8 @@ _STATUS_MAP: dict[str, Status] = {}  # populated on first parse()
 
 # ── Token meta ────────────────────────────────────────────────────────────────
 class Kind(enum.IntEnum):
+    """Enumerate token categories emitted by the lexical scanner."""
+
     COMMENT = 0  # -- Up to newline
     KEY = 1
     EQUAL = 2
@@ -38,6 +42,8 @@ class Kind(enum.IntEnum):
 
 @dataclass(slots=True, frozen=True)
 class Tok:
+    """Represent one token with kind, byte span, and original text."""
+
     kind: Kind
     span: tuple[int, int]  # byte offsets
     text: str

@@ -1,3 +1,5 @@
+"""Architecture guard checks for GUI/core boundary and file-size policies."""
+
 from __future__ import annotations
 
 import ast
@@ -8,6 +10,8 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class BoundaryRule:
+    """Define allowed imports and a maximum line budget for one file."""
+
     allowed_core_modules: frozenset[str]
     max_lines: int
 
@@ -46,6 +50,7 @@ DEFAULT_RULES: dict[str, BoundaryRule] = {
 
 
 def collect_core_modules(source: str) -> set[str]:
+    """Collect imported `translationzed_py.core*` module names from source."""
     tree = ast.parse(source)
     modules: set[str] = set()
     for node in ast.walk(tree):
@@ -62,6 +67,7 @@ def collect_core_modules(source: str) -> set[str]:
 
 
 def check_file(path: Path, rule: BoundaryRule) -> list[str]:
+    """Validate one file against its boundary rule and line-budget limits."""
     if not path.exists():
         return [f"{path}: missing file for architecture guard check."]
     source = path.read_text(encoding="utf-8")
@@ -86,6 +92,7 @@ def check_file(path: Path, rule: BoundaryRule) -> list[str]:
 def check_rules(
     root: Path, rules: Mapping[str, BoundaryRule] | None = None
 ) -> list[str]:
+    """Run architecture rules for all guarded files under the given root."""
     active_rules = rules or DEFAULT_RULES
     violations: list[str] = []
     for rel_path, rule in active_rules.items():

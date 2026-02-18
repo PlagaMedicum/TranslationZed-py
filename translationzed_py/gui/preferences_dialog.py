@@ -1,3 +1,5 @@
+"""Preferences dialog UI for general, QA, search, and TM options."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -43,6 +45,8 @@ _TM_SEGMENT_COUNT_ROLE = Qt.UserRole + 4
 
 
 class PreferencesDialog(QDialog):
+    """Render and collect editable user preferences from tabbed controls."""
+
     def __init__(
         self,
         prefs: dict,
@@ -50,6 +54,7 @@ class PreferencesDialog(QDialog):
         tm_files: list[dict[str, object]] | None = None,
         parent=None,
     ) -> None:
+        """Initialize dialog controls from persisted preferences and TM state."""
         super().__init__(parent)
         self.setWindowTitle("Preferences")
         self._prefs = dict(prefs)
@@ -84,6 +89,7 @@ class PreferencesDialog(QDialog):
         layout.addWidget(buttons)
 
     def values(self) -> dict:
+        """Return normalized preference values selected in the dialog."""
         changed_tm_enabled = {
             tm_path: enabled
             for tm_path, enabled in self._tm_enabled.items()
