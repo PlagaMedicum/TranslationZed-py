@@ -1,3 +1,5 @@
+"""Test module for tm query."""
+
 from translationzed_py.core.tm_query import (
     TMQueryPolicy,
     current_key_from_lookup,
@@ -26,6 +28,7 @@ def _match(score: int, origin: str) -> TMMatch:
 
 
 def test_tm_query_key_helpers() -> None:
+    """Verify tm query key helpers."""
     policy = TMQueryPolicy(
         source_locale="EN",
         min_score=70,
@@ -39,6 +42,7 @@ def test_tm_query_key_helpers() -> None:
 
 
 def test_tm_query_origin_controls_and_filtering() -> None:
+    """Verify tm query origin controls and filtering."""
     disabled = TMQueryPolicy(origin_project=False, origin_import=False)
     assert has_enabled_origins(disabled) is False
     assert origins_for(disabled) == ()
@@ -52,6 +56,7 @@ def test_tm_query_origin_controls_and_filtering() -> None:
 
 
 def test_tm_query_min_score_normalization_range() -> None:
+    """Verify tm query min score normalization range."""
     assert normalize_min_score(1) == 5
     assert normalize_min_score(10) == 10
     assert normalize_min_score(50) == 50
@@ -59,10 +64,12 @@ def test_tm_query_min_score_normalization_range() -> None:
 
 
 def test_tm_query_default_min_score_is_precision_first() -> None:
+    """Verify tm query default min score is precision first."""
     assert TMQueryPolicy().min_score == 50
 
 
 def test_tm_query_suggestion_limit_scales_with_min_score() -> None:
+    """Verify tm query suggestion limit scales with min score."""
     assert suggestion_limit_for(5) == 200
     assert suggestion_limit_for(10) == 200
     assert suggestion_limit_for(15) == 120

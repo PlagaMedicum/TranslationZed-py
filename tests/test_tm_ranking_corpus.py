@@ -1,3 +1,5 @@
+"""Test module for tm ranking corpus."""
+
 from __future__ import annotations
 
 import json
@@ -74,6 +76,7 @@ def _safe_case_label(label: str) -> str:
 
 
 def test_safe_case_label_sanitizes_platform_invalid_filename_chars() -> None:
+    """Verify safe case label sanitizes platform invalid filename chars."""
     assert _safe_case_label("synthetic:drop/all") == "synthetic_drop_all"
     assert _safe_case_label("abc-_.123") == "abc-_.123"
     safe = _safe_case_label('a:b/c\\d*e?f"g<h>i|j')
@@ -81,6 +84,7 @@ def test_safe_case_label_sanitizes_platform_invalid_filename_chars() -> None:
 
 
 def test_tm_ranking_corpus(tmp_path: Path) -> None:
+    """Verify tm ranking corpus."""
     corpus = _load_corpus()
     cases = corpus.get("cases", [])
     assert isinstance(cases, list) and cases

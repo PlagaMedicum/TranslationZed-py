@@ -1,3 +1,5 @@
+"""Test module for tm preferences."""
+
 from pathlib import Path
 
 from translationzed_py.core.tm_preferences import TMPreferencesActions, apply_actions
@@ -5,6 +7,7 @@ from translationzed_py.core.tm_store import TMStore
 
 
 def test_tm_preferences_apply_handles_remove_toggle_and_import(tmp_path: Path) -> None:
+    """Verify tm preferences apply handles remove toggle and import."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -48,6 +51,7 @@ def test_tm_preferences_apply_handles_remove_toggle_and_import(tmp_path: Path) -
 
 
 def test_tm_preferences_apply_collects_copy_failures(tmp_path: Path) -> None:
+    """Verify tm preferences apply collects copy failures."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)

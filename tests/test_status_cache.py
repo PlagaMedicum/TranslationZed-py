@@ -1,3 +1,5 @@
+"""Test module for status cache."""
+
 import struct
 import tempfile
 from pathlib import Path
@@ -16,6 +18,7 @@ from translationzed_py.core.status_cache import (
 
 
 def test_roundtrip():
+    """Verify roundtrip."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "root"
         loc = root / "EN"
@@ -36,6 +39,7 @@ def test_roundtrip():
 
 
 def test_roundtrip_with_value_override():
+    """Verify roundtrip with value override."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "root"
         loc = root / "EN"
@@ -61,6 +65,7 @@ def test_roundtrip_with_value_override():
 
 
 def test_read_migrates_legacy_cache_path():
+    """Verify read migrates legacy cache path."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "root"
         loc = root / "EN"
@@ -84,6 +89,7 @@ def test_read_migrates_legacy_cache_path():
 
 
 def test_write_skips_empty_cache():
+    """Verify write skips empty cache."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "root"
         loc = root / "EN"
@@ -99,6 +105,7 @@ def test_write_skips_empty_cache():
 
 
 def test_last_opened_written():
+    """Verify last opened written."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "root"
         loc = root / "EN"
@@ -114,6 +121,7 @@ def test_last_opened_written():
 
 
 def test_legacy_status_mapping_v3():
+    """Verify legacy status mapping v3."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "root"
         loc = root / "EN"
@@ -143,6 +151,7 @@ def test_legacy_status_mapping_v3():
 
 
 def test_migrate_all_upgrades_u16_cache(tmp_path):
+    """Verify migrate all upgrades u16 cache."""
     root = tmp_path / "root"
     (root / "EN").mkdir(parents=True)
     (root / "EN" / "language.txt").write_text(

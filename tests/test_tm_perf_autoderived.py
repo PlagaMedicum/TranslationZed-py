@@ -1,3 +1,5 @@
+"""Test module for tm perf autoderived."""
+
 from __future__ import annotations
 
 import os
@@ -44,6 +46,7 @@ def _derive_tm_stress_size() -> int:
 def test_tm_query_perf_autoderived_from_committed_perf_fixtures(
     tmp_path: Path, perf_recorder
 ) -> None:
+    """Verify tm query perf autoderived from committed perf fixtures."""
     count = max(100, _derive_tm_stress_size())
     budget_ms = _budget_ms("TZP_PERF_TM_QUERY_MS", 1200.0)
     root = tmp_path / "tm_perf"
@@ -100,6 +103,7 @@ def test_tm_query_perf_autoderived_from_committed_perf_fixtures(
 def test_tm_import_query_perf_autoderived_from_committed_perf_fixtures(
     tmp_path: Path, perf_recorder
 ) -> None:
+    """Verify tm import query perf autoderived from committed perf fixtures."""
     count = max(100, _derive_tm_stress_size())
     import_budget_ms = _budget_ms("TZP_PERF_TM_IMPORT_MS", 2200.0)
     query_budget_ms = _budget_ms("TZP_PERF_TM_IMPORT_QUERY_MS", 1200.0)

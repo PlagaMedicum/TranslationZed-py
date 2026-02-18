@@ -1,3 +1,5 @@
+"""Test module for tm import sync."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -70,6 +72,7 @@ msgstr "Privet mir"
 
 
 def test_sync_import_folder_imports_and_reports_changed(tmp_path: Path) -> None:
+    """Verify sync import folder imports and reports changed."""
     root = tmp_path / "root"
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"
@@ -100,6 +103,7 @@ def test_sync_import_folder_imports_and_reports_changed(tmp_path: Path) -> None:
 
 
 def test_sync_import_folder_imports_xliff_file(tmp_path: Path) -> None:
+    """Verify sync import folder imports xliff file."""
     root = tmp_path / "root"
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"
@@ -130,6 +134,7 @@ def test_sync_import_folder_imports_xliff_file(tmp_path: Path) -> None:
 
 
 def test_sync_import_folder_imports_po_file(tmp_path: Path) -> None:
+    """Verify sync import folder imports po file."""
     root = tmp_path / "root"
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"
@@ -160,6 +165,7 @@ def test_sync_import_folder_imports_po_file(tmp_path: Path) -> None:
 
 
 def test_sync_import_folder_skip_all_marks_remaining_unresolved(tmp_path: Path) -> None:
+    """Verify sync import folder skip all marks remaining unresolved."""
     root = tmp_path / "root"
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"
@@ -186,6 +192,7 @@ def test_sync_import_folder_skip_all_marks_remaining_unresolved(tmp_path: Path) 
 
 
 def test_sync_import_folder_deletes_missing_import_files(tmp_path: Path) -> None:
+    """Verify sync import folder deletes missing import files."""
     root = tmp_path / "root"
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"
@@ -224,6 +231,7 @@ def test_sync_import_folder_deletes_missing_import_files(tmp_path: Path) -> None
 def test_sync_import_folder_reimports_ready_file_when_entries_missing(
     tmp_path: Path,
 ) -> None:
+    """Verify sync import folder reimports ready file when entries missing."""
     root = tmp_path / "root"
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"
@@ -262,6 +270,7 @@ def test_sync_import_folder_reimports_ready_file_when_entries_missing(
 def test_sync_import_folder_reports_zero_segment_imports_and_raw_locales(
     tmp_path: Path,
 ) -> None:
+    """Verify sync import folder reports zero segment imports and raw locales."""
     root = tmp_path / "root"
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"
@@ -291,6 +300,7 @@ def test_sync_import_folder_reports_zero_segment_imports_and_raw_locales(
 def test_sync_import_folder_processes_supported_aliases_and_ignores_unsupported(
     tmp_path: Path,
 ) -> None:
+    """Verify expected behavior."""
     root = tmp_path / "root"
     root.mkdir()
     tm_dir = root / ".tzp" / "tms"

@@ -1,3 +1,5 @@
+"""Test module for source reference ui."""
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -11,6 +13,7 @@ from translationzed_py.gui.source_reference_ui import (
 
 
 def test_available_source_reference_locales_merges_selected_and_project_order() -> None:
+    """Verify expected behavior."""
     locales = available_source_reference_locales(
         ["be"],
         all_locales=["EN", "RU", "BE", "KO"],
@@ -19,6 +22,7 @@ def test_available_source_reference_locales_merges_selected_and_project_order() 
 
 
 def test_sync_source_reference_combo_resolves_mode_from_project_locales(qtbot) -> None:
+    """Verify sync source reference combo resolves mode from project locales."""
     combo = QComboBox()
     qtbot.addWidget(combo)
     resolved = sync_source_reference_combo(
@@ -32,6 +36,7 @@ def test_sync_source_reference_combo_resolves_mode_from_project_locales(qtbot) -
 
 
 def test_sync_source_reference_combo_honors_fallback_order(qtbot) -> None:
+    """Verify sync source reference combo honors fallback order."""
     combo = QComboBox()
     qtbot.addWidget(combo)
     resolved = sync_source_reference_combo(
