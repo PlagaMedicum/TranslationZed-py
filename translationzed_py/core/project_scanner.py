@@ -1,3 +1,5 @@
+"""Project tree scanning helpers for locale and language metadata discovery."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,11 +12,15 @@ _IGNORE_FILES = {"language.txt", "credits.txt"}
 
 
 class LanguageFileError(ValueError):
+    """Raise when locale `language.txt` content is missing or invalid."""
+
     pass
 
 
 @dataclass(frozen=True, slots=True)
 class LocaleMeta:
+    """Describe a locale folder and its parsed language metadata."""
+
     code: str
     path: Path
     display_name: str

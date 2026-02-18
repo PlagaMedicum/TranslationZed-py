@@ -1,3 +1,5 @@
+"""Atomic filesystem write helpers for cache/config persistence."""
+
 from __future__ import annotations
 
 import contextlib
@@ -19,6 +21,7 @@ def write_bytes_atomic(path: Path, data: bytes) -> None:
 
 
 def write_text_atomic(path: Path, text: str, *, encoding: str = "utf-8") -> None:
+    """Write text data atomically using the selected encoding."""
     write_bytes_atomic(path, text.encode(encoding))
 
 

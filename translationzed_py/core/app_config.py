@@ -1,3 +1,5 @@
+"""Application configuration loading utilities for repository-local settings."""
+
 from __future__ import annotations
 
 import importlib
@@ -16,6 +18,8 @@ except ModuleNotFoundError:  # pragma: no cover
 
 @dataclass(frozen=True, slots=True)
 class AppConfig:
+    """Store effective runtime paths and adapter identifiers."""
+
     cache_dir: str = ".tzp/cache"
     config_dir: str = ".tzp/config"
     cache_ext: str = ".bin"
@@ -62,6 +66,7 @@ def _normalize_ext(value: str) -> str:
 
 @lru_cache(maxsize=8)
 def load(root: Path | None = None) -> AppConfig:
+    """Load and merge app configuration from `config/app.toml` candidates."""
     cfg = AppConfig()
     for base in _candidate_roots(root):
         path = base / "config" / "app.toml"
