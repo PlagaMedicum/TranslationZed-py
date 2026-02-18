@@ -92,8 +92,8 @@ check-local: fmt lint typecheck arch-check test
 
 # ─── Verification umbrella gates ───────────────────────────────────────────────
 ## full local verification core (auto-fix + warning policy)
-verify-core: clean-cache clean-config fmt lint typecheck arch-check test-cov perf-advisory \
-	bench-advisory test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build
+verify-core: clean-cache clean-config fmt lint typecheck arch-check perf-advisory \
+	bench-advisory test-cov test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build
 
 ## local perf gates are advisory; strict blocking lives in verify-ci
 perf-advisory:
