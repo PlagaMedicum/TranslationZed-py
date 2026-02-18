@@ -1,3 +1,5 @@
+"""Tm store module."""
+
 from __future__ import annotations
 
 import contextlib
@@ -49,6 +51,8 @@ ProjectEntryRow = (
 
 @dataclass(frozen=True, slots=True)
 class TMMatch:
+    """Represent TMMatch."""
+
     source_text: str
     target_text: str
     score: int
@@ -64,6 +68,8 @@ class TMMatch:
 
 @dataclass(frozen=True, slots=True)
 class TMImportFile:
+    """Represent TMImportFile."""
+
     tm_path: str
     tm_name: str
     source_locale: str
@@ -80,14 +86,17 @@ class TMImportFile:
 
 
 def _normalize(text: str) -> str:
+    """Execute normalize."""
     return " ".join(text.lower().split())
 
 
 def _prefix(text: str, length: int = 8) -> str:
+    """Execute prefix."""
     return text[:length] if text else ""
 
 
 def _query_tokens(text: str) -> tuple[str, ...]:
+    """Execute query tokens."""
     tokens: list[str] = []
     for token in re.findall(r"\w+", text, flags=re.UNICODE):
         if len(token) < 2:
@@ -97,6 +106,7 @@ def _query_tokens(text: str) -> tuple[str, ...]:
 
 
 def _stem_token(token: str) -> str:
+    """Execute stem token."""
     if len(token) <= 3:
         return token
     if token.endswith("ies") and len(token) > 4:
@@ -120,6 +130,7 @@ def _token_matches(
     *,
     use_en_stemming: bool,
 ) -> bool:
+    """Execute token matches."""
     if query_token == candidate_token:
         return True
     if use_en_stemming:
@@ -161,6 +172,7 @@ def _contains_composed_phrase(
     *,
     use_en_stemming: bool,
 ) -> bool:
+    """Execute contains composed phrase."""
     parts = _query_tokens(query)
     if not parts:
         return False
@@ -197,6 +209,7 @@ def _soft_token_overlap(
     *,
     use_en_stemming: bool,
 ) -> float:
+    """Execute soft token overlap."""
     if not query_tokens or not candidate_tokens:
         return 0.0
     matched = 0
@@ -217,6 +230,7 @@ def _exact_token_overlap(
     query_tokens: set[str],
     candidate_tokens: set[str],
 ) -> float:
+    """Execute exact token overlap."""
     if not query_tokens or not candidate_tokens:
         return 0.0
     matched = sum(1 for token in query_tokens if token in candidate_tokens)
@@ -224,10 +238,12 @@ def _exact_token_overlap(
 
 
 def _normalize_locale(locale: str) -> str:
+    """Normalize locale."""
     return locale.strip().upper()
 
 
 def _normalize_row_status(value: object) -> int | None:
+    """Normalize row status."""
     if value is None:
         return None
     if isinstance(value, Status):
@@ -248,6 +264,7 @@ def _normalize_row_status(value: object) -> int | None:
 
 
 def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
+    """Normalize origins."""
     if origins is None:
         return (_PROJECT_ORIGIN, _IMPORT_ORIGIN)
     normalized: list[str] = []
@@ -264,7 +281,10 @@ def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
 
 
 class TMStore:
+    """Represent TMStore."""
+
     def __init__(self, root: Path) -> None:
+        """Initialize the instance."""
         cfg = _load_app_config(root)
         self._path = self._resolve_db_path(root, cfg.config_dir)
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -276,6 +296,7 @@ class TMStore:
 
     @staticmethod
     def _resolve_db_path(root: Path, config_dir: str) -> Path:
+        """Resolve db path."""
         primary = root / config_dir / "tm.sqlite"
         legacy = root / LEGACY_CONFIG_DIR / "tm.sqlite"
         if primary.exists():
@@ -289,6 +310,7 @@ class TMStore:
 
     @staticmethod
     def _migrate_legacy_db(legacy: Path, primary: Path) -> bool:
+        """Execute migrate legacy db."""
         try:
             with sqlite3.connect(legacy) as src, sqlite3.connect(primary) as dst:
                 src.backup(dst)
@@ -299,20 +321,24 @@ class TMStore:
             return False
 
     def close(self) -> None:
+        """Execute close."""
         if self._closed:
             return
         self._conn.close()
         self._closed = True
 
     def __del__(self) -> None:
+        """Clean up resources."""
         with contextlib.suppress(Exception):
             self.close()
 
     @property
     def db_path(self) -> Path:
+        """Execute db path."""
         return self._path
 
     def has_entries(self, *, source_locale: str, target_locale: str) -> bool:
+        """Return whether entries."""
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
         row = self._conn.execute(
@@ -328,21 +354,25 @@ class TMStore:
 
     @staticmethod
     def _configure_conn(conn: sqlite3.Connection) -> None:
+        """Execute configure conn."""
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA temp_store=MEMORY")
 
     def _configure(self) -> None:
+        """Execute configure."""
         self._configure_conn(self._conn)
 
     @classmethod
     def _query_conn_for_path(cls, db_path: Path) -> sqlite3.Connection:
+        """Execute query conn for path."""
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cls._configure_conn(conn)
         return conn
 
     def _ensure_schema(self) -> None:
+        """Execute ensure schema."""
         self._conn.execute("""
             CREATE TABLE IF NOT EXISTS tm_entries (
                 id INTEGER PRIMARY KEY,
@@ -418,6 +448,7 @@ class TMStore:
         self._conn.commit()
 
     def _ensure_tm_entries_columns(self) -> None:
+        """Execute ensure tm entries columns."""
         cols = {
             row["name"]
             for row in self._conn.execute("PRAGMA table_info(tm_entries)").fetchall()
@@ -430,6 +461,7 @@ class TMStore:
             self._conn.execute("ALTER TABLE tm_entries ADD COLUMN row_status INTEGER")
 
     def _ensure_tm_import_files_columns(self) -> None:
+        """Execute ensure tm import files columns."""
         cols = {
             row["name"]
             for row in self._conn.execute(
@@ -462,6 +494,7 @@ class TMStore:
         file_path: str,
         updated_at: int | None = None,
     ) -> int:
+        """Upsert project entries."""
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
         now = int(updated_at if updated_at is not None else time.time())
@@ -545,6 +578,7 @@ class TMStore:
         tm_path: str | None = None,
         updated_at: int | None = None,
     ) -> int:
+        """Insert import pairs."""
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
         tm_name = (tm_name or "").strip() or None
@@ -603,6 +637,7 @@ class TMStore:
         return count
 
     def import_tmx(self, path: Path, *, source_locale: str, target_locale: str) -> int:
+        """Execute import tmx."""
         return self.import_tm(
             path,
             source_locale=source_locale,
@@ -610,6 +645,7 @@ class TMStore:
         )
 
     def import_tm(self, path: Path, *, source_locale: str, target_locale: str) -> int:
+        """Execute import tm."""
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
         pairs = iter_tm_pairs(path, source_locale, target_locale)
@@ -631,6 +667,7 @@ class TMStore:
         target_locale_raw: str = "",
         tm_name: str | None = None,
     ) -> int:
+        """Execute replace import tmx."""
         return self.replace_import_tm(
             path,
             source_locale=source_locale,
@@ -650,6 +687,7 @@ class TMStore:
         target_locale_raw: str = "",
         tm_name: str | None = None,
     ) -> int:
+        """Execute replace import tm."""
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
         name = (tm_name or path.stem).strip() or path.stem
@@ -696,6 +734,7 @@ class TMStore:
         return count
 
     def list_import_files(self) -> list[TMImportFile]:
+        """Execute list import files."""
         rows = self._conn.execute("""
             SELECT
                 tm_path,
@@ -750,6 +789,7 @@ class TMStore:
         note: str = "",
         updated_at: int | None = None,
     ) -> None:
+        """Upsert import file."""
         now = int(updated_at if updated_at is not None else time.time())
         self._conn.execute(
             """
@@ -801,6 +841,7 @@ class TMStore:
         self._conn.commit()
 
     def set_import_enabled(self, tm_path: str, enabled: bool) -> None:
+        """Set import enabled."""
         self._conn.execute(
             """
             UPDATE tm_import_files
@@ -812,6 +853,7 @@ class TMStore:
         self._conn.commit()
 
     def delete_import_file(self, tm_path: str) -> None:
+        """Delete import file."""
         self._conn.execute(
             """
             DELETE FROM tm_entries
@@ -829,6 +871,7 @@ class TMStore:
         self._conn.commit()
 
     def has_import_entries(self, tm_path: str) -> bool:
+        """Return whether import entries."""
         row = self._conn.execute(
             """
             SELECT 1
@@ -848,6 +891,7 @@ class TMStore:
         target_locale: str,
         include_imported: bool = True,
     ) -> int:
+        """Execute export tmx."""
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
         origins = (
@@ -878,6 +922,7 @@ class TMStore:
         min_score: int | None = None,
         origins: Iterable[str] | None = None,
     ) -> list[TMMatch]:
+        """Execute query."""
         return self._query_conn(
             self._conn,
             source_text,
@@ -900,6 +945,7 @@ class TMStore:
         min_score: int | None = None,
         origins: Iterable[str] | None = None,
     ) -> list[TMMatch]:
+        """Execute query path."""
         conn = cls._query_conn_for_path(db_path)
         try:
             return cls._query_conn(
@@ -927,6 +973,7 @@ class TMStore:
         min_score: int | None,
         origins: Iterable[str] | None,
     ) -> list[TMMatch]:
+        """Execute query conn."""
         source_locale = _normalize_locale(source_locale)
         target_locale = _normalize_locale(target_locale)
         origin_list = _normalize_origins(origins)
@@ -1050,6 +1097,7 @@ class TMStore:
         target_locale: str,
         origins: Iterable[str],
     ) -> list[tuple[sqlite3.Row, int, int]]:
+        """Execute fuzzy candidates."""
         from difflib import SequenceMatcher
 
         query_tokens = set(_query_tokens(norm))
@@ -1093,6 +1141,7 @@ class TMStore:
             order_params: tuple[object, ...] = (),
             limit: int,
         ) -> list[sqlite3.Row]:
+            """Execute select rows."""
             return conn.execute(
                 f"""
                 SELECT
@@ -1117,6 +1166,7 @@ class TMStore:
             ).fetchall()
 
         def _append_unique(candidates: list[sqlite3.Row]) -> None:
+            """Execute append unique."""
             for row in candidates:
                 row_key = (
                     row["source_text"],
