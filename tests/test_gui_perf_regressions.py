@@ -1,3 +1,5 @@
+"""Test module for gui perf regressions."""
+
 import os
 import shutil
 import time
@@ -50,6 +52,7 @@ def _open_file(win: MainWindow, path: Path) -> None:
 def test_row_resize_is_budget_sliced_for_large_file(
     qtbot, tmp_path: Path, monkeypatch, perf_recorder
 ) -> None:
+    """Verify row resize is budget sliced for large file."""
     monkeypatch.chdir(tmp_path)
     root = _make_perf_project(tmp_path, files=("SurvivalGuide_BE.txt",))
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -93,6 +96,7 @@ def test_row_resize_is_budget_sliced_for_large_file(
 def test_large_file_scroll_and_selection_stability(
     qtbot, tmp_path: Path, monkeypatch, perf_recorder, filename: str
 ) -> None:
+    """Verify large file scroll and selection stability."""
     monkeypatch.chdir(tmp_path)
     root = _make_perf_project(tmp_path, files=(filename,))
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -141,6 +145,7 @@ def test_large_file_scroll_and_selection_stability(
 
 
 def test_header_resize_reflow_is_debounced(qtbot, tmp_path: Path, monkeypatch) -> None:
+    """Verify header resize reflow is debounced."""
     monkeypatch.chdir(tmp_path)
     root = _make_perf_project(tmp_path, files=("SurvivalGuide_BE.txt",))
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -194,6 +199,7 @@ def test_header_resize_reflow_is_debounced(qtbot, tmp_path: Path, monkeypatch) -
 def test_splitter_resize_reflow_is_debounced(
     qtbot, tmp_path: Path, monkeypatch
 ) -> None:
+    """Verify splitter resize reflow is debounced."""
     monkeypatch.chdir(tmp_path)
     root = _make_perf_project(tmp_path, files=("SurvivalGuide_BE.txt",))
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -242,6 +248,7 @@ def test_splitter_resize_reflow_is_debounced(
 def test_source_reference_switch_is_budgeted(
     qtbot, tmp_path, monkeypatch, perf_recorder
 ):
+    """Verify source reference switch is budgeted."""
     monkeypatch.chdir(tmp_path)
     root = _make_perf_project(
         tmp_path,

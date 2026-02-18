@@ -1,3 +1,5 @@
+"""Test module for gui edit save."""
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -7,6 +9,7 @@ from translationzed_py.gui import MainWindow
 
 def test_edit_and_save(qtbot, tmp_path):
     # copy fixture
+    """Verify edit and save."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE"):

@@ -1,3 +1,5 @@
+"""Test module for gui qa panel."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,6 +16,7 @@ from translationzed_py.gui import MainWindow
 
 
 def test_qa_side_panel_lists_findings_and_navigates(qtbot, tmp_path: Path) -> None:
+    """Verify qa side panel lists findings and navigates."""
     root = tmp_path / "proj"
     root.mkdir()
     for loc in ("EN", "BE"):
@@ -59,6 +62,7 @@ def test_qa_side_panel_lists_findings_and_navigates(qtbot, tmp_path: Path) -> No
 def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     qtbot, tmp_path: Path
 ) -> None:
+    """Verify qa side panel refreshes trailing and newline findings."""
     root = tmp_path / "proj"
     root.mkdir()
     for loc in ("EN", "BE"):
@@ -99,6 +103,7 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
 def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     qtbot, tmp_path: Path
 ) -> None:
+    """Verify qa auto mark for review toggle controls status mutation."""
     root = tmp_path / "proj"
     root.mkdir()
     for loc in ("EN", "BE"):
@@ -144,6 +149,7 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
 def test_qa_token_check_toggle_controls_placeholder_tag_findings(
     qtbot, tmp_path: Path
 ) -> None:
+    """Verify qa token check toggle controls placeholder tag findings."""
     root = tmp_path / "proj"
     root.mkdir()
     for loc in ("EN", "BE"):
@@ -180,6 +186,7 @@ def test_qa_token_check_toggle_controls_placeholder_tag_findings(
 def test_qa_same_as_source_toggle_adds_content_group_finding(
     qtbot, tmp_path: Path
 ) -> None:
+    """Verify qa same as source toggle adds content group finding."""
     root = tmp_path / "proj"
     root.mkdir()
     for loc in ("EN", "BE"):
@@ -210,6 +217,7 @@ def test_qa_same_as_source_toggle_adds_content_group_finding(
 
 
 def test_qa_next_prev_navigation_moves_between_findings(qtbot, tmp_path: Path) -> None:
+    """Verify qa next prev navigation moves between findings."""
     root = tmp_path / "proj"
     root.mkdir()
     for loc in ("EN", "BE"):
@@ -252,6 +260,7 @@ def test_qa_next_prev_navigation_moves_between_findings(qtbot, tmp_path: Path) -
 def test_qa_refresh_does_not_mutate_file_bytes_without_save(
     qtbot, tmp_path: Path
 ) -> None:
+    """Verify qa refresh does not mutate file bytes without save."""
     root = tmp_path / "proj"
     root.mkdir()
     for loc in ("EN", "BE"):

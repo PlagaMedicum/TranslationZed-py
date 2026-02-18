@@ -1,3 +1,5 @@
+"""Test module for gui save encoding."""
+
 from pathlib import Path
 
 import pytest
@@ -24,6 +26,7 @@ def _make_project(tmp_path: Path, locale: str, encoding: str, value: str) -> Pat
 
 
 def test_gui_save_preserves_cp1251(tmp_path, qtbot):
+    """Verify gui save preserves cp1251."""
     root = _make_project(tmp_path, "RU", "CP1251", "Тест")
     path = root / "RU" / "ui.txt"
     win = MainWindow(str(root), selected_locales=["RU"])
@@ -39,6 +42,7 @@ def test_gui_save_preserves_cp1251(tmp_path, qtbot):
 
 
 def test_gui_save_preserves_utf16(tmp_path, qtbot):
+    """Verify gui save preserves utf16."""
     root = _make_project(tmp_path, "KO", "UTF-16", "테스트")
     path = root / "KO" / "ui.txt"
     win = MainWindow(str(root), selected_locales=["KO"])
@@ -54,6 +58,7 @@ def test_gui_save_preserves_utf16(tmp_path, qtbot):
 
 
 def test_gui_save_preserves_crlf_line_endings(tmp_path, qtbot):
+    """Verify gui save preserves crlf line endings."""
     root = _make_project(tmp_path, "RU", "CP1251", "Тест")
     path = root / "RU" / "ui.txt"
     path.write_bytes('UI_OK = "Тест"\r\n'.encode("cp1251"))

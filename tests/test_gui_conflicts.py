@@ -1,3 +1,5 @@
+"""Test module for gui conflicts."""
+
 from pathlib import Path
 
 import pytest
@@ -64,6 +66,7 @@ def _make_conflict_project(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_conflict_drop_cache(tmp_path, qtbot, monkeypatch):
+    """Verify conflict drop cache."""
     root, path = _make_conflict_project(tmp_path)
 
     class FakeDialog:
@@ -94,6 +97,7 @@ def test_conflict_drop_cache(tmp_path, qtbot, monkeypatch):
 
 
 def test_conflict_drop_original(tmp_path, qtbot, monkeypatch):
+    """Verify conflict drop original."""
     root, path = _make_conflict_project(tmp_path)
 
     class FakeDialog:
@@ -124,6 +128,7 @@ def test_conflict_drop_original(tmp_path, qtbot, monkeypatch):
 
 
 def test_conflict_merge_resolutions(tmp_path, qtbot, monkeypatch):
+    """Verify conflict merge resolutions."""
     root, path = _make_conflict_project(tmp_path)
 
     class FakeChoiceDialog:

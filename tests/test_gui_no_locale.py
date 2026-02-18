@@ -1,3 +1,5 @@
+"""Test module for gui no locale."""
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -6,6 +8,7 @@ from translationzed_py.gui import MainWindow
 
 
 def test_no_locale_selected_aborts(tmp_path):
+    """Verify no locale selected aborts."""
     root = tmp_path / "proj"
     (root / "EN").mkdir(parents=True)
     (root / "EN" / "language.txt").write_text("text = English\ncharset = UTF-8\n")

@@ -1,3 +1,5 @@
+"""Test module for gui readonly integrity."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -48,6 +50,7 @@ def test_open_without_edit_does_not_mutate_file_bytes(
     charset: str,
     payload: str,
 ) -> None:
+    """Verify open without edit does not mutate file bytes."""
     root, file_path = _make_project(
         tmp_path,
         locale=locale,
@@ -67,6 +70,7 @@ def test_open_without_edit_does_not_mutate_file_bytes(
 def test_locale_switch_without_edit_keeps_bytes_for_each_file(
     tmp_path: Path, qtbot
 ) -> None:
+    """Verify locale switch without edit keeps bytes for each file."""
     root = tmp_path / "proj"
     (root / "EN").mkdir(parents=True, exist_ok=True)
     (root / "RU").mkdir(parents=True, exist_ok=True)
@@ -102,6 +106,7 @@ def test_locale_switch_without_edit_keeps_bytes_for_each_file(
 def test_open_flow_never_calls_original_saver(
     tmp_path: Path, qtbot, monkeypatch
 ) -> None:
+    """Verify open flow never calls original saver."""
     root, file_path = _make_project(
         tmp_path,
         locale="BE",
