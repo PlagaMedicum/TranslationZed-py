@@ -1,3 +1,5 @@
+"""File workflow module."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
@@ -14,6 +16,8 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class CacheOverlayResult:
+    """Represent CacheOverlayResult."""
+
     changed_keys: set[str]
     baseline_by_row: dict[int, str]
     conflict_originals: dict[str, str]
@@ -22,12 +26,16 @@ class CacheOverlayResult:
 
 @dataclass(frozen=True, slots=True)
 class CacheWriteOverlay:
+    """Represent CacheWriteOverlay."""
+
     entries: list[Entry]
     changed_values: dict[str, str]
 
 
 @dataclass(frozen=True, slots=True)
 class OpenFileCallbacks:
+    """Represent OpenFileCallbacks."""
+
     parse_eager: Callable[[Path, str], ParsedFile]
     parse_lazy: Callable[[Path, str], ParsedFile]
     read_cache: Callable[[Path], Mapping[int, CacheEntry]]
@@ -37,6 +45,8 @@ class OpenFileCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class OpenFileResult:
+    """Represent OpenFileResult."""
+
     parsed_file: ParsedFile
     cache_map: Mapping[int, CacheEntry]
     overlay: CacheOverlayResult
@@ -44,12 +54,16 @@ class OpenFileResult:
 
 @dataclass(frozen=True, slots=True)
 class SaveCurrentRunPlan:
+    """Represent SaveCurrentRunPlan."""
+
     run_save: bool
     immediate_result: bool | None
 
 
 @dataclass(frozen=True, slots=True)
 class SaveCurrentCallbacks:
+    """Represent SaveCurrentCallbacks."""
+
     save_file: Callable[[ParsedFile, Mapping[str, str], str], object]
     write_cache: Callable[[Path, Iterable[Entry], int], object]
     now_ts: Callable[[], int]
@@ -57,12 +71,16 @@ class SaveCurrentCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class SaveCurrentResult:
+    """Represent SaveCurrentResult."""
+
     wrote_original: bool
     wrote_cache: bool
 
 
 @dataclass(frozen=True, slots=True)
 class SaveFromCacheCallbacks:
+    """Represent SaveFromCacheCallbacks."""
+
     parse_file: Callable[[Path, str], ParsedFile]
     save_file: Callable[[ParsedFile, Mapping[str, str], str], object]
     write_cache: Callable[[Path, Iterable[Entry]], object]
@@ -70,13 +88,18 @@ class SaveFromCacheCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class SaveFromCacheResult:
+    """Represent SaveFromCacheResult."""
+
     had_drafts: bool
     wrote_original: bool
     changed_values: Mapping[str, str]
 
 
 class SaveFromCacheParseError(Exception):
+    """Represent SaveFromCacheParseError."""
+
     def __init__(self, *, path: Path, original: Exception) -> None:
+        """Initialize the instance."""
         super().__init__(str(original))
         self.path = path
         self.original = original
@@ -84,6 +107,8 @@ class SaveFromCacheParseError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class FileWorkflowService:
+    """Represent FileWorkflowService."""
+
     def prepare_open_file(
         self,
         path: Path,
@@ -93,6 +118,7 @@ class FileWorkflowService:
         callbacks: OpenFileCallbacks,
         hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
     ) -> OpenFileResult:
+        """Prepare open file."""
         return prepare_open_file(
             path,
             encoding,
@@ -108,6 +134,7 @@ class FileWorkflowService:
         *,
         hash_for_entry: Callable[[Entry], int],
     ) -> CacheOverlayResult:
+        """Apply cache overlay."""
         return apply_cache_overlay(
             entries,
             cache_map,
@@ -121,6 +148,7 @@ class FileWorkflowService:
         *,
         hash_for_entry: Callable[[Entry], int],
     ) -> CacheWriteOverlay:
+        """Apply cache for write."""
         return apply_cache_for_write(
             entries,
             cache_map,
@@ -135,6 +163,7 @@ class FileWorkflowService:
         conflicts_resolved: bool,
         has_changed_keys: bool,
     ) -> SaveCurrentRunPlan:
+        """Build save current run plan."""
         return build_save_current_run_plan(
             has_current_file=has_current_file,
             has_current_model=has_current_model,
@@ -151,6 +180,7 @@ class FileWorkflowService:
         encoding: str,
         callbacks: SaveCurrentCallbacks,
     ) -> SaveCurrentResult:
+        """Execute persist current save."""
         return persist_current_save(
             path=path,
             parsed_file=parsed_file,
@@ -168,6 +198,7 @@ class FileWorkflowService:
         callbacks: SaveFromCacheCallbacks,
         hash_for_entry: Callable[[Entry], int],
     ) -> SaveFromCacheResult:
+        """Write from cache."""
         return write_from_cache(
             path,
             encoding,
@@ -185,6 +216,7 @@ def prepare_open_file(
     callbacks: OpenFileCallbacks,
     hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
 ) -> OpenFileResult:
+    """Prepare open file."""
     parsed = (
         callbacks.parse_lazy(path, encoding)
         if use_lazy_parser
@@ -206,6 +238,7 @@ def apply_cache_overlay(
     *,
     hash_for_entry: Callable[[Entry], int],
 ) -> CacheOverlayResult:
+    """Apply cache overlay."""
     changed_keys: set[str] = set()
     baseline_by_row: dict[int, str] = {}
     conflict_originals: dict[str, str] = {}
@@ -303,6 +336,7 @@ def apply_cache_for_write(
     *,
     hash_for_entry: Callable[[Entry], int],
 ) -> CacheWriteOverlay:
+    """Apply cache for write."""
     changed_values: dict[str, str] = {}
     new_entries: list[Entry] = []
     for entry in entries:
@@ -337,6 +371,7 @@ def build_save_current_run_plan(
     conflicts_resolved: bool,
     has_changed_keys: bool,
 ) -> SaveCurrentRunPlan:
+    """Build save current run plan."""
     if not has_current_file or not has_current_model:
         return SaveCurrentRunPlan(run_save=False, immediate_result=True)
     if not conflicts_resolved:
@@ -354,6 +389,7 @@ def persist_current_save(
     encoding: str,
     callbacks: SaveCurrentCallbacks,
 ) -> SaveCurrentResult:
+    """Execute persist current save."""
     wrote_original = False
     if changed_values:
         callbacks.save_file(parsed_file, changed_values, encoding)
@@ -373,6 +409,7 @@ def write_from_cache(
     callbacks: SaveFromCacheCallbacks,
     hash_for_entry: Callable[[Entry], int],
 ) -> SaveFromCacheResult:
+    """Write from cache."""
     if not any(entry.value is not None for entry in cache_map.values()):
         return SaveFromCacheResult(
             had_drafts=False,
