@@ -1,3 +1,5 @@
+"""Persistent EN-source hash cache helpers for fast project change detection."""
+
 from __future__ import annotations
 
 import struct
@@ -46,6 +48,7 @@ def _read_cache_path(root: Path) -> Path:
 
 
 def compute(root: Path) -> dict[str, int]:
+    """Compute source-file hashes for the EN locale tree."""
     locales = scan_root(root)
     if "EN" not in locales:
         return {}
@@ -62,6 +65,7 @@ def compute(root: Path) -> dict[str, int]:
 
 
 def read(root: Path) -> dict[str, int]:
+    """Read the EN hash cache from current or legacy cache locations."""
     cache_path = _read_cache_path(root)
     try:
         data = cache_path.read_bytes()
@@ -96,6 +100,7 @@ def read(root: Path) -> dict[str, int]:
 
 
 def write(root: Path, hashes: dict[str, int]) -> None:
+    """Write hash entries to cache or remove cache files when empty."""
     cache_path = _cache_path(root)
     legacy_cache_path = _legacy_cache_path(root)
     if not hashes:

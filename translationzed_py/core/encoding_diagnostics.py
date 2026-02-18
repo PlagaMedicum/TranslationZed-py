@@ -1,3 +1,5 @@
+"""Encoding diagnostics utilities for locale files and language metadata."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,6 +18,8 @@ _BOM_UTF16_BE = b"\xfe\xff"
 
 @dataclass(frozen=True, slots=True)
 class EncodingIssue:
+    """Describe one encoding validation issue discovered in a locale file."""
+
     severity: str
     code: str
     path: Path
@@ -51,6 +55,7 @@ def _bom_matches_declared(bom_encoding: str, declared: str) -> bool:
 
 
 def scan_encoding_issues(root: Path) -> tuple[list[str], list[EncodingIssue]]:
+    """Scan project files and return language-file and encoding issues."""
     locales, language_errors = scan_root_with_errors(root)
     issues: list[EncodingIssue] = []
     for locale, meta in sorted(locales.items()):
@@ -127,6 +132,7 @@ def format_encoding_report(
     language_errors: list[str],
     issues: list[EncodingIssue],
 ) -> str:
+    """Format encoding diagnostics into a copyable plain-text report."""
     lines = [f"Encoding diagnostics: {root.as_posix()}"]
     if language_errors:
         lines.append(f"Language metadata issues: {len(language_errors)}")

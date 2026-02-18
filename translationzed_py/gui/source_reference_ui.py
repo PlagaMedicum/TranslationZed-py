@@ -1,3 +1,5 @@
+"""UI helpers for source-reference mode selection widgets."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
@@ -27,6 +29,7 @@ def available_source_reference_locales(
     *,
     all_locales: Iterable[str] | None = None,
 ) -> list[str]:
+    """Return ordered source-reference locale options for UI selection."""
     selected = _normalize_locales(selected_locales)
     all_codes = _normalize_locales(all_locales or selected)
     merged = ["EN"]
@@ -53,6 +56,7 @@ def sync_source_reference_combo(
     fallback_default: str = "EN",
     fallback_secondary: str = "EN",
 ) -> str:
+    """Populate the combo and resolve a valid source-reference mode."""
     available = available_source_reference_locales(
         selected_locales,
         all_locales=all_locales,
@@ -74,4 +78,5 @@ def sync_source_reference_combo(
 
 
 def source_reference_mode_from_combo(combo: QComboBox, index: int) -> str:
+    """Resolve and normalize the selected source-reference mode."""
     return normalize_source_reference_mode(combo.itemData(index), default="EN")

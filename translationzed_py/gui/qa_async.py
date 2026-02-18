@@ -1,3 +1,5 @@
+"""Asynchronous QA scan orchestration helpers for the main window."""
+
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
@@ -44,6 +46,7 @@ def _run_scan_job(
 
 
 def start_scan(win: Any) -> None:
+    """Start a background QA scan for the currently opened file."""
     path = win._current_pf.path if win._current_pf is not None else None
     if path is None or win._current_model is None:
         win._set_qa_findings(())
@@ -76,6 +79,7 @@ def start_scan(win: Any) -> None:
 
 
 def poll_scan(win: Any) -> None:
+    """Poll the running QA scan and apply results when available."""
     future = win._qa_scan_future
     if future is None:
         win._qa_scan_timer.stop()
@@ -99,6 +103,7 @@ def poll_scan(win: Any) -> None:
 
 
 def refresh_sync_for_test(win: Any) -> None:
+    """Run QA scan synchronously while tests execute in test mode."""
     start_scan(win)
     if not win._test_mode:
         return
