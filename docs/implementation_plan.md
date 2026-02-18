@@ -804,11 +804,13 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] CI runs strict non-mutating gate and publishes verification artifacts.
      - [✓] Canonical docs updated to match implemented tooling behavior.
    - **Current verification snapshot (2026-02-18)**:
-     - [✓] Core coverage gate is met in strict run:
+     - [✓] Whole-package strict gate is met:
+       `make test-cov` reports **90.7%**.
+     - [✓] Core coverage gate remains met in strict run:
        `pytest -q tests --cov=translationzed_py.core --cov-report=term-missing:skip-covered`
-       reports **95.0%**.
-     - [→] Whole-package `make test-cov` remains below target at **79.8%**
-       (GUI-heavy gap), so phase-two work is focused on GUI automation expansion.
+       reports **95.7%**.
+     - [→] Ongoing phase-two focus stays on GUI automation expansion to keep
+       reducing residual `main_window` branch gaps beyond the minimum gate.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
