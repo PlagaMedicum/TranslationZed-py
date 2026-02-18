@@ -332,3 +332,153 @@ def test_load_reference_lookup_short_circuits_missing_context(tmp_path: Path) ->
         )
         is None
     )
+
+
+def test_resolve_source_reference_locale_falls_back_to_sorted_available_and_default() -> (
+    None
+):
+    """Verify locale resolution uses sorted available fallback and default fallback."""
+    available_fallback = resolve_source_reference_locale(
+        "JA",
+        available_locales=("RU", "BE"),
+        fallback_locale="KO",
+        default="EN",
+    )
+    assert available_fallback.resolved_locale == "BE"
+    assert available_fallback.fallback_used is True
+
+    empty_fallback = resolve_source_reference_locale(
+        "JA",
+        available_locales=(),
+        fallback_locale=None,
+        default="EN",
+    )
+    assert empty_fallback.resolved_locale == "EN"
+    assert empty_fallback.fallback_used is True
+
+
+def test_reference_path_for_handles_root_relative_and_invalid_root_entries(
+    tmp_path: Path,
+) -> None:
+    """Verify lookup supports root-relative fallback and rejects non-target roots."""
+    root = tmp_path / "proj"
+    lower_be = root / "be"
+    en = root / "EN"
+    other = root / "RU"
+    lower_be.mkdir(parents=True)
+    en.mkdir(parents=True)
+    other.mkdir(parents=True)
+
+    target = lower_be / "IG_UI_BE.txt"
+    source = en / "IG_UI_EN.txt"
+    target.write_text('UI = "B"\n', encoding="utf-8")
+    source.write_text('UI = "E"\n', encoding="utf-8")
+    (other / "IG_UI_RU.txt").write_text('UI = "R"\n', encoding="utf-8")
+
+    assert (
+        reference_path_for(
+            root,
+            target,
+            target_locale="BE",
+            reference_locale="EN",
+        )
+        == source
+    )
+    assert (
+        reference_path_for(
+            root,
+            other / "IG_UI_RU.txt",
+            target_locale="BE",
+            reference_locale="EN",
+        )
+        is None
+    )
+
+
+def test_build_source_lookup_materialized_falls_back_to_by_key_variants() -> None:
+    """Verify source lookup falls back to by-key maps for non-row cases."""
+    raw_reference = [
+        Entry("News_BE.txt", "RAW", Status.UNTOUCHED, (0, 0), (), (), raw=True),
+    ]
+    non_matching_target = [
+        Entry("Different.txt", "X", Status.UNTOUCHED, (0, 0), (), (), raw=True),
+    ]
+    raw_result = build_source_lookup_materialized(
+        raw_reference,
+        target_entries=non_matching_target,
+        path_name="News_BE.txt",
+    )
+    assert raw_result.by_key == {"News_BE.txt": "RAW"}
+    assert raw_result.by_row_values is None
+
+    structured_reference = [
+        Entry("K1", "One", Status.UNTOUCHED, (0, 0), (), ()),
+        Entry("K2", "Two", Status.UNTOUCHED, (0, 0), (), ()),
+    ]
+    shorter_target = [Entry("K1", "Uno", Status.UNTOUCHED, (0, 0), (), ())]
+    structured_result = build_source_lookup_materialized(
+        structured_reference,
+        target_entries=shorter_target,
+        path_name="ui.txt",
+    )
+    assert structured_result.by_key == {"K1": "One", "K2": "Two"}
+
+    empty_result = build_source_lookup_materialized(
+        [],
+        target_entries=None,
+        path_name="empty.txt",
+    )
+    assert empty_result.by_key == {}
+
+
+def test_load_reference_lookup_handles_same_locale_and_parse_failures(
+    tmp_path: Path,
+) -> None:
+    """Verify reference lookup handles same-locale files and parse failures."""
+    root = tmp_path / "proj"
+    en = root / "EN"
+    en.mkdir(parents=True)
+    same_locale_path = en / "ui.txt"
+    same_locale_path.write_text('K = "E"\n', encoding="utf-8")
+
+    def _parse_success(path: Path, _encoding: str) -> ParsedFile:
+        return ParsedFile(
+            path,
+            [Entry("K", "E", Status.UNTOUCHED, (0, 0), (), ())],
+            b"",
+        )
+
+    success = load_reference_lookup(
+        root=root,
+        path=same_locale_path,
+        target_locale="EN",
+        reference_locale="EN",
+        locale_encodings={"EN": "utf-8"},
+        target_entries=None,
+        parsed_cache={},
+        should_parse_lazy=lambda _p: False,
+        parse_eager=_parse_success,
+        parse_lazy=lambda _p, _enc: (_ for _ in ()).throw(RuntimeError("unexpected")),
+    )
+    assert success is not None
+    assert success.by_key == {"K": "E"}
+
+    assert (
+        load_reference_lookup(
+            root=root,
+            path=same_locale_path.with_name("broken.txt"),
+            target_locale="EN",
+            reference_locale="EN",
+            locale_encodings={"EN": "utf-8"},
+            target_entries=None,
+            parsed_cache={},
+            should_parse_lazy=lambda _p: False,
+            parse_eager=lambda _p, _enc: (_ for _ in ()).throw(
+                RuntimeError("parse failed")
+            ),
+            parse_lazy=lambda _p, _enc: (_ for _ in ()).throw(
+                RuntimeError("unexpected")
+            ),
+        )
+        is None
+    )
