@@ -7,6 +7,20 @@
         "test_bench_parse_eager_recorded_media": {"median_ms": 196.0},
         "test_bench_search_translation_survivalguide": {"median_ms": 2.0}
       }
+    },
+    "macos": {
+      "benchmarks": {
+        "test_bench_parse_lazy_survivalguide": {"median_ms": 340.0},
+        "test_bench_parse_eager_recorded_media": {"median_ms": 280.0},
+        "test_bench_search_translation_survivalguide": {"median_ms": 3.0}
+      }
+    },
+    "windows": {
+      "benchmarks": {
+        "test_bench_parse_lazy_survivalguide": {"median_ms": 420.0},
+        "test_bench_parse_eager_recorded_media": {"median_ms": 340.0},
+        "test_bench_search_translation_survivalguide": {"median_ms": 4.0}
+      }
     }
   }
 }
