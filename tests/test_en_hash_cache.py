@@ -1,9 +1,12 @@
+"""Test module for en hash cache."""
+
 from pathlib import Path
 
 from translationzed_py.core.en_hash_cache import compute, read, write
 
 
 def test_en_hash_roundtrip(tmp_path: Path) -> None:
+    """Verify en hash roundtrip."""
     root = tmp_path / "proj"
     en = root / "EN"
     en.mkdir(parents=True)

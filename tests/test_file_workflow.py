@@ -1,3 +1,5 @@
+"""Test module for file workflow."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -75,6 +77,7 @@ def _entry(key: str, value: str, status: Status, key_hash: int = 1) -> Entry:
 
 
 def test_apply_cache_overlay_fallback_tracks_drafts_and_conflicts() -> None:
+    """Verify apply cache overlay fallback tracks drafts and conflicts."""
     entries = [
         _entry("A", "file-a", Status.UNTOUCHED, key_hash=11),
         _entry("B", "file-b", Status.UNTOUCHED, key_hash=22),
@@ -100,6 +103,7 @@ def test_apply_cache_overlay_fallback_tracks_drafts_and_conflicts() -> None:
 
 
 def test_apply_cache_overlay_uses_indexed_lookup_for_hash_bits() -> None:
+    """Verify apply cache overlay uses indexed lookup for hash bits."""
     entries = [
         _entry("A", "file-a", Status.UNTOUCHED, key_hash=111),
         _entry("B", "file-b", Status.UNTOUCHED, key_hash=222),
@@ -127,6 +131,7 @@ def test_apply_cache_overlay_uses_indexed_lookup_for_hash_bits() -> None:
 
 
 def test_apply_cache_for_write_returns_changed_values_and_statuses() -> None:
+    """Verify apply cache for write returns changed values and statuses."""
     entries = [
         _entry("A", "file-a", Status.UNTOUCHED, key_hash=31),
         _entry("B", "file-b", Status.PROOFREAD, key_hash=32),
@@ -150,6 +155,7 @@ def test_apply_cache_for_write_returns_changed_values_and_statuses() -> None:
 
 
 def test_file_workflow_service_wraps_overlay_helpers() -> None:
+    """Verify file workflow service wraps overlay helpers."""
     service = FileWorkflowService()
     entries = [_entry("A", "file-a", Status.UNTOUCHED, key_hash=11)]
     cache = CacheMap(hash_bits=64)
@@ -171,6 +177,7 @@ def test_file_workflow_service_wraps_overlay_helpers() -> None:
 
 
 def test_prepare_open_file_uses_lazy_parser_and_touches_timestamp() -> None:
+    """Verify prepare open file uses lazy parser and touches timestamp."""
     service = FileWorkflowService()
     path = Path("/tmp/a.txt")
     lazy_calls = 0
@@ -219,6 +226,7 @@ def test_prepare_open_file_uses_lazy_parser_and_touches_timestamp() -> None:
 
 
 def test_build_save_current_run_plan() -> None:
+    """Verify build save current run plan."""
     blocked = build_save_current_run_plan(
         has_current_file=True,
         has_current_model=True,
@@ -253,6 +261,7 @@ def test_build_save_current_run_plan() -> None:
 
 
 def test_persist_current_save_writes_original_and_cache() -> None:
+    """Verify persist current save writes original and cache."""
     service = FileWorkflowService()
     path = Path("/tmp/a.txt")
     parsed = ParsedFile(path, [_entry("A", "a", Status.UNTOUCHED)], b'A = "a"\n')
@@ -281,6 +290,7 @@ def test_persist_current_save_writes_original_and_cache() -> None:
 
 
 def test_persist_current_save_with_no_changes_still_writes_cache() -> None:
+    """Verify persist current save with no changes still writes cache."""
     service = FileWorkflowService()
     path = Path("/tmp/a.txt")
     parsed = ParsedFile(path, [_entry("A", "a", Status.UNTOUCHED)], b'A = "a"\n')
@@ -314,6 +324,7 @@ def test_persist_current_save_with_no_changes_still_writes_cache() -> None:
 
 
 def test_file_workflow_service_wraps_save_current_helpers() -> None:
+    """Verify file workflow service wraps save current helpers."""
     service = FileWorkflowService()
     run_plan = service.build_save_current_run_plan(
         has_current_file=True,
@@ -325,6 +336,7 @@ def test_file_workflow_service_wraps_save_current_helpers() -> None:
 
 
 def test_write_from_cache_skips_when_no_draft_values() -> None:
+    """Verify write from cache skips when no draft values."""
     service = FileWorkflowService()
     path = Path("/tmp/a.txt")
     cache = CacheMap(hash_bits=64)
@@ -362,6 +374,7 @@ def test_write_from_cache_skips_when_no_draft_values() -> None:
 
 
 def test_write_from_cache_applies_overlay_and_writes_cache() -> None:
+    """Verify write from cache applies overlay and writes cache."""
     service = FileWorkflowService()
     path = Path("/tmp/a.txt")
     entries = [_entry("A", "file-a", Status.UNTOUCHED, key_hash=31)]
@@ -396,6 +409,7 @@ def test_write_from_cache_applies_overlay_and_writes_cache() -> None:
 
 
 def test_write_from_cache_wraps_parse_errors() -> None:
+    """Verify write from cache wraps parse errors."""
     service = FileWorkflowService()
     path = Path("/tmp/a.txt")
     cache = CacheMap(hash_bits=64)

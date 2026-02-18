@@ -1,3 +1,5 @@
+"""Test module for entry model source."""
+
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,7 @@ from translationzed_py.gui.entry_model import TranslationModel
 
 
 def test_source_column(tmp_path: Path) -> None:
+    """Verify source column."""
     path = tmp_path / "file.txt"
     path.write_text('HELLO = "Hi"\n', encoding="utf-8")
     pf = parse(path)
@@ -22,6 +25,7 @@ def test_source_column(tmp_path: Path) -> None:
 
 
 def test_proofread_background(tmp_path: Path) -> None:
+    """Verify proofread background."""
     path = tmp_path / "file.txt"
     path.write_text('HELLO = "Hi"\n', encoding="utf-8")
     pf = parse(path)
@@ -34,6 +38,7 @@ def test_proofread_background(tmp_path: Path) -> None:
 
 
 def test_source_background_uses_by_row(tmp_path: Path) -> None:
+    """Verify source background uses by row."""
     path = tmp_path / "file.txt"
     path.write_text('HELLO = "Hi"\n', encoding="utf-8")
     pf = parse(path)
@@ -44,6 +49,7 @@ def test_source_background_uses_by_row(tmp_path: Path) -> None:
 
 
 def test_source_background_missing_by_row(tmp_path: Path) -> None:
+    """Verify source background missing by row."""
     path = tmp_path / "file.txt"
     path.write_text('HELLO = "Hi"\n', encoding="utf-8")
     pf = parse(path)
@@ -54,6 +60,7 @@ def test_source_background_missing_by_row(tmp_path: Path) -> None:
 
 
 def test_preview_does_not_affect_edit_role(tmp_path: Path) -> None:
+    """Verify preview does not affect edit role."""
     path = tmp_path / "file.txt"
     path.write_text('HELLO = "Hello world"\n', encoding="utf-8")
     pf = parse(path)
@@ -65,6 +72,7 @@ def test_preview_does_not_affect_edit_role(tmp_path: Path) -> None:
 
 
 def test_status_background_provides_contrast_foreground(tmp_path: Path) -> None:
+    """Verify status background provides contrast foreground."""
     path = tmp_path / "file.txt"
     path.write_text('HELLO = "Hi"\n', encoding="utf-8")
     pf = parse(path)
@@ -78,6 +86,7 @@ def test_status_background_provides_contrast_foreground(tmp_path: Path) -> None:
 
 
 def test_dark_palette_uses_dark_status_background(tmp_path: Path, qapp) -> None:
+    """Verify dark palette uses dark status background."""
     original_palette = qapp.palette()
     dark_palette = QPalette(original_palette)
     dark_palette.setColor(QPalette.Base, QColor(24, 24, 24))

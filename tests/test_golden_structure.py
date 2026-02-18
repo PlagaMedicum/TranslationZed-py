@@ -1,3 +1,5 @@
+"""Test module for golden structure."""
+
 from pathlib import Path
 
 from translationzed_py.core import parse
@@ -24,6 +26,7 @@ def _run_case(
 
 
 def test_structure_recorded_media_slice(tmp_path: Path) -> None:
+    """Verify structure recorded media slice."""
     _run_case(
         tmp_path,
         fixture="recorded_media",
@@ -36,6 +39,7 @@ def test_structure_recorded_media_slice(tmp_path: Path) -> None:
 
 
 def test_structure_stash_slice(tmp_path: Path) -> None:
+    """Verify structure stash slice."""
     _run_case(
         tmp_path,
         fixture="stash",
@@ -45,6 +49,7 @@ def test_structure_stash_slice(tmp_path: Path) -> None:
 
 
 def test_structure_news_raw(tmp_path: Path) -> None:
+    """Verify structure news raw."""
     _run_case(
         tmp_path,
         fixture="news_raw",
@@ -54,6 +59,7 @@ def test_structure_news_raw(tmp_path: Path) -> None:
 
 
 def test_structure_mixed_single(tmp_path: Path) -> None:
+    """Verify structure mixed single."""
     _run_case(
         tmp_path,
         fixture="mixed",
@@ -64,6 +70,7 @@ def test_structure_mixed_single(tmp_path: Path) -> None:
 
 
 def test_structure_mixed_multi(tmp_path: Path) -> None:
+    """Verify structure mixed multi."""
     _run_case(
         tmp_path,
         fixture="mixed",
@@ -79,6 +86,7 @@ def test_structure_mixed_multi(tmp_path: Path) -> None:
 
 
 def test_structure_edge_cases(tmp_path: Path) -> None:
+    """Verify structure edge cases."""
     _run_case(
         tmp_path,
         fixture="edge_cases",

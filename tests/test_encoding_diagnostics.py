@@ -1,3 +1,5 @@
+"""Test module for encoding diagnostics."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,6 +28,7 @@ def _init_project(tmp_path: Path) -> Path:
 
 
 def test_scan_encoding_issues_reports_decode_error(tmp_path: Path) -> None:
+    """Verify scan encoding issues reports decode error."""
     root = _init_project(tmp_path)
     be = _init_locale(root, "BE", charset="UTF-8")
     path = be / "ui.txt"
@@ -38,6 +41,7 @@ def test_scan_encoding_issues_reports_decode_error(tmp_path: Path) -> None:
 
 
 def test_scan_encoding_issues_reports_utf16_bomless_warning(tmp_path: Path) -> None:
+    """Verify scan encoding issues reports utf16 bomless warning."""
     root = _init_project(tmp_path)
     ko = _init_locale(root, "KO", charset="UTF-16")
     path = ko / "ui.txt"
@@ -56,6 +60,7 @@ def test_scan_encoding_issues_reports_utf16_bomless_warning(tmp_path: Path) -> N
 
 
 def test_scan_encoding_issues_reports_bom_mismatch(tmp_path: Path) -> None:
+    """Verify scan encoding issues reports bom mismatch."""
     root = _init_project(tmp_path)
     ru = _init_locale(root, "RU", charset="CP1251")
     path = ru / "ui.txt"
@@ -68,6 +73,7 @@ def test_scan_encoding_issues_reports_bom_mismatch(tmp_path: Path) -> None:
 
 
 def test_format_encoding_report_is_copyable_text(tmp_path: Path) -> None:
+    """Verify format encoding report is copyable text."""
     root = _init_project(tmp_path)
     be = _init_locale(root, "BE", charset="UTF-8")
     path = be / "ui.txt"

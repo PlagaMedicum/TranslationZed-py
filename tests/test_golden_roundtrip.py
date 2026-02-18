@@ -1,3 +1,5 @@
+"""Test module for golden roundtrip."""
+
 from pathlib import Path
 
 from translationzed_py.core import parse
@@ -18,6 +20,7 @@ def _run_case(
 
 
 def test_golden_utf8(tmp_path: Path):
+    """Verify golden utf8."""
     _run_case(
         tmp_path,
         "utf8",
@@ -27,6 +30,7 @@ def test_golden_utf8(tmp_path: Path):
 
 
 def test_golden_cp1251(tmp_path: Path):
+    """Verify golden cp1251."""
     _run_case(
         tmp_path,
         "cp1251",
@@ -36,6 +40,7 @@ def test_golden_cp1251(tmp_path: Path):
 
 
 def test_golden_utf16(tmp_path: Path):
+    """Verify golden utf16."""
     _run_case(
         tmp_path,
         "utf16",

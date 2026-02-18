@@ -1,3 +1,5 @@
+"""Test module for gui about dialog."""
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -9,6 +11,7 @@ from translationzed_py.gui.dialogs import AboutDialog
 
 
 def test_about_dialog_has_compact_top_aligned_layout(qtbot) -> None:
+    """Verify about dialog has compact top aligned layout."""
     dialog = AboutDialog()
     qtbot.addWidget(dialog)
     layout = dialog.layout()
@@ -17,6 +20,7 @@ def test_about_dialog_has_compact_top_aligned_layout(qtbot) -> None:
 
 
 def test_about_dialog_license_toggle_does_not_resize_window(qtbot) -> None:
+    """Verify about dialog license toggle does not resize window."""
     dialog = AboutDialog()
     qtbot.addWidget(dialog)
     dialog.show()
