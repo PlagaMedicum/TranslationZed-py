@@ -1,3 +1,5 @@
+"""Test module for tm store."""
+
 import gc
 import warnings
 from pathlib import Path
@@ -6,6 +8,7 @@ from translationzed_py.core.tm_store import TMStore
 
 
 def test_tm_store_exact_and_fuzzy(tmp_path: Path) -> None:
+    """Verify tm store exact and fuzzy."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -70,6 +73,7 @@ def test_tm_store_exact_and_fuzzy(tmp_path: Path) -> None:
 
 
 def test_tm_store_project_match_exposes_row_status(tmp_path: Path) -> None:
+    """Verify tm store project match exposes row status."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -103,6 +107,7 @@ def test_tm_store_project_match_exposes_row_status(tmp_path: Path) -> None:
 
 
 def test_tm_store_query_path_closes_temporary_connections(tmp_path: Path) -> None:
+    """Verify tm store query path closes temporary connections."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -137,6 +142,7 @@ def test_tm_store_query_path_closes_temporary_connections(tmp_path: Path) -> Non
 
 
 def test_tm_store_filters_low_token_overlap_candidates(tmp_path: Path) -> None:
+    """Verify tm store filters low token overlap candidates."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -167,6 +173,7 @@ def test_tm_store_filters_low_token_overlap_candidates(tmp_path: Path) -> None:
 def test_tm_store_plural_neighbor_is_returned_for_single_token_query(
     tmp_path: Path,
 ) -> None:
+    """Verify tm store plural neighbor is returned for single token query."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -198,6 +205,7 @@ def test_tm_store_plural_neighbor_is_returned_for_single_token_query(
 
 
 def test_tm_store_tagged_query_matches_phrase_candidate(tmp_path: Path) -> None:
+    """Verify tm store tagged query matches phrase candidate."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -222,6 +230,7 @@ def test_tm_store_tagged_query_matches_phrase_candidate(tmp_path: Path) -> None:
 
 
 def test_tm_store_fuzzy_prefix_lookup_finds_neighboring_strings(tmp_path: Path) -> None:
+    """Verify tm store fuzzy prefix lookup finds neighboring strings."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -273,6 +282,7 @@ def test_tm_store_fuzzy_prefix_lookup_finds_neighboring_strings(tmp_path: Path) 
 def test_tm_store_keeps_fuzzy_neighbors_when_exact_pool_is_large(
     tmp_path: Path,
 ) -> None:
+    """Verify tm store keeps fuzzy neighbors when exact pool is large."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -308,6 +318,7 @@ def test_tm_store_keeps_fuzzy_neighbors_when_exact_pool_is_large(
 
 
 def test_tm_store_short_query_includes_phrase_neighbors(tmp_path: Path) -> None:
+    """Verify tm store short query includes phrase neighbors."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -350,6 +361,7 @@ def test_tm_store_short_query_includes_phrase_neighbors(tmp_path: Path) -> None:
 def test_tm_store_multi_token_query_includes_non_prefix_neighbors(
     tmp_path: Path,
 ) -> None:
+    """Verify tm store multi token query includes non prefix neighbors."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -382,6 +394,7 @@ def test_tm_store_multi_token_query_includes_non_prefix_neighbors(
 
 
 def test_tm_store_project_origin_keeps_fuzzy_neighbors(tmp_path: Path) -> None:
+    """Verify tm store project origin keeps fuzzy neighbors."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -415,6 +428,7 @@ def test_tm_store_project_origin_keeps_fuzzy_neighbors(tmp_path: Path) -> None:
 
 
 def test_tm_store_import_origin_keeps_fuzzy_neighbors(tmp_path: Path) -> None:
+    """Verify tm store import origin keeps fuzzy neighbors."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -449,6 +463,7 @@ def test_tm_store_import_origin_keeps_fuzzy_neighbors(tmp_path: Path) -> None:
 def test_tm_store_multi_token_query_handles_single_char_token_typos(
     tmp_path: Path,
 ) -> None:
+    """Verify tm store multi token query handles single char token typos."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -479,6 +494,7 @@ def test_tm_store_multi_token_query_handles_single_char_token_typos(
 
 
 def test_tm_store_single_token_query_filters_substring_noise(tmp_path: Path) -> None:
+    """Verify tm store single token query filters substring noise."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -510,6 +526,7 @@ def test_tm_store_single_token_query_filters_substring_noise(tmp_path: Path) -> 
 
 
 def test_tm_store_token_matching_supports_common_affixes(tmp_path: Path) -> None:
+    """Verify tm store token matching supports common affixes."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -541,6 +558,7 @@ def test_tm_store_token_matching_supports_common_affixes(tmp_path: Path) -> None
 
 
 def test_tm_store_affix_stemming_is_scoped_to_en_source_locale(tmp_path: Path) -> None:
+    """Verify tm store affix stemming is scoped to en source locale."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -571,6 +589,7 @@ def test_tm_store_affix_stemming_is_scoped_to_en_source_locale(tmp_path: Path) -
 
 
 def test_tm_store_exposes_ranked_and_raw_scores_for_diagnostics(tmp_path: Path) -> None:
+    """Verify tm store exposes ranked and raw scores for diagnostics."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -603,6 +622,7 @@ def test_tm_store_exposes_ranked_and_raw_scores_for_diagnostics(tmp_path: Path) 
 
 
 def test_tm_store_fuzzy_prefix_lookup_handles_dense_prefix_sets(tmp_path: Path) -> None:
+    """Verify tm store fuzzy prefix lookup handles dense prefix sets."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -640,6 +660,7 @@ def test_tm_store_fuzzy_prefix_lookup_handles_dense_prefix_sets(tmp_path: Path) 
 
 
 def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
+    """Verify tm import file registry and replace."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -759,6 +780,7 @@ def test_tm_import_file_registry_and_replace(tmp_path: Path) -> None:
 
 
 def test_tm_store_replace_import_tm_with_xliff(tmp_path: Path) -> None:
+    """Verify tm store replace import tm with xliff."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)
@@ -805,6 +827,7 @@ def test_tm_store_replace_import_tm_with_xliff(tmp_path: Path) -> None:
 
 
 def test_tm_store_replace_import_tm_with_po(tmp_path: Path) -> None:
+    """Verify tm store replace import tm with po."""
     root = tmp_path / "root"
     root.mkdir()
     store = TMStore(root)

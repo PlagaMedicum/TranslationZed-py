@@ -1,3 +1,5 @@
+"""Test module for tm workflow service."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -57,6 +59,7 @@ def _import_file(
 
 
 def test_tm_workflow_queue_and_flush_batches() -> None:
+    """Verify tm workflow queue and flush batches."""
     service = TMWorkflowService()
     service.queue_updates(
         "root/BE/a.txt",
@@ -82,6 +85,7 @@ def test_tm_workflow_queue_and_flush_batches() -> None:
 
 
 def test_tm_workflow_query_plan_modes() -> None:
+    """Verify tm workflow query plan modes."""
     service = TMWorkflowService()
     disabled = service.plan_query(
         lookup=("abc", "BE"),
@@ -109,6 +113,7 @@ def test_tm_workflow_query_plan_modes() -> None:
 
 
 def test_tm_workflow_query_cache_limit_and_filtering() -> None:
+    """Verify tm workflow query cache limit and filtering."""
     service = TMWorkflowService(cache_limit=1)
     first = service.plan_query(lookup=("one", "BE"), policy=TMQueryPolicy())
     second = service.plan_query(lookup=("two", "BE"), policy=TMQueryPolicy())
@@ -141,12 +146,14 @@ def test_tm_workflow_query_cache_limit_and_filtering() -> None:
 
 
 def test_tm_workflow_query_terms_tokenize_and_deduplicate() -> None:
+    """Verify tm workflow query terms tokenize and deduplicate."""
     service = TMWorkflowService()
     terms = service.query_terms("Drop one, drop <LINE> one!")
     assert terms == ["drop", "one", "line"]
 
 
 def test_tm_workflow_preference_actions_wrappers(tmp_path: Path) -> None:
+    """Verify tm workflow preference actions wrappers."""
     service = TMWorkflowService()
     remove_path = tmp_path / "old.tmx"
     import_path = tmp_path / "new.tmx"
@@ -184,6 +191,7 @@ def test_tm_workflow_preference_actions_wrappers(tmp_path: Path) -> None:
 
 
 def test_tm_workflow_sync_import_folder_wrapper_delegates(monkeypatch) -> None:
+    """Verify tm workflow sync import folder wrapper delegates."""
     service = TMWorkflowService()
     calls: dict[str, object] = {}
 
@@ -223,6 +231,7 @@ def test_tm_workflow_sync_import_folder_wrapper_delegates(monkeypatch) -> None:
 
 
 def test_tm_workflow_collect_rebuild_locales_wrapper_delegates(monkeypatch) -> None:
+    """Verify tm workflow collect rebuild locales wrapper delegates."""
     service = TMWorkflowService()
     calls: dict[str, object] = {}
 
@@ -247,6 +256,7 @@ def test_tm_workflow_collect_rebuild_locales_wrapper_delegates(monkeypatch) -> N
 
 
 def test_tm_workflow_rebuild_project_tm_wrapper_delegates(monkeypatch) -> None:
+    """Verify tm workflow rebuild project tm wrapper delegates."""
     service = TMWorkflowService()
     calls: dict[str, object] = {}
 
@@ -276,6 +286,7 @@ def test_tm_workflow_rebuild_project_tm_wrapper_delegates(monkeypatch) -> None:
 
 
 def test_tm_workflow_format_rebuild_status_wrapper_delegates(monkeypatch) -> None:
+    """Verify tm workflow format rebuild status wrapper delegates."""
     service = TMWorkflowService()
     calls: dict[str, object] = {}
 
@@ -293,6 +304,7 @@ def test_tm_workflow_format_rebuild_status_wrapper_delegates(monkeypatch) -> Non
 
 
 def test_tm_workflow_build_suggestions_view_formats_items() -> None:
+    """Verify tm workflow build suggestions view formats items."""
     service = TMWorkflowService()
     matches = [
         _match(
@@ -319,6 +331,7 @@ def test_tm_workflow_build_suggestions_view_formats_items() -> None:
 
 
 def test_tm_workflow_build_suggestions_view_imported_label_has_no_status_tag() -> None:
+    """Verify expected behavior."""
     service = TMWorkflowService()
     view = service.build_suggestions_view(
         matches=[
@@ -332,6 +345,7 @@ def test_tm_workflow_build_suggestions_view_imported_label_has_no_status_tag() -
 
 
 def test_tm_workflow_build_locale_variants_view_formats_compact_items() -> None:
+    """Verify tm workflow build locale variants view formats compact items."""
     service = TMWorkflowService()
     view = service.build_locale_variants_view(
         variants=[
@@ -348,6 +362,7 @@ def test_tm_workflow_build_locale_variants_view_formats_compact_items() -> None:
 
 
 def test_tm_workflow_build_suggestions_view_empty_and_filtered_messages() -> None:
+    """Verify tm workflow build suggestions view empty and filtered messages."""
     service = TMWorkflowService()
     empty = service.build_suggestions_view(
         matches=[],
@@ -365,6 +380,7 @@ def test_tm_workflow_build_suggestions_view_empty_and_filtered_messages() -> Non
 
 
 def test_tm_workflow_build_query_request_from_cache_key() -> None:
+    """Verify tm workflow build query request from cache key."""
     service = TMWorkflowService()
     key = ("Drop one", "EN", "BE", 20, True, False)
     req = service.build_query_request(key)
@@ -377,6 +393,7 @@ def test_tm_workflow_build_query_request_from_cache_key() -> None:
 
 
 def test_tm_workflow_build_apply_plan() -> None:
+    """Verify tm workflow build apply plan."""
     service = TMWorkflowService()
     plan = service.build_apply_plan(
         _match(source="Drop one", target="Скінуць шт.", score=92)
@@ -388,6 +405,7 @@ def test_tm_workflow_build_apply_plan() -> None:
 
 
 def test_tm_workflow_build_selection_plan() -> None:
+    """Verify tm workflow build selection plan."""
     service = TMWorkflowService()
     no_match = service.build_selection_plan(
         match=None,
@@ -409,6 +427,7 @@ def test_tm_workflow_build_selection_plan() -> None:
 
 
 def test_tm_workflow_build_lookup_validates_source_and_locale() -> None:
+    """Verify tm workflow build lookup validates source and locale."""
     service = TMWorkflowService()
     assert service.build_lookup(source_text="Drop one", target_locale="BE") == (
         "Drop one",
@@ -419,6 +438,7 @@ def test_tm_workflow_build_lookup_validates_source_and_locale() -> None:
 
 
 def test_tm_workflow_build_update_plan() -> None:
+    """Verify tm workflow build update plan."""
     service = TMWorkflowService()
     skip = service.build_update_plan(
         has_store=False,
@@ -458,6 +478,7 @@ def test_tm_workflow_build_update_plan() -> None:
 
 
 def test_tm_workflow_build_refresh_plan() -> None:
+    """Verify tm workflow build refresh plan."""
     service = TMWorkflowService()
     disabled = service.build_refresh_plan(
         has_store=False,
@@ -496,6 +517,7 @@ def test_tm_workflow_build_refresh_plan() -> None:
 
 
 def test_tm_workflow_build_filter_plan_normalizes_min_score_and_extras() -> None:
+    """Verify tm workflow build filter plan normalizes min score and extras."""
     service = TMWorkflowService()
     plan = service.build_filter_plan(
         source_locale="EN",
@@ -516,6 +538,7 @@ def test_tm_workflow_build_filter_plan_normalizes_min_score_and_extras() -> None
 
 
 def test_tm_workflow_build_query_request_for_lookup() -> None:
+    """Verify tm workflow build query request for lookup."""
     service = TMWorkflowService()
     req = service.build_query_request_for_lookup(
         lookup=("Drop one", "BE"),
@@ -535,6 +558,7 @@ def test_tm_workflow_build_query_request_for_lookup() -> None:
 
 
 def test_tm_workflow_build_diagnostics_report() -> None:
+    """Verify tm workflow build diagnostics report."""
     service = TMWorkflowService()
     policy = TMQueryPolicy(
         min_score=25, limit=60, origin_project=True, origin_import=True
@@ -573,6 +597,7 @@ def test_tm_workflow_build_diagnostics_report() -> None:
 
 
 def test_tm_workflow_build_diagnostics_report_with_query() -> None:
+    """Verify tm workflow build diagnostics report with query."""
     service = TMWorkflowService()
     policy = TMQueryPolicy(
         min_score=3, limit=12, origin_project=False, origin_import=True
@@ -612,6 +637,7 @@ def test_tm_workflow_build_diagnostics_report_with_query() -> None:
 
 
 def test_tm_workflow_diagnostics_report_for_store_adapter() -> None:
+    """Verify tm workflow diagnostics report for store adapter."""
     service = TMWorkflowService()
 
     class _Store:

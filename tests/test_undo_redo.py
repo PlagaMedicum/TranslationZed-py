@@ -1,3 +1,5 @@
+"""Test module for undo redo."""
+
 import tempfile
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from translationzed_py.gui.entry_model import TranslationModel
 
 
 def test_undo_redo(qtbot):
+    """Verify undo redo."""
     with tempfile.TemporaryDirectory() as tmpd:
         p = Path(tmpd) / "file.txt"
         p.write_text('HELLO = "Hi"\n', encoding="utf-8")

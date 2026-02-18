@@ -1,3 +1,5 @@
+"""Test module for tmx io."""
+
 import struct
 import zipfile
 from pathlib import Path
@@ -14,6 +16,7 @@ from translationzed_py.core.tmx_io import (
 
 
 def test_tmx_roundtrip(tmp_path: Path) -> None:
+    """Verify tmx roundtrip."""
     path = tmp_path / "sample.tmx"
     pairs = [("Hello", "Privet"), ("Bye", "Poka")]
     write_tmx(path, pairs, source_locale="EN", target_locale="BE")
@@ -25,6 +28,7 @@ def test_tmx_roundtrip(tmp_path: Path) -> None:
 
 
 def test_iter_tmx_pairs_matches_bcp47_region_variants(tmp_path: Path) -> None:
+    """Verify iter tmx pairs matches bcp47 region variants."""
     path = tmp_path / "variants.tmx"
     path.write_text(
         """<?xml version="1.0" encoding="UTF-8"?>
@@ -51,6 +55,7 @@ def test_iter_tmx_pairs_matches_bcp47_region_variants(tmp_path: Path) -> None:
 
 
 def test_iter_tm_pairs_xliff_and_detect_languages(tmp_path: Path) -> None:
+    """Verify iter tm pairs xliff and detect languages."""
     path = tmp_path / "sample.xliff"
     path.write_text(
         """<?xml version="1.0" encoding="UTF-8"?>
@@ -75,6 +80,7 @@ def test_iter_tm_pairs_xliff_and_detect_languages(tmp_path: Path) -> None:
 
 
 def test_iter_tm_pairs_po_and_detect_languages(tmp_path: Path) -> None:
+    """Verify iter tm pairs po and detect languages."""
     path = tmp_path / "sample.po"
     path.write_text(
         """
@@ -96,6 +102,7 @@ msgstr "Прывітанне свет"
 
 
 def test_supported_tm_import_suffixes() -> None:
+    """Verify supported tm import suffixes."""
     assert supported_tm_import_suffixes() == (
         ".tmx",
         ".xliff",
@@ -110,6 +117,7 @@ def test_supported_tm_import_suffixes() -> None:
 
 
 def test_iter_tm_pairs_xlf_alias(tmp_path: Path) -> None:
+    """Verify iter tm pairs xlf alias."""
     path = tmp_path / "sample.xlf"
     path.write_text(
         """<?xml version="1.0" encoding="UTF-8"?>
@@ -134,6 +142,7 @@ def test_iter_tm_pairs_xlf_alias(tmp_path: Path) -> None:
 
 
 def test_iter_tm_pairs_pot_alias(tmp_path: Path) -> None:
+    """Verify iter tm pairs pot alias."""
     path = tmp_path / "sample.pot"
     path.write_text(
         """
@@ -155,6 +164,7 @@ msgstr "Прывітанне свет"
 
 
 def test_iter_tm_pairs_csv_with_header(tmp_path: Path) -> None:
+    """Verify iter tm pairs csv with header."""
     path = tmp_path / "sample.csv"
     path.write_text(
         "source,target\n" "Hello world,Прывітанне свет\n" "Drop all,Скінуць усё\n",
@@ -168,6 +178,7 @@ def test_iter_tm_pairs_csv_with_header(tmp_path: Path) -> None:
 
 
 def test_iter_tm_pairs_csv_without_header(tmp_path: Path) -> None:
+    """Verify iter tm pairs csv without header."""
     path = tmp_path / "sample.csv"
     path.write_text(
         "Hello world,Прывітанне свет\n" "Drop all,Скінуць усё\n",
@@ -181,6 +192,7 @@ def test_iter_tm_pairs_csv_without_header(tmp_path: Path) -> None:
 
 
 def test_detect_tm_languages_csv_from_locale_columns(tmp_path: Path) -> None:
+    """Verify detect tm languages csv from locale columns."""
     path = tmp_path / "sample.csv"
     path.write_text(
         "source_locale,target_locale,source,target\n"
@@ -193,6 +205,7 @@ def test_detect_tm_languages_csv_from_locale_columns(tmp_path: Path) -> None:
 
 
 def test_iter_tm_pairs_mo_and_detect_languages(tmp_path: Path) -> None:
+    """Verify iter tm pairs mo and detect languages."""
     path = tmp_path / "sample.mo"
     _write_mo(
         path,
@@ -217,6 +230,7 @@ def test_iter_tm_pairs_mo_and_detect_languages(tmp_path: Path) -> None:
 
 
 def test_iter_tm_pairs_xml_and_detect_languages(tmp_path: Path) -> None:
+    """Verify iter tm pairs xml and detect languages."""
     path = tmp_path / "sample.xml"
     path.write_text(
         """<?xml version="1.0" encoding="UTF-8"?>
@@ -241,6 +255,7 @@ def test_iter_tm_pairs_xml_and_detect_languages(tmp_path: Path) -> None:
 
 
 def test_iter_tm_pairs_xlsx_and_detect_languages(tmp_path: Path) -> None:
+    """Verify iter tm pairs xlsx and detect languages."""
     path = tmp_path / "sample.xlsx"
     _write_xlsx(
         path,
@@ -261,6 +276,7 @@ def test_iter_tm_pairs_xlsx_and_detect_languages(tmp_path: Path) -> None:
 
 
 def test_iter_tm_pairs_unsupported_extension_raises(tmp_path: Path) -> None:
+    """Verify iter tm pairs unsupported extension raises."""
     path = tmp_path / "sample.json"
     path.write_text('{"a": 1}\n', encoding="utf-8")
 
@@ -275,6 +291,7 @@ def test_iter_tm_pairs_unsupported_extension_raises(tmp_path: Path) -> None:
 def test_detect_tm_languages_unsupported_extension_returns_empty(
     tmp_path: Path,
 ) -> None:
+    """Verify detect tm languages unsupported extension returns empty."""
     path = tmp_path / "sample.json"
     path.write_text('{"a": 1}\n', encoding="utf-8")
     assert detect_tm_languages(path) == set()

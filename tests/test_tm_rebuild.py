@@ -1,3 +1,5 @@
+"""Test module for tm rebuild."""
+
 from pathlib import Path
 
 from translationzed_py.core.project_scanner import LocaleMeta
@@ -14,6 +16,7 @@ from translationzed_py.core.tm_store import TMStore
 def test_collect_rebuild_locales_uses_en_encoding_and_skips_missing(
     tmp_path: Path,
 ) -> None:
+    """Verify collect rebuild locales uses en encoding and skips missing."""
     locales = {
         "EN": LocaleMeta("EN", tmp_path / "EN", "English", "utf-16"),
         "BE": LocaleMeta("BE", tmp_path / "BE", "Belarusian", "utf-8"),
@@ -24,6 +27,7 @@ def test_collect_rebuild_locales_uses_en_encoding_and_skips_missing(
 
 
 def test_rebuild_project_tm_writes_entries_and_counts_skips(tmp_path: Path) -> None:
+    """Verify rebuild project tm writes entries and counts skips."""
     root = tmp_path / "root"
     (root / "EN").mkdir(parents=True)
     (root / "BE").mkdir(parents=True)
@@ -66,6 +70,7 @@ def test_rebuild_project_tm_writes_entries_and_counts_skips(tmp_path: Path) -> N
 
 
 def test_format_rebuild_status_includes_skip_summary() -> None:
+    """Verify format rebuild status includes skip summary."""
     text = format_rebuild_status(
         TMRebuildResult(
             entries=10,

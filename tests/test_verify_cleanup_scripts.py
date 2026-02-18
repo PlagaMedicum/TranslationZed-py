@@ -1,3 +1,5 @@
+"""Test module for verify cleanup scripts."""
+
 from __future__ import annotations
 
 import os
