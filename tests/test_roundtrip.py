@@ -1,9 +1,12 @@
+"""Test module for roundtrip."""
+
 from pathlib import Path
 
 from translationzed_py.core import parse
 
 
 def test_roundtrip(tmp_path: Path):
+    """Verify roundtrip."""
     f = tmp_path / "test.txt"
     f.write_text('UI_YES = "Yes"\n')
     pf = parse(f)

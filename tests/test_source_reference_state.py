@@ -1,3 +1,5 @@
+"""Test module for source reference state."""
+
 from pathlib import Path
 
 from translationzed_py.gui.source_reference_state import (
@@ -9,6 +11,7 @@ from translationzed_py.gui.source_reference_state import (
 
 
 def test_apply_source_reference_mode_change_updates_global_mode() -> None:
+    """Verify apply source reference mode change updates global mode."""
     extras: dict[str, str] = {}
     overrides: dict[str, str] = {}
     mode, changed = apply_source_reference_mode_change(
@@ -25,6 +28,7 @@ def test_apply_source_reference_mode_change_updates_global_mode() -> None:
 
 
 def test_apply_source_reference_mode_change_updates_file_override() -> None:
+    """Verify apply source reference mode change updates file override."""
     extras: dict[str, str] = {}
     overrides = {"BE/ui.txt": "EN"}
     mode, changed = apply_source_reference_mode_change(
@@ -42,6 +46,7 @@ def test_apply_source_reference_mode_change_updates_file_override() -> None:
 
 
 def test_normalize_source_reference_fallback_policy() -> None:
+    """Verify normalize source reference fallback policy."""
     assert (
         normalize_source_reference_fallback_policy("target_then_en") == "TARGET_THEN_EN"
     )
@@ -49,11 +54,13 @@ def test_normalize_source_reference_fallback_policy() -> None:
 
 
 def test_source_reference_fallback_pair() -> None:
+    """Verify source reference fallback pair."""
     assert source_reference_fallback_pair("BE", "EN_THEN_TARGET") == ("EN", "BE")
     assert source_reference_fallback_pair("BE", "TARGET_THEN_EN") == ("BE", "EN")
 
 
 def test_apply_source_reference_preferences_updates_policy() -> None:
+    """Verify apply source reference preferences updates policy."""
     extras: dict[str, str] = {}
     overrides = {"BE/ui.txt": "RU"}
     policy, changed = apply_source_reference_preferences(

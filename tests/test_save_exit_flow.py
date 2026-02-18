@@ -1,3 +1,5 @@
+"""Test module for save exit flow."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,6 +18,7 @@ from translationzed_py.core.save_exit_flow import (
 
 
 def test_apply_write_original_flow_shows_nothing_to_write_when_empty() -> None:
+    """Verify apply write original flow shows nothing to write when empty."""
     events: list[str] = []
 
     def _write_cache() -> bool:
@@ -48,6 +51,7 @@ def test_apply_write_original_flow_shows_nothing_to_write_when_empty() -> None:
 
 
 def test_apply_write_original_flow_write_calls_save_once() -> None:
+    """Verify apply write original flow write calls save once."""
     events: list[str] = []
     files = [Path("BE/ui.txt")]
 
@@ -81,6 +85,7 @@ def test_apply_write_original_flow_write_calls_save_once() -> None:
 
 
 def test_should_accept_close_blocks_on_cancel() -> None:
+    """Verify should accept close blocks on cancel."""
     events: list[str] = []
     files = [Path("BE/ui.txt")]
 
@@ -112,6 +117,7 @@ def test_should_accept_close_blocks_on_cancel() -> None:
 
 
 def test_should_accept_close_with_write_runs_final_cache_check() -> None:
+    """Verify should accept close with write runs final cache check."""
     events: list[str] = []
     files = [Path("BE/ui.txt")]
 
@@ -143,6 +149,7 @@ def test_should_accept_close_with_write_runs_final_cache_check() -> None:
 
 
 def test_should_accept_close_returns_false_on_final_cache_failure() -> None:
+    """Verify should accept close returns false on final cache failure."""
     calls = {"cache": 0}
 
     def _write_cache() -> bool:
@@ -162,6 +169,7 @@ def test_should_accept_close_returns_false_on_final_cache_failure() -> None:
 
 
 def test_run_save_batch_flow_empty_files() -> None:
+    """Verify run save batch flow empty files."""
     outcome = run_save_batch_flow(
         files=[],
         current_file=None,
@@ -174,6 +182,7 @@ def test_run_save_batch_flow_empty_files() -> None:
 
 
 def test_run_save_batch_flow_aborts_when_current_save_fails() -> None:
+    """Verify run save batch flow aborts when current save fails."""
     calls: list[str] = []
     files = [Path("BE/current.txt"), Path("BE/other.txt")]
 
@@ -194,6 +203,7 @@ def test_run_save_batch_flow_aborts_when_current_save_fails() -> None:
 
 
 def test_run_save_batch_flow_collects_failures() -> None:
+    """Verify run save batch flow collects failures."""
     calls: list[str] = []
     files = [Path("BE/current.txt"), Path("BE/a.txt"), Path("BE/b.txt")]
 
@@ -214,6 +224,7 @@ def test_run_save_batch_flow_collects_failures() -> None:
 
 
 def test_build_save_dialog_labels_prefers_root_relative_paths() -> None:
+    """Verify build save dialog labels prefers root relative paths."""
     root = Path("/tmp/proj")
     files = [root / "BE" / "ui.txt", Path("/outside/menu.txt")]
 
@@ -223,6 +234,7 @@ def test_build_save_dialog_labels_prefers_root_relative_paths() -> None:
 
 
 def test_apply_save_dialog_selection_uses_selected_labels() -> None:
+    """Verify apply save dialog selection uses selected labels."""
     files = [Path("BE/a.txt"), Path("BE/b.txt")]
     labels = ("BE/a.txt", "BE/b.txt")
 
@@ -242,6 +254,7 @@ def test_apply_save_dialog_selection_uses_selected_labels() -> None:
 
 
 def test_format_save_failures_renders_root_relative_lines() -> None:
+    """Verify format save failures renders root relative lines."""
     root = Path("/tmp/proj")
     message = format_save_failures(
         failures=[root / "BE" / "ui.txt", Path("/outside/menu.txt")],
@@ -252,6 +265,7 @@ def test_format_save_failures_renders_root_relative_lines() -> None:
 
 
 def test_build_save_batch_render_plan_for_aborted_outcome() -> None:
+    """Verify build save batch render plan for aborted outcome."""
     plan = build_save_batch_render_plan(
         outcome=SaveBatchOutcome(aborted=True, failures=(), saved_any=False),
         root=Path("/tmp/proj"),
@@ -262,6 +276,7 @@ def test_build_save_batch_render_plan_for_aborted_outcome() -> None:
 
 
 def test_build_save_batch_render_plan_for_failures() -> None:
+    """Verify build save batch render plan for failures."""
     root = Path("/tmp/proj")
     plan = build_save_batch_render_plan(
         outcome=SaveBatchOutcome(
@@ -277,6 +292,7 @@ def test_build_save_batch_render_plan_for_failures() -> None:
 
 
 def test_build_save_batch_render_plan_for_clean_success() -> None:
+    """Verify build save batch render plan for clean success."""
     plan = build_save_batch_render_plan(
         outcome=SaveBatchOutcome(aborted=False, failures=(), saved_any=True),
         root=Path("/tmp/proj"),
@@ -287,6 +303,7 @@ def test_build_save_batch_render_plan_for_clean_success() -> None:
 
 
 def test_save_exit_flow_service_wraps_helper_calls() -> None:
+    """Verify save exit flow service wraps helper calls."""
     service = SaveExitFlowService()
     root = Path("/tmp/proj")
     files = [root / "BE" / "a.txt"]

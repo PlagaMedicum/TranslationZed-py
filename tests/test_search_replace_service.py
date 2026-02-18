@@ -1,3 +1,5 @@
+"""Test module for search replace service."""
+
 from __future__ import annotations
 
 import re
@@ -57,6 +59,7 @@ from translationzed_py.core.status_cache import CacheEntry, CacheMap
 
 
 def test_scope_files_resolves_file_locale_pool() -> None:
+    """Verify scope files resolves file locale pool."""
     current = Path("BE/ui.txt")
     files_by_locale = {
         "BE": [Path("BE/a.txt"), Path("BE/b.txt")],
@@ -93,6 +96,7 @@ def test_scope_files_resolves_file_locale_pool() -> None:
 
 
 def test_search_replace_service_delegates_scope_and_search_spec_helpers() -> None:
+    """Verify search replace service delegates scope and search spec helpers."""
     service = SearchReplaceService()
     current = Path("BE/ui.txt")
     files = service.scope_files(
@@ -110,6 +114,7 @@ def test_search_replace_service_delegates_scope_and_search_spec_helpers() -> Non
 
 
 def test_prioritize_current_file_moves_current_to_front() -> None:
+    """Verify prioritize current file moves current to front."""
     files = [Path("a"), Path("b"), Path("c")]
     assert prioritize_current_file(files, Path("b")) == [
         Path("b"),
@@ -120,6 +125,7 @@ def test_prioritize_current_file_moves_current_to_front() -> None:
 
 
 def test_scope_label_and_search_spec() -> None:
+    """Verify scope label and search spec."""
     assert (
         scope_label(scope="LOCALE", current_locale="BE", selected_locale_count=3)
         == "Locale BE"
@@ -138,12 +144,14 @@ def test_scope_label_and_search_spec() -> None:
 
 
 def test_search_result_label_includes_relative_path_row_and_preview() -> None:
+    """Verify search result label includes relative path row and preview."""
     root = Path("/tmp/proj")
     match = Match(root / "BE" / "ui.txt", 7, preview="hello world")
     assert search_result_label(match=match, root=root) == "BE/ui.txt:8 · hello world"
 
 
 def test_search_result_label_handles_external_path_without_preview() -> None:
+    """Verify search result label handles external path without preview."""
     root = Path("/tmp/proj")
     external = Path("/var/tmp/external.txt")
     match = Match(external, 0)
@@ -151,6 +159,7 @@ def test_search_result_label_handles_external_path_without_preview() -> None:
 
 
 def test_build_search_panel_plan_with_truncation() -> None:
+    """Verify build search panel plan with truncation."""
     root = Path("/tmp/proj")
     files = [root / "BE" / "a.txt", root / "BE" / "b.txt"]
     by_file = {
@@ -175,6 +184,7 @@ def test_build_search_panel_plan_with_truncation() -> None:
 
 
 def test_build_search_panel_plan_without_matches() -> None:
+    """Verify build search panel plan without matches."""
     root = Path("/tmp/proj")
     files = [root / "BE" / "a.txt"]
     service = SearchReplaceService()
@@ -190,6 +200,7 @@ def test_build_search_panel_plan_without_matches() -> None:
 
 
 def test_build_search_run_plan_for_empty_query_and_missing_files() -> None:
+    """Verify build search run plan for empty query and missing files."""
     service = SearchReplaceService()
     empty_query = service.build_search_run_plan(
         query_text="   ",
@@ -217,6 +228,7 @@ def test_build_search_run_plan_for_empty_query_and_missing_files() -> None:
 
 
 def test_build_search_run_plan_resolves_search_field_and_anchor() -> None:
+    """Verify build search run plan resolves search field and anchor."""
     service = SearchReplaceService()
     files = [Path("a.txt"), Path("b.txt")]
     plan = service.build_search_run_plan(
@@ -240,6 +252,7 @@ def test_build_search_run_plan_resolves_search_field_and_anchor() -> None:
 
 
 def test_anchor_and_fallback_rows() -> None:
+    """Verify anchor and fallback rows."""
     assert anchor_row(4, 1) == 4
     assert anchor_row(None, 1) == -1
     assert anchor_row(None, -1) > 1_000_000
@@ -248,6 +261,7 @@ def test_anchor_and_fallback_rows() -> None:
 
 
 def test_find_match_in_rows_forward_and_backward() -> None:
+    """Verify find match in rows forward and backward."""
     rows = [
         SearchRow(Path("x"), 0, "A", "s0", "v0"),
         SearchRow(Path("x"), 1, "B", "s1", "needle"),
@@ -274,6 +288,7 @@ def test_find_match_in_rows_forward_and_backward() -> None:
 
 
 def test_find_match_in_rows_honors_case_sensitive_toggle() -> None:
+    """Verify find match in rows honors case sensitive toggle."""
     rows = [SearchRow(Path("x"), 0, "A", "Alpha", "Value")]
 
     insensitive = find_match_in_rows(
@@ -300,6 +315,7 @@ def test_find_match_in_rows_honors_case_sensitive_toggle() -> None:
 
 
 def test_replace_text_single_and_all_modes() -> None:
+    """Verify replace text single and all modes."""
     pattern = re.compile("a")
     changed, text = replace_text(
         "aba",
@@ -327,6 +343,7 @@ def test_replace_text_single_and_all_modes() -> None:
 
 
 def test_replace_text_handles_regex_groups_and_empty_match_case() -> None:
+    """Verify replace text handles regex groups and empty match case."""
     pattern = re.compile(r"(foo)")
     changed, text = replace_text(
         "foo",
@@ -367,6 +384,7 @@ def test_replace_text_handles_regex_groups_and_empty_match_case() -> None:
 
 
 def test_search_across_files_honors_direction_and_wrap() -> None:
+    """Verify search across files honors direction and wrap."""
     files = [Path("a.txt"), Path("b.txt"), Path("c.txt")]
     calls: list[tuple[Path, int]] = []
 
@@ -392,6 +410,7 @@ def test_search_across_files_honors_direction_and_wrap() -> None:
 
 
 def test_search_across_files_wraps_after_anchor_sequence() -> None:
+    """Verify search across files wraps after anchor sequence."""
     files = [Path("a.txt"), Path("b.txt"), Path("c.txt"), Path("d.txt")]
     calls: list[tuple[Path, int]] = []
 
@@ -419,6 +438,7 @@ def test_search_across_files_wraps_after_anchor_sequence() -> None:
 
 
 def test_search_across_files_no_wrap_returns_none() -> None:
+    """Verify search across files no wrap returns none."""
     files = [Path("a.txt"), Path("b.txt")]
     match = search_across_files(
         files=files,
@@ -432,6 +452,7 @@ def test_search_across_files_no_wrap_returns_none() -> None:
 
 
 def test_search_replace_service_wraps_search_across_files() -> None:
+    """Verify search replace service wraps search across files."""
     service = SearchReplaceService()
     files = [Path("a.txt"), Path("b.txt")]
     match = service.search_across_files(
@@ -448,6 +469,7 @@ def test_search_replace_service_wraps_search_across_files() -> None:
 
 
 def test_build_replace_all_plan_aggregates_counts() -> None:
+    """Verify build replace all plan aggregates counts."""
     files = [Path("a.txt"), Path("b.txt"), Path("c.txt")]
     plan = build_replace_all_plan(
         files=files,
@@ -462,6 +484,7 @@ def test_build_replace_all_plan_aggregates_counts() -> None:
 
 
 def test_build_replace_all_run_plan_file_scope_skips_confirmation() -> None:
+    """Verify build replace all run plan file scope skips confirmation."""
     files = [Path("a.txt")]
     plan = build_replace_all_run_plan(
         scope="FILE",
@@ -480,6 +503,7 @@ def test_build_replace_all_run_plan_file_scope_skips_confirmation() -> None:
 
 
 def test_build_replace_all_run_plan_multi_file_requires_confirmation() -> None:
+    """Verify build replace all run plan multi file requires confirmation."""
     files = [Path("a.txt"), Path("b.txt")]
     plan = build_replace_all_run_plan(
         scope="LOCALE",
@@ -499,6 +523,7 @@ def test_build_replace_all_run_plan_multi_file_requires_confirmation() -> None:
 
 
 def test_build_replace_all_run_plan_multi_file_zero_total_skips_replace() -> None:
+    """Verify build replace all run plan multi file zero total skips replace."""
     files = [Path("a.txt"), Path("b.txt")]
     plan = build_replace_all_run_plan(
         scope="POOL",
@@ -517,6 +542,7 @@ def test_build_replace_all_run_plan_multi_file_zero_total_skips_replace() -> Non
 
 
 def test_apply_replace_all_runs_current_then_other_files() -> None:
+    """Verify apply replace all runs current then other files."""
     files = [Path("a.txt"), Path("b.txt"), Path("c.txt")]
     calls: list[str] = []
 
@@ -532,6 +558,7 @@ def test_apply_replace_all_runs_current_then_other_files() -> None:
 
 
 def test_search_replace_service_wraps_replace_all_helpers() -> None:
+    """Verify search replace service wraps replace all helpers."""
     service = SearchReplaceService()
     files = [Path("a.txt")]
     plan = service.build_replace_all_plan(
@@ -577,6 +604,7 @@ def _entry(key: str, value: str, status: Status = Status.UNTOUCHED) -> Entry:
 
 
 def test_count_replace_all_in_file_uses_cache_overlay_text() -> None:
+    """Verify count replace all in file uses cache overlay text."""
     path = Path("BE/ui.txt")
     parsed = ParsedFile(path, [_entry("A", "Drop one"), _entry("B", "Rest")], b"")
     cache = CacheMap(hash_bits=64)
@@ -602,6 +630,7 @@ def test_count_replace_all_in_file_uses_cache_overlay_text() -> None:
 
 
 def test_apply_replace_all_in_file_marks_translated_and_writes_cache() -> None:
+    """Verify apply replace all in file marks translated and writes cache."""
     path = Path("BE/ui.txt")
     parsed = ParsedFile(path, [_entry("A", "Drop one")], b"")
     cache = CacheMap(hash_bits=64)
@@ -634,6 +663,7 @@ def test_apply_replace_all_in_file_marks_translated_and_writes_cache() -> None:
 
 
 def test_count_replace_all_in_file_wraps_parse_error() -> None:
+    """Verify count replace all in file wraps parse error."""
     path = Path("BE/ui.txt")
     callbacks = ReplaceAllFileCountCallbacks(
         parse_file=lambda _path: (_ for _ in ()).throw(ValueError("broken parse")),
@@ -659,6 +689,7 @@ def test_count_replace_all_in_file_wraps_parse_error() -> None:
 
 
 def test_count_replace_all_in_rows_counts_changed_rows() -> None:
+    """Verify count replace all in rows counts changed rows."""
     rows = ["Drop one", "Rest", "Drop all"]
     callbacks = ReplaceAllRowsCallbacks(
         row_count=lambda: len(rows),
@@ -679,6 +710,7 @@ def test_count_replace_all_in_rows_counts_changed_rows() -> None:
 
 
 def test_apply_replace_all_in_rows_updates_rows_via_callback() -> None:
+    """Verify apply replace all in rows updates rows via callback."""
     rows = ["Drop one", "Rest", "Drop all"]
     callbacks = ReplaceAllRowsCallbacks(
         row_count=lambda: len(rows),
@@ -700,6 +732,7 @@ def test_apply_replace_all_in_rows_updates_rows_via_callback() -> None:
 
 
 def test_build_replace_request_builds_case_sensitive_regex() -> None:
+    """Verify build replace request builds case sensitive regex."""
     request = build_replace_request(
         query="Drop",
         replacement="$1-all",
@@ -715,6 +748,7 @@ def test_build_replace_request_builds_case_sensitive_regex() -> None:
 
 
 def test_build_replace_request_returns_none_for_empty_query() -> None:
+    """Verify build replace request returns none for empty query."""
     assert (
         build_replace_request(
             query="",
@@ -727,6 +761,7 @@ def test_build_replace_request_returns_none_for_empty_query() -> None:
 
 
 def test_build_replace_request_raises_on_invalid_regex() -> None:
+    """Verify build replace request raises on invalid regex."""
     with pytest.raises(ReplaceRequestError):
         build_replace_request(
             query="(",
@@ -737,6 +772,7 @@ def test_build_replace_request_raises_on_invalid_regex() -> None:
 
 
 def test_apply_replace_in_row_uses_callbacks_and_returns_changed() -> None:
+    """Verify apply replace in row uses callbacks and returns changed."""
     rows = ["Drop one", "Rest"]
     request = ReplaceRequest(
         pattern=re.compile("Drop"),
@@ -759,6 +795,7 @@ def test_apply_replace_in_row_uses_callbacks_and_returns_changed() -> None:
 
 
 def test_build_rows_cache_lookup_plan_uses_cached_when_stamp_matches() -> None:
+    """Verify build rows cache lookup plan uses cached when stamp matches."""
     path = Path("BE/ui.txt")
     cached = SearchRowsCacheStamp(
         file_mtime_ns=10,
@@ -782,6 +819,7 @@ def test_build_rows_cache_lookup_plan_uses_cached_when_stamp_matches() -> None:
 
 
 def test_build_rows_cache_lookup_plan_miss_when_stamp_differs() -> None:
+    """Verify build rows cache lookup plan miss when stamp differs."""
     path = Path("BE/ui.txt")
     cached = SearchRowsCacheStamp(
         file_mtime_ns=10,
@@ -801,6 +839,7 @@ def test_build_rows_cache_lookup_plan_miss_when_stamp_differs() -> None:
 
 
 def test_collect_rows_cache_stamp_returns_none_without_file_mtime() -> None:
+    """Verify collect rows cache stamp returns none without file mtime."""
     stamp = collect_rows_cache_stamp(
         path=Path("BE/ui.txt"),
         include_source=True,
@@ -815,6 +854,7 @@ def test_collect_rows_cache_stamp_returns_none_without_file_mtime() -> None:
 
 
 def test_collect_rows_cache_stamp_honors_include_flags() -> None:
+    """Verify collect rows cache stamp honors include flags."""
     cache_calls: list[str] = []
     source_calls: list[str] = []
     stamp = collect_rows_cache_stamp(
@@ -837,6 +877,7 @@ def test_collect_rows_cache_stamp_honors_include_flags() -> None:
 
 
 def test_search_replace_service_wraps_collect_rows_cache_stamp() -> None:
+    """Verify search replace service wraps collect rows cache stamp."""
     service = SearchReplaceService()
     stamp = service.collect_rows_cache_stamp(
         path=Path("BE/ui.txt"),
@@ -856,6 +897,7 @@ def test_search_replace_service_wraps_collect_rows_cache_stamp() -> None:
 
 
 def test_build_rows_cache_store_plan_requires_materialized_and_limit() -> None:
+    """Verify build rows cache store plan requires materialized and limit."""
     store = build_rows_cache_store_plan(
         rows_materialized=True,
         entry_count=100,
@@ -877,6 +919,7 @@ def test_build_rows_cache_store_plan_requires_materialized_and_limit() -> None:
 
 
 def test_search_replace_service_wraps_rows_cache_helpers() -> None:
+    """Verify search replace service wraps rows cache helpers."""
     service = SearchReplaceService()
     cached = SearchRowsCacheStamp(
         file_mtime_ns=1,
@@ -902,6 +945,7 @@ def test_search_replace_service_wraps_rows_cache_helpers() -> None:
 
 
 def test_build_rows_source_plan_handles_locale_and_model_flags() -> None:
+    """Verify build rows source plan handles locale and model flags."""
     missing_locale = build_rows_source_plan(
         locale_known=False,
         is_current_file=True,
@@ -932,6 +976,7 @@ def test_build_rows_source_plan_handles_locale_and_model_flags() -> None:
 
 
 def test_search_replace_service_wraps_rows_source_plan() -> None:
+    """Verify search replace service wraps rows source plan."""
     service = SearchReplaceService()
     plan = service.build_rows_source_plan(
         locale_known=True,
@@ -945,6 +990,7 @@ def test_search_replace_service_wraps_rows_source_plan() -> None:
 
 
 def test_load_search_rows_from_file_uses_lazy_parser_and_overlays_cache() -> None:
+    """Verify load search rows from file uses lazy parser and overlays cache."""
     path = Path("BE/ui.txt")
     entries = [_entry("A", "file-a")]
     parsed = ParsedFile(path, entries, b"")
@@ -979,6 +1025,7 @@ def test_load_search_rows_from_file_uses_lazy_parser_and_overlays_cache() -> Non
 
 
 def test_load_search_rows_from_file_returns_none_on_parse_error() -> None:
+    """Verify load search rows from file returns none on parse error."""
     result = load_search_rows_from_file(
         path=Path("BE/ui.txt"),
         encoding="UTF-8",
@@ -1004,6 +1051,7 @@ def test_load_search_rows_from_file_returns_none_on_parse_error() -> None:
 
 
 def test_search_replace_service_wraps_load_search_rows_from_file() -> None:
+    """Verify search replace service wraps load search rows from file."""
     service = SearchReplaceService()
     path = Path("BE/ui.txt")
     parsed = ParsedFile(path, [_entry("A", "value")], b"")
@@ -1027,6 +1075,7 @@ def test_search_replace_service_wraps_load_search_rows_from_file() -> None:
 
 
 def test_build_search_rows_applies_cache_overlay_and_source_lookup() -> None:
+    """Verify build search rows applies cache overlay and source lookup."""
     path = Path("BE/ui.txt")
     entries = [_entry("A", "file-a"), _entry("B", "file-b")]
     cache = CacheMap(hash_bits=64)
@@ -1052,6 +1101,7 @@ def test_build_search_rows_applies_cache_overlay_and_source_lookup() -> None:
 
 
 def test_build_search_rows_uses_generator_above_limit() -> None:
+    """Verify build search rows uses generator above limit."""
     path = Path("BE/ui.txt")
     entries = [_entry("A", "v1"), _entry("B", "v2")]
     result = build_search_rows(
@@ -1072,6 +1122,7 @@ def test_build_search_rows_uses_generator_above_limit() -> None:
 
 
 def test_search_replace_service_wraps_build_search_rows() -> None:
+    """Verify search replace service wraps build search rows."""
     service = SearchReplaceService()
     entries = [_entry("A", "v1")]
     result = service.build_search_rows(
@@ -1091,6 +1142,7 @@ def test_search_replace_service_wraps_build_search_rows() -> None:
 
 
 def test_build_match_open_plan_requires_open_for_other_file() -> None:
+    """Verify build match open plan requires open for other file."""
     same = build_match_open_plan(
         has_match=True,
         match_file=Path("BE/a.txt"),
@@ -1116,6 +1168,7 @@ def test_build_match_open_plan_requires_open_for_other_file() -> None:
 
 
 def test_build_match_apply_plan_validates_selection_requirements() -> None:
+    """Verify build match apply plan validates selection requirements."""
     good = build_match_apply_plan(
         has_match=True,
         match_file=Path("BE/a.txt"),
@@ -1147,6 +1200,7 @@ def test_build_match_apply_plan_validates_selection_requirements() -> None:
 
 
 def test_search_replace_service_wraps_match_selection_plans() -> None:
+    """Verify search replace service wraps match selection plans."""
     service = SearchReplaceService()
     open_plan = service.build_match_open_plan(
         has_match=True,

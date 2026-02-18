@@ -1,3 +1,5 @@
+"""Test module for source reference service."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,12 +19,14 @@ from translationzed_py.core.source_reference_service import (
 
 
 def test_normalize_source_reference_mode() -> None:
+    """Verify normalize source reference mode."""
     assert normalize_source_reference_mode(" en ") == "EN"
     assert normalize_source_reference_mode("be") == "BE"
     assert normalize_source_reference_mode("", default="EN") == "EN"
 
 
 def test_resolve_source_reference_locale_prefers_requested_available() -> None:
+    """Verify resolve source reference locale prefers requested available."""
     resolution = resolve_source_reference_locale(
         "BE",
         available_locales=("EN", "BE", "RU"),
@@ -33,6 +37,7 @@ def test_resolve_source_reference_locale_prefers_requested_available() -> None:
 
 
 def test_resolve_source_reference_locale_falls_back_to_default_then_locale() -> None:
+    """Verify expected behavior."""
     resolution = resolve_source_reference_locale(
         "KO",
         available_locales=("BE", "RU"),
@@ -44,6 +49,7 @@ def test_resolve_source_reference_locale_falls_back_to_default_then_locale() -> 
 
 
 def test_reference_path_for_mirror_layout(tmp_path: Path) -> None:
+    """Verify reference path for mirror layout."""
     root = tmp_path / "proj"
     be = root / "BE"
     en = root / "EN"
@@ -66,6 +72,7 @@ def test_reference_path_for_mirror_layout(tmp_path: Path) -> None:
 
 
 def test_reference_path_for_suffix_rewrite(tmp_path: Path) -> None:
+    """Verify reference path for suffix rewrite."""
     root = tmp_path / "proj"
     be = root / "BE"
     en = root / "EN"
@@ -88,6 +95,7 @@ def test_reference_path_for_suffix_rewrite(tmp_path: Path) -> None:
 
 
 def test_reference_path_for_returns_none_when_outside_root(tmp_path: Path) -> None:
+    """Verify reference path for returns none when outside root."""
     root = tmp_path / "proj"
     root.mkdir()
     outside = tmp_path.parent / "outside.txt"
@@ -103,6 +111,7 @@ def test_reference_path_for_returns_none_when_outside_root(tmp_path: Path) -> No
 
 
 def test_build_source_lookup_materialized_by_row_when_keys_match() -> None:
+    """Verify build source lookup materialized by row when keys match."""
     entries = [
         Entry("K1", "One", Status.UNTOUCHED, (0, 0), (), ()),
         Entry("K2", "Two", Status.UNTOUCHED, (0, 0), (), ()),
@@ -122,6 +131,7 @@ def test_build_source_lookup_materialized_by_row_when_keys_match() -> None:
 
 
 def test_build_source_lookup_materialized_raw_single_entry() -> None:
+    """Verify build source lookup materialized raw single entry."""
     reference = [
         Entry("News_BE.txt", "RAW", Status.UNTOUCHED, (0, 0), (), (), raw=True),
     ]
@@ -140,6 +150,7 @@ def test_build_source_lookup_materialized_raw_single_entry() -> None:
 def test_load_reference_lookup_uses_cache_and_returns_materialized(
     tmp_path: Path,
 ) -> None:
+    """Verify load reference lookup uses cache and returns materialized."""
     root = tmp_path / "proj"
     for loc in ("EN", "BE"):
         (root / loc).mkdir(parents=True, exist_ok=True)
@@ -174,12 +185,14 @@ def test_load_reference_lookup_uses_cache_and_returns_materialized(
 
 
 def test_source_reference_path_key_is_posix_relative(tmp_path: Path) -> None:
+    """Verify source reference path key is posix relative."""
     root = tmp_path / "proj"
     path = root / "BE" / "ui.txt"
     assert source_reference_path_key(root, path) == "BE/ui.txt"
 
 
 def test_source_reference_file_overrides_round_trip() -> None:
+    """Verify source reference file overrides round trip."""
     encoded = dump_source_reference_file_overrides(
         {"BE\\ui.txt": "ru", "BE/menu.txt": "EN", "": "RU"}
     )
@@ -188,6 +201,7 @@ def test_source_reference_file_overrides_round_trip() -> None:
 
 
 def test_resolve_source_reference_mode_for_path_uses_override(tmp_path: Path) -> None:
+    """Verify resolve source reference mode for path uses override."""
     root = tmp_path / "proj"
     path = root / "BE" / "ui.txt"
     mode = resolve_source_reference_mode_for_path(
