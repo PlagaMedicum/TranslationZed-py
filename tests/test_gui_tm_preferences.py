@@ -1,3 +1,5 @@
+"""Test module for gui tm preferences."""
+
 import re
 from pathlib import Path
 
@@ -61,6 +63,7 @@ def _register_imported_tm(
 
 
 def test_tm_preferences_delete_cancel_keeps_file(tmp_path, qtbot, monkeypatch):
+    """Verify tm preferences delete cancel keeps file."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE", "RU"])
     qtbot.addWidget(win)
@@ -79,6 +82,7 @@ def test_tm_preferences_delete_cancel_keeps_file(tmp_path, qtbot, monkeypatch):
 
 
 def test_tm_preferences_delete_confirm_removes_file(tmp_path, qtbot, monkeypatch):
+    """Verify tm preferences delete confirm removes file."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE", "RU"])
     qtbot.addWidget(win)
@@ -97,6 +101,7 @@ def test_tm_preferences_delete_confirm_removes_file(tmp_path, qtbot, monkeypatch
 
 
 def test_tm_min_score_spin_allows_five_and_changes_filter(tmp_path, qtbot, monkeypatch):
+    """Verify tm min score spin allows five and changes filter."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -144,6 +149,7 @@ def test_tm_min_score_spin_allows_five_and_changes_filter(tmp_path, qtbot, monke
 
 
 def test_tm_min_score_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
+    """Verify tm min score persists to settings env."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -157,6 +163,7 @@ def test_tm_min_score_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
 
 
 def test_tm_preview_term_sanitizer_drops_short_long_and_duplicates(tmp_path, qtbot):
+    """Verify tm preview term sanitizer drops short long and duplicates."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -166,6 +173,7 @@ def test_tm_preview_term_sanitizer_drops_short_long_and_duplicates(tmp_path, qtb
 
 
 def test_tm_apply_double_click_is_deferred(tmp_path, qtbot, monkeypatch):
+    """Verify tm apply double click is deferred."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -187,6 +195,7 @@ def test_tm_apply_double_click_is_deferred(tmp_path, qtbot, monkeypatch):
 
 
 def test_tm_preview_highlight_skips_very_large_text(tmp_path, qtbot):
+    """Verify tm preview highlight skips very large text."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -198,6 +207,7 @@ def test_tm_preview_highlight_skips_very_large_text(tmp_path, qtbot):
 
 
 def test_theme_mode_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
+    """Verify theme mode persists to settings env."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -215,6 +225,7 @@ def test_theme_mode_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
 
 
 def test_apply_theme_mode_clears_delegate_visual_caches(tmp_path, qtbot, monkeypatch):
+    """Verify apply theme mode clears delegate visual caches."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -240,6 +251,7 @@ def test_apply_theme_mode_clears_delegate_visual_caches(tmp_path, qtbot, monkeyp
 def test_system_theme_change_reapplies_only_for_system_mode(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify system theme change reapplies only for system mode."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -261,6 +273,7 @@ def test_system_theme_change_reapplies_only_for_system_mode(
 
 
 def test_source_reference_selector_switches_source_column(tmp_path, qtbot, monkeypatch):
+    """Verify source reference selector switches source column."""
     monkeypatch.chdir(tmp_path)
     root = tmp_path / "proj"
     for loc in ("EN", "BE", "RU"):
@@ -305,6 +318,7 @@ def test_source_reference_selector_switches_source_column(tmp_path, qtbot, monke
 def test_source_reference_selector_shows_only_opened_locales(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify source reference selector shows only opened locales."""
     monkeypatch.chdir(tmp_path)
     root = tmp_path / "proj"
     for loc in ("EN", "BE", "RU"):
@@ -334,6 +348,7 @@ def test_source_reference_selector_shows_only_opened_locales(
 def test_source_reference_mode_applies_globally_across_files(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify source reference mode applies globally across files."""
     monkeypatch.chdir(tmp_path)
     root = tmp_path / "proj"
     for loc in ("EN", "BE", "RU"):
@@ -384,6 +399,7 @@ def test_source_reference_mode_applies_globally_across_files(
 def test_source_reference_selector_falls_back_to_en_when_unavailable(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify source reference selector falls back to en when unavailable."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -402,6 +418,7 @@ def test_source_reference_selector_falls_back_to_en_when_unavailable(
 def test_source_reference_selector_target_then_en_fallback_policy(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify source reference selector target then en fallback policy."""
     monkeypatch.chdir(tmp_path)
     root = tmp_path / "proj"
     for loc, value in (("EN", "EN SRC"), ("BE", "BE SRC")):
@@ -424,6 +441,7 @@ def test_source_reference_selector_target_then_en_fallback_policy(
 
 
 def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
+    """Verify tm panel includes imported matches."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     (root / "EN" / "ui.txt").write_text('UI_KEY = "Hello world"\n', encoding="utf-8")
@@ -482,6 +500,7 @@ def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
 
 
 def test_tm_apply_keeps_status_and_is_single_undo_step(tmp_path, qtbot, monkeypatch):
+    """Verify tm apply keeps status and is single undo step."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     (root / "EN" / "ui.txt").write_text('UI_KEY = "Camera"\n', encoding="utf-8")
@@ -531,6 +550,7 @@ def test_tm_apply_keeps_status_and_is_single_undo_step(tmp_path, qtbot, monkeypa
 def test_tm_panel_shows_cross_locale_variants_in_session_order(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify tm panel shows cross locale variants in session order."""
     monkeypatch.chdir(tmp_path)
     root = tmp_path / "proj"
     for loc in ("EN", "BE", "RU", "KO"):
@@ -562,6 +582,7 @@ def test_tm_panel_shows_cross_locale_variants_in_session_order(
 def test_tm_bootstrap_rebuild_runs_even_when_store_has_entries(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify tm bootstrap rebuild runs even when store has entries."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     (root / "EN" / "ui.txt").write_text('UI_KEY = "Drop one"\n', encoding="utf-8")
@@ -591,6 +612,7 @@ def test_tm_bootstrap_rebuild_runs_even_when_store_has_entries(
 
 
 def test_rebuild_tm_selected_initializes_tm_store(tmp_path, qtbot, monkeypatch):
+    """Verify rebuild tm selected initializes tm store."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -616,6 +638,7 @@ def test_rebuild_tm_selected_initializes_tm_store(tmp_path, qtbot, monkeypatch):
 
 
 def test_apply_preferences_runs_tm_actions_from_tm_tab(tmp_path, qtbot, monkeypatch):
+    """Verify apply preferences runs tm actions from tm tab."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -651,6 +674,7 @@ def test_apply_preferences_runs_tm_actions_from_tm_tab(tmp_path, qtbot, monkeypa
 
 
 def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
+    """Verify preferences tm action buttons set flags."""
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
         {"tm_import_dir": str(root / ".tzp" / "tms"), "theme_mode": "DARK"},
@@ -668,6 +692,7 @@ def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
 
 
 def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
+    """Verify preferences qa tab roundtrip values."""
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
         {
@@ -713,6 +738,7 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
 def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify apply preferences updates qa flags and triggers refresh."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -760,6 +786,7 @@ def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
 
 
 def test_preferences_tm_diagnostics_button_sets_flag(tmp_path, qtbot):
+    """Verify preferences tm diagnostics button sets flag."""
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
         {"tm_import_dir": str(root / ".tzp" / "tms")}, tm_files=[]
@@ -773,6 +800,7 @@ def test_preferences_tm_diagnostics_button_sets_flag(tmp_path, qtbot):
 
 
 def test_tm_diagnostics_uses_copyable_report(tmp_path, qtbot, monkeypatch):
+    """Verify tm diagnostics uses copyable report."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -796,6 +824,7 @@ def test_tm_diagnostics_uses_copyable_report(tmp_path, qtbot, monkeypatch):
 def test_tm_diagnostics_reports_match_density_and_origin_counts(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify tm diagnostics reports match density and origin counts."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     (root / "EN" / "ui.txt").write_text('UI_KEY = "Drop all"\n', encoding="utf-8")
@@ -868,6 +897,7 @@ def test_tm_diagnostics_reports_match_density_and_origin_counts(
 
 
 def test_preferences_tm_tab_shows_format_and_storage_description(tmp_path, qtbot):
+    """Verify preferences tm tab shows format and storage description."""
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
         {"tm_import_dir": str(root / ".tzp" / "tms")}, tm_files=[]
@@ -893,6 +923,7 @@ def test_preferences_tm_tab_shows_format_and_storage_description(tmp_path, qtbot
 
 
 def test_preferences_tm_resolve_button_enables_for_pending_items(tmp_path, qtbot):
+    """Verify preferences tm resolve button enables for pending items."""
     root = _make_project(tmp_path)
     dialog_empty = PreferencesDialog(
         {"tm_import_dir": str(root / ".tzp" / "tms")},
@@ -927,6 +958,7 @@ def test_preferences_tm_resolve_button_enables_for_pending_items(tmp_path, qtbot
 def test_preferences_tm_list_shows_segment_count_and_zero_warning(
     tmp_path, qtbot, monkeypatch
 ):
+    """Verify preferences tm list shows segment count and zero warning."""
     monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])

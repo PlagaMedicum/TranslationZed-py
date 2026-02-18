@@ -1,3 +1,5 @@
+"""Test module for gui search."""
+
 from pathlib import Path
 
 import pytest
@@ -10,6 +12,7 @@ from translationzed_py.gui import MainWindow
 
 
 def test_search_selects_first_match(qtbot, tmp_path: Path):
+    """Verify search selects first match."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE"):
@@ -34,6 +37,7 @@ def test_search_selects_first_match(qtbot, tmp_path: Path):
 
 
 def test_search_moves_to_other_file(qtbot, tmp_path: Path):
+    """Verify search moves to other file."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE"):
@@ -62,6 +66,7 @@ def test_search_moves_to_other_file(qtbot, tmp_path: Path):
 
 
 def test_search_pool_cycles_all_files_before_repeating(qtbot, tmp_path: Path):
+    """Verify search pool cycles all files before repeating."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE"):
@@ -99,6 +104,7 @@ def test_search_pool_cycles_all_files_before_repeating(qtbot, tmp_path: Path):
 
 
 def test_search_case_toggle_controls_literal_matching(qtbot, tmp_path: Path):
+    """Verify search case toggle controls literal matching."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE"):
@@ -122,6 +128,7 @@ def test_search_case_toggle_controls_literal_matching(qtbot, tmp_path: Path):
 
 
 def test_search_side_panel_lists_results_and_navigates(qtbot, tmp_path: Path):
+    """Verify search side panel lists results and navigates."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE"):
@@ -159,6 +166,7 @@ def test_search_side_panel_lists_results_and_navigates(qtbot, tmp_path: Path):
 
 
 def test_search_source_mode_switch_changes_source_matches(qtbot, tmp_path: Path):
+    """Verify search source mode switch changes source matches."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE", "RU"):
@@ -190,6 +198,7 @@ def test_search_source_mode_switch_changes_source_matches(qtbot, tmp_path: Path)
 
 
 def test_search_source_mode_switch_invalidates_rows_cache(qtbot, tmp_path: Path):
+    """Verify search source mode switch invalidates rows cache."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE", "RU"):

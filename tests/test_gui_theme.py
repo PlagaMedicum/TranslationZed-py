@@ -1,3 +1,5 @@
+"""Test module for gui theme."""
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -16,6 +18,7 @@ from translationzed_py.gui.theme import (
 
 
 def test_normalize_theme_mode_accepts_supported_values() -> None:
+    """Verify normalize theme mode accepts supported values."""
     assert normalize_theme_mode("dark") == THEME_DARK
     assert normalize_theme_mode("LIGHT") == "LIGHT"
     assert normalize_theme_mode("system") == THEME_SYSTEM
@@ -23,6 +26,7 @@ def test_normalize_theme_mode_accepts_supported_values() -> None:
 
 
 def test_apply_theme_dark_then_system_updates_stylesheet(qapp) -> None:
+    """Verify apply theme dark then system updates stylesheet."""
     color_scheme = getattr(Qt, "ColorScheme", None)
     assert apply_theme(qapp, "dark") == THEME_DARK
     assert "QToolTip" in qapp.styleSheet()
@@ -51,6 +55,7 @@ def test_apply_theme_dark_then_system_updates_stylesheet(qapp) -> None:
 
 
 def test_apply_theme_dark_sets_readable_text_roles(qapp) -> None:
+    """Verify apply theme dark sets readable text roles."""
     assert apply_theme(qapp, "dark") == THEME_DARK
     palette = qapp.palette()
     base = palette.color(QPalette.Base)
@@ -61,6 +66,7 @@ def test_apply_theme_dark_sets_readable_text_roles(qapp) -> None:
 
 
 def test_system_theme_from_qt_scheme_maps_dark_light() -> None:
+    """Verify system theme from qt scheme maps dark light."""
     color_scheme = getattr(Qt, "ColorScheme", None)
     if color_scheme is None:
         assert system_theme_from_qt_scheme(object()) is None
@@ -71,6 +77,7 @@ def test_system_theme_from_qt_scheme_maps_dark_light() -> None:
 
 
 def test_detect_system_theme_mode_uses_style_hints(qapp) -> None:
+    """Verify detect system theme mode uses style hints."""
     color_scheme = getattr(Qt, "ColorScheme", None)
     if color_scheme is None:
         assert detect_system_theme_mode(qapp, style_hints=object()) is None

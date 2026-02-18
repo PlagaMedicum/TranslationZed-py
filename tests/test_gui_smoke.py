@@ -1,3 +1,5 @@
+"""Test module for gui smoke."""
+
 from pathlib import Path
 
 import pytest
@@ -9,6 +11,7 @@ from translationzed_py.gui import MainWindow
 
 def test_table_fills(qtbot, tmp_path: Path):
     # copy fixture
+    """Verify table fills."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE"):
@@ -26,6 +29,7 @@ def test_table_fills(qtbot, tmp_path: Path):
 
 
 def test_detail_editor_shows_live_char_counts(qtbot, tmp_path: Path):
+    """Verify detail editor shows live char counts."""
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE"):

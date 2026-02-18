@@ -1,3 +1,5 @@
+"""Test module for gui service adapters."""
+
 import re
 from pathlib import Path
 
@@ -54,6 +56,7 @@ def _make_project(tmp_path: Path) -> Path:
 
 
 def test_open_file_delegates_to_file_workflow_service(qtbot, tmp_path, monkeypatch):
+    """Verify open file delegates to file workflow service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -79,6 +82,7 @@ def test_open_file_delegates_to_file_workflow_service(qtbot, tmp_path, monkeypat
 def test_switch_locales_delegates_to_project_session_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify switch locales delegates to project session service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -128,6 +132,7 @@ def test_switch_locales_delegates_to_project_session_service(
 def test_warn_orphan_caches_delegates_warning_plan_to_project_session(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify warn orphan caches delegates warning plan to project session."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -218,6 +223,7 @@ def test_warn_orphan_caches_delegates_warning_plan_to_project_session(
 def test_schedule_cache_migration_delegates_execution_to_project_session(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify schedule cache migration delegates execution to project session."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -257,6 +263,7 @@ def test_schedule_cache_migration_delegates_execution_to_project_session(
 def test_run_cache_migration_batch_delegates_execution_to_project_session(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify run cache migration batch delegates execution to project session."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -299,6 +306,7 @@ def test_run_cache_migration_batch_delegates_execution_to_project_session(
 
 
 def test_save_all_files_delegates_to_save_batch_flow(qtbot, tmp_path, monkeypatch):
+    """Verify save all files delegates to save batch flow."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -340,6 +348,7 @@ def test_save_all_files_delegates_to_save_batch_flow(qtbot, tmp_path, monkeypatc
 def test_request_write_original_delegates_to_save_exit_flow_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify request write original delegates to save exit flow service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -366,6 +375,7 @@ def test_request_write_original_delegates_to_save_exit_flow_service(
 def test_apply_preferences_delegates_scope_normalization_to_preferences_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify expected behavior."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -406,6 +416,7 @@ def test_apply_preferences_delegates_scope_normalization_to_preferences_service(
 def test_apply_tm_preferences_actions_delegates_to_tm_workflow_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify apply tm preferences actions delegates to tm workflow service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -455,6 +466,7 @@ def test_apply_tm_preferences_actions_delegates_to_tm_workflow_service(
 def test_sync_tm_import_folder_delegates_to_tm_workflow_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify sync tm import folder delegates to tm workflow service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -524,6 +536,7 @@ def test_sync_tm_import_folder_delegates_to_tm_workflow_service(
 def test_start_tm_rebuild_delegates_collect_locales_to_tm_workflow_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify expected behavior."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -553,6 +566,7 @@ def test_start_tm_rebuild_delegates_collect_locales_to_tm_workflow_service(
 def test_start_tm_rebuild_submits_tm_rebuild_via_tm_workflow_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify start tm rebuild submits tm rebuild via tm workflow service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -605,6 +619,7 @@ def test_start_tm_rebuild_submits_tm_rebuild_via_tm_workflow_service(
 def test_finish_tm_rebuild_delegates_status_formatting_to_tm_workflow_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify expected behavior."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -640,6 +655,7 @@ def test_finish_tm_rebuild_delegates_status_formatting_to_tm_workflow_service(
 def test_save_all_files_delegates_to_save_batch_render_plan(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify save all files delegates to save batch render plan."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -693,6 +709,7 @@ def test_save_all_files_delegates_to_save_batch_render_plan(
 def test_save_file_from_cache_delegates_to_file_workflow_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify save file from cache delegates to file workflow service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -737,6 +754,7 @@ def test_save_file_from_cache_delegates_to_file_workflow_service(
 
 
 def test_save_current_delegates_to_file_workflow_service(qtbot, tmp_path, monkeypatch):
+    """Verify save current delegates to file workflow service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -804,6 +822,7 @@ def test_save_current_delegates_to_file_workflow_service(qtbot, tmp_path, monkey
 
 
 def test_prompt_conflicts_delegates_to_conflict_service(qtbot, tmp_path, monkeypatch):
+    """Verify prompt conflicts delegates to conflict service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -835,6 +854,7 @@ def test_prompt_conflicts_delegates_to_conflict_service(qtbot, tmp_path, monkeyp
 def test_prompt_conflicts_dialog_path_delegates_choice_execution(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify prompt conflicts dialog path delegates choice execution."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -881,6 +901,7 @@ def test_prompt_conflicts_dialog_path_delegates_choice_execution(
 def test_resolve_conflicts_drop_cache_delegates_persist_execution(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify resolve conflicts drop cache delegates persist execution."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -935,6 +956,7 @@ def test_resolve_conflicts_drop_cache_delegates_persist_execution(
 def test_resolve_conflicts_merge_delegates_merge_execution(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify resolve conflicts merge delegates merge execution."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -981,6 +1003,7 @@ def test_resolve_conflicts_merge_delegates_merge_execution(
 def test_search_from_anchor_delegates_to_search_replace_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify search from anchor delegates to search replace service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1021,6 +1044,7 @@ def test_search_from_anchor_delegates_to_search_replace_service(
 def test_files_for_scope_delegates_to_search_replace_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify files for scope delegates to search replace service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1047,6 +1071,7 @@ def test_files_for_scope_delegates_to_search_replace_service(
 def test_find_match_in_rows_delegates_to_search_replace_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify find match in rows delegates to search replace service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1104,6 +1129,7 @@ def test_find_match_in_rows_delegates_to_search_replace_service(
 def test_refresh_search_panel_delegates_search_spec_to_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify refresh search panel delegates search spec to service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1131,6 +1157,7 @@ def test_refresh_search_panel_delegates_search_spec_to_service(
 def test_replace_all_count_in_file_delegates_to_search_replace_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify replace all count in file delegates to search replace service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1163,6 +1190,7 @@ def test_replace_all_count_in_file_delegates_to_search_replace_service(
 def test_replace_all_count_in_model_delegates_to_search_replace_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify replace all count in model delegates to search replace service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1195,6 +1223,7 @@ def test_replace_all_count_in_model_delegates_to_search_replace_service(
 def test_replace_all_in_file_delegates_to_search_replace_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify replace all in file delegates to search replace service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1236,6 +1265,7 @@ def test_replace_all_in_file_delegates_to_search_replace_service(
 def test_replace_all_in_model_delegates_to_search_replace_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify replace all in model delegates to search replace service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1270,6 +1300,7 @@ def test_replace_all_in_model_delegates_to_search_replace_service(
 def test_replace_current_delegates_to_search_replace_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify replace current delegates to search replace service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1312,6 +1343,7 @@ def test_replace_current_delegates_to_search_replace_service(
 
 
 def test_cached_rows_from_file_delegates_cache_plans(qtbot, tmp_path, monkeypatch):
+    """Verify cached rows from file delegates cache plans."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1368,6 +1400,7 @@ def test_cached_rows_from_file_delegates_cache_plans(qtbot, tmp_path, monkeypatc
 def test_cached_rows_from_file_delegates_stamp_collection_to_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify cached rows from file delegates stamp collection to service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1405,6 +1438,7 @@ def test_cached_rows_from_file_delegates_stamp_collection_to_service(
 def test_search_rows_for_file_delegates_rows_source_plan_current_model(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify search rows for file delegates rows source plan current model."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1449,6 +1483,7 @@ def test_search_rows_for_file_delegates_rows_source_plan_current_model(
 def test_search_rows_for_file_delegates_rows_source_plan_cached_file(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify search rows for file delegates rows source plan cached file."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1486,6 +1521,7 @@ def test_search_rows_for_file_delegates_rows_source_plan_cached_file(
 def test_rows_from_file_delegates_file_row_load_to_service(
     qtbot, tmp_path, monkeypatch
 ):
+    """Verify rows from file delegates file row load to service."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1522,6 +1558,7 @@ def test_rows_from_file_delegates_file_row_load_to_service(
 
 
 def test_select_match_delegates_match_selection_plans(qtbot, tmp_path, monkeypatch):
+    """Verify select match delegates match selection plans."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)

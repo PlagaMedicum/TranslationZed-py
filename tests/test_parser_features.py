@@ -1,3 +1,5 @@
+"""Test module for parser features."""
+
 from translationzed_py.core import Status, parse, parse_lazy
 
 
@@ -8,21 +10,25 @@ def _tmp(txt: str, tmp_path):
 
 
 def test_escaped_quotes(tmp_path):
+    """Verify escaped quotes."""
     pf = _tmp('QUOTE = "He said \\"hi\\""\n', tmp_path)
     assert pf.entries[0].value == 'He said "hi"'
 
 
 def test_concat(tmp_path):
+    """Verify concat."""
     pf = _tmp('HELLO = "Hel"  ..  "lo"\n', tmp_path)
     assert pf.entries[0].value == "Hello"
 
 
 def test_concat_multiline(tmp_path):
+    """Verify concat multiline."""
     pf = _tmp('HELLO = "Hel"  ..\n  "lo"\n', tmp_path)
     assert pf.entries[0].value == "Hello"
 
 
 def test_concat_multiline_lazy(tmp_path):
+    """Verify concat multiline lazy."""
     file = tmp_path / "f.txt"
     file.write_text('HELLO = "Hel"  ..\n  "lo"\n', encoding="utf-8")
     pf = parse_lazy(file)
@@ -30,11 +36,13 @@ def test_concat_multiline_lazy(tmp_path):
 
 
 def test_status_comment(tmp_path):
+    """Verify status comment."""
     pf = _tmp('UI_YES = "Так" -- PROOFREAD\n', tmp_path)
     assert pf.entries[0].status is Status.PROOFREAD
 
 
 def test_parse_cp1251(prod_like_root):
+    """Verify parse cp1251."""
     path = prod_like_root / "RU" / "IG_UI_RU.txt"
     pf = parse(path, encoding="Cp1251")
     assert pf.entries[0].key == "UI_OK"
@@ -42,12 +50,14 @@ def test_parse_cp1251(prod_like_root):
 
 
 def test_parse_utf16(prod_like_root):
+    """Verify parse utf16."""
     path = prod_like_root / "KO" / "IG_UI_KO.txt"
     pf = parse(path, encoding="UTF-16")
     assert pf.entries[0].key == "UI_OK"
 
 
 def test_parse_utf16_no_bom_le(tmp_path):
+    """Verify parse utf16 no bom le."""
     path = tmp_path / "utf16le.txt"
     path.write_bytes('UI_OK = "Test"\n'.encode("utf-16-le"))
     pf = parse(path, encoding="UTF-16")
@@ -55,6 +65,7 @@ def test_parse_utf16_no_bom_le(tmp_path):
 
 
 def test_parse_utf16_no_bom_be(tmp_path):
+    """Verify parse utf16 no bom be."""
     path = tmp_path / "utf16be.txt"
     path.write_bytes('UI_OK = "Test"\n'.encode("utf-16-be"))
     pf = parse(path, encoding="UTF-16")
@@ -62,6 +73,7 @@ def test_parse_utf16_no_bom_be(tmp_path):
 
 
 def test_parse_lua_table_blocks(tmp_path):
+    """Verify parse lua table blocks."""
     text = """
 Challenge_BE = {
     Challenge_One_name = "One",
@@ -75,11 +87,13 @@ Challenge_BE = {
 
 
 def test_parse_dotted_keys(tmp_path):
+    """Verify parse dotted keys."""
     pf = _tmp('EvolvedRecipeName_Base.CannedTomatoOpen = "Tomato"\n', tmp_path)
     assert pf.entries[0].key == "EvolvedRecipeName_Base.CannedTomatoOpen"
 
 
 def test_parse_table_header_without_equals(tmp_path):
+    """Verify parse table header without equals."""
     text = """
 DynamicRadio_BE {
     AEBS_Intro = "Hello",
@@ -91,6 +105,7 @@ DynamicRadio_BE {
 
 
 def test_parse_unterminated_string_line(tmp_path):
+    """Verify parse unterminated string line."""
     text = 'BAD = "Missing quote\nOK = "Fine"\n'
     pf = _tmp(text, tmp_path)
     assert pf.entries[0].key == "BAD"
@@ -100,6 +115,7 @@ def test_parse_unterminated_string_line(tmp_path):
 
 
 def test_parse_block_comments(tmp_path):
+    """Verify parse block comments."""
     text = """
 A = "1"
 /* comment */
@@ -111,6 +127,7 @@ B = "2"
 
 
 def test_parse_stray_quote_with_markup(tmp_path):
+    """Verify parse stray quote with markup."""
     text = """
 X = " <CENTRE> "<SIZE:large> hello",
 Y = "Ok"
@@ -122,6 +139,7 @@ Y = "Ok"
 
 
 def test_parse_inline_quotes_with_trailing_text(tmp_path):
+    """Verify parse inline quotes with trailing text."""
     text = (
         'X = "Use /startrain "intensity", optional intensity is from 1 to 100",\n'
         'Y = "Ok"\n'
@@ -133,6 +151,7 @@ def test_parse_inline_quotes_with_trailing_text(tmp_path):
 
 
 def test_parse_double_slash_comment(tmp_path):
+    """Verify parse double slash comment."""
     text = """// Auto-generated file
 X = "Hello"
 """
@@ -141,6 +160,7 @@ X = "Hello"
 
 
 def test_parse_inner_quotes_with_ellipsis(tmp_path):
+    """Verify parse inner quotes with ellipsis."""
     text = 'X = "...called "baldie", "egghead", "skinskull"..."\n'
     pf = _tmp(text, tmp_path)
     assert pf.entries[0].key == "X"
@@ -148,6 +168,7 @@ def test_parse_inner_quotes_with_ellipsis(tmp_path):
 
 
 def test_parse_inner_quotes_with_ellipsis_lazy(tmp_path):
+    """Verify parse inner quotes with ellipsis lazy."""
     text = 'X = "...called "baldie", "egghead", "skinskull"..."\n'
     file = tmp_path / "lazy.txt"
     file.write_text(text, encoding="utf-8")
@@ -157,11 +178,13 @@ def test_parse_inner_quotes_with_ellipsis_lazy(tmp_path):
 
 
 def test_parse_keys_with_spaces_and_symbols(tmp_path):
+    """Verify parse keys with spaces and symbols."""
     pf = _tmp('UI_optionscreen_binding_Equip/Unequip Handweapon = "Ok"\n', tmp_path)
     assert pf.entries[0].key == "UI_optionscreen_binding_Equip/Unequip Handweapon"
 
 
 def test_parse_plain_text_as_single_entry(tmp_path):
+    """Verify parse plain text as single entry."""
     file = tmp_path / "title.txt"
     file.write_text("Plain text", encoding="utf-8")
     pf = parse(file)
@@ -171,6 +194,7 @@ def test_parse_plain_text_as_single_entry(tmp_path):
 
 
 def test_parse_news_as_raw(tmp_path):
+    """Verify parse news as raw."""
     file = tmp_path / "News_BE.txt"
     file.write_text('Line with "=" and "quotes"\n', encoding="utf-8")
     pf = parse(file)

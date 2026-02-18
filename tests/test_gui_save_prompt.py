@@ -1,3 +1,5 @@
+"""Test module for gui save prompt."""
+
 from dataclasses import replace
 from pathlib import Path
 
@@ -45,6 +47,7 @@ def _cache_draft_value(root: Path, path: Path, value: str) -> None:
 
 
 def test_prompt_cache_only_keeps_original(tmp_path, qtbot, monkeypatch):
+    """Verify prompt cache only keeps original."""
     root, path, _menu = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -68,6 +71,7 @@ def test_prompt_cache_only_keeps_original(tmp_path, qtbot, monkeypatch):
 
 
 def test_prompt_write_updates_original(tmp_path, qtbot, monkeypatch):
+    """Verify prompt write updates original."""
     root, path, _menu = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -92,6 +96,7 @@ def test_prompt_write_updates_original(tmp_path, qtbot, monkeypatch):
 
 
 def test_prompt_write_can_deselect_files(tmp_path, qtbot, monkeypatch):
+    """Verify prompt write can deselect files."""
     root, ui_path, menu_path = _make_project(tmp_path)
     _cache_draft_value(root, menu_path, "Супер меню")
 
@@ -127,6 +132,7 @@ def test_prompt_write_can_deselect_files(tmp_path, qtbot, monkeypatch):
 
 
 def test_prompt_write_is_blocked_during_open_flow(tmp_path, qtbot, monkeypatch):
+    """Verify prompt write is blocked during open flow."""
     root, path, _menu = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
