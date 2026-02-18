@@ -1,3 +1,5 @@
+"""Load, normalize, and persist user preferences."""
+
 from __future__ import annotations
 
 import contextlib
