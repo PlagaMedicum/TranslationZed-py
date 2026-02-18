@@ -1,3 +1,5 @@
+"""Provide search helpers for keys, source text, and translations."""
+
 from __future__ import annotations
 
 import enum
@@ -8,6 +10,8 @@ from pathlib import Path
 
 
 class SearchField(enum.IntEnum):
+    """Identify which entry field is used during matching."""
+
     KEY = 0
     SOURCE = 1
     TRANSLATION = 2
@@ -15,6 +19,8 @@ class SearchField(enum.IntEnum):
 
 @dataclass(frozen=True, slots=True)
 class SearchRow:
+    """Store normalized searchable text for one translation row."""
+
     file: Path
     row: int
     key: str
@@ -24,6 +30,8 @@ class SearchRow:
 
 @dataclass(frozen=True, slots=True)
 class Match:
+    """Describe one search hit and optional preview snippet."""
+
     file: Path
     row: int
     preview: str = ""
@@ -103,6 +111,7 @@ def iter_matches(
     include_preview: bool = False,
     preview_chars: int = 96,
 ) -> Iterable[Match]:
+    """Yield matches for a query across rows with literal or regex mode."""
     if not query:
         return
     if is_regex:
@@ -165,6 +174,7 @@ def search(
     include_preview: bool = False,
     preview_chars: int = 96,
 ) -> list[Match]:
+    """Collect and return all matches from :func:`iter_matches`."""
     return list(
         iter_matches(
             rows,
