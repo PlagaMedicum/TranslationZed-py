@@ -1,3 +1,5 @@
+"""Synchronization workflow for importing external TM files into the TM store."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -13,6 +15,8 @@ _SUPPORTED_TM_IMPORT_SUFFIXES = frozenset(supported_tm_import_suffixes())
 
 @dataclass(frozen=True, slots=True)
 class TMImportSyncReport:
+    """Describe the outcome of synchronizing an import TM directory."""
+
     imported_segments: int
     imported_files: tuple[str, ...]
     unresolved_files: tuple[str, ...]
@@ -30,6 +34,7 @@ def sync_import_folder(
     only_paths: set[Path] | None = None,
     pending_only: bool = False,
 ) -> TMImportSyncReport:
+    """Synchronize import TM files and return a detailed sync report."""
     target_paths = {
         path.resolve()
         for path in only_paths or set()

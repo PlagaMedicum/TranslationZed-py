@@ -1,3 +1,5 @@
+"""Header interaction helpers for the source-reference column."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -7,6 +9,7 @@ from PySide6.QtWidgets import QMenu
 
 
 def refresh_header_label(win: Any) -> None:
+    """Update the source column header based on current reference mode."""
     if not hasattr(win, "table"):
         return
     model = win.table.model()
@@ -22,6 +25,7 @@ def refresh_header_label(win: Any) -> None:
 
 
 def handle_header_click(win: Any, logical_index: int) -> None:
+    """Show and apply source-reference mode choices from the header menu."""
     if not hasattr(win, "table"):
         return
     if logical_index != 1 or win.source_ref_combo.count() <= 0:

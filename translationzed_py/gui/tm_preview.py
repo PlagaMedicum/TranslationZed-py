@@ -1,3 +1,5 @@
+"""Preview highlighting helpers for translation memory suggestions."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -12,6 +14,7 @@ _MAX_TEXT_LEN = 160_000
 
 
 def prepare_tm_preview_terms(terms: Iterable[str]) -> list[str]:
+    """Normalize and limit highlight terms for TM preview rendering."""
     cleaned: list[str] = []
     for term in terms:
         value = str(term).strip()
@@ -26,6 +29,7 @@ def prepare_tm_preview_terms(terms: Iterable[str]) -> list[str]:
 
 
 def apply_tm_preview_highlights(editor: QPlainTextEdit, terms: Iterable[str]) -> None:
+    """Apply bounded highlight selections for TM preview terms."""
     cleaned = prepare_tm_preview_terms(terms)
     if not cleaned:
         editor.setExtraSelections([])
