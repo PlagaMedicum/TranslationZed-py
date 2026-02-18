@@ -80,6 +80,14 @@ def test_status_delegate_editor_data_and_model_roundtrip(qtbot) -> None:
     delegate.setModelData(combo, model, index)
     assert model.data(index, Qt.EditRole) == Status.TRANSLATED
 
+    bare_combo = QComboBox(parent)
+    model.setData(index, Status.PROOFREAD, Qt.EditRole)
+    delegate.setEditorData(bare_combo, index)
+    assert bare_combo.currentIndex() == -1
+
+    delegate.setEditorData(QWidget(parent), index)
+    delegate.setModelData(QWidget(parent), model, index)
+
 
 def test_multiline_delegate_editor_update_and_geometry_paths(qtbot) -> None:
     """Verify multiline delegate editor config, model sync, and geometry updates."""
@@ -116,6 +124,13 @@ def test_multiline_delegate_editor_update_and_geometry_paths(qtbot) -> None:
     assert standalone_editor.geometry().height() >= 1
 
     delegate.setEditorData(QComboBox(table), index)
+    delegate.setModelData(QComboBox(table), model, index)
+
+    invalid_option = _make_option(table)
+    invalid_option.rect = QRect(0, 0, 200, 20)
+    non_plain = QWidget(table)
+    delegate.updateEditorGeometry(non_plain, invalid_option, None)
+    assert non_plain.geometry().height() == 20
 
 
 def test_palette_cache_key_and_visual_helpers_cover_fallback_branches(monkeypatch) -> None:
@@ -145,7 +160,7 @@ def test_palette_cache_key_and_visual_helpers_cover_fallback_branches(monkeypatc
     assert not bool(flags & QTextOption.ShowTabsAndSpaces)
 
     palette = QPalette()
-    doc.setPlainText("A <b> {TOKEN}  B")
+    doc.setPlainText(r"A <b> {TOKEN}  \n B")
     _apply_visual_formats(
         doc,
         doc.toPlainText(),
@@ -245,7 +260,9 @@ def test_visual_delegate_cache_editor_sizehint_and_paint_paths(qtbot, monkeypatc
     painter = QPainter(image)
     try:
         model.setData(index, "x" * 5001, Qt.DisplayRole)
-        delegate.paint(painter, option, index)
+        selected_long = QStyleOptionViewItem(option)
+        selected_long.state |= QStyle.State_Selected
+        delegate.paint(painter, selected_long, index)
 
         model.setData(index, "plain single line", Qt.DisplayRole)
         delegate.paint(painter, option, index)
@@ -262,3 +279,49 @@ def test_visual_delegate_cache_editor_sizehint_and_paint_paths(qtbot, monkeypatc
         highlight_delegate.paint(painter, selected_option, index)
     finally:
         painter.end()
+
+    monkeypatch.setattr("translationzed_py.gui.delegates.MAX_VISUAL_CHARS", 8)
+    model.setData(index, "0123456789", Qt.DisplayRole)
+    optimize_delegate = VisualTextDelegate(
+        view,
+        options_provider=lambda: (True, True, True),
+    )
+    optimize_delegate.sizeHint(option, index)
+
+    image2 = QImage(260, 60, QImage.Format_ARGB32)
+    image2.fill(0)
+    painter2 = QPainter(image2)
+    try:
+        optimize_delegate.paint(painter2, option, index)
+    finally:
+        painter2.end()
+
+    class _DummyDelegate(VisualTextDelegate):
+        """Visual delegate subclass with non-plain editor fallback path."""
+
+        def createEditor(self, parent, _option, _index):  # noqa: N802
+            return QWidget(parent)
+
+    dummy = _DummyDelegate(view, options_provider=lambda: (False, False, False))
+    widget_editor = dummy.createEditor(view, option, index)
+    assert isinstance(widget_editor, QWidget)
+
+
+def test_visual_delegate_set_editor_data_non_plain_and_optimize_branch(qtbot, monkeypatch) -> None:
+    """Verify visual delegate setEditorData handles non-plain and optimize branches."""
+    view = QTableView()
+    qtbot.addWidget(view)
+    model = QStandardItemModel(1, 1, view)
+    model.setData(model.index(0, 0), "x" * 100, Qt.EditRole)
+    view.setModel(model)
+    index = model.index(0, 0)
+
+    monkeypatch.setattr("translationzed_py.gui.delegates.MAX_VISUAL_CHARS", 8)
+    delegate = VisualTextDelegate(
+        view,
+        options_provider=lambda: (True, True, True),
+    )
+    option = _make_option(view)
+    editor = delegate.createEditor(view, option, index)
+    delegate.setEditorData(editor, index)
+    delegate.setEditorData(QWidget(view), index)
