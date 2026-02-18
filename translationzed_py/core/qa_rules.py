@@ -1,3 +1,5 @@
+"""Primitive QA rule checks for trailing fragments, newlines, and tokens."""
+
 from __future__ import annotations
 
 import re
@@ -35,6 +37,7 @@ def has_missing_trailing_fragment(source_text: str, target_text: str) -> bool:
 
 
 def newline_count(text: str) -> int:
+    """Count logical newline markers in text, including escaped newline tokens."""
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
     raw_newlines = normalized.count("\n")
     escaped_newlines = len(_NEWLINE_ESCAPE_RE.findall(normalized))
@@ -42,10 +45,12 @@ def newline_count(text: str) -> int:
 
 
 def has_newline_mismatch(source_text: str, target_text: str) -> bool:
+    """Return whether source and target newline counts differ."""
     return newline_count(source_text) != newline_count(target_text)
 
 
 def same_as_source(source_text: str, target_text: str) -> bool:
+    """Return whether target text is identical to source text."""
     return source_text == target_text
 
 
@@ -63,6 +68,7 @@ def missing_protected_tokens(
     source_text: str,
     target_text: str,
 ) -> tuple[str, ...]:
+    """Return protected tokens present in source but missing in target."""
     source_counts = Counter(extract_protected_tokens(source_text))
     target_counts = Counter(extract_protected_tokens(target_text))
     missing: list[str] = []

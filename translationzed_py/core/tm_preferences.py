@@ -1,3 +1,5 @@
+"""Preference-application helpers for TM import and enablement state."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -10,21 +12,27 @@ from .tm_store import TMStore
 
 @dataclass(slots=True)
 class TMPreferencesActions:
+    """Hold pending TM preference mutations requested from the preferences UI."""
+
     remove_paths: set[str] = field(default_factory=set)
     enabled_map: dict[str, bool] = field(default_factory=dict)
     import_paths: list[str] = field(default_factory=list)
 
     def is_empty(self) -> bool:
+        """Return whether no TM preference changes are queued."""
         return not self.remove_paths and not self.enabled_map and not self.import_paths
 
 
 @dataclass(frozen=True, slots=True)
 class TMPreferencesApplyReport:
+    """Summarize TM preference application results and encountered failures."""
+
     sync_paths: tuple[Path, ...]
     failures: tuple[str, ...]
 
 
 def actions_from_values(values: dict[str, Any]) -> TMPreferencesActions:
+    """Translate raw dialog values into normalized TM preference actions."""
     actions = TMPreferencesActions()
     remove_paths_raw = values.get("tm_remove_paths", []) or []
     enabled_raw = values.get("tm_enabled", {}) or {}
@@ -49,6 +57,7 @@ def apply_actions(
     *,
     copy_to_import_dir: Callable[[Path], Path],
 ) -> TMPreferencesApplyReport:
+    """Apply TM preference actions to the store and import directory."""
     failures: list[str] = []
     sync_paths: set[Path] = set()
     for source in actions.import_paths:

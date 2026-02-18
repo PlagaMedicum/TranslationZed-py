@@ -1,3 +1,5 @@
+"""Theme detection and palette application helpers for the Qt GUI."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -22,6 +24,7 @@ _DARK_TOOLTIP_QSS = (
 
 
 def normalize_theme_mode(value: object, *, default: str = THEME_SYSTEM) -> str:
+    """Normalize arbitrary theme input to a supported mode constant."""
     raw = str(value).strip().upper()
     if raw in THEME_MODES:
         return raw
@@ -61,6 +64,7 @@ def detect_system_theme_mode(
 
 
 def connect_system_theme_sync(callback: Callable[..., object]) -> bool:
+    """Connect callback to Qt system-theme change notifications when available."""
     app = QApplication.instance()
     if app is None:
         return False
@@ -75,6 +79,7 @@ def connect_system_theme_sync(callback: Callable[..., object]) -> bool:
 
 
 def disconnect_system_theme_sync(callback: Callable[..., object]) -> bool:
+    """Disconnect a previously connected system-theme change callback."""
     app = QApplication.instance()
     if app is None:
         return False
@@ -158,6 +163,7 @@ def apply_theme(
     *,
     style_hints: object | None = None,
 ) -> str:
+    """Apply requested theme mode to the QApplication and return normalized mode."""
     normalized = normalize_theme_mode(mode)
     if normalized == THEME_SYSTEM:
         system_mode = detect_system_theme_mode(app, style_hints=style_hints)

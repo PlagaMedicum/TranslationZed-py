@@ -1,3 +1,5 @@
+"""Filesystem tree model for locale translation files."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,6 +20,7 @@ class FsModel(QStandardItemModel):
     def __init__(
         self, root: Path, locales: list[LocaleMeta], *, lazy: bool = True
     ) -> None:
+        """Initialize a tree model for locale files with optional lazy loading."""
         super().__init__()
         self._root = root  # keep for helpers
         self._lazy = lazy
@@ -43,9 +46,11 @@ class FsModel(QStandardItemModel):
             self._locale_items[meta.code] = loc_item
 
     def is_lazy(self) -> bool:
+        """Return whether locale nodes are populated lazily."""
         return self._lazy
 
     def ensure_loaded_for_index(self, index: QModelIndex) -> None:
+        """Ensure the locale branch for the given index is populated."""
         if not index.isValid():
             return
         item = self.itemFromIndex(index)
@@ -81,6 +86,7 @@ class FsModel(QStandardItemModel):
                 self._pending_dirty.discard(abs_path)
 
     def set_dirty(self, path: Path, dirty: bool) -> None:
+        """Toggle dirty visual marker for a file node by absolute path."""
         abs_path = str(path)
         item = self._path_items.get(abs_path)
         if item is None:
