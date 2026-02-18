@@ -93,3 +93,48 @@ def test_render_workflow_prefetch_and_resume() -> None:
     resumed = service.resume_resize_span(span=(20, 40), cursor=30)
     assert resumed == (30, 40)
     assert service.resume_resize_span(span=(20, 25), cursor=40) is None
+
+
+def test_render_workflow_handles_disabled_optimizations_and_empty_spans() -> None:
+    """Verify render workflow handles disabled mode and empty span inputs."""
+    service = RenderWorkflowService()
+
+    decision = service.decide_render_cost(
+        max_value_length=9999,
+        large_text_optimizations=False,
+        render_heavy_threshold=1,
+        preview_limit=10,
+    )
+    assert decision.render_heavy is False
+    assert decision.preview_limit is None
+
+    assert (
+        service.visible_row_span(
+            total_rows=0,
+            first_visible=0,
+            last_visible=1,
+            margin_pct=0.2,
+        )
+        is None
+    )
+    assert (
+        service.prefetch_span(
+            span=None,
+            total_rows=10,
+            margin=2,
+            large_file_mode=False,
+            render_heavy=False,
+        )
+        is None
+    )
+    assert (
+        service.prefetch_span(
+            span=(1, 2),
+            total_rows=0,
+            margin=2,
+            large_file_mode=False,
+            render_heavy=False,
+        )
+        is None
+    )
+    assert service.resume_resize_span(span=None, cursor=0) is None
