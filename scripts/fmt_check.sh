@@ -5,5 +5,5 @@ source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 ensure_venv
 
 while IFS= read -r file; do
-  "$VENV_PY" -m black "$file"
+  "$VENV_PY" -m black --check "$file"
 done < <(rg --files -g "*.py" translationzed_py tests scripts)

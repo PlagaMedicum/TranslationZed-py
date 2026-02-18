@@ -6,8 +6,9 @@ import gettext
 import zipfile
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
+
+from defusedxml import ElementTree as ET  # type: ignore[import-untyped]
 
 _XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 _XML_REL_ID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
@@ -728,7 +729,7 @@ def _xml_lang_hint(elem: ET.Element, *, source: bool) -> str:
         else ("target-language", "trgLang", "target_locale", "target_lang")
     )
     for key in key_candidates:
-        value = elem.attrib.get(key, "").strip()
+        value = str(elem.attrib.get(key, "")).strip()
         if value:
             return value
     return ""

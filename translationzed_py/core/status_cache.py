@@ -468,6 +468,7 @@ def _read_rows_any(data: bytes) -> _CacheRows | None:
 def read(root: Path, file_path: Path) -> CacheMap:
     """
     Read per-file cache, returning a mapping { key_hash: CacheEntry }.
+
     Missing or corrupt files are ignored.
     """
     status_file = _read_cache_path(root, file_path)
@@ -530,10 +531,7 @@ def write(
     original_values: dict[str, str] | None = None,
     force_original: set[str] | None = None,
 ) -> None:
-    """
-    Write current in-memory statuses and (optional) draft translations into
-    per-file cache. Values are stored only for keys in `changed_keys`.
-    """
+    """Write in-memory statuses/drafts to per-file cache for changed keys."""
     status_file = _cache_path(root, file_path)
     legacy_status_file = _legacy_cache_path(root, file_path)
     read_status_file = _read_cache_path(root, file_path)

@@ -116,9 +116,14 @@ def main() -> int:
         if hasattr(entries, "preview_at"):
             indices = _pick_indices(count)
 
-            def _run_preview() -> None:
-                for idx in indices:
-                    entries.preview_at(idx, preview_limit)
+            def _run_preview(
+                *,
+                entries_ref=entries,
+                indices_ref=indices,
+                preview_limit_ref=preview_limit,
+            ) -> None:
+                for idx in indices_ref:
+                    entries_ref.preview_at(idx, preview_limit_ref)
 
             ok, _ = _measure(
                 "preview_at",
@@ -133,7 +138,7 @@ def main() -> int:
             ok, _ = _measure(
                 "prefetch",
                 prefetch_budget,
-                lambda w=window: entries.prefetch(0, w - 1),
+                lambda w=window, entries_ref=entries: entries_ref.prefetch(0, w - 1),
                 f"window={window} entries={count}",
             )
             any_fail |= not ok

@@ -1,9 +1,17 @@
 # ─── Configurable vars ────────────────────────────────────────────────────────
-PY      ?= python            # override on CLI:  make PY=python3.12 venv
+PY      ?= python            # override on CLI: make PY=python3.12 venv
 VENV    ?= .venv
+ARTIFACTS ?= artifacts
+BENCH_BASELINE ?= tests/benchmarks/baseline.json
+BENCH_CURRENT ?= $(ARTIFACTS)/bench/bench.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt lint typecheck arch-check test check verify verify-core verify-fast release-check release-check-if-tag release-dry-run run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win test-encoding-integrity diagnose-encoding test-readonly-clean
+.PHONY: venv install precommit fmt fmt-check lint lint-check typecheck arch-check \
+	test test-cov test-perf perf-advisory check check-local verify verify-ci verify-ci-core verify-core \
+	verify-heavy verify-fast release-check release-check-if-tag release-dry-run \
+	security docstyle docs-build bench bench-check test-mutation \
+	run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
+	test-encoding-integrity diagnose-encoding test-readonly-clean
 
 ## create .venv and populate dev deps (one-off)
 venv:
@@ -20,8 +28,14 @@ precommit: venv
 fmt:
 	VENV=$(VENV) bash scripts/fmt.sh
 
+fmt-check:
+	VENV=$(VENV) bash scripts/fmt_check.sh
+
 lint:
 	VENV=$(VENV) bash scripts/lint.sh
+
+lint-check:
+	VENV=$(VENV) bash scripts/lint_check.sh
 
 typecheck:
 	VENV=$(VENV) bash scripts/typecheck.sh
@@ -32,6 +46,32 @@ arch-check:
 test:
 	VENV=$(VENV) bash scripts/test.sh
 
+test-cov:
+	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/test_cov.sh
+
+test-perf:
+	VENV=$(VENV) bash scripts/test_perf.sh
+
+security:
+	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/security.sh
+
+docstyle:
+	VENV=$(VENV) bash scripts/docstyle.sh
+
+docs-build:
+	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/docs_build.sh
+
+bench:
+	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) BENCH_CURRENT=$(BENCH_CURRENT) \
+		bash scripts/bench.sh $(ARGS)
+
+bench-check:
+	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) BENCH_BASELINE=$(BENCH_BASELINE) BENCH_CURRENT=$(BENCH_CURRENT) \
+		bash scripts/bench_check.sh $(ARGS)
+
+test-mutation:
+	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/mutation.sh
+
 test-encoding-integrity:
 	VENV=$(VENV) bash scripts/test_encoding_integrity.sh
 
@@ -41,25 +81,70 @@ diagnose-encoding:
 test-readonly-clean:
 	VENV=$(VENV) bash scripts/test_readonly_clean.sh
 
-## run all quality gates
-check: fmt lint typecheck arch-check test
+## strict non-mutating quality gate (check-only) for CI
+check: fmt-check lint-check typecheck arch-check test
 
-## pre-commit core verification (clean fixtures + full quality gates)
-verify-core: clean-cache clean-config check test-encoding-integrity diagnose-encoding test-readonly-clean
+## local quality gate (allows auto-fix)
+check-local: fmt lint typecheck arch-check test
 
-## fastest full developer gate (no cache/config cleanup, no perf scenarios)
+## full local verification core (auto-fix + warning policy)
+verify-core: clean-cache clean-config fmt lint typecheck arch-check test-cov perf-advisory \
+	test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build bench
+
+## local perf gates are advisory; strict blocking lives in verify-ci
+perf-advisory:
+	@$(MAKE) test-perf || { \
+		echo "verify warning: test-perf failed (advisory in local verify)."; \
+	}
+	@$(MAKE) perf-scenarios || { \
+		echo "verify warning: perf-scenarios failed (advisory in local verify)."; \
+	}
+
+## full local verification (auto-fix allowed, warn if tracked files changed)
+verify:
+	@before="$$(mktemp)"; \
+	after="$$(mktemp)"; \
+	trap 'rm -f "$$before" "$$after"' EXIT; \
+	git status --porcelain --untracked-files=no >"$$before"; \
+	$(MAKE) verify-core; \
+	$(MAKE) release-check-if-tag TAG=$(TAG); \
+	git status --porcelain --untracked-files=no >"$$after"; \
+	if ! cmp -s "$$before" "$$after"; then \
+		echo "verify warning: auto-fixers changed tracked files. Review and commit updates."; \
+		diff -u "$$before" "$$after" || true; \
+	fi
+
+## strict CI verification core (non-mutating)
+verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-check test-cov test-perf \
+	test-encoding-integrity diagnose-encoding test-readonly-clean security docstyle docs-build bench-check perf-scenarios release-check-if-tag
+
+## strict CI verification (non-mutating + fail-on-drift)
+verify-ci:
+	@before="$$(mktemp)"; \
+	after="$$(mktemp)"; \
+	trap 'rm -f "$$before" "$$after"' EXIT; \
+	git status --porcelain --untracked-files=no >"$$before"; \
+	$(MAKE) verify-ci-core TAG=$(TAG); \
+	git status --porcelain --untracked-files=no >"$$after"; \
+	if ! cmp -s "$$before" "$$after"; then \
+		echo "verify-ci failed: tracked files changed during verification."; \
+		diff -u "$$before" "$$after" || true; \
+		exit 1; \
+	fi
+
+## tiered heavy verification (advisory mutation + optional extra checks)
+verify-heavy: verify-ci test-mutation
+
+## fastest strict developer gate
 verify-fast: check
 
-## full verification (core gate + perf scenarios)
-verify: verify-core perf-scenarios release-check-if-tag
-
-## run release-check only when TAG is provided (keeps `make verify` single-command friendly)
+## run release-check only when TAG is provided (keeps verify single-command friendly)
 release-check-if-tag:
 	@if [ -n "$(TAG)" ]; then \
 		echo "TAG=$(TAG) detected; running release-check"; \
 		$(MAKE) release-check TAG=$(TAG); \
 	else \
-		echo "release-check skipped (set TAG=vX.Y.Z to include it in make verify)"; \
+		echo "release-check skipped (set TAG=vX.Y.Z to include it)"; \
 	fi
 
 ## validate release tag/version/changelog alignment
@@ -72,14 +157,14 @@ release-dry-run:
 		echo "TAG is required (example: make release-dry-run TAG=v0.6.0-rc1)"; \
 		exit 2; \
 	fi
-	$(MAKE) verify
+	$(MAKE) verify TAG=$(TAG)
 	$(MAKE) release-check TAG=$(TAG)
 
 ## run perf scenarios against fixture translation files
 perf-scenarios:
 	VENV=$(VENV) bash scripts/perf_scenarios.sh $(ARGS)
 
-## convenience runner:  make run ARGS="--help"
+## convenience runner: make run ARGS="--help"
 run:
 	VENV=$(VENV) bash scripts/run.sh $(ARGS)
 

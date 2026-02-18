@@ -1,0 +1,16 @@
+site_name: TranslationZed-Py Documentation
+docs_dir: docs
+site_dir: artifacts/docs/site
+strict: true
+nav:
+  - Home: index.md
+  - Documentation Structure: docs_structure.md
+  - Technical Specification: translation_zed_py_technical_specification.md
+  - UX Specification: translation_zed_py_use_case_ux_specification.md
+  - Implementation Plan: implementation_plan.md
+  - Testing Strategy: testing_strategy.md
+  - Checklists: checklists.md
+  - Architecture Overview: architecture_overview.md
+  - Flows: flows.md
+  - TM Ranking Algorithm: tm_ranking_algorithm.md
+  - Technical Notes: technical_notes_current_state.md

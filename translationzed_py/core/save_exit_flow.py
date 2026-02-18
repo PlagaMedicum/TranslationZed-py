@@ -159,9 +159,7 @@ def apply_write_original_flow(
     save_all: Callable[[list[Path]], None],
     notify_nothing_to_write: Callable[[], None],
 ) -> None:
-    """
-    Run the write-original action flow.
-    """
+    """Run the write-original action flow."""
     write_cache()
     files = list_draft_files()
     if not files:
@@ -184,9 +182,7 @@ def should_accept_close(
     choose_action: Callable[[list[Path]], Literal["cancel", "write", "cache"]],
     save_all: Callable[[Sequence[Path]], None],
 ) -> bool:
-    """
-    Run close-decision flow and return whether the window should close.
-    """
+    """Run close-decision flow and return whether the window should close."""
     write_cache()
     if prompt_write_on_exit:
         files = list_draft_files()

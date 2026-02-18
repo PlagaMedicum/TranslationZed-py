@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
-from translationzed_py.core.encoding_diagnostics import format_encoding_report
-from translationzed_py.core.encoding_diagnostics import scan_encoding_issues
+from translationzed_py.core.encoding_diagnostics import (
+    format_encoding_report,
+    scan_encoding_issues,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,7 +33,9 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(args.project_root).resolve()
     language_errors, issues = scan_encoding_issues(root)
     print(
-        format_encoding_report(root=root, language_errors=language_errors, issues=issues)
+        format_encoding_report(
+            root=root, language_errors=language_errors, issues=issues
+        )
     )
     if args.warn_only:
         return 0

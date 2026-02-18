@@ -251,6 +251,7 @@ def _parse_env(path: Path) -> dict[str, Any]:
 def load(root: Path | None = None) -> dict[str, Any]:
     """
     Load preferences from disk without side effects.
+
     Unknown keys are preserved.
     """
     merged = dict(_DEFAULTS)
@@ -269,6 +270,7 @@ def load(root: Path | None = None) -> dict[str, Any]:
 def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
     """
     Ensure settings file exists and contains required keys.
+
     Best effort only: returns loaded prefs even when write fails.
     """
     path = _config_path(root)

@@ -30,7 +30,9 @@ def _extract_pyproject_version(text: str) -> str:
 def _extract_module_version(text: str) -> str:
     m = re.search(r'^__version__\s*=\s*"([^"]+)"\s*$', text, flags=re.MULTILINE)
     if not m:
-        raise RuntimeError("Could not find __version__ in translationzed_py/version.py.")
+        raise RuntimeError(
+            "Could not find __version__ in translationzed_py/version.py."
+        )
     return m.group(1).strip()
 
 
@@ -48,9 +50,7 @@ def _normalize_tag(raw: str) -> tuple[str, str | None]:
         tag = tag[1:]
     match = _TAG_RE.fullmatch(tag)
     if not match:
-        raise RuntimeError(
-            f"Tag '{raw}' does not look like vX.Y.Z (or vX.Y.Z-rcN)."
-        )
+        raise RuntimeError(f"Tag '{raw}' does not look like vX.Y.Z (or vX.Y.Z-rcN).")
     return match.group("version"), match.group("rc")
 
 
@@ -61,9 +61,7 @@ def _resolve_tag(cli_tag: str | None) -> str:
         value = os.getenv(key, "").strip()
         if value:
             return value
-    raise RuntimeError(
-        "No tag provided. Pass --tag vX.Y.Z or set TAG/GITHUB_REF_NAME."
-    )
+    raise RuntimeError("No tag provided. Pass --tag vX.Y.Z or set TAG/GITHUB_REF_NAME.")
 
 
 def main() -> int:
@@ -99,7 +97,8 @@ def main() -> int:
         )
     if module_version != expected_version:
         errors.append(
-            f"translationzed_py/version.py __version__ is {module_version}, expected {expected_version}."
+            "translationzed_py/version.py __version__ is "
+            f"{module_version}, expected {expected_version}."
         )
     if expected_version not in changelog_versions:
         errors.append(

@@ -23,7 +23,9 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = _parse_args()
-    root = Path(args.root).resolve() if args.root else Path(__file__).resolve().parents[1]
+    root = (
+        Path(args.root).resolve() if args.root else Path(__file__).resolve().parents[1]
+    )
     violations = check_rules(root)
     if violations:
         print("Architecture guard violations:")

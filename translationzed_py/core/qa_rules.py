@@ -24,9 +24,7 @@ def trailing_fragment(text: str) -> str:
 
 
 def has_missing_trailing_fragment(source_text: str, target_text: str) -> bool:
-    """
-    True when source ends with a trailing fragment and target does not preserve it.
-    """
+    """Return True when source trailing fragment is not preserved in target."""
     source_tail = trailing_fragment(source_text)
     if not source_tail:
         return False
@@ -52,9 +50,7 @@ def same_as_source(source_text: str, target_text: str) -> bool:
 
 
 def extract_protected_tokens(text: str) -> tuple[str, ...]:
-    """
-    Return code-like tokens to preserve across translation.
-    """
+    """Return code-like tokens to preserve across translation."""
     spans: list[tuple[int, int, str]] = []
     for regex in _PROTECTED_TOKEN_REGEXES:
         for match in regex.finditer(text):
