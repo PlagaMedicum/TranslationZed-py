@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from translationzed_py.core.lazy_entries import EntryMeta, LazyEntries
 from translationzed_py.core.model import Entry, ParsedFile, Status
 from translationzed_py.core.source_reference_service import (
     build_source_lookup_materialized,
@@ -211,3 +212,117 @@ def test_resolve_source_reference_mode_for_path_uses_override(tmp_path: Path) ->
         overrides={"BE/ui.txt": "RU"},
     )
     assert mode == "RU"
+
+
+def test_source_reference_path_key_falls_back_for_external_paths() -> None:
+    """Verify source reference path keys use absolute posix outside root."""
+    root = Path("/tmp/project-root")
+    path = Path("/var/tmp/external.txt")
+    assert source_reference_path_key(root, path) == path.as_posix()
+
+
+def test_load_source_reference_file_overrides_rejects_invalid_payloads() -> None:
+    """Verify source reference overrides loader ignores invalid raw payloads."""
+    assert load_source_reference_file_overrides("") == {}
+    assert load_source_reference_file_overrides("not-json") == {}
+    assert load_source_reference_file_overrides('["EN"]') == {}
+
+
+def test_reference_path_for_handles_same_locale_and_invalid_modes(
+    tmp_path: Path,
+) -> None:
+    """Verify reference path lookup handles same-locale and invalid mode cases."""
+    root = tmp_path / "proj"
+    en = root / "EN"
+    en.mkdir(parents=True)
+    same_path = en / "ui.txt"
+    same_path.write_text('UI = "E"\n', encoding="utf-8")
+
+    assert (
+        reference_path_for(
+            root,
+            same_path,
+            target_locale="EN",
+            reference_locale="EN",
+        )
+        == same_path
+    )
+    assert (
+        reference_path_for(
+            root,
+            same_path.with_name("missing.txt"),
+            target_locale="EN",
+            reference_locale="EN",
+        )
+        is None
+    )
+    assert (
+        reference_path_for(
+            root,
+            same_path,
+            target_locale="",
+            reference_locale="EN",
+        )
+        is None
+    )
+
+
+def test_build_source_lookup_materialized_uses_lazy_row_entries_when_available() -> None:
+    """Verify source lookup returns lazy row entries when keys align."""
+    raw = b'"One"|"Two"'
+    metas = [
+        EntryMeta("K1", Status.UNTOUCHED, (0, 5), (3,), (), False, ((0, 5),), 1),
+        EntryMeta("K2", Status.UNTOUCHED, (6, 11), (3,), (), False, ((6, 11),), 2),
+    ]
+    reference_lazy = LazyEntries(raw=raw, encoding="utf-8", metas=metas)
+    target_entries = [
+        Entry("K1", "A", Status.UNTOUCHED, (0, 0), (), ()),
+        Entry("K2", "B", Status.UNTOUCHED, (0, 0), (), ()),
+    ]
+
+    result = build_source_lookup_materialized(
+        reference_lazy,
+        target_entries=target_entries,
+        path_name="ui.txt",
+    )
+
+    assert result.by_row_entries is reference_lazy
+    assert result.by_row_values is None
+    assert result.keys == ["K1", "K2"]
+
+
+def test_load_reference_lookup_short_circuits_missing_context(tmp_path: Path) -> None:
+    """Verify load reference lookup returns none for missing required context."""
+    root = tmp_path / "proj"
+    root.mkdir()
+    path = root / "BE" / "ui.txt"
+
+    common_kwargs = dict(
+        root=root,
+        path=path,
+        parsed_cache={},
+        should_parse_lazy=lambda _p: False,
+        parse_eager=lambda _p, _enc: (_ for _ in ()).throw(RuntimeError("unexpected")),
+        parse_lazy=lambda _p, _enc: (_ for _ in ()).throw(RuntimeError("unexpected")),
+    )
+
+    assert (
+        load_reference_lookup(
+            **common_kwargs,
+            target_locale=None,
+            reference_locale="EN",
+            locale_encodings={"EN": "utf-8"},
+            target_entries=None,
+        )
+        is None
+    )
+    assert (
+        load_reference_lookup(
+            **common_kwargs,
+            target_locale="BE",
+            reference_locale="EN",
+            locale_encodings={"BE": "utf-8"},
+            target_entries=None,
+        )
+        is None
+    )
