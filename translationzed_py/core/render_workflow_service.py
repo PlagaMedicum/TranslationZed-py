@@ -1,3 +1,5 @@
+"""Render-cost heuristics for large text and virtualized row workflows."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,12 +7,16 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
 class RenderCostDecision:
+    """Describe whether rendering should use heavy-mode protections."""
+
     render_heavy: bool
     preview_limit: int | None
 
 
 @dataclass(frozen=True, slots=True)
 class RenderWorkflowService:
+    """Compute viewport and prefetch decisions for heavy rendering scenarios."""
+
     def decide_render_cost(
         self,
         *,
@@ -19,6 +25,7 @@ class RenderWorkflowService:
         render_heavy_threshold: int,
         preview_limit: int,
     ) -> RenderCostDecision:
+        """Decide whether heavy rendering mode should be enabled."""
         if not large_text_optimizations:
             return RenderCostDecision(render_heavy=False, preview_limit=None)
         if max_value_length >= render_heavy_threshold:
@@ -39,6 +46,7 @@ class RenderWorkflowService:
         large_text_optimizations: bool,
         render_heavy: bool,
     ) -> bool:
+        """Return whether the file should use large-file rendering strategy."""
         if not has_model:
             return False
         return bool(
@@ -55,6 +63,7 @@ class RenderWorkflowService:
         last_visible: int,
         margin_pct: float,
     ) -> tuple[int, int] | None:
+        """Return expanded visible row span with configured viewport margin."""
         if total_rows <= 0:
             return None
         first = 0 if first_visible < 0 else first_visible
@@ -74,6 +83,7 @@ class RenderWorkflowService:
         large_file_mode: bool,
         render_heavy: bool,
     ) -> tuple[int, int] | None:
+        """Return bounded prefetch span derived from the visible span."""
         if span is None or total_rows <= 0:
             return None
         start, end = span
@@ -93,6 +103,7 @@ class RenderWorkflowService:
         span: tuple[int, int] | None,
         cursor: int | None,
     ) -> tuple[int, int] | None:
+        """Return remaining resize span when resuming from a cursor row."""
         if span is None:
             return None
         start, end = span

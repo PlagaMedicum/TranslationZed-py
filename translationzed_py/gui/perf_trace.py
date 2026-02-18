@@ -1,3 +1,5 @@
+"""Lightweight runtime performance tracing utilities for GUI instrumentation."""
+
 from __future__ import annotations
 
 import os
@@ -41,9 +43,12 @@ class _Bucket:
 
 
 class PerfTrace:
+    """Accumulate and periodically flush categorized timing metrics."""
+
     def __init__(
         self, categories: set[str], *, interval_s: float = 1.0, out=None
     ) -> None:
+        """Initialize trace buckets for enabled categories."""
         self.enabled = bool(categories)
         self._categories = categories
         self._interval_s = interval_s
@@ -53,9 +58,11 @@ class PerfTrace:
 
     @classmethod
     def from_env(cls) -> PerfTrace:
+        """Build a trace instance from `TZP_PERF_TRACE` environment settings."""
         return cls(_parse_categories(os.getenv(_TRACE_ENV, "")))
 
     def start(self, name: str) -> float | None:
+        """Start timing for a category and return start timestamp when enabled."""
         if not self.enabled or name not in self._categories:
             return None
         return time.perf_counter()
@@ -63,6 +70,7 @@ class PerfTrace:
     def stop(
         self, name: str, start: float | None, *, items: int = 1, unit: str = "items"
     ) -> None:
+        """Stop timing for a category and record elapsed duration."""
         if start is None:
             return
         elapsed_ms = (time.perf_counter() - start) * 1000.0
@@ -71,6 +79,7 @@ class PerfTrace:
     def record(
         self, name: str, elapsed_ms: float, *, items: int = 1, unit: str = "items"
     ) -> None:
+        """Record one measured duration sample for a named category."""
         if not self.enabled or name not in self._categories:
             return
         bucket = self._buckets.get(name)
