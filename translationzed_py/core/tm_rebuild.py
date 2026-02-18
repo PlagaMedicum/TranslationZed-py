@@ -1,3 +1,5 @@
+"""Rebuild project translation-memory entries from locale files."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -13,6 +15,8 @@ from .tm_store import TMStore
 
 @dataclass(frozen=True, slots=True)
 class TMRebuildLocale:
+    """Describe one target locale used during TM rebuild."""
+
     locale: str
     locale_path: Path
     target_encoding: str
@@ -20,6 +24,8 @@ class TMRebuildLocale:
 
 @dataclass(frozen=True, slots=True)
 class TMRebuildResult:
+    """Summarize rebuild totals and skip reasons."""
+
     files: int = 0
     entries: int = 0
     skipped_missing_source: int = 0
@@ -31,6 +37,7 @@ def collect_rebuild_locales(
     locale_map: Mapping[str, LocaleMeta],
     selected_locales: list[str] | tuple[str, ...] | set[str],
 ) -> tuple[list[TMRebuildLocale], str]:
+    """Build rebuild specifications and return source EN encoding."""
     en_meta = locale_map.get("EN")
     en_encoding = en_meta.charset if en_meta else "utf-8"
     specs: list[TMRebuildLocale] = []
@@ -58,6 +65,7 @@ def rebuild_project_tm(
     en_encoding: str,
     batch_size: int = 1000,
 ) -> TMRebuildResult:
+    """Rebuild TM rows for selected locale files under a project root."""
     store = TMStore(root)
     files = 0
     entries = 0
@@ -120,6 +128,7 @@ def rebuild_project_tm(
 
 
 def format_rebuild_status(result: TMRebuildResult) -> str:
+    """Format a short user-facing summary for rebuild completion."""
     parts = [
         f"TM rebuild complete: {result.entries} entries",
         f"{result.files} files",
