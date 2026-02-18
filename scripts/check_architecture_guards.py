@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Execute architecture guard checks for GUI/core module boundaries."""
+
 from __future__ import annotations
 
 import argparse
@@ -22,6 +24,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Run architecture checks and return a failing status on violations."""
     args = _parse_args()
     root = (
         Path(args.root).resolve() if args.root else Path(__file__).resolve().parents[1]

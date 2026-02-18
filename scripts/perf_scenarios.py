@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Run fixture-backed performance scenarios with configurable time budgets."""
+
 from __future__ import annotations
 
 import os
@@ -41,6 +43,7 @@ def _pick_indices(count: int) -> list[int]:
 
 
 def main() -> int:
+    """Execute performance scenario probes and return pass/fail status."""
     root_arg = Path(sys.argv[1]) if len(sys.argv) > 1 else None
     env_root_raw = os.getenv("TZP_PERF_ROOT", "").strip()
     root = Path("tests/fixtures/perf_root")

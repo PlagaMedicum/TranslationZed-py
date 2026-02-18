@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Validate release tag/version/changelog consistency for a release build."""
+
 from __future__ import annotations
 
 import argparse
@@ -65,6 +67,7 @@ def _resolve_tag(cli_tag: str | None) -> str:
 
 
 def main() -> int:
+    """Run release metadata checks and return an exit status."""
     parser = argparse.ArgumentParser(
         description="Validate release tag against project versions/changelog."
     )

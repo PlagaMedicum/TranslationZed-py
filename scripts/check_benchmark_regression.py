@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Compare benchmark results against a committed regression baseline."""
+
 from __future__ import annotations
 
 import argparse
@@ -109,6 +111,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Run the benchmark regression comparison CLI."""
     args = _parse_args()
     baseline_path = Path(args.baseline).resolve()
     current_path = Path(args.current).resolve()

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Run encoding diagnostics for a TranslationZed project root."""
+
 from __future__ import annotations
 
 import argparse
@@ -11,6 +13,7 @@ from translationzed_py.core.encoding_diagnostics import (
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run encoding diagnostics and return a process status code."""
     parser = argparse.ArgumentParser(
         prog="encoding_diagnostics",
         description=(
