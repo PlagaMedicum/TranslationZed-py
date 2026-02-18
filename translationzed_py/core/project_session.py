@@ -1,3 +1,5 @@
+"""Project session module."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Collection, Iterable, Sequence
@@ -8,6 +10,7 @@ from translationzed_py.core.app_config import LEGACY_CACHE_DIR
 
 
 def _cache_roots(root: Path, cache_dir: str) -> tuple[Path, ...]:
+    """Execute cache roots."""
     primary = root / cache_dir
     legacy = root / LEGACY_CACHE_DIR
     if legacy == primary:
@@ -17,6 +20,8 @@ def _cache_roots(root: Path, cache_dir: str) -> tuple[Path, ...]:
 
 @dataclass(frozen=True, slots=True)
 class ProjectSessionService:
+    """Represent ProjectSessionService."""
+
     cache_dir: str
     cache_ext: str
     translation_ext: str
@@ -31,6 +36,7 @@ class ProjectSessionService:
         locales: Iterable[str] | None = None,
         opened_files: Collection[Path] | None = None,
     ) -> list[Path]:
+        """Collect draft files."""
         return collect_draft_files(
             root=root,
             cache_dir=self.cache_dir,
@@ -44,6 +50,7 @@ class ProjectSessionService:
     def find_last_opened_file(
         self, *, root: Path, selected_locales: Iterable[str]
     ) -> tuple[Path | None, int]:
+        """Find last opened file."""
         return find_last_opened_file(
             root=root,
             cache_dir=self.cache_dir,
@@ -60,6 +67,7 @@ class ProjectSessionService:
         selected_locales: Iterable[str],
         warned_locales: Collection[str] | None = None,
     ) -> dict[str, list[Path]]:
+        """Collect orphan cache paths."""
         return collect_orphan_cache_paths(
             root=root,
             cache_dir=self.cache_dir,
@@ -75,6 +83,7 @@ class ProjectSessionService:
         requested_locales: Iterable[str],
         available_locales: Iterable[str],
     ) -> list[str]:
+        """Normalize selected locales."""
         return normalize_selected_locales(
             requested_locales=requested_locales,
             available_locales=available_locales,
@@ -82,6 +91,7 @@ class ProjectSessionService:
         )
 
     def use_lazy_tree(self, selected_locales: Iterable[str]) -> bool:
+        """Execute use lazy tree."""
         return use_lazy_tree(selected_locales)
 
     def resolve_requested_locales(
@@ -92,6 +102,7 @@ class ProjectSessionService:
         available_locales: Iterable[str],
         smoke_mode: bool,
     ) -> list[str] | None:
+        """Resolve requested locales."""
         return resolve_requested_locales(
             requested_locales=requested_locales,
             last_locales=last_locales,
@@ -107,6 +118,7 @@ class ProjectSessionService:
         available_locales: Iterable[str],
         current_locales: Iterable[str] = (),
     ) -> LocaleSelectionPlan | None:
+        """Build locale selection plan."""
         return build_locale_selection_plan(
             requested_locales=requested_locales,
             available_locales=available_locales,
@@ -121,6 +133,7 @@ class ProjectSessionService:
         available_locales: Iterable[str],
         current_locales: Iterable[str],
     ) -> LocaleSwitchPlan | None:
+        """Build locale switch plan."""
         return build_locale_switch_plan(
             requested_locales=requested_locales,
             available_locales=available_locales,
@@ -129,6 +142,7 @@ class ProjectSessionService:
         )
 
     def build_locale_reset_plan(self) -> LocaleResetPlan:
+        """Build locale reset plan."""
         return build_locale_reset_plan()
 
     def apply_locale_reset_plan(
@@ -145,6 +159,7 @@ class ProjectSessionService:
         clear_table_model: Callable[[], None],
         clear_status_combo: Callable[[], None],
     ) -> None:
+        """Apply locale reset plan."""
         apply_locale_reset_plan(
             plan=plan,
             clear_files_by_locale=clear_files_by_locale,
@@ -161,6 +176,7 @@ class ProjectSessionService:
     def build_post_locale_startup_plan(
         self, *, selected_locales: Iterable[str]
     ) -> PostLocaleStartupPlan:
+        """Build post locale startup plan."""
         return build_post_locale_startup_plan(selected_locales=selected_locales)
 
     def run_post_locale_startup_tasks(
@@ -170,6 +186,7 @@ class ProjectSessionService:
         run_cache_scan: Callable[[], None],
         run_auto_open: Callable[[], None],
     ) -> int:
+        """Run post locale startup tasks."""
         return run_post_locale_startup_tasks(
             plan=plan,
             run_cache_scan=run_cache_scan,
@@ -182,6 +199,7 @@ class ProjectSessionService:
         selected_locales: Iterable[str],
         resize_splitter: bool,
     ) -> TreeRebuildPlan:
+        """Build tree rebuild plan."""
         return build_tree_rebuild_plan(
             selected_locales=selected_locales,
             resize_splitter=resize_splitter,
@@ -195,6 +213,7 @@ class ProjectSessionService:
         root: Path,
         preview_limit: int = 20,
     ) -> OrphanCacheWarningPlan:
+        """Build orphan cache warning."""
         return build_orphan_cache_warning(
             locale=locale,
             orphan_paths=orphan_paths,
@@ -208,6 +227,7 @@ class ProjectSessionService:
         legacy_paths: Sequence[Path],
         batch_size: int,
     ) -> CacheMigrationSchedulePlan:
+        """Build cache migration schedule plan."""
         return build_cache_migration_schedule_plan(
             legacy_paths=legacy_paths,
             batch_size=batch_size,
@@ -220,6 +240,7 @@ class ProjectSessionService:
         batch_size: int,
         migrated_count: int,
     ) -> CacheMigrationBatchPlan:
+        """Build cache migration batch plan."""
         return build_cache_migration_batch_plan(
             pending_paths=pending_paths,
             batch_size=batch_size,
@@ -234,6 +255,7 @@ class ProjectSessionService:
         migrated_count: int,
         callbacks: CacheMigrationScheduleCallbacks,
     ) -> CacheMigrationScheduleExecution:
+        """Execute execute cache migration schedule."""
         return execute_cache_migration_schedule(
             legacy_paths=legacy_paths,
             batch_size=batch_size,
@@ -249,6 +271,7 @@ class ProjectSessionService:
         migrated_count: int,
         callbacks: CacheMigrationBatchCallbacks,
     ) -> CacheMigrationBatchExecution:
+        """Execute execute cache migration batch."""
         return execute_cache_migration_batch(
             pending_paths=pending_paths,
             batch_size=batch_size,
@@ -259,6 +282,8 @@ class ProjectSessionService:
 
 @dataclass(frozen=True, slots=True)
 class LocaleSelectionPlan:
+    """Represent LocaleSelectionPlan."""
+
     selected_locales: tuple[str, ...]
     lazy_tree: bool
     changed: bool
@@ -266,6 +291,8 @@ class LocaleSelectionPlan:
 
 @dataclass(frozen=True, slots=True)
 class LocaleSwitchPlan:
+    """Represent LocaleSwitchPlan."""
+
     selected_locales: tuple[str, ...]
     lazy_tree: bool
     should_apply: bool
@@ -276,6 +303,8 @@ class LocaleSwitchPlan:
 
 @dataclass(frozen=True, slots=True)
 class LocaleResetPlan:
+    """Represent LocaleResetPlan."""
+
     clear_files_by_locale: bool
     clear_opened_files: bool
     clear_conflict_files: bool
@@ -289,6 +318,8 @@ class LocaleResetPlan:
 
 @dataclass(frozen=True, slots=True)
 class PostLocaleStartupPlan:
+    """Represent PostLocaleStartupPlan."""
+
     should_schedule: bool
     run_cache_scan: bool
     run_auto_open: bool
@@ -297,6 +328,8 @@ class PostLocaleStartupPlan:
 
 @dataclass(frozen=True, slots=True)
 class TreeRebuildPlan:
+    """Represent TreeRebuildPlan."""
+
     lazy_tree: bool
     expand_all: bool
     preload_single_root: bool
@@ -305,6 +338,8 @@ class TreeRebuildPlan:
 
 @dataclass(frozen=True, slots=True)
 class OrphanCacheWarningPlan:
+    """Represent OrphanCacheWarningPlan."""
+
     window_title: str
     text: str
     informative_text: str
@@ -314,6 +349,8 @@ class OrphanCacheWarningPlan:
 
 @dataclass(frozen=True, slots=True)
 class CacheMigrationSchedulePlan:
+    """Represent CacheMigrationSchedulePlan."""
+
     run_immediate: bool
     pending_paths: tuple[Path, ...]
     reset_migration_count: bool
@@ -322,6 +359,8 @@ class CacheMigrationSchedulePlan:
 
 @dataclass(frozen=True, slots=True)
 class CacheMigrationBatchPlan:
+    """Represent CacheMigrationBatchPlan."""
+
     batch_paths: tuple[Path, ...]
     remaining_paths: tuple[Path, ...]
     stop_timer: bool
@@ -330,6 +369,8 @@ class CacheMigrationBatchPlan:
 
 @dataclass(frozen=True, slots=True)
 class CacheMigrationScheduleCallbacks:
+    """Represent CacheMigrationScheduleCallbacks."""
+
     migrate_all: Callable[[], int]
     warn: Callable[[str], None]
     start_timer: Callable[[], None]
@@ -337,6 +378,8 @@ class CacheMigrationScheduleCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class CacheMigrationBatchCallbacks:
+    """Represent CacheMigrationBatchCallbacks."""
+
     migrate_paths: Callable[[Sequence[Path]], int]
     warn: Callable[[str], None]
     stop_timer: Callable[[], None]
@@ -345,12 +388,16 @@ class CacheMigrationBatchCallbacks:
 
 @dataclass(frozen=True, slots=True)
 class CacheMigrationScheduleExecution:
+    """Represent CacheMigrationScheduleExecution."""
+
     pending_paths: tuple[Path, ...]
     migrated_count: int
 
 
 @dataclass(frozen=True, slots=True)
 class CacheMigrationBatchExecution:
+    """Represent CacheMigrationBatchExecution."""
+
     remaining_paths: tuple[Path, ...]
     migrated_count: int
 
@@ -365,6 +412,7 @@ def collect_draft_files(
     locales: Iterable[str] | None = None,
     opened_files: Collection[Path] | None = None,
 ) -> list[Path]:
+    """Collect draft files."""
     cache_roots = [path for path in _cache_roots(root, cache_dir) if path.exists()]
     if not cache_roots:
         return []
@@ -401,6 +449,7 @@ def find_last_opened_file(
     selected_locales: Iterable[str],
     read_last_opened: Callable[[Path], int],
 ) -> tuple[Path | None, int]:
+    """Find last opened file."""
     cache_roots = [path for path in _cache_roots(root, cache_dir) if path.exists()]
     if not cache_roots:
         return None, 0
@@ -442,6 +491,7 @@ def collect_orphan_cache_paths(
     selected_locales: Iterable[str],
     warned_locales: Collection[str] | None = None,
 ) -> dict[str, list[Path]]:
+    """Collect orphan cache paths."""
     cache_roots = [path for path in _cache_roots(root, cache_dir) if path.exists()]
     if not cache_roots:
         return {}
@@ -475,6 +525,7 @@ def build_orphan_cache_warning(
     root: Path,
     preview_limit: int = 20,
 ) -> OrphanCacheWarningPlan:
+    """Build orphan cache warning."""
     rels: list[str] = []
     for path in orphan_paths:
         try:
@@ -499,6 +550,7 @@ def build_cache_migration_schedule_plan(
     legacy_paths: Sequence[Path],
     batch_size: int,
 ) -> CacheMigrationSchedulePlan:
+    """Build cache migration schedule plan."""
     paths = tuple(legacy_paths)
     if not paths:
         return CacheMigrationSchedulePlan(
@@ -528,6 +580,7 @@ def build_cache_migration_batch_plan(
     batch_size: int,
     migrated_count: int,
 ) -> CacheMigrationBatchPlan:
+    """Build cache migration batch plan."""
     paths = tuple(pending_paths)
     if not paths:
         message = None
@@ -556,6 +609,7 @@ def execute_cache_migration_schedule(
     migrated_count: int,
     callbacks: CacheMigrationScheduleCallbacks,
 ) -> CacheMigrationScheduleExecution:
+    """Execute execute cache migration schedule."""
     plan = build_cache_migration_schedule_plan(
         legacy_paths=legacy_paths,
         batch_size=batch_size,
@@ -589,6 +643,7 @@ def execute_cache_migration_batch(
     migrated_count: int,
     callbacks: CacheMigrationBatchCallbacks,
 ) -> CacheMigrationBatchExecution:
+    """Execute execute cache migration batch."""
     plan = build_cache_migration_batch_plan(
         pending_paths=pending_paths,
         batch_size=batch_size,
@@ -623,6 +678,7 @@ def normalize_selected_locales(
     available_locales: Iterable[str],
     source_locale: str = "EN",
 ) -> list[str]:
+    """Normalize selected locales."""
     allowed = {loc for loc in available_locales if loc and loc != source_locale}
     selected: list[str] = []
     seen: set[str] = set()
@@ -635,6 +691,7 @@ def normalize_selected_locales(
 
 
 def use_lazy_tree(selected_locales: Iterable[str]) -> bool:
+    """Execute use lazy tree."""
     count = 0
     for code in selected_locales:
         if not code:
@@ -653,6 +710,7 @@ def resolve_requested_locales(
     smoke_mode: bool,
     source_locale: str = "EN",
 ) -> list[str] | None:
+    """Resolve requested locales."""
     if requested_locales is not None:
         return list(requested_locales)
     if not smoke_mode:
@@ -682,6 +740,7 @@ def build_locale_selection_plan(
     current_locales: Iterable[str] = (),
     source_locale: str = "EN",
 ) -> LocaleSelectionPlan | None:
+    """Build locale selection plan."""
     selected = normalize_selected_locales(
         requested_locales=requested_locales,
         available_locales=available_locales,
@@ -708,6 +767,7 @@ def build_locale_switch_plan(
     current_locales: Iterable[str],
     source_locale: str = "EN",
 ) -> LocaleSwitchPlan | None:
+    """Build locale switch plan."""
     selection = build_locale_selection_plan(
         requested_locales=requested_locales,
         available_locales=available_locales,
@@ -728,6 +788,7 @@ def build_locale_switch_plan(
 
 
 def build_locale_reset_plan() -> LocaleResetPlan:
+    """Build locale reset plan."""
     return LocaleResetPlan(
         clear_files_by_locale=True,
         clear_opened_files=True,
@@ -754,6 +815,7 @@ def apply_locale_reset_plan(
     clear_table_model: Callable[[], None],
     clear_status_combo: Callable[[], None],
 ) -> None:
+    """Apply locale reset plan."""
     if plan.clear_files_by_locale:
         clear_files_by_locale()
     if plan.clear_opened_files:
@@ -777,6 +839,7 @@ def apply_locale_reset_plan(
 def build_post_locale_startup_plan(
     *, selected_locales: Iterable[str]
 ) -> PostLocaleStartupPlan:
+    """Build post locale startup plan."""
     has_locales = any(code for code in selected_locales)
     if not has_locales:
         return PostLocaleStartupPlan(
@@ -799,6 +862,7 @@ def run_post_locale_startup_tasks(
     run_cache_scan: Callable[[], None],
     run_auto_open: Callable[[], None],
 ) -> int:
+    """Run post locale startup tasks."""
     if not plan.should_schedule:
         return 0
     executed = 0
@@ -816,6 +880,7 @@ def build_tree_rebuild_plan(
     selected_locales: Iterable[str],
     resize_splitter: bool,
 ) -> TreeRebuildPlan:
+    """Build tree rebuild plan."""
     selected = [code for code in selected_locales if code]
     lazy_tree = use_lazy_tree(selected)
     preload_single_root = lazy_tree and len(selected) == 1
