@@ -267,7 +267,9 @@ def test_reference_path_for_handles_same_locale_and_invalid_modes(
     )
 
 
-def test_build_source_lookup_materialized_uses_lazy_row_entries_when_available() -> None:
+def test_build_source_lookup_materialized_uses_lazy_row_entries_when_available() -> (
+    None
+):
     """Verify source lookup returns lazy row entries when keys align."""
     raw = b'"One"|"Two"'
     metas = [
@@ -297,14 +299,18 @@ def test_load_reference_lookup_short_circuits_missing_context(tmp_path: Path) ->
     root.mkdir()
     path = root / "BE" / "ui.txt"
 
-    common_kwargs = dict(
-        root=root,
-        path=path,
-        parsed_cache={},
-        should_parse_lazy=lambda _p: False,
-        parse_eager=lambda _p, _enc: (_ for _ in ()).throw(RuntimeError("unexpected")),
-        parse_lazy=lambda _p, _enc: (_ for _ in ()).throw(RuntimeError("unexpected")),
-    )
+    common_kwargs = {
+        "root": root,
+        "path": path,
+        "parsed_cache": {},
+        "should_parse_lazy": lambda _p: False,
+        "parse_eager": lambda _p, _enc: (_ for _ in ()).throw(
+            RuntimeError("unexpected")
+        ),
+        "parse_lazy": lambda _p, _enc: (_ for _ in ()).throw(
+            RuntimeError("unexpected")
+        ),
+    }
 
     assert (
         load_reference_lookup(
