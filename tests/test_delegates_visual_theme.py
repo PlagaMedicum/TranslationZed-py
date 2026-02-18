@@ -1,3 +1,5 @@
+"""Test module for delegates visual theme."""
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -17,6 +19,7 @@ def _dark_palette() -> QPalette:
 
 
 def test_ws_glyph_format_is_visible_in_dark_palette() -> None:
+    """Verify ws glyph format is visible in dark palette."""
     palette = _dark_palette()
     formats = _build_visual_formats(palette, selected=False)
     base = palette.color(QPalette.Base)
@@ -25,6 +28,7 @@ def test_ws_glyph_format_is_visible_in_dark_palette() -> None:
 
 
 def test_selected_tag_format_differs_from_plain_selected_text() -> None:
+    """Verify selected tag format differs from plain selected text."""
     palette = _dark_palette()
     formats = _build_visual_formats(palette, selected=True)
     tag = formats.tag.foreground().color()
@@ -33,6 +37,7 @@ def test_selected_tag_format_differs_from_plain_selected_text() -> None:
 
 
 def test_palette_cache_key_changes_when_palette_changes() -> None:
+    """Verify palette cache key changes when palette changes."""
     palette_a = _dark_palette()
     palette_b = _dark_palette()
     palette_b.setColor(QPalette.Highlight, QColor(110, 80, 40))

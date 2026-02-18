@@ -1,3 +1,5 @@
+"""Test module for core benchmarks."""
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,3 +1,5 @@
+"""Test module for architecture guard."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,6 +12,7 @@ from translationzed_py.core.architecture_guard import (
 
 
 def test_collect_core_modules_handles_import_and_import_from() -> None:
+    """Verify collect core modules handles import and import from."""
     source = """
 import os
 import translationzed_py.core.search as search_mod
@@ -26,6 +29,7 @@ from translationzed_py.gui.entry_model import EntryTableModel
 def test_check_rules_reports_disallowed_import_and_line_budget(
     tmp_path: Path,
 ) -> None:
+    """Verify check rules reports disallowed import and line budget."""
     target = tmp_path / "translationzed_py" / "gui" / "main_window.py"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
@@ -54,6 +58,7 @@ def test_check_rules_reports_disallowed_import_and_line_budget(
 
 
 def test_check_rules_passes_within_allowlist_and_budget(tmp_path: Path) -> None:
+    """Verify check rules passes within allowlist and budget."""
     target = tmp_path / "translationzed_py" / "gui" / "main_window.py"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(

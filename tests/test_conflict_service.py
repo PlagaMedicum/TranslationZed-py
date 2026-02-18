@@ -1,3 +1,5 @@
+"""Test module for conflict service."""
+
 from __future__ import annotations
 
 from translationzed_py.core.conflict_service import (
@@ -35,6 +37,7 @@ def _entry(key: str, value: str, status: Status = Status.UNTOUCHED) -> Entry:
 
 
 def test_build_merge_rows_sorts_keys_and_extracts_cache_values() -> None:
+    """Verify build merge rows sorts keys and extracts cache values."""
     rows, cache_values = build_merge_rows(
         entries=[_entry("B", "cache-b"), _entry("A", "cache-a"), _entry("C", "c")],
         conflict_originals={"B": "orig-b", "A": "orig-a"},
@@ -48,6 +51,7 @@ def test_build_merge_rows_sorts_keys_and_extracts_cache_values() -> None:
 
 
 def test_drop_cache_plan_removes_conflict_keys_from_drafts() -> None:
+    """Verify drop cache plan removes conflict keys from drafts."""
     plan = drop_cache_plan(
         changed_keys={"A", "B", "C"},
         baseline_values={"A": "a0", "B": "b0", "C": "c0"},
@@ -59,6 +63,7 @@ def test_drop_cache_plan_removes_conflict_keys_from_drafts() -> None:
 
 
 def test_drop_original_plan_forces_conflict_keys() -> None:
+    """Verify drop original plan forces conflict keys."""
     plan = drop_original_plan(
         changed_keys={"A"},
         baseline_values={"A": "a0"},
@@ -71,6 +76,7 @@ def test_drop_original_plan_forces_conflict_keys() -> None:
 
 
 def test_merge_plan_applies_status_rule_for_original_choice() -> None:
+    """Verify merge plan applies status rule for original choice."""
     plan = merge_plan(
         changed_keys={"A", "B"},
         baseline_values={"A": "a0", "B": "b0"},
@@ -92,6 +98,7 @@ def test_merge_plan_applies_status_rule_for_original_choice() -> None:
 
 
 def test_apply_entry_updates_modifies_only_target_keys() -> None:
+    """Verify apply entry updates modifies only target keys."""
     entries = [_entry("A", "a", Status.UNTOUCHED), _entry("B", "b", Status.TRANSLATED)]
     changed = apply_entry_updates(
         entries,
@@ -109,6 +116,7 @@ def test_apply_entry_updates_modifies_only_target_keys() -> None:
 
 
 def test_conflict_workflow_service_drop_cache_builds_resolution() -> None:
+    """Verify conflict workflow service drop cache builds resolution."""
     service = ConflictWorkflowService()
     resolution = service.resolve_drop_cache(
         changed_keys={"A", "B"},
@@ -122,6 +130,7 @@ def test_conflict_workflow_service_drop_cache_builds_resolution() -> None:
 
 
 def test_conflict_workflow_service_merge_builds_and_applies_resolution() -> None:
+    """Verify conflict workflow service merge builds and applies resolution."""
     service = ConflictWorkflowService()
     resolution = service.resolve_merge(
         changed_keys={"A"},
@@ -140,6 +149,7 @@ def test_conflict_workflow_service_merge_builds_and_applies_resolution() -> None
 
 
 def test_build_prompt_plan_cases() -> None:
+    """Verify build prompt plan cases."""
     no_conflict = build_prompt_plan(
         has_conflicts=False,
         is_current_file=True,
@@ -182,6 +192,7 @@ def test_build_prompt_plan_cases() -> None:
 
 
 def test_build_persist_plan_marks_clean_only_when_no_changed_keys() -> None:
+    """Verify build persist plan marks clean only when no changed keys."""
     dirty = build_persist_plan(
         ConflictResolution(
             changed_keys=frozenset({"A"}),
@@ -209,6 +220,7 @@ def test_build_persist_plan_marks_clean_only_when_no_changed_keys() -> None:
 
 
 def test_execute_persist_resolution_executes_callbacks_for_dirty_plan() -> None:
+    """Verify execute persist resolution executes callbacks for dirty plan."""
     resolution = ConflictResolution(
         changed_keys=frozenset({"A"}),
         original_values={"A": "a0"},
@@ -231,6 +243,7 @@ def test_execute_persist_resolution_executes_callbacks_for_dirty_plan() -> None:
 
 
 def test_execute_persist_resolution_executes_mark_clean_when_no_changed() -> None:
+    """Verify execute persist resolution executes mark clean when no changed."""
     resolution = ConflictResolution(
         changed_keys=frozenset(),
         original_values={},
@@ -253,6 +266,7 @@ def test_execute_persist_resolution_executes_mark_clean_when_no_changed() -> Non
 
 
 def test_normalize_choice_and_service_wrappers() -> None:
+    """Verify normalize choice and service wrappers."""
     assert normalize_choice("drop_cache") == "drop_cache"
     assert normalize_choice("drop_original") == "drop_original"
     assert normalize_choice("merge") == "merge"
@@ -324,6 +338,7 @@ def test_normalize_choice_and_service_wrappers() -> None:
 
 
 def test_execute_choice_dispatches_callbacks() -> None:
+    """Verify execute choice dispatches callbacks."""
     called: list[str] = []
 
     assert (
@@ -375,6 +390,7 @@ def test_execute_choice_dispatches_callbacks() -> None:
 
 
 def test_build_resolution_run_plan() -> None:
+    """Verify build resolution run plan."""
     blocked = build_resolution_run_plan(
         action="drop_cache",
         has_current_file=False,
@@ -407,6 +423,7 @@ def test_build_resolution_run_plan() -> None:
 
 
 def test_execute_merge_resolution_flow() -> None:
+    """Verify execute merge resolution flow."""
     entries = [_entry("A", "a-cache", Status.TRANSLATED)]
     conflict_originals = {"A": "a-file"}
     sources = {"A": "a-src"}
@@ -426,6 +443,7 @@ def test_execute_merge_resolution_flow() -> None:
 
 
 def test_execute_merge_resolution_cancel_and_no_conflicts() -> None:
+    """Verify execute merge resolution cancel and no conflicts."""
     entries = [_entry("A", "a-cache", Status.TRANSLATED)]
     canceled = execute_merge_resolution(
         entries=entries,

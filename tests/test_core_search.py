@@ -1,9 +1,12 @@
+"""Test module for core search."""
+
 from pathlib import Path
 
 from translationzed_py.core.search import SearchField, SearchRow, search
 
 
 def test_search_plain_text():
+    """Verify search plain text."""
     rows = [
         SearchRow(Path("A.txt"), 0, "KEY_ONE", "Source", "Value One"),
         SearchRow(Path("A.txt"), 1, "KEY_TWO", "Other", "Value Two"),
@@ -13,6 +16,7 @@ def test_search_plain_text():
 
 
 def test_search_regex():
+    """Verify search regex."""
     rows = [
         SearchRow(Path("A.txt"), 0, "KEY_ONE", "Source", "Value One"),
         SearchRow(Path("A.txt"), 1, "KEY_TWO", "Other", "Value Two"),
@@ -22,6 +26,7 @@ def test_search_regex():
 
 
 def test_search_plain_composed_phrase_matches_non_contiguous_tokens():
+    """Verify search plain composed phrase matches non contiguous tokens."""
     rows = [
         SearchRow(
             Path("A.txt"),
@@ -36,6 +41,7 @@ def test_search_plain_composed_phrase_matches_non_contiguous_tokens():
 
 
 def test_search_preview_is_one_line_and_present_for_literal_match():
+    """Verify search preview is one line and present for literal match."""
     rows = [
         SearchRow(
             Path("A.txt"),

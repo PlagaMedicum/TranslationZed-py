@@ -1,3 +1,5 @@
+"""Test module for benchmark regression script."""
+
 from __future__ import annotations
 
 import json

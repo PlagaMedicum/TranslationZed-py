@@ -1,3 +1,5 @@
+"""Provide shared pytest fixtures and hooks."""
+
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -16,10 +18,12 @@ def _record_perf(label: str, elapsed_ms: float, budget_ms: float, detail: str) -
 
 @pytest.fixture()
 def perf_recorder() -> Callable[[str, float, float, str], None]:
+    """Provide perf recorder."""
     return _record_perf
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:  # type: ignore[no-untyped-def]
+    """Handle pytest lifecycle hook."""
     if not _PERF_SAMPLES:
         return
     terminalreporter.section("Performance")
@@ -32,4 +36,5 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config) -> None:  # ty
 
 @pytest.fixture()
 def prod_like_root() -> Path:
+    """Provide prod like root."""
     return Path(__file__).parent / "fixtures" / "prod_like"
