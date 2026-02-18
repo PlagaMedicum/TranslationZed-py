@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from translationzed_py.core.tm_import_sync import sync_import_folder
-from translationzed_py.core.tm_store import TMStore
+from translationzed_py.core.tm_import_sync import (
+    _is_up_to_date_ready,
+    _normalize_locale_tag,
+    _pick_raw_pair,
+    sync_import_folder,
+)
+from translationzed_py.core.tm_store import TMImportFile, TMStore
 
 
 def _write_tmx(path: Path, source_lang: str = "EN", target_lang: str = "RU") -> None:
@@ -324,3 +329,150 @@ def test_sync_import_folder_processes_supported_aliases_and_ignores_unsupported(
     assert records[0].tm_path.endswith("ignored.xlf")
     assert records[0].segment_count == 0
     store.close()
+
+
+def test_sync_import_folder_only_paths_filters_files_and_skips_deletion(
+    tmp_path: Path,
+) -> None:
+    """Verify only-path sync filters checked files and keeps unmatched records."""
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    one = tm_dir / "one.tmx"
+    two = tm_dir / "two.tmx"
+    _write_tmx(one)
+    _write_tmx(two)
+    store = TMStore(root)
+    store.upsert_import_file(
+        tm_path=str(tm_dir / "stale.tmx"),
+        tm_name="stale",
+        source_locale="EN",
+        target_locale="RU",
+        mtime_ns=1,
+        file_size=1,
+        status="ready",
+    )
+
+    report = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+        only_paths={one},
+    )
+
+    assert report.checked_files == ("one.tmx",)
+    assert any(
+        Path(rec.tm_path).name == "stale.tmx" for rec in store.list_import_files()
+    )
+    store.close()
+
+
+def test_sync_import_folder_pending_only_skips_non_pending_records(
+    tmp_path: Path,
+) -> None:
+    """Verify pending-only mode skips files without needs-mapping status."""
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    one = tm_dir / "one.tmx"
+    _write_tmx(one)
+    store = TMStore(root)
+
+    report = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+        pending_only=True,
+    )
+
+    assert report.checked_files == ("one.tmx",)
+    assert report.imported_segments == 0
+    assert report.imported_files == ()
+    assert report.failures == ()
+    store.close()
+
+
+def test_sync_import_folder_records_language_detect_failures(tmp_path: Path) -> None:
+    """Verify sync stores an error record when language detection raises."""
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    broken = tm_dir / "broken.tmx"
+    tm_dir.mkdir(parents=True, exist_ok=True)
+    broken.write_text("<tmx><bad", encoding="utf-8")
+    store = TMStore(root)
+
+    report = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+
+    assert report.imported_segments == 0
+    assert len(report.failures) == 1
+    assert "broken.tmx" in report.failures[0]
+    records = store.list_import_files()
+    assert len(records) == 1
+    assert records[0].status == "error"
+    store.close()
+
+
+def test_sync_import_folder_records_replace_errors(tmp_path: Path, monkeypatch) -> None:
+    """Verify sync stores error metadata when TM replacement fails."""
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    tmx_path = tm_dir / "pack_ru.tmx"
+    _write_tmx(tmx_path)
+    store = TMStore(root)
+
+    def _raise_replace(*_args, **_kwargs) -> int:
+        raise RuntimeError("replace failed")
+
+    monkeypatch.setattr(store, "replace_import_tm", _raise_replace)
+    report = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+
+    assert report.imported_segments == 0
+    assert len(report.failures) == 1
+    assert "replace failed" in report.failures[0]
+    records = store.list_import_files()
+    assert len(records) == 1
+    assert records[0].status == "error"
+    assert records[0].source_locale == "EN"
+    assert records[0].target_locale == "RU"
+    store.close()
+
+
+def test_tm_import_sync_locale_and_uptodate_helpers_cover_fallback_paths() -> None:
+    """Verify locale helper fallbacks and up-to-date checks."""
+    assert _normalize_locale_tag("   ") == ""
+    assert _pick_raw_pair("EN-GB", "RU", {"en-US", "en-CA", "ru-RU"})[0] in {
+        "en-CA",
+        "en-US",
+    }
+    assert _pick_raw_pair("ZZ", "RU", {"en-US", "ru-RU"})[0] == "en-US"
+    assert _pick_raw_pair("EN", "RU", {"EN"}) == ("EN", "EN")
+
+    ready = TMImportFile(
+        tm_path="/tmp/a.tmx",
+        tm_name="a",
+        source_locale="EN",
+        target_locale="RU",
+        source_locale_raw="EN",
+        target_locale_raw="RU",
+        segment_count=1,
+        mtime_ns=10,
+        file_size=20,
+        enabled=True,
+        status="ready",
+        note="",
+        updated_at=0,
+    )
+    assert (
+        _is_up_to_date_ready(ready, 10, 20, pending_only=False, has_entries=True)
+        is True
+    )
