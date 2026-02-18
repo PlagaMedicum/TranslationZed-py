@@ -1,3 +1,5 @@
+"""Define the main desktop window and end-to-end GUI workflows."""
+
 from __future__ import annotations
 
 import contextlib
@@ -399,12 +401,15 @@ class _CommitPlainTextEdit(QPlainTextEdit):
 
 
 class MainWindow(QMainWindow):
+    """Coordinate project browsing, editing, QA, and TM interactions."""
+
     def __init__(
         self,
         project_root: str | None = None,
         *,
         selected_locales: list[str] | None = None,
     ) -> None:
+        """Initialize UI state, services, and startup project selection."""
         super().__init__()
         self._startup_aborted = False
         self._root = Path(".").resolve()
@@ -2917,6 +2922,7 @@ class MainWindow(QMainWindow):
                 self._refresh_qa_panel_results()
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        """Handle table viewport tooltip timing and hover behavior."""
         table = getattr(self, "table", None)
         if table is None:
             return super().eventFilter(obj, event)
@@ -5281,11 +5287,13 @@ class MainWindow(QMainWindow):
         return f'<span style="white-space: pre-wrap;">{escaped}</span>'
 
     def showEvent(self, event) -> None:  # noqa: N802
+        """Re-apply detail panel state when the window becomes visible."""
         super().showEvent(event)
         if self._detail_panel.isVisible():
             self._toggle_detail_panel(True)
 
     def resizeEvent(self, event) -> None:
+        """Refresh table layout and replace bar positioning on resize."""
         super().resizeEvent(event)
         if self.table.model():
             self._apply_table_layout()
@@ -5490,6 +5498,7 @@ class MainWindow(QMainWindow):
         self._apply_status_to_selection(Status.FOR_REVIEW, "Mark for review")
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        """Guard close with save flow checks and worker shutdown."""
         if self._merge_active:
             event.ignore()
             return
