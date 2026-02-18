@@ -312,7 +312,10 @@ class TMStore:
     def _migrate_legacy_db(legacy: Path, primary: Path) -> bool:
         """Execute migrate legacy db."""
         try:
-            with sqlite3.connect(legacy) as src, sqlite3.connect(primary) as dst:
+            with (
+                contextlib.closing(sqlite3.connect(legacy)) as src,
+                contextlib.closing(sqlite3.connect(primary)) as dst,
+            ):
                 src.backup(dst)
             return True
         except sqlite3.Error:
