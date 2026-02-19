@@ -825,6 +825,8 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
   - coverage gates via `make test-cov`:
     - whole package: **>=90%**,
     - `translationzed_py/core`: **>=95%**.
+  - warning-safety gate via `make test-warnings`:
+    - runs targeted TM/SQLite suites with `-W error::ResourceWarning`.
 - **Performance**:
   - deterministic perf budget tests (`make test-perf`),
   - fixture-backed scenario smoke (`make perf-scenarios`),

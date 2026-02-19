@@ -786,7 +786,7 @@ A9 [✓] **Verification-overhaul milestone**
      - strict CI/release gate (`make verify-ci`) with non-mutating checks.
    - **Implemented**:
      - [✓] Make target split: `fmt`/`fmt-check`, `lint`/`lint-check`,
-       `test-cov`, `test-perf`, `bench`, `bench-check`, `security`,
+       `test-cov`, `test-warnings`, `test-perf`, `bench`, `bench-check`, `security`,
        `docstyle`, `docs-build`, `test-mutation`, `verify-heavy`.
      - [✓] Coverage gates enforced: whole package >=90%, core >=95%.
      - [✓] Benchmark baseline + comparator added with 20% regression threshold

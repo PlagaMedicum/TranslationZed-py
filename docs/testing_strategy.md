@@ -149,6 +149,11 @@ _Last updated: 2026-02-18_
   published without blocking until baseline quality is stabilized.
 - Tiered heavy lane entrypoint is `make verify-heavy` (`verify-ci` + advisory mutation).
 
+### 2.10 Warning-safety gate
+- `make test-warnings` runs targeted TM/SQLite suites with
+  `-W error::ResourceWarning` to fail on unclosed resource warnings.
+- `make verify-ci` includes this gate in strict mode.
+
 ---
 
 ## 3) Golden‑File Tests (definition)
