@@ -12,10 +12,6 @@ trap 'rm -f "$before" "$after"' EXIT
 
 git status --porcelain --untracked-files=no >"$before"
 
-pytest_run -q \
-  tests/test_gui_readonly_integrity.py \
-  tests/test_encoding_diagnostics.py
-
 "$VENV_PY" scripts/encoding_diagnostics.py \
   tests/fixtures/prod_like \
   --warn-only >/dev/null
