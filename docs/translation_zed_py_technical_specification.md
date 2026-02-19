@@ -944,4 +944,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-18 (v0.7.0)*
+*Last updated: 2026-02-19 (v0.7.0)*

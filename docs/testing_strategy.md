@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-18_
+_Last updated: 2026-02-19_
 
 ---
 
@@ -366,8 +366,8 @@ They include:
 - Enforced gate thresholds:
   - Core modules (`translationzed_py/core`): **>=95%** line coverage.
   - Whole package (`translationzed_py`): **>=90%** line coverage.
-- Current strict baseline (2026-02-18):
-  - `make test-cov`: **90.7%** whole package.
+- Current strict baseline (2026-02-19):
+  - `make test-cov`: **91.3%** whole package.
   - core-only strict run: **95.7%**.
 - GUI: smoke and integration coverage sufficient to validate wiring.
 - Cover **all known structure/encoding edge-cases** found in production files.
