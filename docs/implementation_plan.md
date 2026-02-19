@@ -806,7 +806,7 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] Canonical docs updated to match implemented tooling behavior.
    - **Current verification snapshot (2026-02-19)**:
      - [✓] Whole-package strict gate is met:
-       `make test-cov` reports **91.3%**.
+       `make test-cov` reports **91.4%**.
      - [✓] Core coverage gate remains met in strict run:
        `pytest -q tests --cov=translationzed_py.core --cov-report=term-missing:skip-covered`
        reports **95.7%**.
