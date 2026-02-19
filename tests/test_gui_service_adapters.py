@@ -44,8 +44,21 @@ def _disable_close_prompt_for_module(monkeypatch):
     """Disable write-on-exit prompt in this module to speed widget teardown."""
     original_init = mw.MainWindow.__init__
 
+    def _fast_apply_theme(self, mode: object, *, persist: bool = False) -> None:
+        normalized = mw._normalize_theme_mode(mode, default=mw._THEME_SYSTEM)
+        self._theme_mode = normalized
+        if persist:
+            self._prefs_extras["UI_THEME_MODE"] = normalized
+
     def _patched_init(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-        original_init(self, *args, **kwargs)
+        original_check = mw.MainWindow._check_en_hash_cache
+        try:
+            mw.MainWindow._check_en_hash_cache = (  # type: ignore[assignment]
+                lambda _self: True
+            )
+            original_init(self, *args, **kwargs)
+        finally:
+            mw.MainWindow._check_en_hash_cache = original_check  # type: ignore[assignment]
         if getattr(self, "_startup_aborted", False):
             return
         self._prompt_write_on_exit = False
@@ -72,6 +85,8 @@ def _disable_close_prompt_for_module(monkeypatch):
             timer.stop()
             timer.setInterval(max(int(timer.interval()), 60_000))
 
+    monkeypatch.setattr(mw, "_connect_system_theme_sync", lambda _callback: False)
+    monkeypatch.setattr(mw.MainWindow, "_apply_theme_mode", _fast_apply_theme)
     monkeypatch.setattr(mw.MainWindow, "__init__", _patched_init)
 
 
