@@ -18,6 +18,8 @@ avoid missing mandatory tasks.
     security/docstyle/docs-build checks, encoding-integrity
     gates, read-only repo-clean gate, and perf scenarios
   - Warns (does not fail) when auto-fixers modify tracked files
+  - Avoid duplicate reruns by default: `make verify` already executes the strict
+    coverage pytest lane (`make test-cov`) once
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
   with CI (non-mutating, fail-on-drift)
 - **Run** `make verify-heavy` when you need full strict gates plus advisory mutation
@@ -93,3 +95,6 @@ avoid missing mandatory tasks.
 
 - **Linux**: ensure `make ci-deps` runs before tests (Qt needs `libegl1`, `libgl1`, `libxkbcommon-x11-0`)
 - **Windows**: ensure tests write UTF‑8 when test data includes non‑ASCII characters
+- **Benchmark de-dup**: CI matrix verify jobs intentionally use
+  `VERIFY_SKIP_BENCH=1`; strict benchmark enforcement is done by the dedicated
+  `benchmark-regression` job (`make bench-check ...`).

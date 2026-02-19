@@ -134,8 +134,9 @@ _Last updated: 2026-02-19_
   `BENCH_REGRESSION_THRESHOLD_PERCENT` (default 20%).
 - Baseline file includes dedicated platform sections (`linux`, `macos`, `windows`)
   and benchmark checks resolve against the active platform key.
-- CI enforces benchmark regression in dedicated Linux job (`BENCH_COMPARE_MODE=fail`);
-  local verify runs benchmark compare in advisory mode (`BENCH_COMPARE_MODE=warn`).
+- CI enforces benchmark regression in a dedicated Linux job (`BENCH_COMPARE_MODE=fail`);
+  matrix `verify-ci` jobs use `VERIFY_SKIP_BENCH=1` to avoid duplicate benchmark runs.
+- Local verify runs benchmark compare in advisory mode (`BENCH_COMPARE_MODE=warn`).
 
 ### 2.9 Property and mutation testing
 - Property-based tests (Hypothesis) are part of the default suite for:
@@ -159,6 +160,14 @@ _Last updated: 2026-02-19_
 - `make test-readonly-clean` is script-level (diagnostics + tracked-state check)
   so it does not duplicate pytest execution.
 - Optional `make test-warnings` remains available as a focused TM/SQLite warning check.
+
+### 2.11 GUI runtime optimization policy
+- High-volume GUI adapter suites use autouse fixture startup shortcuts
+  (theme-sync hook stub + fast theme apply + EN-hash check bypass) to reduce
+  repeated `MainWindow` construction overhead.
+- These shortcuts are limited to test fixtures and do not alter production behavior.
+- Theme behavior remains covered by dedicated suites (`tests/test_gui_theme.py`,
+  `tests/test_gui_tm_preferences.py`, `tests/test_main_window_tm_rebuild_prefs.py`).
 
 ---
 
@@ -373,8 +382,8 @@ They include:
   - Core modules (`translationzed_py/core`): **>=95%** line coverage.
   - Whole package (`translationzed_py`): **>=90%** line coverage.
 - Current strict baseline (2026-02-19):
-  - `make test-cov`: **93.4%** whole package.
+  - `make test-cov`: **94.3%** whole package.
   - core-only strict run: **95.7%**.
-  - `translationzed_py/gui/main_window.py`: **87.3%**.
+  - `translationzed_py/gui/main_window.py`: **90.2%**.
 - GUI: smoke and integration coverage sufficient to validate wiring.
 - Cover **all known structure/encoding edge-cases** found in production files.

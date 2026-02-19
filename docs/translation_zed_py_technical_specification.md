@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.7.0 · 2026-02-18**\
+**Version 0.7.0 · 2026-02-19**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -850,6 +850,8 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 - **Gate contract**:
   - local umbrella gate: `make verify` (auto-fix allowed; warns on tracked-file changes),
   - CI/release strict gate: `make verify-ci` (non-mutating, fail-on-drift),
+  - CI matrix may set `VERIFY_SKIP_BENCH=1` in `verify-ci` when benchmark compare is
+    enforced by a dedicated strict benchmark job to avoid duplicate benchmark execution,
   - heavy tier gate: `make verify-heavy` (`verify-ci` + advisory mutation run).
 
 ---
@@ -892,7 +894,13 @@ Current builds use **cache‑only** recovery:
 - **Source build**: `pip install -e .[dev]` for development; `make venv` + `make run` for local use.
 - **Executables**: PyInstaller is the baseline packager. Builds must be produced on each target OS
   (Linux/Windows/macOS) and bundle LICENSE + README.
-- **CI**: GitHub Actions matrix (Linux/Windows/macOS) runs ruff, mypy, pytest; Linux runs Qt offscreen.
+- **CI**:
+  - matrix verify job (Linux/Windows/macOS) runs strict `make verify-ci` gates;
+    Linux uses Qt offscreen for headless GUI checks,
+  - dedicated Linux benchmark-regression job runs strict `make bench-check`
+    (`BENCH_COMPARE_MODE=fail`, 20% threshold),
+  - scheduled/workflow-dispatch heavy lane runs `make verify-heavy`
+    (`verify-ci` + advisory mutation report).
 
 ## 13  Backlog (Post‑v0.7)
 

@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-18_
+_Last updated: 2026-02-19_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.7.0 is shipped; this plan now
@@ -807,14 +807,34 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] Canonical docs updated to match implemented tooling behavior.
    - **Current verification snapshot (2026-02-19)**:
      - [✓] Whole-package strict gate is met:
-       `make test-cov` reports **93.4%**.
+       `make test-cov` reports **94.3%**.
      - [✓] Core coverage gate remains met in strict run:
        `pytest -q tests --cov=translationzed_py.core --cov-report=term-missing:skip-covered`
        reports **95.7%**.
-     - [✓] `translationzed_py/gui/main_window.py` branch-coverage push is trending up:
-       strict run reports **87.3%**.
-     - [→] Ongoing phase-two focus stays on GUI automation expansion to keep
-       reducing residual `main_window` branch gaps beyond the minimum gate.
+     - [✓] `translationzed_py/gui/main_window.py` branch-coverage baseline target is now met:
+       strict run reports **90.2%**.
+     - [✓] GUI suite runtime was reduced by fixture-level startup optimizations
+       (theme sync/paint heavy-path stubs in targeted test modules), dropping
+       `tests/test_gui_service_adapters.py` from ~4m13s to ~14s on reference dev run.
+     - [✓] CI benchmark duplication was removed in matrix verify lane:
+       `verify-ci` now supports `VERIFY_SKIP_BENCH=1` so matrix jobs skip bench
+       when dedicated `benchmark-regression` gate runs strict compare once.
+     - [→] Ongoing phase-two focus remains on high-value GUI branch expansion
+       (warning dialogs, malformed-locale UI flows, and orphan-cache full interaction).
+
+## Decision Backlog (Awaiting Product Input)
+
+These are collected questions that should be resolved later; implementation can continue
+without blocking on them.
+
+1. Should CI enforce a hard per-file threshold for `translationzed_py/gui/main_window.py`
+   (for example `>=90%`) in addition to global package/core coverage gates?
+2. Should fast GUI fixtures keep stubbing theme sync/application permanently, or should
+   we add a small dedicated non-stub theme integration suite in strict CI lanes?
+3. Should mutation testing remain advisory for v0.8.0, or move to a staged fail-under
+   threshold (for example report-only -> soft fail -> hard fail)?
+4. Should benchmark strict gating remain Linux-only (current policy) or be expanded to
+   multi-OS strict gates after baseline variance data is collected?
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
