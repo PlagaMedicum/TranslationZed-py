@@ -464,6 +464,32 @@ def test_notify_nothing_to_write_shows_information_dialog(
     assert infos == [("Nothing to write", "No draft changes to write.")]
 
 
+def test_mark_status_actions_delegate_expected_status_and_labels(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify mark-* actions route through shared status-selection helper with expected labels."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        win,
+        "_apply_status_to_selection",
+        lambda status, label: calls.append((status.name, label)),
+    )
+
+    win._mark_proofread()
+    win._mark_translated()
+    win._mark_for_review()
+
+    assert calls == [
+        ("PROOFREAD", "Mark proofread"),
+        ("TRANSLATED", "Mark translated"),
+        ("FOR_REVIEW", "Mark for review"),
+    ]
+
+
 def test_show_save_files_dialog_returns_non_write_without_mutating_files(
     qtbot, tmp_path, monkeypatch
 ) -> None:
@@ -551,6 +577,120 @@ def test_show_save_files_dialog_write_without_selected_files_uses_none(
     assert decision == "write"
     assert selected_seen == [None]
     assert files == [root / "BE" / "menu.txt"]
+
+
+def test_close_event_ignores_when_merge_is_active(qtbot, tmp_path) -> None:
+    """Verify close event is ignored while merge workflow is active."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._merge_active = True
+
+    event_state: dict[str, bool] = {"accepted": False, "ignored": False}
+    event = SimpleNamespace(
+        accept=lambda: event_state.__setitem__("accepted", True),
+        ignore=lambda: event_state.__setitem__("ignored", True),
+    )
+    win.closeEvent(event)
+    assert event_state == {"accepted": False, "ignored": True}
+
+
+def test_close_event_ignores_when_save_exit_service_rejects(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify close event is ignored when save/exit flow reports rejection."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[dict[str, object]] = []
+    delegate = win._save_exit_flow_service
+
+    class _StubService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def should_accept_close(self, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append(kwargs)
+            return False
+
+    monkeypatch.setattr(win, "_save_exit_flow_service", _StubService())
+    stop_calls: list[str] = []
+    monkeypatch.setattr(win, "_stop_timers", lambda: stop_calls.append("stop"))
+
+    event_state: dict[str, bool] = {"accepted": False, "ignored": False}
+    event = SimpleNamespace(
+        accept=lambda: event_state.__setitem__("accepted", True),
+        ignore=lambda: event_state.__setitem__("ignored", True),
+    )
+    win.closeEvent(event)
+
+    assert calls
+    assert event_state == {"accepted": False, "ignored": True}
+    assert stop_calls == []
+
+
+def test_close_event_accepts_and_runs_shutdown_when_allowed(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify accepted close path runs shutdown/persist hooks and updates tree width pref."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    delegate = win._save_exit_flow_service
+
+    class _StubService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        @staticmethod
+        def should_accept_close(**_kwargs):  # type: ignore[no-untyped-def]
+            return True
+
+    monkeypatch.setattr(win, "_save_exit_flow_service", _StubService())
+
+    calls: list[str] = []
+    monkeypatch.setattr(win, "_stop_timers", lambda: calls.append("stop"))
+    monkeypatch.setattr(win, "_flush_tm_updates", lambda: calls.append("flush"))
+    monkeypatch.setattr(win, "_shutdown_qa_workers", lambda: calls.append("qa"))
+    monkeypatch.setattr(win, "_shutdown_tm_workers", lambda: calls.append("tm"))
+    monkeypatch.setattr(win, "_persist_preferences", lambda: calls.append("persist"))
+    monkeypatch.setattr(
+        mw,
+        "_disconnect_system_theme_sync",
+        lambda _cb: calls.append("disconnect"),
+    )
+
+    class _TMStore:
+        @staticmethod
+        def close() -> None:
+            calls.append("store_close")
+
+    win._tm_store = _TMStore()  # type: ignore[assignment]
+    win._system_theme_sync_connected = True
+    win._tree_last_width = 12
+    win._tree_width_timer.start(50)
+
+    event_state: dict[str, bool] = {"accepted": False, "ignored": False}
+    event = SimpleNamespace(
+        accept=lambda: event_state.__setitem__("accepted", True),
+        ignore=lambda: event_state.__setitem__("ignored", True),
+    )
+    win.closeEvent(event)
+
+    assert event_state == {"accepted": True, "ignored": False}
+    assert win._system_theme_sync_connected is False
+    assert win._prefs_extras["TREE_PANEL_WIDTH"] == "60"
+    assert calls == [
+        "stop",
+        "disconnect",
+        "flush",
+        "qa",
+        "tm",
+        "store_close",
+        "persist",
+    ]
 
 
 def test_apply_preferences_delegates_scope_normalization_to_preferences_service(
