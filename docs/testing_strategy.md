@@ -373,8 +373,8 @@ They include:
   - Core modules (`translationzed_py/core`): **>=95%** line coverage.
   - Whole package (`translationzed_py`): **>=90%** line coverage.
 - Current strict baseline (2026-02-19):
-  - `make test-cov`: **92.7%** whole package.
+  - `make test-cov`: **93.0%** whole package.
   - core-only strict run: **95.7%**.
-  - `translationzed_py/gui/main_window.py`: **84.9%**.
+  - `translationzed_py/gui/main_window.py`: **86.2%**.
 - GUI: smoke and integration coverage sufficient to validate wiring.
 - Cover **all known structure/encoding edge-cases** found in production files.
