@@ -823,8 +823,10 @@ A9 [✓] **Verification-overhaul milestone**
       full orphan-cache purge/dismiss interaction paths (including warned-locale dedupe).
     - [✓] Added conflict-lifecycle integration coverage for save-time merge
       resolution with persisted-file output and post-save cache-clear assertions.
+    - [✓] Added non-critical UI-state persistence integration coverage:
+      tree width, table column layout extras, and search-case toggle survive restart.
     - [→] Ongoing phase-two focus remains on high-value GUI branch expansion
-      for broader end-to-end cache lifecycle scenarios.
+      for remaining robustness gaps (heavy-corpus stress profiles and fault-injection cases).
 
 ## Decision Backlog (Awaiting Product Input)
 

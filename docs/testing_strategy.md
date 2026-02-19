@@ -259,6 +259,9 @@ They include:
 - GUI conflict flows: drop‑cache / drop‑original / merge decision handling,
   plus save-time merge resolution lifecycle coverage (persist-to-file and
   post-save cache draft clear assertions).
+- Non-critical UI-state persistence matrix:
+  tree panel width, table key/status/source ratio, and search-case toggle
+  are persisted and restored across restart.
 - Scanner: locale discovery, language.txt parsing, ignore rules.
 - TM: SQLite store round‑trip, exact/fuzzy query, TM import (TMX/XLIFF/XLF/PO/POT/CSV/MO/XML/XLSX), TMX export.
 - TM import metadata: per-file import registry, replace/delete lifecycle, TM source-name propagation,
@@ -363,8 +366,7 @@ They include:
   extended stress-profile gates (tiered heavy lane).
 
 **Integration gaps**
-- Preferences persistence for non-critical UI state (tree width/column widths/toggle
-  sets) lacks full integration matrix.
+- No critical integration gaps are currently tracked in strict automated lanes.
 
 **System / functional / regression / smoke gaps**
 - Mutation testing is advisory-only; no fail-under threshold is enforced yet.
