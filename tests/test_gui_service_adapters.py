@@ -2097,6 +2097,31 @@ def test_left_panel_changed_routes_tm_search_and_qa_branches(
     assert qa_refresh_calls == ["refresh"]
 
 
+def test_left_panel_tm_branch_skips_followups_when_store_unavailable(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify TM panel does not run sync/bootstrap/update when TM store is unavailable."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[str] = []
+    monkeypatch.setattr(win, "_ensure_tm_store", lambda: False)
+    monkeypatch.setattr(
+        win,
+        "_sync_tm_import_folder",
+        lambda **_kwargs: calls.append("sync"),
+    )
+    monkeypatch.setattr(win, "_maybe_bootstrap_tm", lambda: calls.append("bootstrap"))
+    monkeypatch.setattr(win, "_schedule_tm_update", lambda: calls.append("update"))
+
+    win._tm_bootstrap_pending = True
+    win._on_left_panel_changed(win._left_tm_btn)
+    assert win._left_stack.currentIndex() == mw._LEFT_PANEL_TM
+    assert calls == []
+    assert win._tm_bootstrap_pending is True
+
+
 def test_scroll_handlers_cover_wrap_disabled_and_idle_paths(
     qtbot, tmp_path, monkeypatch
 ) -> None:
@@ -2135,6 +2160,50 @@ def test_scroll_handlers_cover_wrap_disabled_and_idle_paths(
     assert calls == ["resize"]
 
 
+def test_resize_reflow_helpers_cover_pending_and_wrap_model_guards(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify resize-reflow scheduling and flush guards for pending/wrap/model states."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+
+    win._wrap_text = True
+    assert win._current_model is not None
+    win._resize_reflow_timer.start(50)
+    win._schedule_resize_reflow()
+    assert win._resize_reflow_pending is True
+    assert win._resize_reflow_timer.isActive() is True
+
+    clear_calls: list[str] = []
+    resize_calls: list[str] = []
+    monkeypatch.setattr(win, "_clear_row_height_cache", lambda: clear_calls.append("c"))
+    monkeypatch.setattr(win, "_schedule_row_resize", lambda: resize_calls.append("r"))
+
+    win._resize_reflow_pending = False
+    win._flush_resize_reflow()
+    assert clear_calls == []
+    assert resize_calls == []
+
+    win._resize_reflow_pending = True
+    win._wrap_text = False
+    win._flush_resize_reflow()
+    assert win._resize_reflow_pending is False
+    assert clear_calls == []
+    assert resize_calls == []
+
+    win._resize_reflow_pending = True
+    win._wrap_text = True
+    win._current_model = None
+    win._flush_resize_reflow()
+    assert win._resize_reflow_pending is False
+    assert clear_calls == []
+    assert resize_calls == []
+
+
 def test_on_header_resized_covers_key_status_and_unknown_column_paths(
     qtbot, tmp_path, monkeypatch
 ) -> None:
@@ -2166,6 +2235,14 @@ def test_on_header_resized_covers_key_status_and_unknown_column_paths(
     win._on_header_resized(9, 0, 120)
     assert calls == []
     assert win._source_translation_ratio == ratio_before
+
+    win.show()
+    qtbot.wait(1)
+    calls.clear()
+    win._on_header_resized(2, 120, 180)
+    assert "TABLE_SRC_RATIO" in win._prefs_extras
+    assert win._user_resized_columns is True
+    assert calls == ["reflow"]
 
 
 def test_tooltip_event_filter_covers_move_leave_and_tooltip_paths(
@@ -2339,3 +2416,9 @@ def test_resize_visible_rows_covers_cached_budget_resume_and_zero_height_paths(
     assert win._pending_row_span is None
     assert win._row_resize_cursor is None
     assert win._row_height_cache == {}
+
+    win._pending_row_span = (0, 0)
+    win._row_resize_cursor = 5
+    win._resize_visible_rows()
+    assert win._pending_row_span == (0, 0)
+    assert win._row_resize_cursor == 5
