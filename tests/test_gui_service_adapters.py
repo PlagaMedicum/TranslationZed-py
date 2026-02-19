@@ -693,6 +693,157 @@ def test_close_event_accepts_and_runs_shutdown_when_allowed(
     ]
 
 
+def test_shutdown_tm_workers_cancels_and_clears_futures_and_pools(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify TM worker shutdown cancels active futures, shuts pools, and hides progress."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[tuple[str, object]] = []
+
+    class _Future:
+        def __init__(self, tag: str) -> None:
+            self._tag = tag
+
+        def cancel(self) -> None:
+            calls.append(("cancel", self._tag))
+
+    class _Pool:
+        def __init__(self, tag: str) -> None:
+            self._tag = tag
+
+        def shutdown(
+            self, *, wait: bool, cancel_futures: bool
+        ) -> None:  # noqa: FBT001,FBT002
+            calls.append(("shutdown", self._tag, wait, cancel_futures))
+
+    win._tm_query_future = _Future("query")  # type: ignore[assignment]
+    win._tm_query_key = "qkey"
+    win._tm_query_pool = _Pool("query_pool")  # type: ignore[assignment]
+    win._tm_rebuild_future = _Future("rebuild")  # type: ignore[assignment]
+    win._tm_rebuild_pool = _Pool("rebuild_pool")  # type: ignore[assignment]
+    progress: list[bool] = []
+    monkeypatch.setattr(
+        win, "_set_tm_progress_visible", lambda v: progress.append(bool(v))
+    )
+
+    win._shutdown_tm_workers()
+
+    assert ("cancel", "query") in calls
+    assert ("cancel", "rebuild") in calls
+    assert ("shutdown", "query_pool", False, True) in calls
+    assert ("shutdown", "rebuild_pool", False, True) in calls
+    assert win._tm_query_future is None
+    assert win._tm_query_key is None
+    assert win._tm_query_pool is None
+    assert win._tm_rebuild_future is None
+    assert win._tm_rebuild_pool is None
+    assert progress == [False]
+
+
+def test_shutdown_tm_workers_handles_missing_pools_and_still_hides_progress(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify TM worker shutdown handles empty pool state and still updates UI state."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    win._tm_query_future = None
+    win._tm_query_key = "stale"
+    win._tm_query_pool = None
+    win._tm_rebuild_future = None
+    win._tm_rebuild_pool = None
+    progress: list[bool] = []
+    monkeypatch.setattr(
+        win, "_set_tm_progress_visible", lambda v: progress.append(bool(v))
+    )
+
+    win._shutdown_tm_workers()
+
+    assert win._tm_query_key is None
+    assert progress == [False]
+
+
+def test_shutdown_qa_workers_cancels_pool_and_hides_progress(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify QA worker shutdown cancels future, shuts pool, and hides progress."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[tuple[str, object]] = []
+
+    class _Future:
+        @staticmethod
+        def cancel() -> None:
+            calls.append(("cancel", "qa"))
+
+    class _Pool:
+        @staticmethod
+        def shutdown(
+            *, wait: bool, cancel_futures: bool
+        ) -> None:  # noqa: FBT001,FBT002
+            calls.append(("shutdown", "qa_pool", wait, cancel_futures))
+
+    win._qa_scan_future = _Future()  # type: ignore[assignment]
+    win._qa_scan_pool = _Pool()  # type: ignore[assignment]
+    progress: list[bool] = []
+    monkeypatch.setattr(
+        win, "_set_qa_progress_visible", lambda v: progress.append(bool(v))
+    )
+
+    win._shutdown_qa_workers()
+
+    assert ("cancel", "qa") in calls
+    assert ("shutdown", "qa_pool", False, True) in calls
+    assert win._qa_scan_future is None
+    assert win._qa_scan_pool is None
+    assert progress == [False]
+
+
+def test_stop_timers_stops_active_timers_including_optional_migration(
+    qtbot, tmp_path
+) -> None:
+    """Verify timer shutdown stops active built-in timers and optional migration timer."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    timer_names = [
+        "_search_timer",
+        "_row_resize_timer",
+        "_resize_reflow_timer",
+        "_scroll_idle_timer",
+        "_tooltip_timer",
+        "_tree_width_timer",
+        "_post_locale_timer",
+        "_qa_refresh_timer",
+        "_qa_scan_timer",
+        "_tm_update_timer",
+        "_tm_flush_timer",
+        "_tm_query_timer",
+        "_tm_rebuild_timer",
+    ]
+    for name in timer_names:
+        timer = getattr(win, name)
+        timer.start(50)
+        assert timer.isActive() is True
+
+    win._migration_timer = mw.QTimer(win)
+    win._migration_timer.start(50)
+    assert win._migration_timer.isActive() is True
+
+    win._stop_timers()
+
+    for name in timer_names:
+        assert getattr(win, name).isActive() is False
+    assert win._migration_timer.isActive() is False
+
+
 def test_apply_preferences_delegates_scope_normalization_to_preferences_service(
     qtbot, tmp_path, monkeypatch
 ):
