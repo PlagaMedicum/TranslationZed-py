@@ -7,7 +7,7 @@ BENCH_CURRENT ?= $(ARTIFACTS)/bench/bench.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-check lint lint-check typecheck arch-check \
-	test test-cov test-perf perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
+	test test-cov test-perf test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build bench bench-check bench-advisory test-mutation \
 	test-warnings run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
@@ -53,6 +53,9 @@ test-cov:
 
 test-perf:
 	VENV=$(VENV) bash scripts/test_perf.sh
+
+test-perf-heavy:
+	VENV=$(VENV) bash scripts/test_perf_heavy.sh
 
 security:
 	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/security.sh
@@ -157,7 +160,7 @@ verify-ci:
 	fi
 
 ## tiered heavy verification (advisory mutation + optional extra checks)
-verify-heavy: verify-ci test-mutation
+verify-heavy: verify-ci test-perf-heavy test-mutation
 
 ## fastest strict developer gate
 verify-fast: check

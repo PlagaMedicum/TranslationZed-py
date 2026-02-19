@@ -6,6 +6,8 @@ import os
 import time
 from pathlib import Path
 
+import pytest
+
 from translationzed_py.core import parse_lazy
 from translationzed_py.core.project_scanner import scan_root_with_errors
 from translationzed_py.core.tm_store import TMStore
@@ -41,6 +43,23 @@ def _derive_tm_stress_size() -> int:
         counts.append(len(parsed.entries))
     assert counts
     return max(counts)
+
+
+def _env_flag(name: str, *, default: bool = False) -> bool:
+    raw = os.getenv(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default_value: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default_value
+    try:
+        return int(raw)
+    except ValueError:
+        return default_value
 
 
 def test_tm_query_perf_autoderived_from_committed_perf_fixtures(
@@ -159,6 +178,81 @@ def test_tm_import_query_perf_autoderived_from_committed_perf_fixtures(
         query_elapsed_ms = (time.perf_counter() - start) * 1000.0
         perf_recorder(
             "tm import query (auto-derived prod max)",
+            query_elapsed_ms,
+            query_budget_ms,
+            f"entries={count}",
+        )
+        assert query_elapsed_ms <= query_budget_ms
+        sources = {item.source_text for item in matches}
+        assert "Drop all" in sources
+        assert "Drop one" in sources
+    finally:
+        store.close()
+
+
+@pytest.mark.skipif(
+    not _env_flag("TZP_PERF_TM_HEAVY"),
+    reason="set TZP_PERF_TM_HEAVY=1 to enable heavy TM stress profile",
+)
+def test_tm_import_query_perf_heavy_stress_profile(tmp_path: Path, perf_recorder) -> None:
+    """Verify heavy-lane TM import/query profile on scaled corpora."""
+    base_count = max(100, _derive_tm_stress_size())
+    multiplier = max(2, _env_int("TZP_PERF_TM_HEAVY_MULTIPLIER", 3))
+    count = base_count * multiplier
+    import_budget_ms = _budget_ms("TZP_PERF_TM_IMPORT_HEAVY_MS", 7000.0)
+    query_budget_ms = _budget_ms("TZP_PERF_TM_IMPORT_QUERY_HEAVY_MS", 3500.0)
+    root = tmp_path / "tm_import_perf_heavy"
+    root.mkdir(parents=True, exist_ok=True)
+    tm_path = root / ".tzp" / "tms" / "bulk-heavy.tmx"
+    tm_path.parent.mkdir(parents=True, exist_ok=True)
+
+    pairs = [
+        ("Drop all", "Пакід. усё"),
+        ("Drop one", "Скінуць шт."),
+        ("Drop-all", "Пакінуць усё"),
+    ]
+    pairs.extend(
+        (
+            f"Heavy random token {idx:06d}",
+            f"Heavy noise tr {idx:06d}",
+        )
+        for idx in range(max(0, count - len(pairs)))
+    )
+    write_tmx(tm_path, pairs, source_locale="EN", target_locale="BE")
+
+    store = TMStore(root)
+    try:
+        start = time.perf_counter()
+        imported = store.replace_import_tm(
+            tm_path,
+            source_locale="EN",
+            target_locale="BE",
+            source_locale_raw="EN",
+            target_locale_raw="BE",
+            tm_name="bulk-heavy",
+        )
+        import_elapsed_ms = (time.perf_counter() - start) * 1000.0
+        perf_recorder(
+            "tm import load (heavy auto-derived stress)",
+            import_elapsed_ms,
+            import_budget_ms,
+            f"segments={count}",
+        )
+        assert import_elapsed_ms <= import_budget_ms
+        assert imported == count
+
+        start = time.perf_counter()
+        matches = store.query(
+            "Drop all",
+            source_locale="EN",
+            target_locale="BE",
+            limit=20,
+            min_score=5,
+            origins=["import"],
+        )
+        query_elapsed_ms = (time.perf_counter() - start) * 1000.0
+        perf_recorder(
+            "tm import query (heavy auto-derived stress)",
             query_elapsed_ms,
             query_budget_ms,
             f"entries={count}",
