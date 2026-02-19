@@ -6,6 +6,8 @@ ensure_venv
 
 ARTIFACTS_DIR="$ROOT_DIR/${ARTIFACTS:-artifacts}/mutation"
 mkdir -p "$ARTIFACTS_DIR"
+MODE="${MUTATION_SCORE_MODE:-warn}"
+MIN_KILLED_PERCENT="${MUTATION_MIN_KILLED_PERCENT:-0}"
 
 if ! "$VENV_PY" -m mutmut --help >/dev/null 2>&1; then
   echo "mutmut is unavailable in this environment; skipping advisory mutation run."
@@ -17,6 +19,14 @@ set +e
 run_status=$?
 "$VENV_PY" -m mutmut results >"$ARTIFACTS_DIR/mutmut-results.txt" 2>&1
 results_status=$?
+"$VENV_PY" scripts/mutation_summary.py \
+  --run-log "$ARTIFACTS_DIR/mutmut-run.log" \
+  --results "$ARTIFACTS_DIR/mutmut-results.txt" \
+  --out-json "$ARTIFACTS_DIR/summary.json" \
+  --mode "$MODE" \
+  --min-killed-percent "$MIN_KILLED_PERCENT" \
+  >"$ARTIFACTS_DIR/summary.txt" 2>&1
+summary_status=$?
 set -e
 
 if [ "$run_status" -ne 0 ] || [ "$results_status" -ne 0 ]; then
@@ -25,5 +35,13 @@ else
   echo "mutation advisory: completed; see $ARTIFACTS_DIR"
 fi
 
-# Advisory by policy: never block the pipeline at this stage.
+if [ "$summary_status" -ne 0 ]; then
+  echo "mutation score gate did not pass; see $ARTIFACTS_DIR/summary.txt" >&2
+fi
+
+if [ "$MODE" = "fail" ] && [ "$summary_status" -ne 0 ]; then
+  exit 1
+fi
+
+# Advisory-by-default policy: only explicit fail mode can block the pipeline.
 exit 0
