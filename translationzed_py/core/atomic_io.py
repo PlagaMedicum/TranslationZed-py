@@ -11,13 +11,18 @@ def write_bytes_atomic(path: Path, data: bytes) -> None:
     """Write bytes with atomic replace and best-effort fsync."""
     tmp = path.with_name(path.name + ".tmp")
     tmp.parent.mkdir(parents=True, exist_ok=True)
-    with open(tmp, "wb") as handle:
-        handle.write(data)
-        handle.flush()
+    try:
+        with open(tmp, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            with contextlib.suppress(OSError):
+                os.fsync(handle.fileno())
+        os.replace(tmp, path)
+        _fsync_dir(path.parent)
+    except Exception:
         with contextlib.suppress(OSError):
-            os.fsync(handle.fileno())
-    os.replace(tmp, path)
-    _fsync_dir(path.parent)
+            tmp.unlink()
+        raise
 
 
 def write_text_atomic(path: Path, text: str, *, encoding: str = "utf-8") -> None:
