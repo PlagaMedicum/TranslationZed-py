@@ -9,7 +9,8 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtCore import QPoint
+from PySide6.QtCore import QPoint, QSize
+from PySide6.QtGui import QResizeEvent, QShowEvent
 
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
@@ -615,3 +616,326 @@ def test_status_combo_helpers_cover_guards_single_and_macro_paths(
     assert model.undo_stack.events == ["begin", "end"]
     assert (5, 3, status_a) in model.set_calls
     assert (6, 3, status_a) in model.set_calls
+
+
+def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify selection, status bar, and scope-indicator helper branches."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    monkeypatch.setattr(win.table, "selectionModel", lambda: None, raising=False)
+    assert win._selected_rows() == []
+
+    class _Index:
+        def __init__(self, row: int, valid: bool = True) -> None:
+            self._row = row
+            self._valid = valid
+
+        def isValid(self) -> bool:  # noqa: N802
+            return self._valid
+
+        def row(self) -> int:
+            return self._row
+
+    class _Selection:
+        @staticmethod
+        def isSelected(_index) -> bool:  # noqa: N802
+            return False
+
+        @staticmethod
+        def selectedRows():  # noqa: N802
+            return []
+
+        @staticmethod
+        def selectedIndexes():  # noqa: N802
+            return []
+
+    monkeypatch.setattr(win.table, "selectionModel", lambda: _Selection(), raising=False)
+    monkeypatch.setattr(win.table, "currentIndex", lambda: _Index(7), raising=False)
+    assert win._selected_rows() == [7]
+
+    class _FallbackSelection:
+        @staticmethod
+        def isSelected(_index) -> bool:  # noqa: N802
+            return True
+
+        @staticmethod
+        def selectedRows():  # noqa: N802
+            return []
+
+        @staticmethod
+        def selectedIndexes():  # noqa: N802
+            return [_Index(2), _Index(4), _Index(2)]
+
+    monkeypatch.setattr(
+        win.table, "selectionModel", lambda: _FallbackSelection(), raising=False
+    )
+    monkeypatch.setattr(win.table, "currentIndex", lambda: _Index(0), raising=False)
+    assert win._selected_rows() == [2, 4]
+
+    shown_messages: list[str] = []
+    monkeypatch.setattr(
+        win.statusBar(),
+        "showMessage",
+        lambda text: shown_messages.append(str(text)),
+    )
+    scope_updates: list[str] = []
+    monkeypatch.setattr(win, "_update_scope_indicators", lambda: scope_updates.append("u"))
+
+    class _RowModel:
+        @staticmethod
+        def rowCount() -> int:  # noqa: N802
+            return 11
+
+    win._last_saved_text = "Saved 12:34:56"
+    win._search_progress_text = "Searching..."
+    win._current_model = _RowModel()  # type: ignore[assignment]
+    monkeypatch.setattr(win.table, "currentIndex", lambda: _Index(3), raising=False)
+    win._current_pf = SimpleNamespace(path=root / "BE" / "ui.txt")
+    win._update_status_bar()
+    assert "Saved 12:34:56" in shown_messages[-1]
+    assert "Searching..." in shown_messages[-1]
+    assert "Row 4 / 11" in shown_messages[-1]
+    assert "BE/ui.txt" in shown_messages[-1]
+    assert scope_updates[-1] == "u"
+
+    win._current_pf = SimpleNamespace(path=Path("/tmp/external_ui.txt"))
+    win._update_status_bar()
+    assert "/tmp/external_ui.txt" in shown_messages[-1]
+
+    win._last_saved_text = ""
+    win._search_progress_text = ""
+    win._current_model = None
+    win._current_pf = None
+    monkeypatch.setattr(win.table, "currentIndex", lambda: _Index(0, valid=False), raising=False)
+    win._update_status_bar()
+    assert shown_messages[-1] == "Ready"
+
+    win._search_scope_widget = None
+    win._replace_scope_widget = None
+    win._update_scope_indicators()
+
+    monkeypatch.setattr(
+        win,
+        "_update_scope_indicators",
+        mw.MainWindow._update_scope_indicators.__get__(win),
+    )
+    win._search_scope_widget = mw.QWidget()
+    win._replace_scope_widget = mw.QWidget()
+    win._search_scope_icon = mw.QLabel()
+    win._replace_scope_icon = mw.QLabel()
+    indicator_calls: list[tuple[str, bool]] = []
+    monkeypatch.setattr(
+        win,
+        "_set_scope_indicator",
+        lambda widget, icon, scope, active, title: indicator_calls.append(  # noqa: ARG005
+            (str(scope), bool(active))
+        ),
+    )
+    win.search_edit.setText("find")
+    win.replace_toolbar.setVisible(False)
+    win._update_scope_indicators()
+    assert indicator_calls[-2:] == [(win._search_scope, True), (win._replace_scope, False)]
+
+    monkeypatch.setattr(
+        win,
+        "_set_scope_indicator",
+        mw.MainWindow._set_scope_indicator.__get__(win),
+    )
+    icon_label = mw.QLabel()
+    indicator_widget = mw.QWidget()
+    indicator_widget.setVisible(True)
+    win._set_scope_indicator(indicator_widget, icon_label, "FILE", False, "Search scope")
+    assert indicator_widget.isVisible() is False
+    win._set_scope_indicator(indicator_widget, icon_label, "LOCALE", True, "Replace scope")
+    assert indicator_widget.isVisible() is True
+    assert indicator_widget.toolTip() == "Replace scope: Locale"
+
+
+def test_status_apply_helpers_cover_row_filtering_and_qa_auto_mark_paths(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify status-apply helpers cover guard, row-filter, macro, and QA branches."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    win._current_model = None
+    win._apply_status_to_rows([1], status=mw.Status.FOR_REVIEW, label="L")
+
+    class _UndoStack:
+        def __init__(self) -> None:
+            self.events: list[str] = []
+
+        def beginMacro(self, _label: str) -> None:  # noqa: N802
+            self.events.append("begin")
+
+        def endMacro(self) -> None:  # noqa: N802
+            self.events.append("end")
+
+    class _Model:
+        def __init__(self) -> None:
+            self.undo_stack = _UndoStack()
+            self.statuses: dict[int, object] = {
+                1: mw.Status.TRANSLATED,
+                2: mw.Status.UNTOUCHED,
+                3: mw.Status.PROOFREAD,
+                4: mw.Status.TRANSLATED,
+            }
+            self.set_calls: list[tuple[int, int, object]] = []
+
+        @staticmethod
+        def index(row: int, column: int):  # type: ignore[no-untyped-def]
+            return (row, column)
+
+        def setData(self, model_index, status, _role):  # type: ignore[no-untyped-def]
+            row = int(model_index[0])
+            self.statuses[row] = status
+            self.set_calls.append((int(model_index[0]), int(model_index[1]), status))
+
+        def status_for_row(self, row: int):  # type: ignore[no-untyped-def]
+            return self.statuses.get(row)
+
+    model = _Model()
+    win._current_model = model  # type: ignore[assignment]
+
+    win._apply_status_to_rows([], status=mw.Status.TRANSLATED, label="L")
+    assert model.set_calls == []
+
+    win._apply_status_to_rows([-1, 1], status=mw.Status.TRANSLATED, label="L")
+    assert model.set_calls == []
+
+    win._apply_status_to_rows([2], status=mw.Status.TRANSLATED, label="single")
+    assert model.set_calls[-1] == (2, 3, mw.Status.TRANSLATED)
+
+    model.undo_stack.events.clear()
+    win._apply_status_to_rows([3, 4], status=mw.Status.FOR_REVIEW, label="multi")
+    assert model.undo_stack.events == ["begin", "end"]
+    assert (3, 3, mw.Status.FOR_REVIEW) in model.set_calls
+    assert (4, 3, mw.Status.FOR_REVIEW) in model.set_calls
+
+    apply_calls: list[tuple[tuple[int, ...], object, str]] = []
+    monkeypatch.setattr(
+        win,
+        "_apply_status_to_rows",
+        lambda rows, *, status, label: apply_calls.append(
+            (tuple(int(r) for r in rows), status, str(label))
+        ),
+    )
+
+    class _QAService:
+        @staticmethod
+        def auto_mark_rows(_findings):  # type: ignore[no-untyped-def]
+            return (1, 2, 3)
+
+    model.statuses = {
+        1: mw.Status.UNTOUCHED,
+        2: mw.Status.TRANSLATED,
+        3: mw.Status.PROOFREAD,
+    }
+    win._qa_service = _QAService()  # type: ignore[assignment]
+    win._qa_auto_mark_touched_for_review = False
+    win._apply_qa_auto_mark([object()])
+    assert apply_calls[-1] == ((1,), mw.Status.FOR_REVIEW, "QA auto-mark For review")
+
+    win._qa_auto_mark_touched_for_review = True
+    win._apply_qa_auto_mark([object()])
+    assert apply_calls[-1] == ((1, 2, 3), mw.Status.FOR_REVIEW, "QA auto-mark For review")
+
+    apply_selection_calls: list[tuple[tuple[int, ...], object, str]] = []
+    combo_updates: list[str] = []
+    monkeypatch.setattr(
+        win,
+        "_apply_status_to_rows",
+        lambda rows, *, status, label: apply_selection_calls.append(
+            (tuple(int(r) for r in rows), status, str(label))
+        ),
+    )
+    monkeypatch.setattr(
+        win,
+        "_update_status_combo_from_selection",
+        lambda: combo_updates.append("u"),
+    )
+
+    win._current_pf = None
+    win._apply_status_to_selection(mw.Status.PROOFREAD, "label")
+    assert apply_selection_calls == []
+
+    win._current_pf = SimpleNamespace(path=root / "BE" / "ui.txt")
+    monkeypatch.setattr(win, "_selected_rows", lambda: [])
+    win._apply_status_to_selection(mw.Status.PROOFREAD, "label")
+    assert apply_selection_calls == []
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [4, 5])
+    win._apply_status_to_selection(mw.Status.PROOFREAD, "label")
+    assert apply_selection_calls[-1] == ((4, 5), mw.Status.PROOFREAD, "label")
+    assert combo_updates == ["u"]
+
+    # Keep teardown closeEvent on real-safe state.
+    win._current_model = None
+    win._current_pf = None
+
+
+def test_show_resize_and_set_status_combo_helpers_cover_remaining_ui_branches(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify show/resize handlers and status-combo setter edge paths."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    toggle_calls: list[bool] = []
+    monkeypatch.setattr(
+        win,
+        "_toggle_detail_panel",
+        lambda checked: toggle_calls.append(bool(checked)),
+    )
+    monkeypatch.setattr(win._detail_panel, "isVisible", lambda: True, raising=False)
+    win.showEvent(QShowEvent())
+    assert toggle_calls == [True]
+
+    layout_calls: list[str] = []
+    reflow_calls: list[str] = []
+    align_calls: list[str] = []
+    monkeypatch.setattr(win, "_apply_table_layout", lambda: layout_calls.append("layout"))
+    monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: reflow_calls.append("reflow"))
+    monkeypatch.setattr(win, "_align_replace_bar", lambda: align_calls.append("align"))
+
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    layout_calls.clear()
+    reflow_calls.clear()
+    align_calls.clear()
+    win.replace_toolbar.setVisible(True)
+    monkeypatch.setattr(win.replace_toolbar, "isVisible", lambda: True, raising=False)
+    win.resizeEvent(QResizeEvent(QSize(1200, 800), QSize(1000, 700)))
+    assert layout_calls == ["layout"]
+    assert reflow_calls == ["reflow"]
+    assert align_calls == ["align"]
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [])
+    win._set_status_combo(None)
+    assert win.status_combo.isEnabled() is False
+    assert win.status_combo.currentIndex() == -1
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [0])
+    win._set_status_combo(None)
+    assert win.status_combo.isEnabled() is True
+    assert win.status_combo.currentIndex() == -1
+
+    known_status = win.status_combo.itemData(0)
+    win._set_status_combo(known_status)
+    assert win.status_combo.currentData() == known_status
+
+    win._set_status_combo(object())  # type: ignore[arg-type]
+    assert win.status_combo.currentIndex() == -1
