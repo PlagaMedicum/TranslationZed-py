@@ -374,6 +374,185 @@ def test_request_write_original_delegates_to_save_exit_flow_service(
     assert calls[0]["save_all"] == win._save_all_files
 
 
+def test_request_write_original_skips_flow_when_guard_blocks(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify write-original flow is not invoked when write guard rejects the action."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    called: list[str] = []
+    delegate = win._save_exit_flow_service
+
+    class _StubService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def apply_write_original_flow(self, **_kwargs):  # type: ignore[no-untyped-def]
+            called.append("flow")
+
+    monkeypatch.setattr(win, "_save_exit_flow_service", _StubService())
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: False)
+    win._request_write_original()
+    assert called == []
+
+
+def test_open_flow_guard_restores_depth_after_nested_and_exception(
+    qtbot, tmp_path
+) -> None:
+    """Verify open-flow guard increments depth and always restores it."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    assert win._open_flow_depth == 0
+    with win._open_flow_guard():
+        assert win._open_flow_depth == 1
+        with win._open_flow_guard():
+            assert win._open_flow_depth == 2
+        assert win._open_flow_depth == 1
+    assert win._open_flow_depth == 0
+
+    with pytest.raises(RuntimeError, match="boom"):
+        with win._open_flow_guard():
+            assert win._open_flow_depth == 1
+            raise RuntimeError("boom")
+    assert win._open_flow_depth == 0
+
+
+def test_can_write_originals_warns_when_read_flow_is_active(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify write guard warns and blocks while open/read flow is active."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    warnings: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        mw.QMessageBox,
+        "warning",
+        lambda _parent, title, text: warnings.append((str(title), str(text))),
+    )
+
+    win._open_flow_depth = 1
+    assert win._can_write_originals("save now") is False
+    assert warnings == [
+        ("Operation blocked", "Cannot save now while file open/read flow is active.")
+    ]
+
+    win._open_flow_depth = 0
+    assert win._can_write_originals("save now") is True
+
+
+def test_notify_nothing_to_write_shows_information_dialog(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify helper shows the expected informational dialog for empty draft set."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    infos: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        mw.QMessageBox,
+        "information",
+        lambda _parent, title, text: infos.append((str(title), str(text))),
+    )
+    win._notify_nothing_to_write()
+    assert infos == [("Nothing to write", "No draft changes to write.")]
+
+
+def test_show_save_files_dialog_returns_non_write_without_mutating_files(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify save-files dialog returns early for non-write decisions."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    files = [root / "BE" / "ui.txt", root / "BE" / "menu.txt"]
+    before = list(files)
+
+    calls: list[tuple[str, object]] = []
+    delegate = win._save_exit_flow_service
+
+    class _StubService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_save_dialog_labels(self, items, *, root):  # type: ignore[no-untyped-def]
+            calls.append(("labels", tuple(items)))
+            return [p.relative_to(root).as_posix() for p in items]
+
+        def apply_save_dialog_selection(self, **_kwargs):  # type: ignore[no-untyped-def]
+            calls.append(("apply", _kwargs))
+            return ()
+
+    class _Dialog:
+        def __init__(self, labels, *_args, **_kwargs):
+            calls.append(("dialog_labels", tuple(labels)))
+
+        def exec(self):
+            return None
+
+        def choice(self):
+            return "cache"
+
+    monkeypatch.setattr(win, "_save_exit_flow_service", _StubService())
+    monkeypatch.setattr(mw, "SaveFilesDialog", _Dialog)
+    decision = win._show_save_files_dialog(files)
+
+    assert decision == "cache"
+    assert files == before
+    assert not any(kind == "apply" for kind, _ in calls)
+
+
+def test_show_save_files_dialog_write_without_selected_files_uses_none(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify write decision passes selected_labels=None when dialog omits selected_files hook."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    files = [root / "BE" / "ui.txt", root / "BE" / "menu.txt"]
+    selected_seen: list[object] = []
+    delegate = win._save_exit_flow_service
+
+    class _StubService:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        def build_save_dialog_labels(self, items, *, root):  # type: ignore[no-untyped-def]
+            return [p.relative_to(root).as_posix() for p in items]
+
+        def apply_save_dialog_selection(
+            self, *, files, labels, selected_labels
+        ):  # type: ignore[no-untyped-def]
+            _ = files
+            _ = labels
+            selected_seen.append(selected_labels)
+            return (root / "BE" / "menu.txt",)
+
+    class _Dialog:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def exec(self):
+            return None
+
+        def choice(self):
+            return "write"
+
+    monkeypatch.setattr(win, "_save_exit_flow_service", _StubService())
+    monkeypatch.setattr(mw, "SaveFilesDialog", _Dialog)
+    decision = win._show_save_files_dialog(files)
+
+    assert decision == "write"
+    assert selected_seen == [None]
+    assert files == [root / "BE" / "menu.txt"]
+
+
 def test_apply_preferences_delegates_scope_normalization_to_preferences_service(
     qtbot, tmp_path, monkeypatch
 ):
