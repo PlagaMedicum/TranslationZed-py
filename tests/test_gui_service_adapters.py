@@ -1606,7 +1606,9 @@ def test_rows_from_model_handles_missing_context_and_active_model(
     assert tuple(win._rows_from_model()) == ()
 
     calls: list[dict[str, object]] = []
-    expected_rows = [mw._SearchRow(file=target, row=0, key="UI_OK", source="", value="x")]
+    expected_rows = [
+        mw._SearchRow(file=target, row=0, key="UI_OK", source="", value="x")
+    ]
 
     class _Model:
         def iter_search_rows(self, **kwargs):  # type: ignore[no-untyped-def]
