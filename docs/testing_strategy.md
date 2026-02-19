@@ -150,9 +150,9 @@ _Last updated: 2026-02-19_
 - Tiered heavy lane entrypoint is `make verify-heavy` (`verify-ci` + advisory mutation).
 
 ### 2.10 Warning-safety gate
-- `make test-warnings` runs targeted TM/SQLite suites with
-  `-W error::ResourceWarning` to fail on unclosed resource warnings.
-- `make verify-ci` includes this gate in strict mode.
+- Default pytest-based gates run with `-W error::ResourceWarning` so
+  unclosed resource warnings fail in the primary pass (no duplicate full-suite rerun).
+- Optional `make test-warnings` remains available as a focused TM/SQLite warning check.
 
 ---
 
