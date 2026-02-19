@@ -11,6 +11,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import Qt
 
 from translationzed_py.gui import MainWindow
+from translationzed_py.gui import main_window as mw
 
 
 def _make_project(tmp_path: Path) -> Path:
@@ -151,7 +152,9 @@ def test_set_detail_pending_covers_model_and_no_model_paths(
 
 
 def test_commit_detail_translation_covers_pending_and_invalid_index_paths(
-    qtbot, tmp_path
+    qtbot,
+    tmp_path,
+    monkeypatch,
 ) -> None:
     """Verify commit-detail exits for pending rows and clears dirty on invalid index."""
     win, _root = _open_window_with_current_file(qtbot, tmp_path)
@@ -166,6 +169,24 @@ def test_commit_detail_translation_covers_pending_and_invalid_index_paths(
     assert model is not None
     win._detail_pending_row = None
     win._detail_dirty = True
-    win.table.setCurrentIndex(model.index(-1, -1))
+    monkeypatch.setattr(win.table, "currentIndex", lambda: model.index(-1, -1))
     win._commit_detail_translation()
     assert win._detail_dirty is False
+
+
+def test_sync_detail_editors_uses_pending_mode_for_large_rows(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify sync-detail delegates to pending-mode when lazy threshold is reached."""
+    win, _root = _open_window_with_current_file(qtbot, tmp_path)
+    assert win._current_model is not None
+    win._large_text_optimizations = True
+
+    pending_calls: list[int] = []
+    monkeypatch.setattr(mw, "_DETAIL_LAZY_THRESHOLD", 1)
+    monkeypatch.setattr(win, "_set_detail_pending", lambda row: pending_calls.append(row))
+
+    win._sync_detail_editors()
+    assert pending_calls == [0]
