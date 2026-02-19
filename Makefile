@@ -7,7 +7,7 @@ BENCH_CURRENT ?= $(ARTIFACTS)/bench/bench.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-check lint lint-check typecheck arch-check \
-	test test-cov test-perf perf-advisory check check-local verify verify-ci verify-ci-core verify-core \
+	test test-cov test-perf perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build bench bench-check bench-advisory test-mutation \
 	test-warnings run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
@@ -130,7 +130,15 @@ verify:
 
 ## strict CI verification core (non-mutating)
 verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-check test-cov test-perf \
-	test-readonly-clean security docstyle docs-build bench-check perf-scenarios release-check-if-tag
+	test-readonly-clean security docstyle docs-build perf-scenarios release-check-if-tag
+
+## CI benchmark gate helper; can be skipped when a dedicated benchmark job is used.
+verify-ci-bench:
+	@if [ "$(VERIFY_SKIP_BENCH)" = "1" ]; then \
+		echo "verify-ci: bench-check skipped (VERIFY_SKIP_BENCH=1; use dedicated benchmark gate)."; \
+	else \
+		$(MAKE) bench-check; \
+	fi
 
 ## strict CI verification (non-mutating + fail-on-drift)
 verify-ci:
@@ -140,6 +148,7 @@ verify-ci:
 	trap 'rm -f "$$before" "$$after"' EXIT; \
 	git status --porcelain --untracked-files=no >"$$before"; \
 	$(MAKE) verify-ci-core TAG=$(TAG); \
+	$(MAKE) verify-ci-bench; \
 	git status --porcelain --untracked-files=no >"$$after"; \
 	if ! cmp -s "$$before" "$$after"; then \
 		echo "verify-ci failed: tracked files changed during verification."; \

@@ -31,7 +31,7 @@ jobs:
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
       - name: Verify (strict, non-mutating)
-        run: make verify-ci BENCH_COMPARE_MODE=warn
+        run: make verify-ci VERIFY_SKIP_BENCH=1
       - name: Upload verification artifacts
         if: always()
         uses: actions/upload-artifact@v4
