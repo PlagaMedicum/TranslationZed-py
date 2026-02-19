@@ -156,7 +156,8 @@ _Last updated: 2026-02-19_
   `conflict_service`, `search_replace_service`.
 - Current mutation mode is **advisory** (`make test-mutation`): reports are
   published without blocking until baseline quality is stabilized.
-- Tiered heavy lane entrypoint is `make verify-heavy` (`verify-ci` + advisory mutation).
+- Tiered heavy lane entrypoint is `make verify-heavy`
+  (`verify-ci` + heavy TM stress-profile perf gate + advisory mutation).
 
 ### 2.10 Warning-safety gate
 - Default pytest-based gates run with `-W error::ResourceWarning` so
@@ -362,8 +363,7 @@ They include:
 **Not covered yet (automation gaps, by layer):**
 
 **Unit (core) gaps**
-- TM retrieval under larger imported corpora than committed fixtures should gain
-  extended stress-profile gates (tiered heavy lane).
+- No critical unit-level gaps are currently tracked in strict/heavy automated lanes.
 
 **Integration gaps**
 - No critical integration gaps are currently tracked in strict automated lanes.

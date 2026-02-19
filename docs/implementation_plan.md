@@ -827,8 +827,10 @@ A9 [✓] **Verification-overhaul milestone**
       tree width, table column layout extras, and search-case toggle survive restart.
     - [✓] Added `core.atomic_io` fault-injection coverage for fsync failures and
       replace-failure temp-file cleanup guarantees.
-    - [→] Ongoing phase-two focus remains on high-value GUI branch expansion
-      for remaining robustness gaps (heavy-corpus stress profiles and mutation-threshold ratcheting).
+    - [✓] Added heavy-lane TM stress-profile perf gate:
+      `make test-perf-heavy`, wired into `make verify-heavy`.
+    - [→] Ongoing verification-overhaul focus remains on remaining robustness gaps
+      (mutation-threshold ratcheting and release policy hardening).
 
 ## Decision Backlog (Awaiting Product Input)
 

@@ -23,7 +23,7 @@ avoid missing mandatory tasks.
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
   with CI (non-mutating, fail-on-drift)
 - **Run** `make verify-heavy` when you need full strict gates plus advisory mutation
-  report generation (`artifacts/mutation/*`)
+  report generation (`artifacts/mutation/*`) and heavy TM stress-profile perf checks
 - **Update docs** whenever behavior, UX, or workflows change
   - Keep specs and plan in sync with implemented features
   - Add/adjust questions when requirements are unclear or changed
