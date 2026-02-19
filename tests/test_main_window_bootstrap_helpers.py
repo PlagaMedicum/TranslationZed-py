@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -12,6 +13,24 @@ from PySide6.QtCore import QEvent
 from PySide6.QtGui import QFocusEvent
 
 from translationzed_py.gui import main_window as mw
+
+
+def _make_project(tmp_path: Path) -> Path:
+    """Create a minimal two-locale project fixture."""
+    root = tmp_path / "proj"
+    root.mkdir()
+    for locale, text in (
+        ("EN", "English"),
+        ("BE", "Belarusian"),
+    ):
+        (root / locale).mkdir()
+        (root / locale / "language.txt").write_text(
+            f"text = {text},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "ui.txt").write_text('UI_OK = "OK"\n', encoding="utf-8")
+    (root / "BE" / "ui.txt").write_text('UI_OK = "Добра"\n', encoding="utf-8")
+    return root
 
 
 def test_in_test_mode_and_pref_parsers_handle_common_inputs(monkeypatch) -> None:
@@ -161,3 +180,92 @@ def test_main_window_startup_warns_for_missing_picked_root(
     assert win._startup_aborted is True
     assert persisted == [str(selected.resolve())]
     assert warnings == [("Invalid project root", str(selected.resolve()))]
+
+
+def test_init_locales_handles_scan_exceptions(qtbot, tmp_path, monkeypatch) -> None:
+    """Verify locale init handles scan failures with critical error fallback."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    errors: list[tuple[str, str]] = []
+
+    def _raise_scan(_root: Path):  # type: ignore[no-untyped-def]
+        raise RuntimeError("scan failed")
+
+    monkeypatch.setattr(mw, "scan_root_with_errors", _raise_scan)
+    monkeypatch.setattr(
+        mw.QMessageBox,
+        "critical",
+        staticmethod(lambda _parent, title, text: errors.append((title, text))),
+    )
+
+    win._init_locales(selected_locales=["BE"])
+    assert errors == [("Invalid language.txt", "scan failed")]
+    assert win._locales == {}
+    assert win._selected_locales == []
+
+
+def test_init_locales_covers_malformed_warning_and_empty_selectable_branch(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify locale init warns on malformed files and handles EN-only scans."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    class _WarningBox:
+        """Message-box stub used to capture malformed-language warnings."""
+
+        Warning = 1
+        instances: list[_WarningBox] = []
+
+        def __init__(self, *_args, **_kwargs):
+            self.title = ""
+            self.text = ""
+            self.detail = ""
+            self.executed = False
+            _WarningBox.instances.append(self)
+
+        def setIcon(self, _icon):
+            return None
+
+        def setWindowTitle(self, title: str) -> None:
+            self.title = title
+
+        def setText(self, text: str) -> None:
+            self.text = text
+
+        def setDetailedText(self, detail: str) -> None:
+            self.detail = detail
+
+        def exec(self) -> None:
+            self.executed = True
+
+    calls: list[str] = []
+    monkeypatch.setattr(mw, "QMessageBox", _WarningBox)
+    monkeypatch.setattr(win, "_schedule_cache_migration", lambda: calls.append("migrate"))
+    monkeypatch.setattr(win, "_schedule_post_locale_tasks", lambda: calls.append("post"))
+    monkeypatch.setattr(win, "_warn_orphan_caches", lambda: calls.append("warn"))
+    monkeypatch.setattr(mw.QTimer, "singleShot", lambda _ms, callback: callback())
+
+    def _scan_with_errors(_root: Path):  # type: ignore[no-untyped-def]
+        return {"EN": "English", "BE": "Belarusian"}, ["BE/language.txt: malformed"]
+
+    monkeypatch.setattr(mw, "scan_root_with_errors", _scan_with_errors)
+    win._init_locales(selected_locales=["BE"])
+
+    assert _WarningBox.instances
+    warning = _WarningBox.instances[-1]
+    assert warning.executed is True
+    assert warning.title == "Malformed language.txt"
+    assert "skipped" in warning.text
+    assert warning.detail == "BE/language.txt: malformed"
+    assert win._selected_locales == ["BE"]
+    assert calls == ["migrate", "warn", "post"]
+
+    monkeypatch.setattr(mw, "scan_root_with_errors", lambda _root: ({"EN": "English"}, []))
+    win._selected_locales = ["BE"]
+    win._init_locales(selected_locales=None)
+    assert win._selected_locales == []
