@@ -39,7 +39,8 @@ avoid missing mandatory tasks.
   - Final `Release` workflow ignores RC tags (`v*-rc*`) at trigger level to avoid accidental release publishing
 - **Run** `make test-readonly-clean` to confirm diagnostics workflow does not mutate tracked files
 - **Optional targeted rerun** (when investigating encoding regressions):
-  `make test-encoding-integrity` and `make diagnose-encoding ARGS=\"<project-root>\"`
+  `make test-encoding-integrity` (full encoding-integrity suite) and
+  `make diagnose-encoding ARGS=\"<project-root>\"`
 - **Run** `make bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20`
   to enforce benchmark regression threshold against committed baseline
 - **Confirm** `make pack` completes on your platform

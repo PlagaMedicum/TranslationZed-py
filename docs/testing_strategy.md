@@ -153,8 +153,9 @@ _Last updated: 2026-02-19_
 - Default pytest-based gates run with `-W error::ResourceWarning` so
   unclosed resource warnings fail in the primary pass (no duplicate full-suite rerun).
 - Default verification runs the full pytest suite once via `make test-cov`;
-  focused encoding/read-only pytest subsets are kept as targeted commands and
-  are not re-run by default verify umbrellas.
+  the full encoding-integrity pytest suite remains available through
+  `make test-encoding-integrity` as a targeted rerun command and is not
+  re-run by default verify umbrellas.
 - `make test-readonly-clean` is script-level (diagnostics + tracked-state check)
   so it does not duplicate pytest execution.
 - Optional `make test-warnings` remains available as a focused TM/SQLite warning check.
