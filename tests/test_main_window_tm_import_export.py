@@ -12,6 +12,36 @@ from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
 
 
+@pytest.fixture(autouse=True)
+def _disable_close_prompt_for_module(monkeypatch):
+    """Disable write-on-exit prompt in this module to speed widget teardown."""
+    original_init = mw.MainWindow.__init__
+
+    def _patched_init(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        original_init(self, *args, **kwargs)
+        if getattr(self, "_startup_aborted", False):
+            return
+        self._prompt_write_on_exit = False
+        self._qa_auto_refresh = False
+        self._tm_bootstrap_pending = False
+        for name in (
+            "_post_locale_timer",
+            "_qa_refresh_timer",
+            "_qa_scan_timer",
+            "_tm_update_timer",
+            "_tm_flush_timer",
+            "_tm_query_timer",
+            "_tm_rebuild_timer",
+        ):
+            timer = getattr(self, name, None)
+            if timer is None:
+                continue
+            timer.stop()
+            timer.setInterval(max(int(timer.interval()), 60_000))
+
+    monkeypatch.setattr(mw.MainWindow, "__init__", _patched_init)
+
+
 def _make_project(tmp_path: Path) -> Path:
     """Create minimal project fixture for TM workflow tests."""
     root = tmp_path / "proj"
@@ -289,3 +319,147 @@ def test_export_tmx_and_rebuild_selected_cover_core_branches(
     win._selected_locales = ["EN", "BE", "RU"]
     win._rebuild_tm_selected()
     assert start_calls == [(["BE", "RU"], True, True)]
+
+
+def test_open_project_covers_cancel_aborted_and_success_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify open-project handles cancel, aborted child startup, and successful open."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    monkeypatch.setattr(
+        mw.QFileDialog,
+        "getExistingDirectory",
+        staticmethod(lambda *_args, **_kwargs: ""),
+    )
+    win._open_project()
+    assert win._child_windows == []
+
+    picked = str(root)
+    monkeypatch.setattr(
+        mw.QFileDialog,
+        "getExistingDirectory",
+        staticmethod(lambda *_args, **_kwargs: picked),
+    )
+    created: list[object] = []
+
+    class _FakeWindow:
+        def __init__(self, _path: str) -> None:
+            self._startup_aborted = True
+            created.append(self)
+
+        def show(self) -> None:
+            raise AssertionError("show() must not run when startup is aborted")
+
+    monkeypatch.setattr(mw, "MainWindow", _FakeWindow)
+    win._open_project()
+    assert len(created) == 1
+    assert win._child_windows == []
+
+    created.clear()
+
+    class _FakeWindowOk:
+        def __init__(self, _path: str) -> None:
+            self._startup_aborted = False
+            self.shown = False
+            created.append(self)
+
+        def show(self) -> None:
+            self.shown = True
+
+    monkeypatch.setattr(mw, "MainWindow", _FakeWindowOk)
+    win._open_project()
+    assert len(created) == 1
+    assert created[0].shown is True
+    assert win._child_windows == [created[0]]
+
+
+def test_resolve_pending_tmx_delegates_sync_with_pending_only(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify resolve-pending TMX forwards pending-only interactive sync options."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        win,
+        "_sync_tm_import_folder",
+        lambda **kwargs: calls.append(kwargs),
+    )
+    win._resolve_pending_tmx()
+    assert calls == [
+        {"interactive": True, "pending_only": True, "show_summary": True}
+    ]
+
+
+def test_export_tmx_uses_current_file_locale_and_handles_store_export_exception(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify TM export derives dialog default target from current file and warns on failure."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    index = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(index)
+    monkeypatch.setattr(win, "_ensure_tm_store", lambda: True)
+    monkeypatch.setattr(
+        mw.QFileDialog,
+        "getSaveFileName",
+        staticmethod(lambda *_args, **_kwargs: (str(root / "out.tmx"), "")),
+    )
+    monkeypatch.setattr(mw, "QMessageBox", _MessageBoxStub)
+    _MessageBoxStub._warnings.clear()
+    captured_targets: list[str | None] = []
+
+    class _Dialog:
+        class DialogCode:
+            Accepted = 1
+
+        def __init__(self, _langs, **kwargs):  # type: ignore[no-untyped-def]
+            captured_targets.append(kwargs.get("default_target"))
+
+        def exec(self) -> int:
+            return self.DialogCode.Accepted
+
+        @staticmethod
+        def source_locale() -> str:
+            return "EN"
+
+        @staticmethod
+        def target_locale() -> str:
+            return "BE"
+
+    monkeypatch.setattr(mw, "TmLanguageDialog", _Dialog)
+    win._tm_store = type(
+        "_Store",
+        (),
+        {
+            "export_tmx": staticmethod(
+                lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
+            )
+        },
+    )()
+    win._export_tmx()
+    assert captured_targets == ["BE"]
+    assert ("TMX export failed", "boom") in _MessageBoxStub._warnings
+
+
+def test_show_copyable_report_executes_dialog(qtbot, tmp_path, monkeypatch) -> None:
+    """Verify copyable report builds and executes a dialog without blocking tests."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        mw.QDialog,
+        "exec",
+        lambda _self: calls.append("exec") or 0,
+        raising=False,
+    )
+
+    win._show_copyable_report("TM diagnostics", "line-1\nline-2")
+    assert calls == ["exec"]
