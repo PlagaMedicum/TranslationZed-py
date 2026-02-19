@@ -414,10 +414,9 @@ def test_open_flow_guard_restores_depth_after_nested_and_exception(
         assert win._open_flow_depth == 1
     assert win._open_flow_depth == 0
 
-    with pytest.raises(RuntimeError, match="boom"):
-        with win._open_flow_guard():
-            assert win._open_flow_depth == 1
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError, match="boom"), win._open_flow_guard():
+        assert win._open_flow_depth == 1
+        raise RuntimeError("boom")
     assert win._open_flow_depth == 0
 
 
@@ -1574,6 +1573,228 @@ def test_resolve_conflicts_merge_delegates_merge_execution(
     monkeypatch.setattr(win, "_conflict_workflow_service", _SpyService())
     assert win._resolve_conflicts_merge(target) is False
     assert calls == [1]
+
+
+def test_ensure_conflicts_resolved_covers_no_conflict_and_prompt_paths(
+    qtbot, tmp_path, monkeypatch
+):
+    """Verify ensure-conflicts path bypasses and save-prompt delegation."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    calls: list[tuple[Path, bool]] = []
+
+    def _prompt(path: Path, *, for_save: bool = False) -> bool:
+        calls.append((path, for_save))
+        return False
+
+    monkeypatch.setattr(win, "_prompt_conflicts", _prompt)
+
+    assert win._ensure_conflicts_resolved(target) is True
+    assert calls == []
+
+    win._conflict_files[target] = {"UI_OK": "orig"}
+    assert win._ensure_conflicts_resolved(target) is False
+    assert calls == [(target, True)]
+
+
+def test_reload_file_returns_for_invalid_index_and_sets_skip_flags_when_valid(
+    qtbot, tmp_path, monkeypatch
+):
+    """Verify reload-file guard and valid-index branch side effects."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    missing = root / "BE" / "missing.txt"
+
+    assert win.fs_model.index_for_path(missing).isValid() is False
+    assert win._skip_conflict_check is False
+    assert win._skip_cache_write is False
+    win._reload_file(missing)
+    assert win._skip_conflict_check is False
+    assert win._skip_cache_write is False
+
+    calls: list[bool] = []
+    monkeypatch.setattr(win, "_file_chosen", lambda index: calls.append(index.isValid()))
+    win._reload_file(root / "BE" / "ui.txt")
+    assert win._skip_conflict_check is True
+    assert win._skip_cache_write is True
+    assert calls == [True]
+
+
+def test_resolve_conflicts_drop_paths_cover_immediate_and_skip_resolution(
+    qtbot, tmp_path, monkeypatch
+):
+    """Verify drop-cache/drop-original short-circuit plan branches."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+
+    class _ImmediateService:
+        @staticmethod
+        def build_resolution_run_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(immediate_result=True, run_resolution=False)
+
+    class _SkipService:
+        @staticmethod
+        def build_resolution_run_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(immediate_result=None, run_resolution=False)
+
+    monkeypatch.setattr(win, "_conflict_workflow_service", _ImmediateService())
+    assert win._resolve_conflicts_drop_cache(target) is True
+    assert win._resolve_conflicts_drop_original(target) is True
+
+    monkeypatch.setattr(win, "_conflict_workflow_service", _SkipService())
+    assert win._resolve_conflicts_drop_cache(target) is False
+    assert win._resolve_conflicts_drop_original(target) is False
+
+
+def test_persist_conflict_resolution_returns_false_without_current_file(
+    qtbot, tmp_path
+):
+    """Verify persist conflict resolution exits when no current file exists."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._current_pf = None
+    resolution = ConflictResolution(
+        changed_keys=frozenset(),
+        original_values={},
+        force_original=frozenset(),
+        value_updates={},
+        status_updates={},
+    )
+
+    assert win._persist_conflict_resolution(root / "BE" / "ui.txt", resolution) is False
+
+
+def test_resolve_conflicts_merge_covers_plan_short_circuits_and_unresolved_execution(
+    qtbot, tmp_path, monkeypatch
+):
+    """Verify merge resolution handles immediate, skip, and unresolved paths."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    win._conflict_files[target] = {"UI_OK": "orig"}
+    win._conflict_sources[target] = {"UI_OK": "src"}
+
+    mode = {"step": "immediate"}
+
+    class _StubService:
+        @staticmethod
+        def build_resolution_run_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            if mode["step"] == "immediate":
+                return SimpleNamespace(immediate_result=True, run_resolution=False)
+            if mode["step"] == "skip":
+                return SimpleNamespace(immediate_result=None, run_resolution=False)
+            return SimpleNamespace(immediate_result=None, run_resolution=True)
+
+        @staticmethod
+        def execute_merge_resolution(**_kwargs):  # type: ignore[no-untyped-def]
+            return ConflictMergeExecution(
+                resolved=False,
+                immediate_result=None,
+                resolution=None,
+            )
+
+    monkeypatch.setattr(win, "_conflict_workflow_service", _StubService())
+
+    assert win._resolve_conflicts_merge(target) is True
+    mode["step"] = "skip"
+    assert win._resolve_conflicts_merge(target) is False
+    mode["step"] = "unresolved"
+    assert win._resolve_conflicts_merge(target) is False
+
+
+def test_run_merge_ui_covers_active_and_event_loop_paths(qtbot, tmp_path, monkeypatch):
+    """Verify merge UI returns early when active and executes loop when inactive."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    rows = [
+        SimpleNamespace(
+            key="UI_OK",
+            source_value="source",
+            original_value="orig",
+            cache_value="cache",
+        )
+    ]
+
+    win._merge_active = True
+    assert win._run_merge_ui(target, rows) is None
+
+    win._merge_active = False
+    calls: list[tuple[str, object]] = []
+
+    def _record_build(path: Path, merge_rows) -> None:  # type: ignore[no-untyped-def]
+        calls.append(("build", (path, len(merge_rows))))
+
+    def _record_active(active: bool) -> None:
+        calls.append(("active", active))
+
+    class _Loop:
+        def exec(self) -> None:
+            win._merge_result = {"UI_OK": ("merged", "cache")}
+
+    monkeypatch.setattr(win, "_build_merge_view", _record_build)
+    monkeypatch.setattr(win, "_set_merge_active", _record_active)
+    monkeypatch.setattr(mw, "QEventLoop", _Loop)
+
+    assert win._run_merge_ui(target, rows) == {"UI_OK": ("merged", "cache")}
+    assert calls == [
+        ("build", (target, 1)),
+        ("active", True),
+        ("active", False),
+    ]
+    assert win._merge_loop is None
+
+
+def test_update_merge_apply_enabled_returns_when_rows_or_button_missing(
+    qtbot, tmp_path
+):
+    """Verify merge-apply enable helper handles missing state safely."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._merge_rows = []
+    win._merge_apply_btn = None
+    win._update_merge_apply_enabled()
+
+
+def test_apply_merge_resolutions_skips_quit_when_loop_not_running(qtbot, tmp_path):
+    """Verify apply-merge keeps results when loop is absent or not running."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    rows = [
+        SimpleNamespace(
+            key="UI_OK",
+            source_value="source",
+            original_value="orig",
+            cache_value="cache",
+        )
+    ]
+    win._build_merge_view(root / "BE" / "ui.txt", rows)
+    _key, _orig_item, cache_item, _btn_original, btn_cache = win._merge_rows[0]
+    btn_cache.setChecked(True)
+
+    class _Loop:
+        def isRunning(self) -> bool:
+            return False
+
+        def quit(self) -> None:
+            raise AssertionError("quit() must not be called when loop is not running")
+
+    win._merge_loop = _Loop()  # type: ignore[assignment]
+    win._apply_merge_resolutions()
+    assert win._merge_result == {"UI_OK": (cache_item.text(), "cache")}
 
 
 def test_search_from_anchor_delegates_to_search_replace_service(
