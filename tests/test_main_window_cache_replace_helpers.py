@@ -401,3 +401,217 @@ def test_replace_helper_branches_cover_toggle_align_enable_and_request(
 
     win._search_replace_service = _SuccessService()  # type: ignore[assignment]
     assert win._prepare_replace_request() == "request"
+
+
+def test_tm_query_poll_and_show_matches_cover_timer_failure_and_accept_paths(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify TM query polling and suggestion rendering branches."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    progress_flags: list[bool] = []
+    monkeypatch.setattr(
+        win,
+        "_set_tm_progress_visible",
+        lambda visible: progress_flags.append(bool(visible)),
+    )
+
+    win._tm_query_timer.start(50)
+    win._tm_query_future = None
+    win._tm_rebuild_future = object()  # type: ignore[assignment]
+    win._poll_tm_query()
+    assert win._tm_query_timer.isActive() is False
+    assert progress_flags[-1] is True
+
+    class _PendingFuture:
+        @staticmethod
+        def done() -> bool:
+            return False
+
+    win._tm_query_future = _PendingFuture()  # type: ignore[assignment]
+    win._tm_query_key = "k"
+    win._tm_query_timer.start(50)
+    win._poll_tm_query()
+    assert win._tm_query_timer.isActive() is True
+    assert win._tm_query_future is not None
+
+    class _DoneFuture:
+        def __init__(self, result) -> None:  # type: ignore[no-untyped-def]
+            self._result = result
+
+        @staticmethod
+        def done() -> bool:
+            return True
+
+        def result(self):  # type: ignore[no-untyped-def]
+            return self._result
+
+    win._tm_query_timer.start(50)
+    win._tm_query_future = _DoneFuture([])
+    win._tm_query_key = None
+    win._poll_tm_query()
+    assert win._tm_query_future is None
+    assert win._tm_query_key is None
+
+    class _ErrorFuture:
+        @staticmethod
+        def done() -> bool:
+            return True
+
+        @staticmethod
+        def result():  # type: ignore[no-untyped-def]
+            raise RuntimeError("boom")
+
+    win._tm_query_timer.start(50)
+    win._tm_query_future = _ErrorFuture()  # type: ignore[assignment]
+    win._tm_query_key = "k"
+    win._poll_tm_query()
+    assert win._tm_status_label.text() == "TM lookup failed."
+    assert win._tm_apply_btn.isEnabled() is False
+
+    shown: list[list[str]] = []
+    monkeypatch.setattr(win, "_show_tm_matches", lambda matches: shown.append(matches))
+    monkeypatch.setattr(win, "_current_tm_lookup", lambda: "lookup")
+    monkeypatch.setattr(win, "_tm_query_policy", lambda: "policy")
+
+    class _WorkflowDrop:
+        @staticmethod
+        def accept_query_result(**_kwargs):  # type: ignore[no-untyped-def]
+            return False
+
+    class _WorkflowKeep:
+        @staticmethod
+        def accept_query_result(**_kwargs):  # type: ignore[no-untyped-def]
+            return True
+
+    win._tm_workflow = _WorkflowDrop()  # type: ignore[assignment]
+    win._tm_query_timer.start(50)
+    win._tm_query_future = _DoneFuture(["m1"])
+    win._tm_query_key = "k"
+    win._poll_tm_query()
+    assert shown == []
+
+    win._tm_workflow = _WorkflowKeep()  # type: ignore[assignment]
+    win._tm_query_timer.start(50)
+    win._tm_query_future = _DoneFuture(["m2"])
+    win._tm_query_key = "k"
+    win._poll_tm_query()
+    assert shown == [["m2"]]
+
+    preview_calls: list[object] = []
+    monkeypatch.setattr(win, "_set_tm_preview", lambda plan: preview_calls.append(plan))
+
+    class _EmptyViewWorkflow:
+        @staticmethod
+        def build_suggestions_view(**_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(message="No matches", items=())
+
+        @staticmethod
+        def build_selection_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return "preview-plan"
+
+    monkeypatch.setattr(
+        win,
+        "_show_tm_matches",
+        mw.MainWindow._show_tm_matches.__get__(win),
+    )
+    win._tm_workflow = _EmptyViewWorkflow()  # type: ignore[assignment]
+    win._show_tm_matches([])
+    assert win._tm_status_label.text() == "No matches"
+    assert win._tm_apply_btn.isEnabled() is False
+    assert preview_calls == ["preview-plan"]
+
+
+def test_status_combo_helpers_cover_guards_single_and_macro_paths(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify status combo update/change helpers cover guard, single-row, and macro paths."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    set_calls: list[object] = []
+    monkeypatch.setattr(win, "_set_status_combo", lambda status: set_calls.append(status))
+    monkeypatch.setattr(win, "_selected_rows", lambda: [0])
+    win._current_model = None
+    win._update_status_combo_from_selection()
+    assert set_calls[-1] is None
+
+    class _UpdateModel:
+        @staticmethod
+        def status_for_row(_row: int):  # type: ignore[no-untyped-def]
+            return None
+
+    win._current_model = _UpdateModel()  # type: ignore[assignment]
+    monkeypatch.setattr(win, "_selected_rows", lambda: [])
+    win._update_status_combo_from_selection()
+    assert set_calls[-1] is None
+
+    status_a = win.status_combo.itemData(0)
+    status_b = win.status_combo.itemData(1)
+
+    class _UndoStack:
+        def __init__(self) -> None:
+            self.events: list[str] = []
+
+        def beginMacro(self, _label: str) -> None:  # noqa: N802
+            self.events.append("begin")
+
+        def endMacro(self) -> None:  # noqa: N802
+            self.events.append("end")
+
+    class _Model:
+        def __init__(self) -> None:
+            self.undo_stack = _UndoStack()
+            self.statuses: dict[int, object] = {}
+            self.set_calls: list[tuple[int, int, object]] = []
+
+        @staticmethod
+        def index(row: int, column: int):  # type: ignore[no-untyped-def]
+            return (row, column)
+
+        def setData(self, model_index, status, _role):  # type: ignore[no-untyped-def]
+            row = int(model_index[0])
+            self.statuses[row] = status
+            self.set_calls.append((int(model_index[0]), int(model_index[1]), status))
+
+        def status_for_row(self, row: int):  # type: ignore[no-untyped-def]
+            return self.statuses.get(row)
+
+    model = _Model()
+    win._current_model = model  # type: ignore[assignment]
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [0, 1])
+    win._update_status_combo_from_selection()
+    assert set_calls[-1] is None
+
+    monkeypatch.setattr(win.status_combo, "currentData", lambda: None, raising=False)
+    win._status_combo_changed(0)
+    assert model.set_calls == []
+
+    monkeypatch.setattr(win.status_combo, "currentData", lambda: status_a, raising=False)
+    monkeypatch.setattr(win, "_selected_rows", lambda: [])
+    win._status_combo_changed(0)
+    assert model.set_calls == []
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [2])
+    win._status_combo_changed(0)
+    assert model.set_calls[-1] == (2, 3, status_a)
+
+    model.statuses = {3: status_a, 4: status_a}
+    monkeypatch.setattr(win, "_selected_rows", lambda: [3, 4])
+    win._status_combo_changed(0)
+    assert model.undo_stack.events == []
+
+    model.statuses = {5: status_b, 6: status_a}
+    monkeypatch.setattr(win, "_selected_rows", lambda: [5, 6])
+    win._status_combo_changed(0)
+    assert model.undo_stack.events == ["begin", "end"]
+    assert (5, 3, status_a) in model.set_calls
+    assert (6, 3, status_a) in model.set_calls
