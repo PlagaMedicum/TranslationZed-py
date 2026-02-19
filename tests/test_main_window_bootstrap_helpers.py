@@ -305,6 +305,159 @@ def test_init_locales_returns_empty_when_locale_dialog_is_cancelled(
     assert win._selected_locales == []
 
 
+def test_init_locales_malformed_scan_with_chooser_accept_schedules_followups(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify malformed-locale warning + accepted chooser path schedules follow-up tasks."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._post_locale_timer.stop()
+    win._pending_post_locale_plan = SimpleNamespace(should_schedule=False)
+    delegate = win._project_session_service
+
+    class _WarningBox:
+        """Message-box stub used to capture malformed-language warning rendering."""
+
+        Warning = 1
+        instances: list[_WarningBox] = []
+
+        def __init__(self, *_args, **_kwargs):
+            self.title = ""
+            self.text = ""
+            self.detail = ""
+            self.executed = False
+            _WarningBox.instances.append(self)
+
+        def setIcon(self, _icon):
+            return None
+
+        def setWindowTitle(self, title: str) -> None:
+            self.title = title
+
+        def setText(self, text: str) -> None:
+            self.text = text
+
+        def setDetailedText(self, detail: str) -> None:
+            self.detail = detail
+
+        def exec(self) -> None:
+            self.executed = True
+
+    class _Dialog:
+        class DialogCode:
+            Accepted = 1
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def exec(self) -> int:
+            return self.DialogCode.Accepted
+
+        def selected_codes(self) -> list[str]:
+            return ["BE"]
+
+    class _Service:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        @staticmethod
+        def resolve_requested_locales(**_kwargs):  # type: ignore[no-untyped-def]
+            return None
+
+        @staticmethod
+        def build_locale_selection_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(selected_locales=["BE"])
+
+    call_log: list[str] = []
+    monkeypatch.setattr(mw, "QMessageBox", _WarningBox)
+    monkeypatch.setattr(mw, "LocaleChooserDialog", _Dialog)
+    monkeypatch.setattr(win, "_project_session_service", _Service())
+    monkeypatch.setattr(win, "_schedule_cache_migration", lambda: call_log.append("migrate"))
+    monkeypatch.setattr(win, "_warn_orphan_caches", lambda: call_log.append("warn"))
+    monkeypatch.setattr(
+        win,
+        "_schedule_post_locale_tasks",
+        lambda: call_log.append("post"),
+    )
+    monkeypatch.setattr(mw.QTimer, "singleShot", lambda _ms, callback: callback())
+    monkeypatch.setattr(
+        mw,
+        "scan_root_with_errors",
+        lambda _root: (  # type: ignore[no-untyped-def]
+            {"EN": "English", "BE": "Belarusian"},
+            ["BE/language.txt: trailing comma"],
+        ),
+    )
+
+    win._init_locales(selected_locales=None)
+
+    assert win._selected_locales == ["BE"]
+    assert call_log == ["migrate", "warn", "post"]
+    assert _WarningBox.instances
+    warning = _WarningBox.instances[-1]
+    assert warning.executed is True
+    assert warning.title == "Malformed language.txt"
+    assert warning.detail == "BE/language.txt: trailing comma"
+
+
+def test_init_locales_rejected_plan_clears_selection_without_post_tasks(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify locale-plan rejection clears selection and skips orphan/post scheduling."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._post_locale_timer.stop()
+    win._pending_post_locale_plan = SimpleNamespace(should_schedule=False)
+    delegate = win._project_session_service
+
+    class _Service:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        @staticmethod
+        def resolve_requested_locales(**_kwargs):  # type: ignore[no-untyped-def]
+            return ["BE"]
+
+        @staticmethod
+        def build_locale_selection_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return None
+
+    calls: list[str] = []
+    scheduled: list[int] = []
+    monkeypatch.setattr(
+        mw,
+        "scan_root_with_errors",
+        lambda _root: ({"EN": "English", "BE": "Belarusian"}, []),  # type: ignore[no-untyped-def]
+    )
+    monkeypatch.setattr(win, "_project_session_service", _Service())
+    monkeypatch.setattr(win, "_schedule_cache_migration", lambda: calls.append("migrate"))
+    monkeypatch.setattr(
+        win,
+        "_schedule_post_locale_tasks",
+        lambda: calls.append("post"),
+    )
+    monkeypatch.setattr(
+        mw.QTimer,
+        "singleShot",
+        lambda ms, _callback: scheduled.append(int(ms)),
+    )
+
+    win._selected_locales = ["BE"]
+    win._tm_bootstrap_pending = False
+    win._init_locales(selected_locales=["BE"])
+
+    assert win._selected_locales == []
+    assert win._tm_bootstrap_pending is False
+    assert calls == ["migrate"]
+    assert scheduled == []
+
+
 def test_main_window_startup_aborts_when_en_hash_guard_rejects(
     qtbot,
     tmp_path,
@@ -409,3 +562,124 @@ def test_warn_orphan_caches_purge_deletes_existing_and_ignores_unlink_errors(
 
     assert orphan_keep.exists() is False
     assert "BE" in win._orphan_cache_warned_locales
+
+
+def test_warn_orphan_caches_tracks_warned_locales_and_respects_dismiss(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify orphan warning supports purge/dismiss paths and avoids duplicate warnings."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._post_locale_timer.stop()
+    win._pending_post_locale_plan = SimpleNamespace(should_schedule=False)
+    delegate = win._project_session_service
+
+    orphan_purge = root / ".tzp" / "cache" / "BE" / "purge.bin"
+    orphan_keep = root / ".tzp" / "cache" / "RU" / "keep.bin"
+    orphan_purge.parent.mkdir(parents=True, exist_ok=True)
+    orphan_keep.parent.mkdir(parents=True, exist_ok=True)
+    orphan_purge.write_bytes(b"purge")
+    orphan_keep.write_bytes(b"keep")
+
+    collect_calls: list[tuple[str, ...]] = []
+
+    class _Service:
+        def __getattr__(self, name: str):
+            return getattr(delegate, name)
+
+        @staticmethod
+        def collect_orphan_cache_paths(  # type: ignore[no-untyped-def]
+            *,
+            root,
+            selected_locales,
+            warned_locales,
+        ):
+            _ = root
+            _ = selected_locales
+            collect_calls.append(tuple(sorted(str(loc) for loc in warned_locales)))
+            if warned_locales:
+                return {}
+            return {"BE": [orphan_purge], "RU": [orphan_keep]}
+
+        @staticmethod
+        def build_orphan_cache_warning(  # type: ignore[no-untyped-def]
+            *,
+            locale,
+            orphan_paths,
+            root,
+            preview_limit=20,
+        ):
+            _ = root
+            _ = preview_limit
+            return SimpleNamespace(
+                window_title=f"Orphan cache files ({locale})",
+                text=f"Locale {locale} has orphan cache files.",
+                informative_text="Use Purge to delete stale cache entries.",
+                detailed_text=f"{locale} details",
+                orphan_paths=list(orphan_paths),
+            )
+
+    class _DecisionMessageBox:
+        Warning = 1
+        AcceptRole = 2
+        RejectRole = 3
+        instances: list[_DecisionMessageBox] = []
+
+        def __init__(self, *_args, **_kwargs):
+            self._title = ""
+            self._text = ""
+            self._info = ""
+            self._detail = ""
+            self._purge = None
+            self._dismiss = None
+            _DecisionMessageBox.instances.append(self)
+
+        def setIcon(self, _icon):
+            return None
+
+        def setWindowTitle(self, title: str):
+            self._title = title
+
+        def setText(self, text: str):
+            self._text = text
+
+        def setInformativeText(self, text: str):
+            self._info = text
+
+        def setDetailedText(self, text: str):
+            self._detail = text
+
+        def addButton(self, label, _role):  # type: ignore[no-untyped-def]
+            button = object()
+            if str(label) == "Purge":
+                self._purge = button
+            elif str(label) == "Dismiss":
+                self._dismiss = button
+            return button
+
+        def exec(self):
+            return None
+
+        def clickedButton(self):
+            if "BE" in self._title:
+                return self._purge
+            return self._dismiss
+
+    monkeypatch.setattr(win, "_project_session_service", _Service())
+    monkeypatch.setattr(mw, "QMessageBox", _DecisionMessageBox)
+
+    win._warn_orphan_caches()
+    win._warn_orphan_caches()
+
+    assert orphan_purge.exists() is False
+    assert orphan_keep.exists() is True
+    assert win._orphan_cache_warned_locales == {"BE", "RU"}
+    assert collect_calls == [(), ("BE", "RU")]
+    assert len(_DecisionMessageBox.instances) == 2
+    assert _DecisionMessageBox.instances[0]._title == "Orphan cache files (BE)"
+    assert _DecisionMessageBox.instances[0]._text == "Locale BE has orphan cache files."
+    assert _DecisionMessageBox.instances[0]._info.startswith("Use Purge")
+    assert _DecisionMessageBox.instances[0]._detail == "BE details"
