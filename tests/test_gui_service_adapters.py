@@ -2040,3 +2040,243 @@ def test_search_next_prev_and_prompt_toggle_cover_timer_and_persist_paths(
     win._toggle_prompt_on_exit(True)
     assert win._prompt_write_on_exit is True
     assert persisted == [True]
+
+
+def test_left_panel_changed_routes_tm_search_and_qa_branches(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify left-panel toggle routes TM/Search/QA behavior through helper branches."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    tm_calls: list[object] = []
+    monkeypatch.setattr(win, "_ensure_tm_store", lambda: True)
+    monkeypatch.setattr(
+        win,
+        "_sync_tm_import_folder",
+        lambda *, interactive, show_summary: tm_calls.append(
+            ("sync", bool(interactive), bool(show_summary))
+        ),
+    )
+    monkeypatch.setattr(
+        win, "_maybe_bootstrap_tm", lambda: tm_calls.append("bootstrap")
+    )
+    monkeypatch.setattr(win, "_schedule_tm_update", lambda: tm_calls.append("update"))
+    win._tm_bootstrap_pending = True
+    win._on_left_panel_changed(win._left_tm_btn)
+    assert win._left_stack.currentIndex() == mw._LEFT_PANEL_TM
+    assert tm_calls == [("sync", True, False), "bootstrap", "update"]
+    assert win._tm_bootstrap_pending is False
+
+    search_calls: list[str] = []
+    monkeypatch.setattr(
+        win,
+        "_refresh_search_panel_results",
+        lambda: search_calls.append("refresh"),
+    )
+    win._on_left_panel_changed(win._left_search_btn)
+    assert win._left_stack.currentIndex() == mw._LEFT_PANEL_SEARCH
+    assert search_calls == ["refresh"]
+
+    qa_messages: list[str] = []
+    qa_refresh_calls: list[str] = []
+    monkeypatch.setattr(win, "_set_qa_panel_message", qa_messages.append)
+    monkeypatch.setattr(
+        win, "_refresh_qa_panel_results", lambda: qa_refresh_calls.append("refresh")
+    )
+    win._qa_findings = ()
+    win._qa_auto_refresh = False
+    win._on_left_panel_changed(win._left_qa_btn)
+    assert win._left_stack.currentIndex() == mw._LEFT_PANEL_QA
+    assert qa_messages == ["QA is manual. Click Run QA for this file."]
+    assert qa_refresh_calls == []
+
+    win._qa_findings = (SimpleNamespace(file=root / "BE" / "ui.txt", row=0),)
+    win._on_left_panel_changed(win._left_qa_btn)
+    assert qa_refresh_calls == ["refresh"]
+
+
+def test_scroll_handlers_cover_wrap_disabled_and_idle_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify scroll hooks handle wrap-off guard and idle follow-up work."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[str] = []
+    monkeypatch.setattr(win, "_prefetch_visible_rows", lambda: calls.append("prefetch"))
+    monkeypatch.setattr(win, "_schedule_row_resize", lambda: calls.append("resize"))
+
+    win._wrap_text = False
+    win._scrolling = False
+    win._prefetch_pending = False
+    win._on_table_scrolled()
+    assert win._prefetch_pending is True
+    assert win._scrolling is False
+    assert win._scroll_idle_timer.isActive() is False
+
+    win._wrap_text = True
+    win._prefetch_pending = False
+    win._on_table_scrolled()
+    assert win._scrolling is True
+    assert win._scroll_idle_timer.isActive() is True
+
+    win._prefetch_pending = True
+    win._on_scroll_idle()
+    assert win._scrolling is False
+    assert win._prefetch_pending is False
+    assert calls == ["prefetch", "resize"]
+
+    calls.clear()
+    win._prefetch_pending = False
+    win._on_scroll_idle()
+    assert calls == ["resize"]
+
+
+def test_on_header_resized_covers_key_status_and_unknown_column_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify header resize updates persisted key/status widths and ignores unknown columns."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+
+    calls: list[str] = []
+    monkeypatch.setattr(win, "_apply_table_layout", lambda: calls.append("layout"))
+    monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: calls.append("reflow"))
+
+    win._on_header_resized(0, win._key_column_width, 40)
+    assert win._key_column_width == 60
+    assert win._prefs_extras["TABLE_KEY_WIDTH"] == "60"
+    assert calls == ["layout", "reflow"]
+
+    calls.clear()
+    win._on_header_resized(3, win._status_column_width, 77)
+    assert win._status_column_width == 77
+    assert win._prefs_extras["TABLE_STATUS_WIDTH"] == "77"
+    assert calls == ["layout", "reflow"]
+
+    calls.clear()
+    ratio_before = win._source_translation_ratio
+    win._on_header_resized(9, 0, 120)
+    assert calls == []
+    assert win._source_translation_ratio == ratio_before
+
+
+def test_tooltip_event_filter_covers_move_leave_and_tooltip_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify tooltip event-filter handles move, leave, and tooltip suppression branches."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    win.show()
+    qtbot.wait(1)
+    viewport = win.table.viewport()
+
+    class _MoveEvent:
+        def __init__(self, pos, global_pos) -> None:
+            self._pos = pos
+            self._global_pos = global_pos
+
+        def type(self):
+            return mw.QEvent.Type.MouseMove
+
+        def pos(self):
+            return self._pos
+
+        def globalPos(self):
+            return self._global_pos
+
+    class _TypeEvent:
+        def __init__(self, event_type) -> None:
+            self._event_type = event_type
+
+        def type(self):
+            return self._event_type
+
+    hidden_calls: list[str] = []
+    monkeypatch.setattr(mw.QToolTip, "hideText", lambda: hidden_calls.append("hide"))
+
+    invalid_move = _MoveEvent(
+        mw.QPoint(-100, -100),
+        viewport.mapToGlobal(mw.QPoint(0, 0)),
+    )
+    assert win.eventFilter(viewport, invalid_move) is False
+    assert not win._tooltip_index.isValid()
+    assert hidden_calls == ["hide"]
+
+    pos = mw.QPoint(
+        win.table.columnViewportPosition(0) + 8,
+        win.table.rowViewportPosition(0) + 8,
+    )
+    idx = win.table.indexAt(pos)
+    assert idx.isValid()
+    move = _MoveEvent(pos, viewport.mapToGlobal(pos))
+    assert win.eventFilter(viewport, move) is False
+    assert win._tooltip_index == idx
+    assert win._tooltip_timer.isActive() is True
+
+    updated_global = viewport.mapToGlobal(pos + mw.QPoint(2, 2))
+    move_same = _MoveEvent(pos, updated_global)
+    assert win.eventFilter(viewport, move_same) is False
+    assert win._tooltip_pos == updated_global
+
+    leave = _TypeEvent(mw.QEvent.Type.Leave)
+    assert win.eventFilter(viewport, leave) is False
+    assert not win._tooltip_index.isValid()
+    assert win._tooltip_timer.isActive() is False
+
+    tooltip_event = _TypeEvent(mw.QEvent.Type.ToolTip)
+    assert win.eventFilter(viewport, tooltip_event) is True
+
+
+def test_show_delayed_tooltip_covers_guard_and_show_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify delayed tooltip helper skips invalid states and shows tooltip on valid hover."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    win.show()
+    qtbot.wait(1)
+    viewport = win.table.viewport()
+
+    pos = mw.QPoint(
+        win.table.columnViewportPosition(2) + 8,
+        win.table.rowViewportPosition(0) + 8,
+    )
+    idx = win.table.indexAt(pos)
+    assert idx.isValid()
+
+    shown: list[tuple[object, ...]] = []
+    monkeypatch.setattr(mw.QToolTip, "showText", lambda *args: shown.append(args))
+
+    win._tooltip_index = mw.QModelIndex()
+    win._show_delayed_tooltip()
+    assert shown == []
+
+    win._tooltip_index = idx
+    monkeypatch.setattr(
+        mw.QCursor,
+        "pos",
+        staticmethod(lambda: viewport.mapToGlobal(mw.QPoint(-10, -10))),
+    )
+    win._show_delayed_tooltip()
+    assert shown == []
+
+    win._tooltip_pos = viewport.mapToGlobal(pos)
+    monkeypatch.setattr(mw.QCursor, "pos", staticmethod(lambda: win._tooltip_pos))
+    win._show_delayed_tooltip()
+    assert len(shown) == 1
