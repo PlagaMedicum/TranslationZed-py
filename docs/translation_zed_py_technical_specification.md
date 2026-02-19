@@ -852,7 +852,12 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
   - CI/release strict gate: `make verify-ci` (non-mutating, fail-on-drift),
   - CI matrix may set `VERIFY_SKIP_BENCH=1` in `verify-ci` when benchmark compare is
     enforced by a dedicated strict benchmark job to avoid duplicate benchmark execution,
-  - heavy tier gate: `make verify-heavy` (`verify-ci` + advisory mutation run).
+  - heavy tier gate: `make verify-heavy` (`verify-ci` + advisory mutation run),
+  - mutation artifacts include machine-readable gate summary
+    (`artifacts/mutation/summary.json`) and human log (`summary.txt`);
+    optional staged ratchet is available through
+    `MUTATION_SCORE_MODE={warn|fail|off}` and
+    `MUTATION_MIN_KILLED_PERCENT=<threshold>` (default policy remains advisory).
 
 ---
 

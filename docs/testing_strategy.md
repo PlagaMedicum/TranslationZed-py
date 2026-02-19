@@ -156,6 +156,10 @@ _Last updated: 2026-02-19_
   `conflict_service`, `search_replace_service`.
 - Current mutation mode is **advisory** (`make test-mutation`): reports are
   published without blocking until baseline quality is stabilized.
+- Mutation summary artifacts now include `artifacts/mutation/summary.json` and
+  `artifacts/mutation/summary.txt`; optional staged ratcheting is supported via
+  `MUTATION_SCORE_MODE={warn|fail|off}` and
+  `MUTATION_MIN_KILLED_PERCENT=<threshold>` (default remains advisory `warn` with disabled threshold).
 - Tiered heavy lane entrypoint is `make verify-heavy`
   (`verify-ci` + heavy TM stress-profile perf gate + advisory mutation).
 
@@ -369,7 +373,8 @@ They include:
 - No critical integration gaps are currently tracked in strict automated lanes.
 
 **System / functional / regression / smoke gaps**
-- Mutation testing is advisory-only; no fail-under threshold is enforced yet.
+- Mutation testing is advisory in default lanes; fail-under controls exist but are
+  not yet enforced in strict CI by default.
 
 **Planned test expansions:**
 - Golden save fixtures derived from real PZ files (small slices) that include

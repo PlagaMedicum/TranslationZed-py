@@ -818,21 +818,26 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] GUI suite runtime was reduced by fixture-level startup optimizations
        (theme sync/paint heavy-path stubs in targeted test modules), dropping
        `tests/test_gui_service_adapters.py` from ~4m13s to ~14s on reference dev run.
-    - [✓] CI benchmark duplication was removed in matrix verify lane:
-      `verify-ci` now supports `VERIFY_SKIP_BENCH=1` so matrix jobs skip bench
-      when dedicated `benchmark-regression` gate runs strict compare once.
-    - [✓] Added direct GUI coverage for malformed-locale bootstrap warnings and
-      full orphan-cache purge/dismiss interaction paths (including warned-locale dedupe).
-    - [✓] Added conflict-lifecycle integration coverage for save-time merge
-      resolution with persisted-file output and post-save cache-clear assertions.
-    - [✓] Added non-critical UI-state persistence integration coverage:
-      tree width, table column layout extras, and search-case toggle survive restart.
-    - [✓] Added `core.atomic_io` fault-injection coverage for fsync failures and
-      replace-failure temp-file cleanup guarantees.
-    - [✓] Added heavy-lane TM stress-profile perf gate:
-      `make test-perf-heavy`, wired into `make verify-heavy`.
-    - [→] Ongoing verification-overhaul focus remains on remaining robustness gaps
-      (mutation-threshold ratcheting and release policy hardening).
+     - [✓] CI benchmark duplication was removed in matrix verify lane:
+       `verify-ci` now supports `VERIFY_SKIP_BENCH=1` so matrix jobs skip bench
+       when dedicated `benchmark-regression` gate runs strict compare once.
+     - [✓] Added direct GUI coverage for malformed-locale bootstrap warnings and
+       full orphan-cache purge/dismiss interaction paths (including warned-locale dedupe).
+     - [✓] Added conflict-lifecycle integration coverage for save-time merge
+       resolution with persisted-file output and post-save cache-clear assertions.
+     - [✓] Added non-critical UI-state persistence integration coverage:
+       tree width, table column layout extras, and search-case toggle survive restart.
+     - [✓] Added `core.atomic_io` fault-injection coverage for fsync failures and
+       replace-failure temp-file cleanup guarantees.
+     - [✓] Added heavy-lane TM stress-profile perf gate:
+       `make test-perf-heavy`, wired into `make verify-heavy`.
+     - [✓] Hardened release dry-run workflow-dispatch path to checkout
+       `refs/tags/<rc-tag>` in both preflight/build jobs (tag-pinned execution).
+     - [✓] Added optional mutation score-ratchet infrastructure:
+       mutation summary artifacts + `MUTATION_SCORE_MODE` /
+       `MUTATION_MIN_KILLED_PERCENT` gating controls (default remains advisory).
+     - [→] Ongoing verification-overhaul focus remains on policy activation decisions
+       (when to switch mutation thresholds from advisory to strict CI enforcement).
 
 ## Decision Backlog (Awaiting Product Input)
 
@@ -844,7 +849,8 @@ without blocking on them.
 2. Should fast GUI fixtures keep stubbing theme sync/application permanently, or should
    we add a small dedicated non-stub theme integration suite in strict CI lanes?
 3. Should mutation testing remain advisory for v0.8.0, or move to a staged fail-under
-   threshold (for example report-only -> soft fail -> hard fail)?
+   threshold (for example report-only -> soft fail -> hard fail) now that
+   optional gate controls are implemented (`MUTATION_SCORE_MODE` / `MUTATION_MIN_KILLED_PERCENT`)?
 4. Should benchmark strict gating remain Linux-only (current policy) or be expanded to
    multi-OS strict gates after baseline variance data is collected?
 
