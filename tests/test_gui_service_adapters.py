@@ -2562,6 +2562,14 @@ def test_qa_panel_helpers_cover_empty_plan_navigation_and_focus_paths(
 
     class _QAService:
         @staticmethod
+        def build_panel_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(items=(), status_message="No QA findings.")
+
+        @staticmethod
+        def auto_mark_rows(_findings):  # type: ignore[no-untyped-def]
+            return ()
+
+        @staticmethod
         def build_navigation_plan(**_kwargs):  # type: ignore[no-untyped-def]
             return plan_box["value"]
 
