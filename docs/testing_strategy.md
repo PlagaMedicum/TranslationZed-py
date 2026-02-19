@@ -241,6 +241,8 @@ They include:
   locale-switch apply-intent flags), plus post-locale startup task plan flags
   and post-locale startup task execution order, plus tree-rebuild render-intent
   plan flags, plus locale-reset intent flags and locale-reset callback execution.
+- Atomic I/O: fsync-failure tolerance and replace-failure temporary-file cleanup
+  (`core.atomic_io` unit tests).
 - Core search: plain + regex paths.
 - GUI smoke: open, table fill, search navigation, edit/save, undo/redo.
 - GUI save prompts: cache‑only vs write‑to‑original, all-draft listing, and per-file deselection.
@@ -360,8 +362,6 @@ They include:
 **Not covered yet (automation gaps, by layer):**
 
 **Unit (core) gaps**
-- `atomic_io`: explicit fsync-failure simulation and temp-cleanup guarantees still need
-  deterministic fault-injection tests.
 - TM retrieval under larger imported corpora than committed fixtures should gain
   extended stress-profile gates (tiered heavy lane).
 

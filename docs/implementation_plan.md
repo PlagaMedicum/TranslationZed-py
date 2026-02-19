@@ -825,8 +825,10 @@ A9 [✓] **Verification-overhaul milestone**
       resolution with persisted-file output and post-save cache-clear assertions.
     - [✓] Added non-critical UI-state persistence integration coverage:
       tree width, table column layout extras, and search-case toggle survive restart.
+    - [✓] Added `core.atomic_io` fault-injection coverage for fsync failures and
+      replace-failure temp-file cleanup guarantees.
     - [→] Ongoing phase-two focus remains on high-value GUI branch expansion
-      for remaining robustness gaps (heavy-corpus stress profiles and fault-injection cases).
+      for remaining robustness gaps (heavy-corpus stress profiles and mutation-threshold ratcheting).
 
 ## Decision Backlog (Awaiting Product Input)
 
