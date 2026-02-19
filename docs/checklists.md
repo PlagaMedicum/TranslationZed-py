@@ -37,9 +37,9 @@ avoid missing mandatory tasks.
   to validate matrix packaging/smoke artifacts without publishing a release
   - Alternative: push `vX.Y.Z-rcN` tag and the same dry-run workflow starts automatically
   - Final `Release` workflow ignores RC tags (`v*-rc*`) at trigger level to avoid accidental release publishing
-- **Run** `make test-encoding-integrity`
-- **Run** `make diagnose-encoding ARGS=\"<project-root>\"` for the release corpus
-- **Run** `make test-readonly-clean` to confirm read-only workflows do not mutate tracked files
+- **Run** `make test-readonly-clean` to confirm diagnostics workflow does not mutate tracked files
+- **Optional targeted rerun** (when investigating encoding regressions):
+  `make test-encoding-integrity` and `make diagnose-encoding ARGS=\"<project-root>\"`
 - **Run** `make bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20`
   to enforce benchmark regression threshold against committed baseline
 - **Confirm** `make pack` completes on your platform

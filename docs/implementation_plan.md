@@ -411,10 +411,11 @@ A‑P0 [✓] **Encoding integrity conflicts + no-write-on-open guarantee** (**hi
      - [✓] Add regression test for locale switch + auto-open path to ensure no implicit writes.
      - [✓] Add diagnostics command/log output that reports detected encoding mismatches/conflicts (read-only report):
        `make diagnose-encoding` (fixture default, optional explicit root).
-     - [✓] Add CI gate for encoding-integrity suite before release tag pipeline:
-       explicit `make test-encoding-integrity` + `make diagnose-encoding` steps in CI/release workflows.
+     - [✓] Add CI/release encoding-integrity gating:
+       strict `make verify-ci` includes full coverage tests plus repo-clean read-only diagnostics guard.
+       Focused `make test-encoding-integrity` + `make diagnose-encoding` remain available for targeted reruns.
      - [✓] Add repo-clean read-only guard target:
-       `make test-readonly-clean` snapshots tracked `git status`, runs read-only workflows,
+       `make test-readonly-clean` snapshots tracked `git status`, runs diagnostics workflow in read-only mode,
        and fails if tracked state changes.
    - **Acceptance**:
      - [✓] Zero file-byte deltas after open/switch/close without edits on all supported encodings.

@@ -825,6 +825,8 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
   - coverage gates via `make test-cov`:
     - whole package: **>=90%**,
     - `translationzed_py/core`: **>=95%**.
+  - default verify umbrellas execute the pytest suite once via `make test-cov`;
+    focused encoding suites are opt-in targeted commands.
   - warning safety: pytest-based test gates run with
     `-W error::ResourceWarning` by default (single-pass strictness, no duplicate rerun).
 - **Performance**:
