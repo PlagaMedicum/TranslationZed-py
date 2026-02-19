@@ -807,12 +807,12 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] Canonical docs updated to match implemented tooling behavior.
    - **Current verification snapshot (2026-02-19)**:
      - [✓] Whole-package strict gate is met:
-       `make test-cov` reports **93.0%**.
+       `make test-cov` reports **93.2%**.
      - [✓] Core coverage gate remains met in strict run:
        `pytest -q tests --cov=translationzed_py.core --cov-report=term-missing:skip-covered`
        reports **95.7%**.
      - [✓] `translationzed_py/gui/main_window.py` branch-coverage push is trending up:
-       strict run reports **86.2%**.
+       strict run reports **86.6%**.
      - [→] Ongoing phase-two focus stays on GUI automation expansion to keep
        reducing residual `main_window` branch gaps beyond the minimum gate.
 
