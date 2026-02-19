@@ -8,6 +8,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from translationzed_py.core.preferences import load as load_preferences
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
 
@@ -228,3 +229,47 @@ def test_apply_tm_preferences_actions_handles_empty_store_guard_sync_and_failure
     assert _MsgBox._instances[0].title == "TM preferences"
     assert _MsgBox._instances[0].text == "Some TM file operations failed."
     assert _MsgBox._instances[0].details == "boom"
+
+
+def test_noncritical_ui_layout_and_toggle_state_persist_across_restart(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify tree/column layout extras and search-case toggle survive restart."""
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    index = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(index)
+
+    win._tree_last_width = 236
+    win._key_column_width = 164
+    win._status_column_width = 78
+    win._source_translation_ratio = 0.37
+    win._search_case_sensitive = True
+    win._prefs_extras["TREE_PANEL_WIDTH"] = "236"
+    win._prefs_extras["TABLE_KEY_WIDTH"] = "164"
+    win._prefs_extras["TABLE_STATUS_WIDTH"] = "78"
+    win._prefs_extras["TABLE_SRC_RATIO"] = "0.370000"
+    win._prefs_extras["SEARCH_CASE_SENSITIVE"] = "1"
+    win._persist_preferences()
+
+    raw = load_preferences(None)
+    extras = dict(raw.get("__extras__", {}))
+    assert extras["TREE_PANEL_WIDTH"] == "236"
+    assert extras["TABLE_KEY_WIDTH"] == "164"
+    assert extras["TABLE_STATUS_WIDTH"] == "78"
+    assert extras["TABLE_SRC_RATIO"] == "0.370000"
+    assert extras["SEARCH_CASE_SENSITIVE"] == "1"
+
+    win_reopen = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win_reopen)
+    assert win_reopen._tree_last_width == 236
+    assert win_reopen._key_column_width == 164
+    assert win_reopen._status_column_width == 78
+    assert win_reopen._search_case_sensitive is True
+    assert abs(win_reopen._source_translation_ratio - 0.37) < 0.000001
