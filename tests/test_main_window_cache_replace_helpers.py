@@ -939,3 +939,106 @@ def test_show_resize_and_set_status_combo_helpers_cover_remaining_ui_branches(
 
     win._set_status_combo(object())  # type: ignore[arg-type]
     assert win.status_combo.currentIndex() == -1
+
+
+def test_show_tm_matches_and_show_resize_guard_paths(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify TM/show/resize helpers cover fallback and non-visible guard branches."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    preview_calls: list[object] = []
+    monkeypatch.setattr(win, "_set_tm_preview", lambda plan: preview_calls.append(plan))
+
+    class _Workflow:
+        @staticmethod
+        def build_suggestions_view(**_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(
+                message="Has candidate",
+                items=[
+                    SimpleNamespace(label="item", match="m", tooltip_html="<b>x</b>"),
+                ],
+            )
+
+        @staticmethod
+        def build_selection_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return "fallback-preview"
+
+    monkeypatch.setattr(win._tm_list, "addItem", lambda _item: None, raising=False)
+    monkeypatch.setattr(win, "_tm_query_policy", lambda: object())
+    win._tm_workflow = _Workflow()  # type: ignore[assignment]
+    win._show_tm_matches([])
+    assert win._tm_status_label.text() == "Has candidate"
+    assert win._tm_apply_btn.isEnabled() is False
+    assert preview_calls == ["fallback-preview"]
+
+    toggle_calls: list[bool] = []
+    monkeypatch.setattr(
+        win,
+        "_toggle_detail_panel",
+        lambda checked: toggle_calls.append(bool(checked)),
+    )
+    monkeypatch.setattr(win._detail_panel, "isVisible", lambda: False, raising=False)
+    win.showEvent(QShowEvent())
+    assert toggle_calls == []
+
+    layout_calls: list[str] = []
+    reflow_calls: list[str] = []
+    align_calls: list[str] = []
+    monkeypatch.setattr(win, "_apply_table_layout", lambda: layout_calls.append("layout"))
+    monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: reflow_calls.append("reflow"))
+    monkeypatch.setattr(win, "_align_replace_bar", lambda: align_calls.append("align"))
+    monkeypatch.setattr(win.table, "model", lambda: None, raising=False)
+    monkeypatch.setattr(win.replace_toolbar, "isVisible", lambda: False, raising=False)
+    win.resizeEvent(QResizeEvent(QSize(900, 700), QSize(800, 600)))
+    assert layout_calls == []
+    assert reflow_calls == ["reflow"]
+    assert align_calls == []
+
+
+def test_update_status_combo_from_selection_handles_single_and_mixed_statuses(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify status-combo update helper sets single status or clears on mixed selection."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    status_calls: list[object] = []
+    monkeypatch.setattr(win, "_set_status_combo", lambda status: status_calls.append(status))
+
+    status_a = win.status_combo.itemData(0)
+    status_b = win.status_combo.itemData(1)
+
+    class _Model:
+        statuses = {
+            1: status_a,
+            2: status_a,
+            3: status_b,
+            4: None,
+        }
+
+        @classmethod
+        def status_for_row(cls, row: int):  # type: ignore[no-untyped-def]
+            return cls.statuses.get(row)
+
+    win._current_model = _Model()  # type: ignore[assignment]
+    monkeypatch.setattr(win, "_selected_rows", lambda: [1, 2])
+    win._update_status_combo_from_selection()
+    assert status_calls[-1] == status_a
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [3, 4])
+    win._update_status_combo_from_selection()
+    assert status_calls[-1] == status_b
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [1, 3])
+    win._update_status_combo_from_selection()
+    assert status_calls[-1] is None
+
+    win._current_model = None
