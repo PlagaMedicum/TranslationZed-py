@@ -269,3 +269,143 @@ def test_init_locales_covers_malformed_warning_and_empty_selectable_branch(
     win._selected_locales = ["BE"]
     win._init_locales(selected_locales=None)
     assert win._selected_locales == []
+
+
+def test_init_locales_returns_empty_when_locale_dialog_is_cancelled(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify locale init returns no selection when chooser dialog is cancelled."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    class _Dialog:
+        class DialogCode:
+            Accepted = 1
+
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def exec(self) -> int:
+            return 0
+
+        def selected_codes(self) -> list[str]:
+            return ["BE"]
+
+    monkeypatch.setattr(mw, "LocaleChooserDialog", _Dialog)
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "resolve_requested_locales",
+        lambda _self, **_kwargs: None,
+    )
+    win._selected_locales = ["BE"]
+    win._init_locales(selected_locales=None)
+    assert win._selected_locales == []
+
+
+def test_main_window_startup_aborts_when_en_hash_guard_rejects(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify startup aborts when EN hash guard blocks initialization."""
+    root = _make_project(tmp_path)
+    monkeypatch.setattr(mw.MainWindow, "_check_en_hash_cache", lambda _self: False)
+
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    assert win._startup_aborted is True
+
+
+def test_warn_orphan_caches_purge_deletes_existing_and_ignores_unlink_errors(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify orphan-cache purge unlinks existing files and ignores unlink failures."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    orphan_keep = root / ".tzp" / "cache" / "BE" / "orphan_keep.bin"
+    orphan_keep.parent.mkdir(parents=True, exist_ok=True)
+    orphan_keep.write_bytes(b"cache")
+    orphan_missing = root / ".tzp" / "cache" / "BE" / "orphan_missing.bin"
+    win._post_locale_timer.stop()
+    win._pending_post_locale_plan = SimpleNamespace(should_schedule=False)
+
+    class _Service:
+        @staticmethod
+        def collect_orphan_cache_paths(  # type: ignore[no-untyped-def]
+            *,
+            root,
+            selected_locales,
+            warned_locales,
+        ):
+            _ = root
+            _ = selected_locales
+            _ = warned_locales
+            return {"BE": [orphan_keep, orphan_missing]}
+
+        @staticmethod
+        def build_orphan_cache_warning(  # type: ignore[no-untyped-def]
+            *,
+            locale,
+            orphan_paths,
+            root,
+            preview_limit=20,
+        ):
+            _ = locale
+            _ = root
+            _ = preview_limit
+            return SimpleNamespace(
+                window_title="Orphan cache files",
+                text="Locale BE has cache files without source files.",
+                informative_text="Purge recommended.",
+                detailed_text="orphan entries",
+                orphan_paths=list(orphan_paths),
+            )
+
+    class _PurgeMessageBox:
+        Warning = 1
+        AcceptRole = 2
+        RejectRole = 3
+
+        def __init__(self, *_args, **_kwargs):
+            self._clicked = None
+
+        def setIcon(self, _icon):
+            return None
+
+        def setWindowTitle(self, _title):
+            return None
+
+        def setText(self, _text):
+            return None
+
+        def setInformativeText(self, _text):
+            return None
+
+        def setDetailedText(self, _text):
+            return None
+
+        def addButton(self, label, _role):  # type: ignore[no-untyped-def]
+            button = object()
+            if str(label) == "Purge":
+                self._clicked = button
+            return button
+
+        def exec(self):
+            return None
+
+        def clickedButton(self):
+            return self._clicked
+
+    monkeypatch.setattr(win, "_project_session_service", _Service())
+    monkeypatch.setattr(mw, "QMessageBox", _PurgeMessageBox)
+    win._warn_orphan_caches()
+
+    assert orphan_keep.exists() is False
+    assert "BE" in win._orphan_cache_warned_locales
