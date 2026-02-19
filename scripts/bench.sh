@@ -12,6 +12,6 @@ if [ "$#" -ge 1 ] && [ -n "$1" ]; then
   OUT="$1"
 fi
 
-"$VENV_PY" -m pytest tests/benchmarks -q --benchmark-only \
+pytest_run tests/benchmarks -q --benchmark-only \
   --benchmark-json "$OUT" \
   -o addopts="-ra -q"

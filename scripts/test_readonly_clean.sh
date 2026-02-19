@@ -12,7 +12,7 @@ trap 'rm -f "$before" "$after"' EXIT
 
 git status --porcelain --untracked-files=no >"$before"
 
-"$VENV_PY" -m pytest -q \
+pytest_run -q \
   tests/test_gui_readonly_integrity.py \
   tests/test_encoding_diagnostics.py
 
@@ -28,4 +28,3 @@ if ! cmp -s "$before" "$after"; then
   diff -u "$before" "$after" || true
   exit 1
 fi
-

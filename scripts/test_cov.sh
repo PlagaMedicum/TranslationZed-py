@@ -12,7 +12,7 @@ CORE_FAIL_UNDER="${COVERAGE_FAIL_UNDER_CORE:-95}"
 OVERALL_TARGET="${COVERAGE_TARGET_OVERALL:-$OVERALL_FAIL_UNDER}"
 CORE_TARGET="${COVERAGE_TARGET_CORE:-$CORE_FAIL_UNDER}"
 
-"$VENV_PY" -m pytest -q \
+pytest_run -q \
   --cov=translationzed_py \
   --cov-branch \
   --cov-report=term-missing:skip-covered \

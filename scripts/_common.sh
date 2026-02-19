@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${VENV:-.venv}"
 PY="${PY:-python}"
 VENV_PY="$ROOT_DIR/$VENV/bin/python"
+PYTEST_RESOURCE_WARNING_FILTER="${PYTEST_RESOURCE_WARNING_FILTER:-error::ResourceWarning}"
 
 ensure_venv() {
   if [ ! -x "$VENV_PY" ]; then
@@ -42,4 +43,8 @@ PY
       rm -rf "$abs/.tzp/config"
       ;;
   esac
+}
+
+pytest_run() {
+  "$VENV_PY" -m pytest -W "$PYTEST_RESOURCE_WARNING_FILTER" "$@"
 }

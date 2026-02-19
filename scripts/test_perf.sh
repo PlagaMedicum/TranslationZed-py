@@ -4,7 +4,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 ensure_venv
 
-"$VENV_PY" -m pytest -q \
+pytest_run -q \
   tests/test_perf_budgets.py \
   tests/test_gui_perf_regressions.py \
   tests/test_qa_perf_autoderived.py \

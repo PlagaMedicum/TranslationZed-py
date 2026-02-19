@@ -4,7 +4,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 ensure_venv
 
-"$VENV_PY" -m pytest -q -W error::ResourceWarning \
+pytest_run -q \
   tests/test_tm_store.py \
   tests/test_tm_store_edge_paths.py \
   tests/test_tm_query.py \
