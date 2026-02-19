@@ -13,6 +13,36 @@ from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
 
 
+@pytest.fixture(autouse=True)
+def _disable_close_prompt_for_module(monkeypatch):
+    """Disable write-on-exit prompt in this module to speed widget teardown."""
+    original_init = mw.MainWindow.__init__
+
+    def _patched_init(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        original_init(self, *args, **kwargs)
+        if getattr(self, "_startup_aborted", False):
+            return
+        self._prompt_write_on_exit = False
+        self._qa_auto_refresh = False
+        self._tm_bootstrap_pending = False
+        for name in (
+            "_post_locale_timer",
+            "_qa_refresh_timer",
+            "_qa_scan_timer",
+            "_tm_update_timer",
+            "_tm_flush_timer",
+            "_tm_query_timer",
+            "_tm_rebuild_timer",
+        ):
+            timer = getattr(self, name, None)
+            if timer is None:
+                continue
+            timer.stop()
+            timer.setInterval(max(int(timer.interval()), 60_000))
+
+    monkeypatch.setattr(mw.MainWindow, "__init__", _patched_init)
+
+
 def _make_project(tmp_path: Path) -> Path:
     """Create a minimal EN/BE/RU project fixture."""
     root = tmp_path / "proj"
