@@ -167,3 +167,47 @@ def test_conflict_merge_resolutions(tmp_path, qtbot, monkeypatch):
     assert hello.original == "Привет!!"
     assert bye.value is None
     assert bye.status == Status.FOR_REVIEW
+
+
+def test_conflict_merge_save_flow_clears_cache_and_persists_resolution(
+    tmp_path, qtbot, monkeypatch
+):
+    """Verify save-time merge resolution writes file and clears draft cache values."""
+    root, path = _make_conflict_project(tmp_path)
+
+    class FakeChoiceDialog:
+        def __init__(self, *_args, **_kwargs):
+            self._choice = "merge"
+
+        def exec(self):
+            return None
+
+        def choice(self):
+            return self._choice
+
+    monkeypatch.setattr(mw, "ConflictChoiceDialog", FakeChoiceDialog)
+    monkeypatch.setattr(
+        mw.MainWindow,
+        "_run_merge_ui",
+        lambda _self, _path, _rows: {
+            "HELLO": ("Здравствуйте", "cache"),
+            "BYE": ("Пока...", "original"),
+        },
+    )
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    win._prompt_write_on_exit = False
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(path)
+    win._conflict_notified.add(path)
+    win._file_chosen(ix)
+    assert win._has_conflicts(path)
+
+    assert win._save_current() is True
+    assert path.read_text(encoding="utf-8") == (
+        'HELLO = "Здравствуйте"\n'
+        'BYE = "Пока..."\n'
+    )
+    cache = read_cache(root, path)
+    if cache:
+        assert all(entry.value is None for entry in cache.values())
