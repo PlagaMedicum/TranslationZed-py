@@ -816,11 +816,13 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] GUI suite runtime was reduced by fixture-level startup optimizations
        (theme sync/paint heavy-path stubs in targeted test modules), dropping
        `tests/test_gui_service_adapters.py` from ~4m13s to ~14s on reference dev run.
-     - [✓] CI benchmark duplication was removed in matrix verify lane:
-       `verify-ci` now supports `VERIFY_SKIP_BENCH=1` so matrix jobs skip bench
-       when dedicated `benchmark-regression` gate runs strict compare once.
+    - [✓] CI benchmark duplication was removed in matrix verify lane:
+      `verify-ci` now supports `VERIFY_SKIP_BENCH=1` so matrix jobs skip bench
+      when dedicated `benchmark-regression` gate runs strict compare once.
     - [✓] Added direct GUI coverage for malformed-locale bootstrap warnings and
       full orphan-cache purge/dismiss interaction paths (including warned-locale dedupe).
+    - [✓] Added conflict-lifecycle integration coverage for save-time merge
+      resolution with persisted-file output and post-save cache-clear assertions.
     - [→] Ongoing phase-two focus remains on high-value GUI branch expansion
       for broader end-to-end cache lifecycle scenarios.
 

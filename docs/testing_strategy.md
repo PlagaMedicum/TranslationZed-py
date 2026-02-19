@@ -256,7 +256,9 @@ They include:
   runtime `SYSTEM` re-apply callback behavior.
 - Detail editor telemetry: bottom-right Source/Translation char counter and live
   Translation delta updates while editing.
-- GUI conflict flows: drop‑cache / drop‑original / merge decision handling.
+- GUI conflict flows: drop‑cache / drop‑original / merge decision handling,
+  plus save-time merge resolution lifecycle coverage (persist-to-file and
+  post-save cache draft clear assertions).
 - Scanner: locale discovery, language.txt parsing, ignore rules.
 - TM: SQLite store round‑trip, exact/fuzzy query, TM import (TMX/XLIFF/XLF/PO/POT/CSV/MO/XML/XLSX), TMX export.
 - TM import metadata: per-file import registry, replace/delete lifecycle, TM source-name propagation,
@@ -365,8 +367,6 @@ They include:
   sets) lacks full integration matrix.
 
 **System / functional / regression / smoke gaps**
-- End‑to‑end cache lifecycle (edit -> reopen -> conflict -> resolve -> save -> cache clear)
-  should be captured as a single scenario test.
 - Mutation testing is advisory-only; no fail-under threshold is enforced yet.
 
 **Planned test expansions:**
