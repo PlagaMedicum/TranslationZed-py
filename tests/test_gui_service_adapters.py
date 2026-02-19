@@ -1882,6 +1882,33 @@ def test_search_and_qa_result_openers_ignore_invalid_payloads(
     assert selected == []
 
 
+def test_refresh_search_panel_results_covers_guard_empty_query_and_empty_files(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify search panel refresh handles missing widgets, empty query, and empty file scopes."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    win._search_results_list = None
+    win.search_edit.setText("needle")
+    win._refresh_search_panel_results()
+
+    win._search_results_list = mw.QListWidget()
+    win._search_status_label = mw.QLabel()
+    win.search_edit.setText("   ")
+    win._refresh_search_panel_results()
+    assert (
+        win._search_status_label.text()
+        == "Press Enter in the search box to populate results."
+    )
+
+    win.search_edit.setText("needle")
+    monkeypatch.setattr(win, "_search_files_for_scope", lambda: [])
+    win._refresh_search_panel_results()
+    assert win._search_status_label.text() == "No files in current search scope."
+
+
 def test_schedule_qa_refresh_covers_disabled_busy_immediate_and_timer_paths(
     qtbot, tmp_path, monkeypatch
 ) -> None:
