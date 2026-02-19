@@ -1880,3 +1880,136 @@ def test_search_and_qa_result_openers_ignore_invalid_payloads(
     win._open_qa_result_item(qa_item)
 
     assert selected == []
+
+
+def test_schedule_qa_refresh_covers_disabled_busy_immediate_and_timer_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify QA refresh scheduling handles guard, immediate, and deferred branches."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        win,
+        "_start_qa_scan_for_current_file",
+        lambda: calls.append("scan"),
+    )
+
+    win._qa_auto_refresh = False
+    win._schedule_qa_refresh(immediate=False)
+    assert win._qa_refresh_timer.isActive() is False
+
+    win._qa_auto_refresh = True
+    win._qa_scan_busy = True
+    win._schedule_qa_refresh(immediate=False)
+    assert win._qa_refresh_timer.isActive() is False
+
+    win._qa_scan_busy = False
+    win._schedule_qa_refresh(immediate=False)
+    assert win._qa_refresh_timer.isActive() is True
+
+    win._qa_refresh_timer.start(50)
+    win._schedule_qa_refresh(immediate=True)
+    assert calls == ["scan"]
+    assert win._qa_refresh_timer.isActive() is False
+
+
+def test_qa_panel_helpers_cover_empty_plan_navigation_and_focus_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify QA panel helpers cover missing-list, no-finding, failed-open, and success paths."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+
+    win._set_qa_panel_message("hello")
+    assert win._qa_status_label.text() == "hello"
+    assert win._qa_results_list.count() == 0
+
+    win._qa_results_list = None
+    win._refresh_qa_panel_results()
+    win._qa_results_list = mw.QListWidget()
+
+    item = QListWidgetItem("qa row")
+    item.setData(Qt.UserRole, (str(target), 0))
+    win._qa_results_list.addItem(item)
+    finding = SimpleNamespace(file=target, row=0)
+    win._focus_qa_finding_item(finding)
+    assert win._qa_results_list.currentItem() is item
+    win._focus_qa_finding_item(SimpleNamespace(file=target, row=999))
+
+    status_calls: list[tuple[str, int]] = []
+    monkeypatch.setattr(
+        win.statusBar(),
+        "showMessage",
+        lambda text, ms=0: status_calls.append((text, int(ms))),
+    )
+
+    win._qa_findings = ()
+    win._navigate_qa_finding(direction=1)
+    assert status_calls[-1] == ("Run QA first to navigate findings.", 3000)
+
+    win._qa_findings = (finding,)
+    plan_box: dict[str, object] = {
+        "value": SimpleNamespace(finding=None, status_message="No finding")
+    }
+
+    class _QAService:
+        @staticmethod
+        def build_navigation_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return plan_box["value"]
+
+    win._qa_service = _QAService()  # type: ignore[assignment]
+    win._navigate_qa_finding(direction=1)
+    assert status_calls[-1] == ("No finding", 3000)
+
+    plan_box["value"] = SimpleNamespace(
+        finding=SimpleNamespace(file=target, row=0),
+        status_message="Go row",
+    )
+    monkeypatch.setattr(win, "_select_match", lambda _match: False)
+    win._navigate_qa_finding(direction=1)
+    assert status_calls[-1] == ("Unable to navigate to QA finding.", 3000)
+
+    focused: list[object] = []
+    monkeypatch.setattr(win, "_select_match", lambda _match: True)
+    monkeypatch.setattr(
+        win, "_focus_qa_finding_item", lambda found: focused.append(found)
+    )
+    win._left_stack.setCurrentIndex(mw._LEFT_PANEL_QA)
+    win._navigate_qa_finding(direction=1)
+    assert focused
+    assert status_calls[-1] == ("Go row", 4000)
+
+
+def test_search_next_prev_and_prompt_toggle_cover_timer_and_persist_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify search next/prev stop active timer and prompt toggle persists value."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[int] = []
+    monkeypatch.setattr(
+        win,
+        "_search_from_anchor",
+        lambda *, direction, **_kwargs: calls.append(int(direction)),
+    )
+    win._search_timer.start(50)
+    win._search_next()
+    win._search_timer.start(50)
+    win._search_prev()
+    assert calls == [1, -1]
+    assert win._search_timer.isActive() is False
+
+    persisted: list[bool] = []
+    monkeypatch.setattr(win, "_persist_preferences", lambda: persisted.append(True))
+    win._toggle_prompt_on_exit(True)
+    assert win._prompt_write_on_exit is True
+    assert persisted == [True]
