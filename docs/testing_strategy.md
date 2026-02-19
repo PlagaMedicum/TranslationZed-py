@@ -66,6 +66,14 @@ _Last updated: 2026-02-19_
 - Architecture guards enforce allowed GUI->core imports and `main_window.py`
   line-budget threshold.
 - EN hash change dialog (implemented).
+- GUI locale-bootstrap warning flows:
+  malformed `language.txt` warning rendering,
+  chooser accept/cancel behavior,
+  and service-plan rejection fallback.
+- Orphan-cache warning dialog full interaction:
+  purge vs dismiss actions,
+  warning payload rendering (title/text/details),
+  and warned-locale dedupe across repeated runs.
 
 ### 2.3 GUI Smoke Tests
 - App starts headless (`QT_QPA_PLATFORM=offscreen`).
@@ -353,10 +361,6 @@ They include:
   extended stress-profile gates (tiered heavy lane).
 
 **Integration gaps**
-- GUI warning flow for malformed/missing `language.txt`: locale skip + degraded-open UX
-  still needs direct GUI assertions.
-- Orphan cache warning dialog end-to-end purge/dismiss interaction remains partially
-  covered through adapter/service layers, not full UI path.
 - Preferences persistence for non-critical UI state (tree width/column widths/toggle
   sets) lacks full integration matrix.
 
@@ -371,7 +375,6 @@ They include:
 - Locale‑driven encoding save tests (write via GUI/controller and compare bytes).
 - Regression suite for previously reported parse/saver failures (screenshots).
 - GUI tests for large‑string guards (delegate elide + detail panel lazy load).
-- Full orphan-cache warning + purge/dismiss integration tests.
 - Mutation score ratchet from advisory to blocking threshold after baseline stabilization.
 
 ---

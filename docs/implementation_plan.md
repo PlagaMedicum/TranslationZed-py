@@ -819,8 +819,10 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] CI benchmark duplication was removed in matrix verify lane:
        `verify-ci` now supports `VERIFY_SKIP_BENCH=1` so matrix jobs skip bench
        when dedicated `benchmark-regression` gate runs strict compare once.
-     - [→] Ongoing phase-two focus remains on high-value GUI branch expansion
-       (warning dialogs, malformed-locale UI flows, and orphan-cache full interaction).
+    - [✓] Added direct GUI coverage for malformed-locale bootstrap warnings and
+      full orphan-cache purge/dismiss interaction paths (including warned-locale dedupe).
+    - [→] Ongoing phase-two focus remains on high-value GUI branch expansion
+      for broader end-to-end cache lifecycle scenarios.
 
 ## Decision Backlog (Awaiting Product Input)
 
