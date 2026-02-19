@@ -118,10 +118,16 @@ def test_set_detail_pending_covers_model_and_no_model_paths(
 
     char_calls: list[tuple[int | None, int | None]] = []
     load_calls: list[str] = []
-    monkeypatch.setattr(win, "_set_detail_char_counts", lambda s, t: char_calls.append((s, t)))
-    monkeypatch.setattr(win, "_load_pending_detail_text", lambda: load_calls.append("load"))
+    monkeypatch.setattr(
+        win, "_set_detail_char_counts", lambda s, t: char_calls.append((s, t))
+    )
+    monkeypatch.setattr(
+        win, "_load_pending_detail_text", lambda: load_calls.append("load")
+    )
     monkeypatch.setattr(win._detail_source, "hasFocus", lambda: False, raising=False)
-    monkeypatch.setattr(win._detail_translation, "hasFocus", lambda: False, raising=False)
+    monkeypatch.setattr(
+        win._detail_translation, "hasFocus", lambda: False, raising=False
+    )
 
     win._set_detail_pending(0)
     assert win._detail_pending_row == 0
@@ -129,7 +135,9 @@ def test_set_detail_pending_covers_model_and_no_model_paths(
     assert win._detail_syncing is False
     assert win._detail_dirty is False
     assert win._detail_translation.isReadOnly() is True
-    assert win._detail_source.placeholderText() == "Large text. Click to load full source."
+    assert (
+        win._detail_source.placeholderText() == "Large text. Click to load full source."
+    )
     assert (
         win._detail_translation.placeholderText()
         == "Large text. Click to load full translation."
@@ -146,7 +154,9 @@ def test_set_detail_pending_covers_model_and_no_model_paths(
 
     win._current_model = None
     monkeypatch.setattr(win._detail_source, "hasFocus", lambda: False, raising=False)
-    monkeypatch.setattr(win._detail_translation, "hasFocus", lambda: False, raising=False)
+    monkeypatch.setattr(
+        win._detail_translation, "hasFocus", lambda: False, raising=False
+    )
     win._set_detail_pending(0)
     assert char_calls[-1] == (None, None)
 
@@ -186,7 +196,9 @@ def test_sync_detail_editors_uses_pending_mode_for_large_rows(
 
     pending_calls: list[int] = []
     monkeypatch.setattr(mw, "_DETAIL_LAZY_THRESHOLD", 1)
-    monkeypatch.setattr(win, "_set_detail_pending", lambda row: pending_calls.append(row))
+    monkeypatch.setattr(
+        win, "_set_detail_pending", lambda row: pending_calls.append(row)
+    )
 
     win._sync_detail_editors()
     assert pending_calls == [0]

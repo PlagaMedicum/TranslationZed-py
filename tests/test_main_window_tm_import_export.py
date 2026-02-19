@@ -406,9 +406,7 @@ def test_resolve_pending_tmx_delegates_sync_with_pending_only(
         lambda **kwargs: calls.append(kwargs),
     )
     win._resolve_pending_tmx()
-    assert calls == [
-        {"interactive": True, "pending_only": True, "show_summary": True}
-    ]
+    assert calls == [{"interactive": True, "pending_only": True, "show_summary": True}]
 
 
 def test_export_tmx_uses_current_file_locale_and_handles_store_export_exception(

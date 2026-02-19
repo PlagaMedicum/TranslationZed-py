@@ -205,8 +205,7 @@ def test_conflict_merge_save_flow_clears_cache_and_persists_resolution(
 
     assert win._save_current() is True
     assert path.read_text(encoding="utf-8") == (
-        'HELLO = "Здравствуйте"\n'
-        'BYE = "Пока..."\n'
+        'HELLO = "Здравствуйте"\n' 'BYE = "Пока..."\n'
     )
     cache = read_cache(root, path)
     if cache:

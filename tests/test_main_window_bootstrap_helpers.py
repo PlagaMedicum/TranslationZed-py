@@ -245,8 +245,12 @@ def test_init_locales_covers_malformed_warning_and_empty_selectable_branch(
 
     calls: list[str] = []
     monkeypatch.setattr(mw, "QMessageBox", _WarningBox)
-    monkeypatch.setattr(win, "_schedule_cache_migration", lambda: calls.append("migrate"))
-    monkeypatch.setattr(win, "_schedule_post_locale_tasks", lambda: calls.append("post"))
+    monkeypatch.setattr(
+        win, "_schedule_cache_migration", lambda: calls.append("migrate")
+    )
+    monkeypatch.setattr(
+        win, "_schedule_post_locale_tasks", lambda: calls.append("post")
+    )
     monkeypatch.setattr(win, "_warn_orphan_caches", lambda: calls.append("warn"))
     monkeypatch.setattr(mw.QTimer, "singleShot", lambda _ms, callback: callback())
 
@@ -265,7 +269,9 @@ def test_init_locales_covers_malformed_warning_and_empty_selectable_branch(
     assert win._selected_locales == ["BE"]
     assert calls == ["migrate", "warn", "post"]
 
-    monkeypatch.setattr(mw, "scan_root_with_errors", lambda _root: ({"EN": "English"}, []))
+    monkeypatch.setattr(
+        mw, "scan_root_with_errors", lambda _root: ({"EN": "English"}, [])
+    )
     win._selected_locales = ["BE"]
     win._init_locales(selected_locales=None)
     assert win._selected_locales == []
@@ -375,7 +381,9 @@ def test_init_locales_malformed_scan_with_chooser_accept_schedules_followups(
     monkeypatch.setattr(mw, "QMessageBox", _WarningBox)
     monkeypatch.setattr(mw, "LocaleChooserDialog", _Dialog)
     monkeypatch.setattr(win, "_project_session_service", _Service())
-    monkeypatch.setattr(win, "_schedule_cache_migration", lambda: call_log.append("migrate"))
+    monkeypatch.setattr(
+        win, "_schedule_cache_migration", lambda: call_log.append("migrate")
+    )
     monkeypatch.setattr(win, "_warn_orphan_caches", lambda: call_log.append("warn"))
     monkeypatch.setattr(
         win,
@@ -436,7 +444,9 @@ def test_init_locales_rejected_plan_clears_selection_without_post_tasks(
         lambda _root: ({"EN": "English", "BE": "Belarusian"}, []),  # type: ignore[no-untyped-def]
     )
     monkeypatch.setattr(win, "_project_session_service", _Service())
-    monkeypatch.setattr(win, "_schedule_cache_migration", lambda: calls.append("migrate"))
+    monkeypatch.setattr(
+        win, "_schedule_cache_migration", lambda: calls.append("migrate")
+    )
     monkeypatch.setattr(
         win,
         "_schedule_post_locale_tasks",

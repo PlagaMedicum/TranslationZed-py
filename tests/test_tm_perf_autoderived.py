@@ -194,7 +194,9 @@ def test_tm_import_query_perf_autoderived_from_committed_perf_fixtures(
     not _env_flag("TZP_PERF_TM_HEAVY"),
     reason="set TZP_PERF_TM_HEAVY=1 to enable heavy TM stress profile",
 )
-def test_tm_import_query_perf_heavy_stress_profile(tmp_path: Path, perf_recorder) -> None:
+def test_tm_import_query_perf_heavy_stress_profile(
+    tmp_path: Path, perf_recorder
+) -> None:
     """Verify heavy-lane TM import/query profile on scaled corpora."""
     base_count = max(100, _derive_tm_stress_size())
     multiplier = max(2, _env_int("TZP_PERF_TM_HEAVY_MULTIPLIER", 3))

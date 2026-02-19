@@ -1668,7 +1668,9 @@ def test_reload_file_returns_for_invalid_index_and_sets_skip_flags_when_valid(
     assert win._skip_cache_write is False
 
     calls: list[bool] = []
-    monkeypatch.setattr(win, "_file_chosen", lambda index: calls.append(index.isValid()))
+    monkeypatch.setattr(
+        win, "_file_chosen", lambda index: calls.append(index.isValid())
+    )
     win._reload_file(root / "BE" / "ui.txt")
     assert win._skip_conflict_check is True
     assert win._skip_cache_write is True

@@ -330,7 +330,9 @@ def test_replace_helper_branches_cover_toggle_align_enable_and_request(
 
     win.replace_spacer.setFixedWidth(9)
     win.replace_toolbar.setVisible(False)
-    monkeypatch.setattr(win, "_align_replace_bar", mw.MainWindow._align_replace_bar.__get__(win))
+    monkeypatch.setattr(
+        win, "_align_replace_bar", mw.MainWindow._align_replace_bar.__get__(win)
+    )
     win._align_replace_bar()
     assert win.replace_spacer.width() == 9
 
@@ -538,7 +540,9 @@ def test_status_combo_helpers_cover_guards_single_and_macro_paths(
     qtbot.addWidget(win)
 
     set_calls: list[object] = []
-    monkeypatch.setattr(win, "_set_status_combo", lambda status: set_calls.append(status))
+    monkeypatch.setattr(
+        win, "_set_status_combo", lambda status: set_calls.append(status)
+    )
     monkeypatch.setattr(win, "_selected_rows", lambda: [0])
     win._current_model = None
     win._update_status_combo_from_selection()
@@ -596,7 +600,9 @@ def test_status_combo_helpers_cover_guards_single_and_macro_paths(
     win._status_combo_changed(0)
     assert model.set_calls == []
 
-    monkeypatch.setattr(win.status_combo, "currentData", lambda: status_a, raising=False)
+    monkeypatch.setattr(
+        win.status_combo, "currentData", lambda: status_a, raising=False
+    )
     monkeypatch.setattr(win, "_selected_rows", lambda: [])
     win._status_combo_changed(0)
     assert model.set_calls == []
@@ -655,7 +661,9 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
         def selectedIndexes():  # noqa: N802
             return []
 
-    monkeypatch.setattr(win.table, "selectionModel", lambda: _Selection(), raising=False)
+    monkeypatch.setattr(
+        win.table, "selectionModel", lambda: _Selection(), raising=False
+    )
     monkeypatch.setattr(win.table, "currentIndex", lambda: _Index(7), raising=False)
     assert win._selected_rows() == [7]
 
@@ -685,7 +693,9 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
         lambda text: shown_messages.append(str(text)),
     )
     scope_updates: list[str] = []
-    monkeypatch.setattr(win, "_update_scope_indicators", lambda: scope_updates.append("u"))
+    monkeypatch.setattr(
+        win, "_update_scope_indicators", lambda: scope_updates.append("u")
+    )
 
     class _RowModel:
         @staticmethod
@@ -712,7 +722,9 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
     win._search_progress_text = ""
     win._current_model = None
     win._current_pf = None
-    monkeypatch.setattr(win.table, "currentIndex", lambda: _Index(0, valid=False), raising=False)
+    monkeypatch.setattr(
+        win.table, "currentIndex", lambda: _Index(0, valid=False), raising=False
+    )
     win._update_status_bar()
     assert shown_messages[-1] == "Ready"
 
@@ -740,7 +752,10 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
     win.search_edit.setText("find")
     win.replace_toolbar.setVisible(False)
     win._update_scope_indicators()
-    assert indicator_calls[-2:] == [(win._search_scope, True), (win._replace_scope, False)]
+    assert indicator_calls[-2:] == [
+        (win._search_scope, True),
+        (win._replace_scope, False),
+    ]
 
     monkeypatch.setattr(
         win,
@@ -750,9 +765,13 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
     icon_label = mw.QLabel()
     indicator_widget = mw.QWidget()
     indicator_widget.setVisible(True)
-    win._set_scope_indicator(indicator_widget, icon_label, "FILE", False, "Search scope")
+    win._set_scope_indicator(
+        indicator_widget, icon_label, "FILE", False, "Search scope"
+    )
     assert indicator_widget.isVisible() is False
-    win._set_scope_indicator(indicator_widget, icon_label, "LOCALE", True, "Replace scope")
+    win._set_scope_indicator(
+        indicator_widget, icon_label, "LOCALE", True, "Replace scope"
+    )
     assert indicator_widget.isVisible() is True
     assert indicator_widget.toolTip() == "Replace scope: Locale"
 
@@ -847,7 +866,11 @@ def test_status_apply_helpers_cover_row_filtering_and_qa_auto_mark_paths(
 
     win._qa_auto_mark_touched_for_review = True
     win._apply_qa_auto_mark([object()])
-    assert apply_calls[-1] == ((1, 2, 3), mw.Status.FOR_REVIEW, "QA auto-mark For review")
+    assert apply_calls[-1] == (
+        (1, 2, 3),
+        mw.Status.FOR_REVIEW,
+        "QA auto-mark For review",
+    )
 
     apply_selection_calls: list[tuple[tuple[int, ...], object, str]] = []
     combo_updates: list[str] = []
@@ -906,8 +929,12 @@ def test_show_resize_and_set_status_combo_helpers_cover_remaining_ui_branches(
     layout_calls: list[str] = []
     reflow_calls: list[str] = []
     align_calls: list[str] = []
-    monkeypatch.setattr(win, "_apply_table_layout", lambda: layout_calls.append("layout"))
-    monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: reflow_calls.append("reflow"))
+    monkeypatch.setattr(
+        win, "_apply_table_layout", lambda: layout_calls.append("layout")
+    )
+    monkeypatch.setattr(
+        win, "_schedule_resize_reflow", lambda: reflow_calls.append("reflow")
+    )
     monkeypatch.setattr(win, "_align_replace_bar", lambda: align_calls.append("align"))
 
     target = root / "BE" / "ui.txt"
@@ -989,8 +1016,12 @@ def test_show_tm_matches_and_show_resize_guard_paths(
     layout_calls: list[str] = []
     reflow_calls: list[str] = []
     align_calls: list[str] = []
-    monkeypatch.setattr(win, "_apply_table_layout", lambda: layout_calls.append("layout"))
-    monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: reflow_calls.append("reflow"))
+    monkeypatch.setattr(
+        win, "_apply_table_layout", lambda: layout_calls.append("layout")
+    )
+    monkeypatch.setattr(
+        win, "_schedule_resize_reflow", lambda: reflow_calls.append("reflow")
+    )
     monkeypatch.setattr(win, "_align_replace_bar", lambda: align_calls.append("align"))
     monkeypatch.setattr(win.table, "model", lambda: None, raising=False)
     monkeypatch.setattr(win.replace_toolbar, "isVisible", lambda: False, raising=False)
@@ -1011,7 +1042,9 @@ def test_update_status_combo_from_selection_handles_single_and_mixed_statuses(
     qtbot.addWidget(win)
 
     status_calls: list[object] = []
-    monkeypatch.setattr(win, "_set_status_combo", lambda status: status_calls.append(status))
+    monkeypatch.setattr(
+        win, "_set_status_combo", lambda status: status_calls.append(status)
+    )
 
     status_a = win.status_combo.itemData(0)
     status_b = win.status_combo.itemData(1)
