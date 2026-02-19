@@ -823,6 +823,110 @@ def test_save_current_delegates_to_file_workflow_service(qtbot, tmp_path, monkey
     assert persist_calls == [target]
 
 
+def test_save_current_returns_false_when_write_is_blocked(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify save current exits early when original writes are blocked."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[str] = []
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: False)
+
+    class _StubService:
+        @staticmethod
+        def build_save_current_run_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            calls.append("plan")
+            return SimpleNamespace(immediate_result=False, run_save=False)
+
+    monkeypatch.setattr(win, "_file_workflow_service", _StubService())
+    assert win._save_current() is False
+    assert calls == []
+
+
+def test_save_current_returns_immediate_result_from_run_plan(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify save current returns immediate run-plan result without persistence."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: True)
+    plan_box: dict[str, object] = {
+        "plan": SimpleNamespace(immediate_result=True, run_save=False)
+    }
+
+    class _StubService:
+        @staticmethod
+        def build_save_current_run_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return plan_box["plan"]
+
+    monkeypatch.setattr(win, "_file_workflow_service", _StubService())
+    assert win._save_current() is True
+
+    plan_box["plan"] = SimpleNamespace(immediate_result=False, run_save=False)
+    assert win._save_current() is False
+
+
+def test_save_current_returns_false_when_run_plan_skips_save(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify save current returns false when plan requests no save run."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: True)
+
+    class _StubService:
+        @staticmethod
+        def build_save_current_run_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(immediate_result=None, run_save=False)
+
+    monkeypatch.setattr(win, "_file_workflow_service", _StubService())
+    assert win._save_current() is False
+
+
+def test_save_current_shows_error_dialog_when_persist_fails(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify save current surfaces persist exceptions through error dialog."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+    assert win._current_model is not None
+    value_idx = win._current_model.index(0, 2)
+    win._current_model.setData(value_idx, "Changed", Qt.EditRole)
+
+    monkeypatch.setattr(win, "_can_write_originals", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(win, "_ensure_conflicts_resolved", lambda *_args: True)
+
+    class _StubService:
+        @staticmethod
+        def build_save_current_run_plan(**_kwargs):  # type: ignore[no-untyped-def]
+            return SimpleNamespace(immediate_result=None, run_save=True)
+
+        @staticmethod
+        def persist_current_save(**_kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("persist failed")
+
+    monkeypatch.setattr(win, "_file_workflow_service", _StubService())
+    errors: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        mw.QMessageBox,
+        "critical",
+        lambda _parent, title, text: errors.append((str(title), str(text))),
+    )
+
+    assert win._save_current() is False
+    assert errors == [("Save failed", "persist failed")]
+
+
 def test_prompt_conflicts_delegates_to_conflict_service(qtbot, tmp_path, monkeypatch):
     """Verify prompt conflicts delegates to conflict service."""
     root = _make_project(tmp_path)
