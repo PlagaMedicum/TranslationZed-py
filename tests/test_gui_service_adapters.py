@@ -2280,3 +2280,62 @@ def test_show_delayed_tooltip_covers_guard_and_show_paths(
     monkeypatch.setattr(mw.QCursor, "pos", staticmethod(lambda: win._tooltip_pos))
     win._show_delayed_tooltip()
     assert len(shown) == 1
+
+
+def test_row_height_cache_helpers_cover_subset_and_full_clear_paths(
+    qtbot, tmp_path
+) -> None:
+    """Verify row-height cache helpers handle model-missing and cache-clear branches."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    win.table.setModel(None)
+    assert win._row_height_cache_signature() == ()
+
+    win._row_height_cache = {0: 24, 1: 30}
+    win._row_height_cache_key = (100, 200, 300, 120)
+    win._clear_row_height_cache(rows=[0, 99])
+    assert win._row_height_cache == {1: 30}
+    assert win._row_height_cache_key == (100, 200, 300, 120)
+
+    win._clear_row_height_cache()
+    assert win._row_height_cache == {}
+    assert win._row_height_cache_key is None
+
+
+def test_resize_visible_rows_covers_cached_budget_resume_and_zero_height_paths(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify row-resize loop handles cached-row budget resume and zero-height rows."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    target = root / "BE" / "ui.txt"
+    index = win.fs_model.index_for_path(target)
+    win._file_chosen(index)
+
+    win._wrap_text = True
+
+    cached_height = max(1, win.table.rowHeight(0)) + 7
+    win._row_height_cache = {0: cached_height}
+    win._row_height_cache_key = win._row_height_cache_signature()
+    win._pending_row_span = (0, 0)
+    win._row_resize_cursor = None
+    win._row_resize_budget_ms = 0
+    win._resize_visible_rows()
+    assert win.table.rowHeight(0) == cached_height
+    assert win._row_resize_cursor == 1
+    assert win._pending_row_span == (0, 0)
+    assert win._row_resize_timer.isActive() is True
+
+    win._row_resize_timer.stop()
+    win._row_height_cache.clear()
+    win._pending_row_span = (999, 999)
+    win._row_resize_cursor = None
+    win._row_resize_budget_ms = 10_000
+    monkeypatch.setattr(win.table, "sizeHintForRow", lambda _row: 0)
+    win._resize_visible_rows()
+    assert win._pending_row_span is None
+    assert win._row_resize_cursor is None
+    assert win._row_height_cache == {}
