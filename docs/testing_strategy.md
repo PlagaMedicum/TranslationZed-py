@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-19_
+_Last updated: 2026-02-20_
 
 ---
 
@@ -160,8 +160,11 @@ _Last updated: 2026-02-19_
   `artifacts/mutation/summary.txt`; optional staged ratcheting is supported via
   `MUTATION_SCORE_MODE={warn|fail|off}` and
   `MUTATION_MIN_KILLED_PERCENT=<threshold>` (default remains advisory `warn` with disabled threshold).
+- Staged rollout is active in CI heavy lane:
+  default `MUTATION_SCORE_MODE=warn` with `MUTATION_MIN_KILLED_PERCENT=25`;
+  workflow-dispatch can switch to `MUTATION_SCORE_MODE=fail` for strict ratchet trials.
 - Tiered heavy lane entrypoint is `make verify-heavy`
-  (`verify-ci` + heavy TM stress-profile perf gate + advisory mutation).
+  (`verify-ci` + heavy TM stress-profile perf gate + staged mutation gate).
 
 ### 2.10 Warning-safety gate
 - Default pytest-based gates run with `-W error::ResourceWarning` so
@@ -391,9 +394,9 @@ They include:
 - Enforced gate thresholds:
   - Core modules (`translationzed_py/core`): **>=95%** line coverage.
   - Whole package (`translationzed_py`): **>=90%** line coverage.
-- Current strict baseline (2026-02-19):
-  - `make test-cov`: **94.3%** whole package.
+- Current strict baseline (2026-02-20):
+  - `make test-cov`: **92.2%** whole package.
   - core-only strict run: **95.7%**.
-  - `translationzed_py/gui/main_window.py`: **90.2%**.
+  - `translationzed_py/gui/main_window.py`: **83.4%** (informational, no per-file hard gate).
 - GUI: smoke and integration coverage sufficient to validate wiring.
 - Cover **all known structure/encoding edge-cases** found in production files.

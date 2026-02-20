@@ -1,4 +1,4 @@
-_Last updated: 2026-02-19_
+_Last updated: 2026-02-20_
 
 # Checklists
 
@@ -24,7 +24,9 @@ avoid missing mandatory tasks.
   with CI (non-mutating, fail-on-drift)
 - **Run** `make verify-heavy` when you need full strict gates plus advisory mutation
   report generation (`artifacts/mutation/*`) and heavy TM stress-profile perf checks
-  - Optional staged mutation ratchet:
+  - Staged mutation rollout defaults to soft mode in heavy CI lanes
+    (`MUTATION_SCORE_MODE=warn`, `MUTATION_MIN_KILLED_PERCENT=25`).
+  - Ratchet trial command:
     `MUTATION_SCORE_MODE=fail MUTATION_MIN_KILLED_PERCENT=<N> make test-mutation`
 - **Update docs** whenever behavior, UX, or workflows change
   - Keep specs and plan in sync with implemented features

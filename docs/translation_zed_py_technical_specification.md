@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.7.0 · 2026-02-19**\
+**Version 0.7.0 · 2026-02-20**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -857,7 +857,8 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
     (`artifacts/mutation/summary.json`) and human log (`summary.txt`);
     optional staged ratchet is available through
     `MUTATION_SCORE_MODE={warn|fail|off}` and
-    `MUTATION_MIN_KILLED_PERCENT=<threshold>` (default policy remains advisory).
+    `MUTATION_MIN_KILLED_PERCENT=<threshold>` (staged rollout currently defaults
+    to `warn` + threshold in heavy CI lanes; strict fail mode is dispatch-controlled).
 
 ---
 
@@ -904,8 +905,9 @@ Current builds use **cache‑only** recovery:
     Linux uses Qt offscreen for headless GUI checks,
   - dedicated Linux benchmark-regression job runs strict `make bench-check`
     (`BENCH_COMPARE_MODE=fail`, 20% threshold),
+  - benchmark strict enforcement remains Linux-only for now,
   - scheduled/workflow-dispatch heavy lane runs `make verify-heavy`
-    (`verify-ci` + advisory mutation report).
+    (`verify-ci` + staged mutation report/gate).
 
 ## 13  Backlog (Post‑v0.7)
 
@@ -960,4 +962,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-19 (v0.7.0)*
+*Last updated: 2026-02-20 (v0.7.0)*
