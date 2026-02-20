@@ -4,6 +4,8 @@ VENV    ?= .venv
 ARTIFACTS ?= artifacts
 BENCH_BASELINE ?= tests/benchmarks/baseline.json
 BENCH_CURRENT ?= $(ARTIFACTS)/bench/bench.json
+MUTATION_SCORE_MODE ?= warn
+MUTATION_MIN_KILLED_PERCENT ?= 0
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-check lint lint-check typecheck arch-check \
@@ -75,7 +77,9 @@ bench-check:
 		bash scripts/bench_check.sh $(ARGS)
 
 test-mutation:
-	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/mutation.sh
+	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) MUTATION_SCORE_MODE=$(MUTATION_SCORE_MODE) \
+		MUTATION_MIN_KILLED_PERCENT=$(MUTATION_MIN_KILLED_PERCENT) \
+		bash scripts/mutation.sh
 
 test-encoding-integrity:
 	VENV=$(VENV) bash scripts/test_encoding_integrity.sh
