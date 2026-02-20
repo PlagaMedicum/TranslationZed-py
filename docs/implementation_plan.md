@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-19_
+_Last updated: 2026-02-20_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.7.0 is shipped; this plan now
@@ -355,17 +355,17 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 
 ## 3) Baseline Acceptance Checklist (historical v0.1)
 
-[✓] Open project, select locales (EN hidden)  
-[✓] File tree + table (Key | Source | Translation | Status)  
-[✓] Edit translations with undo/redo  
-[✓] Status changes + proofread shortcut + background coloring  
-[✓] Draft cache auto‑written  
-[✓] Save prompt (Write / Cache only / Cancel)  
-[✓] EN hash warning  
-[✓] Search with regex + F3 navigation  
-[✓] Preferences: prompt on exit + wrap text  
-[✓] Status bar feedback (Saved time + row index)  
-[✓] Golden‑file tests for encodings  
+[✓] Open project, select locales (EN hidden)
+[✓] File tree + table (Key | Source | Translation | Status)
+[✓] Edit translations with undo/redo
+[✓] Status changes + proofread shortcut + background coloring
+[✓] Draft cache auto‑written
+[✓] Save prompt (Write / Cache only / Cancel)
+[✓] EN hash warning
+[✓] Search with regex + F3 navigation
+[✓] Preferences: prompt on exit + wrap text
+[✓] Status bar feedback (Saved time + row index)
+[✓] Golden‑file tests for encodings
 
 ---
 
@@ -807,14 +807,14 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] `make verify` remains local primary gate with explicit auto-fix warning.
      - [✓] CI runs strict non-mutating gate and publishes verification artifacts.
      - [✓] Canonical docs updated to match implemented tooling behavior.
-   - **Current verification snapshot (2026-02-19)**:
+   - **Current verification snapshot (2026-02-20)**:
      - [✓] Whole-package strict gate is met:
-       `make test-cov` reports **94.3%**.
+       `make test-cov` reports **92.2%**.
      - [✓] Core coverage gate remains met in strict run:
        `pytest -q tests --cov=translationzed_py.core --cov-report=term-missing:skip-covered`
        reports **95.7%**.
-     - [✓] `translationzed_py/gui/main_window.py` branch-coverage baseline target is now met:
-       strict run reports **90.2%**.
+     - [✓] `translationzed_py/gui/main_window.py` current strict-run coverage is
+       **83.4%**; no per-file hard threshold is enforced (global/core gates only).
      - [✓] GUI suite runtime was reduced by fixture-level startup optimizations
        (theme sync/paint heavy-path stubs in targeted test modules), dropping
        `tests/test_gui_service_adapters.py` from ~4m13s to ~14s on reference dev run.
@@ -836,23 +836,11 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] Added optional mutation score-ratchet infrastructure:
        mutation summary artifacts + `MUTATION_SCORE_MODE` /
        `MUTATION_MIN_KILLED_PERCENT` gating controls (default remains advisory).
-     - [→] Ongoing verification-overhaul focus remains on policy activation decisions
-       (when to switch mutation thresholds from advisory to strict CI enforcement).
-
-## Decision Backlog (Awaiting Product Input)
-
-These are collected questions that should be resolved later; implementation can continue
-without blocking on them.
-
-1. Should CI enforce a hard per-file threshold for `translationzed_py/gui/main_window.py`
-   (for example `>=90%`) in addition to global package/core coverage gates?
-2. Should fast GUI fixtures keep stubbing theme sync/application permanently, or should
-   we add a small dedicated non-stub theme integration suite in strict CI lanes?
-3. Should mutation testing remain advisory for v0.8.0, or move to a staged fail-under
-   threshold (for example report-only -> soft fail -> hard fail) now that
-   optional gate controls are implemented (`MUTATION_SCORE_MODE` / `MUTATION_MIN_KILLED_PERCENT`)?
-4. Should benchmark strict gating remain Linux-only (current policy) or be expanded to
-   multi-OS strict gates after baseline variance data is collected?
+     - [✓] Staged mutation rollout activated:
+       heavy CI lane now applies thresholded mutation gate in staged mode
+       (default `warn` + `MUTATION_MIN_KILLED_PERCENT=25`; dispatch can switch to `fail`).
+     - [→] Ongoing verification-overhaul focus remains on ratchet progression
+       (promoting staged mutation from soft to strict default after baseline stabilizes).
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
@@ -986,6 +974,13 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
 - **Metadata immutability**: `language.txt` is read‑only and never modified by the app.
 - **Performance escape hatch**: hot paths may be moved to native extensions (Rust preferred,
   C acceptable) with a stable Python API and clean integration.
+- **2026-02-20 decision set**:
+  - no per-file strict coverage gate for `translationzed_py/gui/main_window.py` yet;
+    keep global/core thresholds only.
+  - keep fast GUI fixture stubs for theme sync/application as-is for now;
+    do not add strict non-stub lane yet.
+  - move mutation policy to staged rollout (soft threshold active, strict mode available).
+  - keep strict benchmark gate Linux-only for now; revisit multi-OS strictness after variance data collection.
 
 ---
 

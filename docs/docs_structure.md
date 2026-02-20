@@ -1,5 +1,5 @@
 # TranslationZed-Py — Documentation Structure
-_Last updated: 2026-02-18_
+_Last updated: 2026-02-20_
 
 ## 1) Purpose
 
@@ -23,6 +23,8 @@ changes should be propagated to keep docs coherent.
   - Execution document for coding agents.
   - Owns: feature status (done/in-progress/deferred), ordered mini-steps,
     dependencies, acceptance checks, and implementation sequence.
+  - Owns the single canonical implementation decision ledger
+    (`## 5) Decisions (recorded)`); avoid parallel decision sections.
   - Must not redefine product rules; references spec for normative behavior.
 
 - `docs/testing_strategy.md`
