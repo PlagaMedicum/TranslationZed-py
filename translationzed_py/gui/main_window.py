@@ -386,6 +386,8 @@ def _prepare_message_box(
     *,
     min_width: int = 560,
     min_height: int = 260,
+    max_width: int = 1200,
+    max_height: int = 860,
 ) -> QMessageBox:
     """Apply consistent sizing/resizability policy to GUI message boxes."""
     # Be tolerant to test doubles that may not implement every Qt API.
@@ -401,10 +403,42 @@ def _prepare_message_box(
         with contextlib.suppress(Exception):
             layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
     with contextlib.suppress(Exception):
-        msg.setMinimumSize(min_width, min_height)
+        min_w, min_h, max_w, max_h = _message_box_size_limits(
+            min_width=min_width,
+            min_height=min_height,
+            max_width=max_width,
+            max_height=max_height,
+        )
+        msg.setMinimumSize(min_w, min_h)
+        msg.setMaximumSize(max_w, max_h)
         hint = msg.sizeHint()
-        msg.resize(max(min_width, hint.width()), max(min_height, hint.height()))
+        target_w = max(min_w, min(max_w, hint.width()))
+        target_h = max(min_h, min(max_h, hint.height()))
+        msg.resize(target_w, target_h)
     return msg
+
+
+def _message_box_size_limits(
+    *,
+    min_width: int,
+    min_height: int,
+    max_width: int,
+    max_height: int,
+) -> tuple[int, int, int, int]:
+    """Return screen-aware lower/upper bounds for message-box sizing."""
+    avail_w = 1280
+    avail_h = 900
+    with contextlib.suppress(Exception):
+        screen = QGuiApplication.primaryScreen()
+        if screen is not None:
+            geometry = screen.availableGeometry()
+            avail_w = max(1, int(geometry.width()))
+            avail_h = max(1, int(geometry.height()))
+    min_w = min(int(min_width), max(320, avail_w - 120))
+    min_h = min(int(min_height), max(220, avail_h - 120))
+    max_w = max(min_w, min(int(max_width), int(avail_w * 0.92)))
+    max_h = max(min_h, min(int(max_height), int(avail_h * 0.90)))
+    return min_w, min_h, max_w, max_h
 
 
 def _show_warning_box(parent: QWidget, title: str, text: str) -> int:

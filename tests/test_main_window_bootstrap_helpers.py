@@ -53,6 +53,48 @@ def test_in_test_mode_and_pref_parsers_handle_common_inputs(monkeypatch) -> None
     assert mw._int_from_pref("bad", default=7, min_value=0, max_value=50) == 7
 
 
+def test_message_box_size_limits_use_fallback_when_screen_is_unavailable(
+    monkeypatch,
+) -> None:
+    """Verify message-box bounds use fallback geometry when no screen is exposed."""
+    monkeypatch.setattr(mw.QGuiApplication, "primaryScreen", staticmethod(lambda: None))
+    bounds = mw._message_box_size_limits(
+        min_width=560,
+        min_height=260,
+        max_width=1200,
+        max_height=860,
+    )
+    assert bounds == (560, 260, 1177, 810)
+
+
+def test_message_box_size_limits_clamp_to_small_screen_geometry(monkeypatch) -> None:
+    """Verify message-box bounds clamp both minimum and maximum for small screens."""
+
+    class _Geometry:
+        def width(self) -> int:
+            return 640
+
+        def height(self) -> int:
+            return 480
+
+    class _Screen:
+        def availableGeometry(self) -> _Geometry:
+            return _Geometry()
+
+    monkeypatch.setattr(
+        mw.QGuiApplication,
+        "primaryScreen",
+        staticmethod(lambda: _Screen()),
+    )
+    bounds = mw._message_box_size_limits(
+        min_width=560,
+        min_height=260,
+        max_width=1200,
+        max_height=860,
+    )
+    assert bounds == (520, 260, 588, 432)
+
+
 def test_patch_message_boxes_uses_test_shortcuts_and_non_test_fallback(
     monkeypatch,
 ) -> None:
