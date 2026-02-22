@@ -864,6 +864,15 @@ A9 [✓] **Verification-overhaul milestone**
        added `make verify-heavy-extra` (perf-heavy + mutation) and switched
        heavy workflow execution to extras-only after `verify` pass; schedule-heavy
        keeps a single strict `bench-check` run to preserve benchmark coverage.
+     - [✓] CI heavy-lane mutation artifact contract finalized:
+       heavy runs now publish dedicated `heavy-mutation-summary`
+       (`artifacts/mutation/summary.json`) for cross-run promotion-readiness evaluation.
+     - [✓] Scheduled mutation-promotion readiness automation added:
+       `scripts/check_mutation_promotion_ci.py` + `make mutation-promotion-readiness`
+       evaluate latest scheduled heavy-run artifacts; workflow
+       `.github/workflows/mutation-promotion-readiness.yml` publishes readiness
+       evidence and keeps not-ready outcomes non-blocking (exit `1` informational,
+       exit `2` strict failure).
      - [✓] TM panel passive-sync UX hardened:
        opening TM panel now uses non-interactive import sync (status-bar issue
        signal, no modal warning), and unchanged errored TM files are not reparsed
@@ -873,15 +882,12 @@ A9 [✓] **Verification-overhaul milestone**
        with screen-aware min/max bounds, and custom message-box flows apply
        shared size/resizability preparation before `exec()` (prevents both tiny
        and excessively large diagnostics windows).
-     - [→] Ongoing verification-overhaul focus remains on mutation-ratchet
-       promotion readiness:
-       promote workflow-dispatch default stage from `soft` to `strict` only
+     - [✓] Mutation-ratchet progression policy finalized:
+       keep workflow-dispatch default stage at `soft`, promote to `strict` only
        after two consecutive scheduled heavy-lane runs satisfy strict-stage
        criteria (effective `MUTATION_SCORE_MODE=fail` threshold pass and no
-       mutmut execution failures).
-     - [→] A9 finalization slice (current): automate scheduled heavy-run
-       promotion-readiness evaluation in CI with persisted evidence artifacts,
-       while keeping the default-stage flip as a manual reviewed commit.
+       mutmut execution failures), and apply the default flip via a manual
+       reviewed commit.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
@@ -1036,6 +1042,10 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
     criteria (`mode=fail`, threshold pass, no mutmut execution failures).
   - replace stale TM panel-open mapping-dialog wording in C1 with passive-sync
     behavior and keep a short superseded historical note.
+  - finalize A9 promotion-readiness automation:
+    scheduled CI now evaluates readiness from heavy artifacts via
+    `make mutation-promotion-readiness`; not-ready remains non-blocking evidence,
+    and stage-default flips stay manual via reviewed commit.
 
 ---
 
