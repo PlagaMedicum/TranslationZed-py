@@ -14,7 +14,7 @@ MUTATION_STAGE_MIN_KILLED_PERCENT ?= 25
 	test test-cov test-perf test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build bench bench-check bench-advisory test-mutation \
-	test-mutation-stage \
+	test-mutation-stage mutation-promotion-check \
 	test-warnings run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
 
@@ -96,6 +96,9 @@ test-mutation-stage:
 	$(MAKE) test-mutation \
 		MUTATION_SCORE_MODE="$$MUTATION_EFFECTIVE_MODE" \
 		MUTATION_MIN_KILLED_PERCENT="$$MUTATION_EFFECTIVE_MIN_KILLED_PERCENT"
+
+mutation-promotion-check:
+	$(VENV)/bin/python scripts/check_mutation_promotion.py $(ARGS)
 
 test-encoding-integrity:
 	VENV=$(VENV) bash scripts/test_encoding_integrity.sh
