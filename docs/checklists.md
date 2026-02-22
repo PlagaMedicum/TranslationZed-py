@@ -32,6 +32,9 @@ avoid missing mandatory tasks.
     `MUTATION_STAGE=<report|soft|strict> MUTATION_STAGE_MIN_KILLED_PERCENT=<N> make test-mutation-stage`
   - Local strict ratchet trial command:
     `MUTATION_SCORE_MODE=fail MUTATION_MIN_KILLED_PERCENT=<N> make test-mutation`
+  - CI heavy lane optimization:
+    after `verify` passes, CI runs `make verify-heavy-extra` (extras only) to avoid
+    re-running strict base gates in the same workflow.
 - **Update docs** whenever behavior, UX, or workflows change
   - Keep specs and plan in sync with implemented features
   - Add/adjust questions when requirements are unclear or changed
@@ -106,4 +109,5 @@ avoid missing mandatory tasks.
 - **Windows**: ensure tests write UTF‑8 when test data includes non‑ASCII characters
 - **Benchmark de-dup**: CI matrix verify jobs intentionally use
   `VERIFY_SKIP_BENCH=1`; strict benchmark enforcement is done by the dedicated
-  `benchmark-regression` job (`make bench-check ...`).
+  `benchmark-regression` job (`make bench-check ...`), and schedule-heavy runs
+  still execute strict `bench-check` once in the heavy lane.

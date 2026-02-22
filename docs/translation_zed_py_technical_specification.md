@@ -852,7 +852,10 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
   - CI/release strict gate: `make verify-ci` (non-mutating, fail-on-drift),
   - CI matrix may set `VERIFY_SKIP_BENCH=1` in `verify-ci` when benchmark compare is
     enforced by a dedicated strict benchmark job to avoid duplicate benchmark execution,
-  - heavy tier gate: `make verify-heavy` (`verify-ci` + advisory mutation run),
+  - local heavy tier gate: `make verify-heavy`
+    (`verify-ci` + staged mutation/perf extras),
+  - CI heavy lane uses `make verify-heavy-extra` after verify passes to avoid
+    duplicate strict-base reruns in the same workflow,
   - mutation artifacts include machine-readable gate summary
     (`artifacts/mutation/summary.json`) and human log (`summary.txt`);
     optional staged ratchet is available through
@@ -907,8 +910,9 @@ Current builds use **cache‑only** recovery:
   - dedicated Linux benchmark-regression job runs strict `make bench-check`
     (`BENCH_COMPARE_MODE=fail`, 20% threshold),
   - benchmark strict enforcement remains Linux-only for now,
-  - scheduled/workflow-dispatch heavy lane runs `make verify-heavy`
-    (`verify-ci` + staged mutation report/gate).
+  - scheduled/workflow-dispatch heavy lane runs staged mutation/perf extras after
+    verify pass; schedule-heavy additionally runs strict benchmark compare once
+    (`make bench-check` fail mode) because the dedicated benchmark job is skipped on schedule.
 
 ## 13  Backlog (Post‑v0.7)
 

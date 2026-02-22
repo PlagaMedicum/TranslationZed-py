@@ -144,6 +144,8 @@ _Last updated: 2026-02-22_
   and benchmark checks resolve against the active platform key.
 - CI enforces benchmark regression in a dedicated Linux job (`BENCH_COMPARE_MODE=fail`);
   matrix `verify-ci` jobs use `VERIFY_SKIP_BENCH=1` to avoid duplicate benchmark runs.
+- Scheduled CI heavy lane still runs strict benchmark regression once
+  (`make bench-check`, fail mode) because dedicated benchmark job is skipped on schedule.
 - Local verify runs benchmark compare in advisory mode (`BENCH_COMPARE_MODE=warn`).
 
 ### 2.9 Property and mutation testing
@@ -177,8 +179,10 @@ _Last updated: 2026-02-22_
   (`MUTATION_STAGE=<report|soft|strict>`, `MUTATION_STAGE_MIN_KILLED_PERCENT=<N>`).
 - Mutation shell runner strict/advisory behavior is guarded by
   `tests/test_mutation_script.py`.
-- Tiered heavy lane entrypoint is `make verify-heavy`
+- Local tiered heavy entrypoint is `make verify-heavy`
   (`verify-ci` + heavy TM stress-profile perf gate + staged mutation gate).
+- CI heavy lane uses `make verify-heavy-extra` after the verify job has already
+  completed, so strict base gates are not duplicated in the same workflow run.
 
 ### 2.10 Warning-safety gate
 - Default pytest-based gates run with `-W error::ResourceWarning` so
