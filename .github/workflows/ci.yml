@@ -103,24 +103,10 @@ jobs:
       - name: Resolve mutation stage profile
         shell: bash
         run: |
-          case "${MUTATION_STAGE}" in
-            report)
-              echo "MUTATION_EFFECTIVE_MODE=warn" >> "$GITHUB_ENV"
-              echo "MUTATION_EFFECTIVE_MIN_KILLED_PERCENT=0" >> "$GITHUB_ENV"
-              ;;
-            soft)
-              echo "MUTATION_EFFECTIVE_MODE=warn" >> "$GITHUB_ENV"
-              echo "MUTATION_EFFECTIVE_MIN_KILLED_PERCENT=${MUTATION_STAGE_MIN_KILLED_PERCENT}" >> "$GITHUB_ENV"
-              ;;
-            strict)
-              echo "MUTATION_EFFECTIVE_MODE=fail" >> "$GITHUB_ENV"
-              echo "MUTATION_EFFECTIVE_MIN_KILLED_PERCENT=${MUTATION_STAGE_MIN_KILLED_PERCENT}" >> "$GITHUB_ENV"
-              ;;
-            *)
-              echo "Unsupported mutation stage profile: ${MUTATION_STAGE}" >&2
-              exit 2
-              ;;
-          esac
+          python scripts/mutation_stage.py \
+            --stage "${MUTATION_STAGE}" \
+            --min-killed-percent "${MUTATION_STAGE_MIN_KILLED_PERCENT}" \
+            --out-env "$GITHUB_ENV"
       - name: Heavy verification (staged mutation gate)
         run: |
           make verify-heavy \
