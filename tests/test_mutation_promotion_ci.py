@@ -227,6 +227,38 @@ def test_evaluate_reports_not_ready_when_actionable_mutants_are_zero(
     assert "actionable_total<=0" in evaluation.results[-1].reasons
 
 
+def test_evaluate_reports_not_ready_when_artifact_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return not-ready when one of the latest runs has no summary artifact."""
+    module = _load_module()
+    _mock_two_runs(
+        module,
+        monkeypatch,
+        {
+            100: _zip_summary(_summary_payload(killed_percent=31.0)),
+        },
+    )
+
+    evaluation = module.evaluate_promotion_readiness(
+        repo="owner/repo",
+        workflow="ci.yml",
+        branch="main",
+        event="schedule",
+        artifact_name="heavy-mutation-summary",
+        required_consecutive=2,
+        min_killed_percent=25.0,
+        require_mode="fail",
+        token="token",
+        work_dir=tmp_path,
+    )
+
+    assert evaluation.ready is False
+    assert evaluation.results[-1].artifact_state == "missing"
+    assert "artifact 'heavy-mutation-summary' not found" in evaluation.results[-1].reasons
+
+
 def test_evaluate_raises_value_error_for_unreadable_zip_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -269,6 +301,34 @@ def test_main_returns_invalid_input_when_github_token_is_missing(
         lambda **_: (_ for _ in ()).throw(AssertionError("must not be called")),
     )
     monkeypatch.setenv("PYTHONHASHSEED", os.environ.get("PYTHONHASHSEED", "0"))
+
+    old_argv = sys.argv
+    try:
+        sys.argv = [
+            "check_mutation_promotion_ci.py",
+            "--repo",
+            "owner/repo",
+            "--branch",
+            "main",
+        ]
+        result = module.main()
+    finally:
+        sys.argv = old_argv
+
+    assert result == module.EXIT_INVALID_INPUT
+
+
+def test_main_returns_invalid_input_for_malformed_workflow_runs_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Return exit code 2 when workflow-runs payload shape is malformed."""
+    module = _load_module()
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setattr(
+        module,
+        "_fetch_completed_runs",
+        lambda **_: [{"id": "bad"}],
+    )
 
     old_argv = sys.argv
     try:
