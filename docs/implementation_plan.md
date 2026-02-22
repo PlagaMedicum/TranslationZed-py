@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-20_
+_Last updated: 2026-02-22_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.7.0 is shipped; this plan now
@@ -836,6 +836,9 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] Added optional mutation score-ratchet infrastructure:
        mutation summary artifacts + `MUTATION_SCORE_MODE` /
        `MUTATION_MIN_KILLED_PERCENT` gating controls (default remains advisory).
+     - [✓] Added explicit in-repo mutmut target scope configuration
+       (`[tool.mutmut].paths_to_mutate`) plus regression guard
+       (`tests/test_mutmut_config.py`) for critical-core module coverage.
      - [✓] Staged mutation rollout activated:
        heavy CI lane now applies thresholded mutation gate in staged mode
        (default `warn` + `MUTATION_MIN_KILLED_PERCENT=25`; dispatch can switch to `fail`).

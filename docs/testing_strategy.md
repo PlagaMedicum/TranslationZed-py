@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-20_
+_Last updated: 2026-02-22_
 
 ---
 
@@ -154,6 +154,8 @@ _Last updated: 2026-02-20_
 - Mutation testing is configured for critical core modules:
   `parser`, `saver`, `status_cache`, `project_session`, `save_exit_flow`,
   `conflict_service`, `search_replace_service`.
+- Mutation scope is pinned in `pyproject.toml` (`[tool.mutmut].paths_to_mutate`)
+  and guarded by regression test `tests/test_mutmut_config.py`.
 - Current mutation mode is **advisory** (`make test-mutation`): reports are
   published without blocking until baseline quality is stabilized.
 - Mutation summary artifacts now include `artifacts/mutation/summary.json` and
