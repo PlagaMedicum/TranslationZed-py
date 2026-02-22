@@ -8,13 +8,23 @@ MUTATION_SCORE_MODE ?= warn
 MUTATION_MIN_KILLED_PERCENT ?= 0
 MUTATION_STAGE ?= soft
 MUTATION_STAGE_MIN_KILLED_PERCENT ?= 25
+MUTATION_PROMOTION_REPO ?= $(GITHUB_REPOSITORY)
+MUTATION_PROMOTION_WORKFLOW ?= ci.yml
+MUTATION_PROMOTION_BRANCH ?= main
+MUTATION_PROMOTION_EVENT ?= schedule
+MUTATION_PROMOTION_ARTIFACT_NAME ?= heavy-mutation-summary
+MUTATION_PROMOTION_REQUIRED_CONSECUTIVE ?= 2
+MUTATION_PROMOTION_MIN_KILLED_PERCENT ?= 25
+MUTATION_PROMOTION_REQUIRE_MODE ?= fail
+MUTATION_PROMOTION_TOKEN_ENV ?= GITHUB_TOKEN
+MUTATION_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/mutation/promotion-readiness.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check \
 	test test-cov test-perf test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build bench bench-check bench-advisory test-mutation \
-	test-mutation-stage mutation-promotion-check \
+	test-mutation-stage mutation-promotion-check mutation-promotion-readiness \
 	test-warnings run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
 
@@ -102,6 +112,24 @@ test-mutation-stage:
 
 mutation-promotion-check:
 	$(VENV)/bin/python scripts/check_mutation_promotion.py $(ARGS)
+
+mutation-promotion-readiness:
+	@if [ -z "$(MUTATION_PROMOTION_REPO)" ]; then \
+		echo "MUTATION_PROMOTION_REPO is required (example: owner/repo)."; \
+		exit 2; \
+	fi
+	$(VENV)/bin/python scripts/check_mutation_promotion_ci.py \
+		--repo "$(MUTATION_PROMOTION_REPO)" \
+		--workflow "$(MUTATION_PROMOTION_WORKFLOW)" \
+		--branch "$(MUTATION_PROMOTION_BRANCH)" \
+		--event "$(MUTATION_PROMOTION_EVENT)" \
+		--artifact-name "$(MUTATION_PROMOTION_ARTIFACT_NAME)" \
+		--required-consecutive "$(MUTATION_PROMOTION_REQUIRED_CONSECUTIVE)" \
+		--min-killed-percent "$(MUTATION_PROMOTION_MIN_KILLED_PERCENT)" \
+		--require-mode "$(MUTATION_PROMOTION_REQUIRE_MODE)" \
+		--token-env "$(MUTATION_PROMOTION_TOKEN_ENV)" \
+		--out-json "$(MUTATION_PROMOTION_OUT_JSON)" \
+		$(ARGS)
 
 test-encoding-integrity:
 	VENV=$(VENV) bash scripts/test_encoding_integrity.sh
