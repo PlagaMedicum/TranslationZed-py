@@ -392,8 +392,10 @@ They include:
   tricky comments/spacing/concat chains and raw tables.
 - Locale‑driven encoding save tests (write via GUI/controller and compare bytes).
 - Regression suite for previously reported parse/saver failures (screenshots).
-- GUI tests for large‑string guards (delegate elide + detail panel lazy load).
 - Mutation score ratchet from advisory to blocking threshold after baseline stabilization.
+- Large-string GUI guards are already covered by
+  `tests/test_delegates_behaviors.py` (delegate elide/render paths) and
+  `tests/test_main_window_detail_helpers.py` (detail-panel lazy-load threshold paths).
 
 ---
 
@@ -402,7 +404,7 @@ They include:
 - Enforced gate thresholds:
   - Core modules (`translationzed_py/core`): **>=95%** line coverage.
   - Whole package (`translationzed_py`): **>=90%** line coverage.
-- Current strict baseline (2026-02-20):
+- Current strict baseline (2026-02-22):
   - `make test-cov`: **92.2%** whole package.
   - core-only strict run: **95.7%**.
   - `translationzed_py/gui/main_window.py`: **83.4%** (informational, no per-file hard gate).
