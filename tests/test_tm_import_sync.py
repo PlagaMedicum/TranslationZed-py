@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from translationzed_py.core.tm_import_sync import (
+    _is_up_to_date_error,
     _is_up_to_date_ready,
     _normalize_locale_tag,
     _pick_raw_pair,
@@ -417,6 +418,65 @@ def test_sync_import_folder_records_language_detect_failures(tmp_path: Path) -> 
     store.close()
 
 
+def test_sync_import_folder_skips_repeated_unchanged_error_files(tmp_path: Path) -> None:
+    """Unchanged parse-error imports should not re-fail every passive sync."""
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    broken = tm_dir / "broken.tmx"
+    tm_dir.mkdir(parents=True, exist_ok=True)
+    broken.write_text("<tmx><bad", encoding="utf-8")
+    store = TMStore(root)
+
+    first = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+    assert len(first.failures) == 1
+    assert first.checked_files == ("broken.tmx",)
+
+    second = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+    assert second.failures == ()
+    assert second.checked_files == ("broken.tmx",)
+    assert second.imported_files == ()
+    assert second.imported_segments == 0
+    store.close()
+
+
+def test_sync_import_folder_retries_error_file_after_content_change(tmp_path: Path) -> None:
+    """Errored file is retried and imported once its on-disk content changes."""
+    root = tmp_path / "root"
+    root.mkdir()
+    tm_dir = root / ".tzp" / "tms"
+    broken = tm_dir / "broken.tmx"
+    tm_dir.mkdir(parents=True, exist_ok=True)
+    broken.write_text("<tmx><bad", encoding="utf-8")
+    store = TMStore(root)
+
+    first = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+    assert len(first.failures) == 1
+
+    _write_tmx(broken, source_lang="EN", target_lang="RU")
+    second = sync_import_folder(
+        store,
+        tm_dir,
+        resolve_locales=lambda _path, _langs: (("EN", "RU"), False),
+    )
+    assert second.failures == ()
+    assert second.imported_segments == 1
+    assert second.imported_files == ("broken.tmx (1 segment(s))",)
+    store.close()
+
+
 def test_sync_import_folder_records_replace_errors(tmp_path: Path, monkeypatch) -> None:
     """Verify sync stores error metadata when TM replacement fails."""
     root = tmp_path / "root"
@@ -476,3 +536,19 @@ def test_tm_import_sync_locale_and_uptodate_helpers_cover_fallback_paths() -> No
         _is_up_to_date_ready(ready, 10, 20, pending_only=False, has_entries=True)
         is True
     )
+    error = TMImportFile(
+        tm_path="/tmp/broken.tmx",
+        tm_name="broken",
+        source_locale="EN",
+        target_locale="RU",
+        source_locale_raw="EN",
+        target_locale_raw="RU",
+        segment_count=0,
+        mtime_ns=11,
+        file_size=21,
+        enabled=True,
+        status="error",
+        note="syntax error",
+        updated_at=0,
+    )
+    assert _is_up_to_date_error(error, 11, 21, pending_only=False) is True

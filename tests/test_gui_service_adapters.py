@@ -2922,7 +2922,7 @@ def test_left_panel_changed_routes_tm_search_and_qa_branches(
     win._tm_bootstrap_pending = True
     win._on_left_panel_changed(win._left_tm_btn)
     assert win._left_stack.currentIndex() == mw._LEFT_PANEL_TM
-    assert tm_calls == [("sync", True, False), "bootstrap", "update"]
+    assert tm_calls == [("sync", False, False), "bootstrap", "update"]
     assert win._tm_bootstrap_pending is False
 
     search_calls: list[str] = []

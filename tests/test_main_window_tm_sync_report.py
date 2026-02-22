@@ -196,6 +196,40 @@ def test_apply_tm_sync_report_renders_summary_and_no_change_messages(
     assert "Checked:" in _FakeMessageBox._instances[1].details
 
 
+def test_apply_tm_sync_report_non_interactive_uses_status_bar_not_modal(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Non-interactive sync reports should surface as status-bar messages only."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    monkeypatch.setattr(mw, "QMessageBox", _FakeMessageBox)
+    _FakeMessageBox._instances.clear()
+
+    shown: list[tuple[str, int]] = []
+    monkeypatch.setattr(
+        win.statusBar(),
+        "showMessage",
+        lambda text, ms=0: shown.append((str(text), int(ms))),
+    )
+
+    report = TMImportSyncReport(
+        imported_segments=0,
+        imported_files=(),
+        unresolved_files=("pending.tmx",),
+        zero_segment_files=(),
+        failures=("broken.tmx: syntax error",),
+        checked_files=("pending.tmx", "broken.tmx"),
+        changed=False,
+    )
+    win._apply_tm_sync_report(report, interactive=False, show_summary=False)
+
+    assert _FakeMessageBox._instances == []
+    assert shown == [("TM import sync issues: 1 failed, 1 pending mapping", 5000)]
+
+
 def test_sync_tm_import_folder_handles_mkdir_errors_for_interactive_and_non_interactive(
     qtbot,
     tmp_path,
