@@ -68,3 +68,15 @@ ignore_errors = true       # GUI code uses Qt – relax the checker here
 
 [tool.pytest.ini_options]
 addopts = "-ra -q --benchmark-skip"
+
+[tool.mutmut]
+paths_to_mutate = [
+    "translationzed_py/core/parser.py",
+    "translationzed_py/core/saver.py",
+    "translationzed_py/core/status_cache.py",
+    "translationzed_py/core/project_session.py",
+    "translationzed_py/core/save_exit_flow.py",
+    "translationzed_py/core/conflict_service.py",
+    "translationzed_py/core/search_replace_service.py",
+]
+tests_dir = ["tests"]
