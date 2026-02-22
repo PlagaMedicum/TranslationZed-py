@@ -879,6 +879,9 @@ A9 [✓] **Verification-overhaul milestone**
        after two consecutive scheduled heavy-lane runs satisfy strict-stage
        criteria (effective `MUTATION_SCORE_MODE=fail` threshold pass and no
        mutmut execution failures).
+     - [→] A9 finalization slice (current): automate scheduled heavy-run
+       promotion-readiness evaluation in CI with persisted evidence artifacts,
+       while keeping the default-stage flip as a manual reviewed commit.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
