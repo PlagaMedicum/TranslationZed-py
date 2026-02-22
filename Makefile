@@ -6,12 +6,15 @@ BENCH_BASELINE ?= tests/benchmarks/baseline.json
 BENCH_CURRENT ?= $(ARTIFACTS)/bench/bench.json
 MUTATION_SCORE_MODE ?= warn
 MUTATION_MIN_KILLED_PERCENT ?= 0
+MUTATION_STAGE ?= soft
+MUTATION_STAGE_MIN_KILLED_PERCENT ?= 25
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-check lint lint-check typecheck arch-check \
 	test test-cov test-perf test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build bench bench-check bench-advisory test-mutation \
+	test-mutation-stage \
 	test-warnings run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
 
@@ -80,6 +83,19 @@ test-mutation:
 	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) MUTATION_SCORE_MODE=$(MUTATION_SCORE_MODE) \
 		MUTATION_MIN_KILLED_PERCENT=$(MUTATION_MIN_KILLED_PERCENT) \
 		bash scripts/mutation.sh
+
+test-mutation-stage:
+	@set -e; \
+	stage_env="$$(mktemp)"; \
+	trap 'rm -f "$$stage_env"' EXIT; \
+	$(VENV)/bin/python scripts/mutation_stage.py \
+		--stage "$(MUTATION_STAGE)" \
+		--min-killed-percent "$(MUTATION_STAGE_MIN_KILLED_PERCENT)" \
+		--out-env "$$stage_env" >/dev/null; \
+	. "$$stage_env"; \
+	$(MAKE) test-mutation \
+		MUTATION_SCORE_MODE="$$MUTATION_EFFECTIVE_MODE" \
+		MUTATION_MIN_KILLED_PERCENT="$$MUTATION_EFFECTIVE_MIN_KILLED_PERCENT"
 
 test-encoding-integrity:
 	VENV=$(VENV) bash scripts/test_encoding_integrity.sh
