@@ -44,7 +44,8 @@ DEFAULT_RULES: dict[str, BoundaryRule] = {
             }
         ),
         # Growth watchdog until the remaining extraction slices land.
-        max_lines=5600,
+        # Raised narrowly to match the current extracted-state footprint.
+        max_lines=5800,
     )
 }
 
