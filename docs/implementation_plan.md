@@ -807,7 +807,7 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] `make verify` remains local primary gate with explicit auto-fix warning.
      - [✓] CI runs strict non-mutating gate and publishes verification artifacts.
      - [✓] Canonical docs updated to match implemented tooling behavior.
-   - **Current verification snapshot (2026-02-20)**:
+   - **Current verification snapshot (2026-02-22)**:
      - [✓] Whole-package strict gate is met:
        `make test-cov` reports **92.2%**.
      - [✓] Core coverage gate remains met in strict run:
@@ -865,8 +865,12 @@ A9 [✓] **Verification-overhaul milestone**
        with screen-aware min/max bounds, and custom message-box flows apply
        shared size/resizability preparation before `exec()` (prevents both tiny
        and excessively large diagnostics windows).
-     - [→] Ongoing verification-overhaul focus remains on ratchet progression
-       (promoting staged mutation from soft to strict default after baseline stabilizes).
+     - [→] Ongoing verification-overhaul focus remains on mutation-ratchet
+       promotion readiness:
+       promote workflow-dispatch default stage from `soft` to `strict` only
+       after two consecutive scheduled heavy-lane runs satisfy strict-stage
+       criteria (effective `MUTATION_SCORE_MODE=fail` threshold pass and no
+       mutmut execution failures).
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
@@ -896,7 +900,14 @@ C1 [✓] **Translation memory** (Step 29).
      - [✓] TM import now copies files into managed folder; drop-in supported TM files are discovered and synced.
      - [✓] Imported TM format support extended to `.xliff`/`.xlf`, `.po`/`.pot`, `.csv`, `.mo`, `.xml`, and `.xlsx` (alongside `.tmx`); drop-in sync scans all supported import extensions.
      - [✓] Locale-pair safety for imported TMs: unresolved locale metadata is kept pending until mapped manually.
-     - [✓] TM panel open triggers import-folder sync and immediate mapping dialogs; mapping dialog supports **Skip all for now**.
+     - [✓] TM panel open triggers import-folder sync in passive,
+       non-interactive mode (status-bar issue reporting, no modal mapping
+       dialogs on panel open); unresolved locale mapping is handled through
+       explicit **Resolve Pending** / **Import TM** actions with
+       **Skip all for now** support.
+     - [✓] Superseded note (2026-02-22): earlier implementation notes that
+       described immediate mapping dialogs during panel-open sync are retained
+       as historical context only and are not current behavior.
      - [✓] TMX import locale matching accepts region variants (`en-US`/`be-BY` -> `EN`/`BE`) to prevent zero-segment imports from locale-tag mismatch.
      - [✓] TM import sync auto-recovers `ready` records with missing import entries by forcing re-import on next sync.
      - [✓] TM import registry now persists per-file `segment_count` and original TMX locale tags (`source_locale_raw`, `target_locale_raw`).
@@ -1007,6 +1018,13 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
     do not add strict non-stub lane yet.
   - move mutation policy to staged rollout (soft threshold active, strict mode available).
   - keep strict benchmark gate Linux-only for now; revisit multi-OS strictness after variance data collection.
+- **2026-02-22 decision set**:
+  - use criteria-based mutation-ratchet promotion:
+    keep workflow-dispatch default stage at `soft`, and promote to `strict`
+    only after two consecutive scheduled heavy-lane runs pass strict-stage
+    criteria (`mode=fail`, threshold pass, no mutmut execution failures).
+  - replace stale TM panel-open mapping-dialog wording in C1 with passive-sync
+    behavior and keep a short superseded historical note.
 
 ---
 
