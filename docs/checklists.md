@@ -37,14 +37,16 @@ avoid missing mandatory tasks.
   - CI heavy lane optimization:
     after `verify` passes, CI runs `make verify-heavy-extra` (extras only) to avoid
     re-running strict base gates in the same workflow.
-  - Mutation default-promotion operator flow (criteria-gated):
-    1) Collect the two latest scheduled heavy-lane mutation summaries
-       (`artifacts/mutation/summary.json`) in chronological order
-       (oldest -> newest).
-    2) Run:
-       `make mutation-promotion-check ARGS="--summaries <older-summary.json> <newer-summary.json> --required-consecutive 2 --min-killed-percent 25 --require-mode fail"`.
-    3) Switch workflow-dispatch mutation-stage default from `soft` to `strict`
-       only when the command exits `0` (promotion ready).
+  - Mutation default-promotion operator flow (criteria-gated, automated evidence):
+    1) Inspect the latest **Mutation Promotion Readiness** workflow run
+       (`.github/workflows/mutation-promotion-readiness.yml`) for scheduled CI.
+    2) Verify `mutation promotion readiness: ready=true` in logs/summary and
+       review artifact `mutation-promotion-readiness` (`promotion-readiness.json`).
+    3) If ready, switch workflow-dispatch mutation-stage default from `soft`
+       to `strict` via a normal reviewed commit (manual control, no auto-flip).
+    4) If not ready, keep default at `soft` and continue collecting scheduled evidence.
+  - Optional local/manual checker run:
+    `make mutation-promotion-readiness MUTATION_PROMOTION_REPO=<owner/repo> MUTATION_PROMOTION_BRANCH=<branch>`
 - **Update docs** whenever behavior, UX, or workflows change
   - Keep specs and plan in sync with implemented features
   - Add/adjust questions when requirements are unclear or changed

@@ -869,10 +869,16 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
     `MUTATION_MIN_KILLED_PERCENT=<threshold>` (staged rollout uses explicit profiles:
     `report`=`warn/0`, `soft`=`warn/<threshold>`, `strict`=`fail/<threshold>`;
     workflow-dispatch defaults to `soft`, schedule defaults to `strict`).
+  - CI heavy lane publishes dedicated artifact `heavy-mutation-summary`
+    (`artifacts/mutation/summary.json`) for cross-run readiness evaluation.
   - mutation default-stage promotion is criteria-gated and evaluated via
-    `make mutation-promotion-check` over ordered scheduled heavy-run summaries;
-    promote workflow-dispatch default from `soft` to `strict` only when
-    readiness passes (two consecutive strict-qualified runs).
+    `scripts/check_mutation_promotion_ci.py` / `make mutation-promotion-readiness`
+    over latest scheduled heavy-run artifacts (tail streak rule);
+    workflow `.github/workflows/mutation-promotion-readiness.yml` treats
+    checker exit `1` as informational not-ready and checker exit `2` as failure.
+  - promote workflow-dispatch default from `soft` to `strict` only when
+    readiness passes (two consecutive strict-qualified scheduled runs), and
+    apply that default flip through a manual reviewed commit.
 
 ---
 

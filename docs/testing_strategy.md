@@ -182,9 +182,16 @@ _Last updated: 2026-02-22_
   (`MUTATION_STAGE=<report|soft|strict>`, `MUTATION_STAGE_MIN_KILLED_PERCENT=<N>`).
 - Mutation shell runner strict/advisory behavior is guarded by
   `tests/test_mutation_script.py`.
-- Mutation promotion readiness is evaluated with
-  `make mutation-promotion-check`, which checks ordered mutation summaries and
-  requires a qualifying tail streak before changing default stage policy.
+- Mutation promotion readiness is evaluated automatically in CI with
+  `scripts/check_mutation_promotion_ci.py` / `make mutation-promotion-readiness`,
+  which query scheduled `CI` heavy-run artifacts (`heavy-mutation-summary`) and
+  require a qualifying tail streak before changing default stage policy.
+- Readiness workflow contract:
+  `.github/workflows/mutation-promotion-readiness.yml` runs on completed
+  scheduled `CI` workflows; checker exit `1` is informational (not-ready) and
+  checker exit `2` fails the workflow (invalid input/API/format).
+- `make mutation-promotion-check` remains available for explicit local/manual
+  evaluation when operators already have ordered summary files.
 - Local tiered heavy entrypoint is `make verify-heavy`
   (`verify-ci` + heavy TM stress-profile perf gate + staged mutation gate).
 - CI heavy lane uses `make verify-heavy-extra` after the verify job has already
@@ -192,7 +199,8 @@ _Last updated: 2026-02-22_
 - Criteria-gated mutation promotion policy:
   keep workflow-dispatch heavy runs defaulted to `soft`; promote default to
   `strict` only after two consecutive scheduled heavy runs pass strict-stage
-  criteria (`mode=fail`, threshold pass, no mutmut execution failures).
+  criteria (`mode=fail`, threshold pass, no mutmut execution failures), then
+  apply the default flip via a normal reviewed commit.
 
 ### 2.10 Warning-safety gate
 - Default pytest-based gates run with `-W error::ResourceWarning` so
