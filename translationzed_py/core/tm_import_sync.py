@@ -83,6 +83,8 @@ def sync_import_folder(
             has_entries=has_entries,
         ):
             continue
+        if _is_up_to_date_error(record, stat.st_mtime_ns, stat.st_size, pending_only):
+            continue
         try:
             langs = detect_tm_languages(path)
         except Exception as exc:
@@ -230,5 +232,16 @@ def _is_up_to_date_ready(
     if pending_only or record is None or record.status != "ready":
         return False
     if not has_entries:
+        return False
+    return record.mtime_ns == mtime_ns and record.file_size == file_size
+
+
+def _is_up_to_date_error(
+    record: TMImportFile | None,
+    mtime_ns: int,
+    file_size: int,
+    pending_only: bool,
+) -> bool:
+    if pending_only or record is None or record.status != "error":
         return False
     return record.mtime_ns == mtime_ns and record.file_size == file_size

@@ -1778,6 +1778,27 @@ class MainWindow(QMainWindow):
             self._tm_workflow.clear_cache()
             if self._left_stack.currentIndex() == 1:
                 self._schedule_tm_update()
+        if not interactive:
+            issue_parts: list[str] = []
+            if report.failures:
+                issue_parts.append(f"{len(report.failures)} failed")
+            if report.unresolved_files:
+                issue_parts.append(f"{len(report.unresolved_files)} pending mapping")
+            if report.zero_segment_files:
+                issue_parts.append(f"{len(report.zero_segment_files)} imported with 0 segments")
+            if issue_parts:
+                self.statusBar().showMessage(
+                    "TM import sync issues: " + ", ".join(issue_parts),
+                    5000,
+                )
+            elif show_summary and report.imported_files:
+                self.statusBar().showMessage(
+                    "TM import sync: "
+                    f"Imported {len(report.imported_files)} file(s), "
+                    f"{report.imported_segments} segment(s).",
+                    5000,
+                )
+            return
         if interactive:
             parts = []
             if report.imported_files:
@@ -2908,7 +2929,8 @@ class MainWindow(QMainWindow):
         if idx >= 0:
             self._left_stack.setCurrentIndex(idx)
         if idx == _LEFT_PANEL_TM and self._ensure_tm_store():
-            self._sync_tm_import_folder(interactive=True, show_summary=False)
+            # Passive panel switch should not open modal dialogs for stale TM issues.
+            self._sync_tm_import_folder(interactive=False, show_summary=False)
             if self._tm_bootstrap_pending:
                 self._tm_bootstrap_pending = False
                 self._maybe_bootstrap_tm()
