@@ -10,7 +10,7 @@ MUTATION_STAGE ?= soft
 MUTATION_STAGE_MIN_KILLED_PERCENT ?= 25
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt fmt-check lint lint-check typecheck arch-check \
+.PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check \
 	test test-cov test-perf test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build bench bench-check bench-advisory test-mutation \
@@ -34,6 +34,9 @@ precommit: venv
 # ─── Quality families ──────────────────────────────────────────────────────────
 fmt:
 	VENV=$(VENV) bash scripts/fmt.sh
+
+fmt-changed:
+	FMT_SCOPE=changed VENV=$(VENV) bash scripts/fmt.sh
 
 fmt-check:
 	VENV=$(VENV) bash scripts/fmt_check.sh
@@ -121,7 +124,7 @@ check-local: fmt lint typecheck arch-check test
 
 # ─── Verification umbrella gates ───────────────────────────────────────────────
 ## full local verification core (auto-fix + warning policy)
-verify-core: clean-cache clean-config fmt lint typecheck arch-check perf-advisory \
+verify-core: clean-cache clean-config fmt-changed lint typecheck arch-check perf-advisory \
 	bench-advisory test-cov test-readonly-clean security docstyle docs-build
 
 ## local perf gates are advisory; strict blocking lives in verify-ci

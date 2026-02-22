@@ -48,3 +48,37 @@ PY
 pytest_run() {
   "$VENV_PY" -m pytest -W "$PYTEST_RESOURCE_WARNING_FILTER" "$@"
 }
+
+python_source_files() {
+  local -a roots=("translationzed_py" "tests" "scripts")
+  if command -v rg >/dev/null 2>&1; then
+    (
+      cd "$ROOT_DIR"
+      rg --files "${roots[@]}" -g "*.py"
+    )
+    return 0
+  fi
+  (
+    cd "$ROOT_DIR"
+    find "${roots[@]}" -type f -name "*.py" | sort
+  )
+}
+
+changed_python_source_files() {
+  if ! command -v git >/dev/null 2>&1; then
+    python_source_files
+    return 0
+  fi
+  if ! git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    python_source_files
+    return 0
+  fi
+  (
+    cd "$ROOT_DIR"
+    {
+      git diff --name-only --diff-filter=ACMRTUXB
+      git diff --cached --name-only --diff-filter=ACMRTUXB
+      git ls-files --others --exclude-standard
+    } | awk '/^(translationzed_py|tests|scripts)\/.*\.py$/ { print }' | sort -u
+  )
+}
