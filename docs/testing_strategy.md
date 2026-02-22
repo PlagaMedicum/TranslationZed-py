@@ -321,10 +321,11 @@ They include:
 - TM bootstrap behavior: opening TM panel triggers one-time project bootstrap
   for selected locales even when DB already has stale partial entries
   (`tests/test_gui_tm_preferences.py`).
-- TM import sync service: managed-folder sync, skip-all mapping behavior, and missing-file cleanup
+- TM import sync service: managed-folder sync, skip-all mapping behavior,
+  missing-file cleanup, unchanged-error skip, and changed-error retry behavior
+  (`core.tm_import_sync` unit tests).
 - Source-reference path service: cross-locale mirror and suffix-rewrite resolution
   is covered by `tests/test_source_reference_service.py`.
-  (`core.tm_import_sync` unit tests).
 - TM query/policy service: cache-key construction and score/origin filtering semantics.
 - TM workflow service: suggestion view-model formatting/status messages and
   query-term tokenization used by TM preview highlighting, plus lookup/apply
@@ -382,6 +383,9 @@ They include:
 - GUI adapter delegation: verifies `main_window` routes key orchestration to services
   for open/switch/save/conflict/search flows, including file-level replace-all
   delegation (`tests/test_gui_service_adapters.py`).
+- TM panel passive sync uses non-interactive path (status-bar issue reporting,
+  no modal warning) on panel switch (`tests/test_gui_service_adapters.py`,
+  `tests/test_main_window_tm_sync_report.py`).
 - Architecture guardrail checks: import-boundary allowlist + line-budget watchdog
   for `gui/main_window.py` (`tests/test_architecture_guard.py`, `make arch-check`).
 

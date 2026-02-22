@@ -711,9 +711,13 @@ UNTOUCHED).
     pending mapping, error capture) without Qt dependencies.
   - Imported TM files (`.tmx`, `.xliff`, `.xlf`, `.po`, `.pot`, `.csv`, `.mo`, `.xml`, `.xlsx`) are copied into and synchronized from `TM_IMPORT_DIR`; drop-in files are
     discovered on TM panel activation (synchronization trigger).
-  - Locale mapping for imported TM files is auto-detected when reliable; unresolved files trigger an
-    immediate locale-mapping dialog when TM panel is opened, with **Skip all for now** support.
+  - Locale mapping for imported TM files is auto-detected when reliable.
+    TM panel activation runs non-interactive sync (status-bar issue signal, no modal dialog);
+    unresolved locale mapping is resolved via explicit interactive actions
+    (Import TM / Resolve Pending) with **Skip all for now** support.
   - Pending/unresolved/error imported files are excluded from TM suggestions until resolved.
+  - Unchanged `error` import records are not reparsed on every passive sync;
+    files are retried when mtime/size changes.
   - A `ready` import record with zero import entries is treated as stale and re-imported
     on next sync, so older failed/partial imports self-heal automatically.
   - Import registry stores normalized locales, original source locale tags, and last imported segment count per TM file.

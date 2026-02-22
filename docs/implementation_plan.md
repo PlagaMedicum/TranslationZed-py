@@ -856,6 +856,10 @@ A9 [✓] **Verification-overhaul milestone**
        added `make verify-heavy-extra` (perf-heavy + mutation) and switched
        heavy workflow execution to extras-only after `verify` pass; schedule-heavy
        keeps a single strict `bench-check` run to preserve benchmark coverage.
+     - [✓] TM panel passive-sync UX hardened:
+       opening TM panel now uses non-interactive import sync (status-bar issue
+       signal, no modal warning), and unchanged errored TM files are not reparsed
+       on every panel open (retries happen only after file changes).
      - [→] Ongoing verification-overhaul focus remains on ratchet progression
        (promoting staged mutation from soft to strict default after baseline stabilizes).
 

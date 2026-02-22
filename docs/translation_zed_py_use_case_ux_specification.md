@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.7.0 · 2026‑02‑18_
+_version 0.7.0 · 2026‑02‑22_
 
 ---
 ## 1  Actors
@@ -268,7 +268,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | User drops supported TM files (`.tmx`, `.xliff`, `.xlf`, `.po`, `.pot`, `.csv`, `.mo`, `.xml`, `.xlsx`) into the managed TM import folder outside the app. |
 | **Flow** |
 |  1 | On TM panel activation, SYS scans TM import folder for new/changed/removed supported TM files. |
-|  2 | SYS auto-detects source/target locales when possible; unresolved files trigger immediate locale-mapping dialogs with **Skip all for now** support. |
+|  2 | SYS auto-detects source/target locales when possible; panel-activation sync is passive (non-modal) and unresolved files remain pending for explicit **Resolve Pending** action. |
 |  3 | SYS imports locale-resolved files and removes TM entries for missing files. |
 |  4 | If mapping is unresolved or TM parsing fails, SYS keeps file in pending/error state and excludes it from TM suggestions. |
 | **Post-condition** | TM store reflects folder content without mixing unrelated locale pairs. |
