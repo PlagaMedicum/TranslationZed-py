@@ -860,6 +860,10 @@ A9 [✓] **Verification-overhaul milestone**
        opening TM panel now uses non-interactive import sync (status-bar issue
        signal, no modal warning), and unchanged errored TM files are not reparsed
        on every panel open (retries happen only after file changes).
+     - [✓] GUI message-box usability hardening:
+       warning/error/info dialogs in `main_window` now use resizable dialog policy,
+       and custom message-box flows apply shared size/resizability preparation
+       before `exec()` (prevents tiny, non-resizable diagnostics windows).
      - [→] Ongoing verification-overhaul focus remains on ratchet progression
        (promoting staged mutation from soft to strict default after baseline stabilizes).
 

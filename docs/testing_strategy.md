@@ -386,6 +386,10 @@ They include:
 - TM panel passive sync uses non-interactive path (status-bar issue reporting,
   no modal warning) on panel switch (`tests/test_gui_service_adapters.py`,
   `tests/test_main_window_tm_sync_report.py`).
+- GUI message-dialog policy:
+  warning/error/info flows route through resizable message-box helpers, while
+  custom `QMessageBox(self)` dialogs apply shared size/resizability preparation
+  before execution (covered across main-window dialog-flow tests).
 - Architecture guardrail checks: import-boundary allowlist + line-budget watchdog
   for `gui/main_window.py` (`tests/test_architecture_guard.py`, `make arch-check`).
 
