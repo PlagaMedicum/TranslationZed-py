@@ -163,8 +163,12 @@ _Last updated: 2026-02-22_
   `MUTATION_SCORE_MODE={warn|fail|off}` and
   `MUTATION_MIN_KILLED_PERCENT=<threshold>` (default remains advisory `warn` with disabled threshold).
 - Staged rollout is active in CI heavy lane:
-  default `MUTATION_SCORE_MODE=warn` with `MUTATION_MIN_KILLED_PERCENT=25`;
-  workflow-dispatch can switch to `MUTATION_SCORE_MODE=fail` for strict ratchet trials.
+  workflow-dispatch uses stage profiles (`report`/`soft`/`strict`, default `soft`)
+  and scheduled heavy runs use `strict` profile by default.
+  Stage mapping:
+  `report -> mode=warn, min=0`,
+  `soft -> mode=warn, min=<threshold>`,
+  `strict -> mode=fail, min=<threshold>`.
 - Tiered heavy lane entrypoint is `make verify-heavy`
   (`verify-ci` + heavy TM stress-profile perf gate + staged mutation gate).
 

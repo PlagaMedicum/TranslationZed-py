@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.7.0 · 2026-02-20**\
+**Version 0.7.0 · 2026-02-22**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -857,8 +857,9 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
     (`artifacts/mutation/summary.json`) and human log (`summary.txt`);
     optional staged ratchet is available through
     `MUTATION_SCORE_MODE={warn|fail|off}` and
-    `MUTATION_MIN_KILLED_PERCENT=<threshold>` (staged rollout currently defaults
-    to `warn` + threshold in heavy CI lanes; strict fail mode is dispatch-controlled).
+    `MUTATION_MIN_KILLED_PERCENT=<threshold>` (staged rollout uses explicit profiles:
+    `report`=`warn/0`, `soft`=`warn/<threshold>`, `strict`=`fail/<threshold>`;
+    workflow-dispatch defaults to `soft`, schedule defaults to `strict`).
 
 ---
 
@@ -962,4 +963,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-20 (v0.7.0)*
+*Last updated: 2026-02-22 (v0.7.0)*

@@ -841,7 +841,8 @@ A9 [✓] **Verification-overhaul milestone**
        (`tests/test_mutmut_config.py`) for critical-core module coverage.
      - [✓] Staged mutation rollout activated:
        heavy CI lane now applies thresholded mutation gate in staged mode
-       (default `warn` + `MUTATION_MIN_KILLED_PERCENT=25`; dispatch can switch to `fail`).
+       with explicit profiles (`report`/`soft`/`strict`),
+       workflow-dispatch default `soft`, and scheduled heavy runs default `strict`.
      - [→] Ongoing verification-overhaul focus remains on ratchet progression
        (promoting staged mutation from soft to strict default after baseline stabilizes).
 
