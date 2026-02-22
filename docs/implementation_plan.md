@@ -846,6 +846,9 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] Mutation stage-profile resolution is centralized in
        `scripts/mutation_stage.py` and regression-tested
        (`tests/test_mutation_stage.py`) to avoid CI policy drift.
+     - [✓] Added local staged mutation entrypoint:
+       `make test-mutation-stage` (stage-profile wrapper over `test-mutation`)
+       for `report`/`soft`/`strict` ratchet trials.
      - [→] Ongoing verification-overhaul focus remains on ratchet progression
        (promoting staged mutation from soft to strict default after baseline stabilizes).
 

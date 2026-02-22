@@ -171,6 +171,8 @@ _Last updated: 2026-02-22_
   `strict -> mode=fail, min=<threshold>`.
 - Stage-profile resolution is centralized in `scripts/mutation_stage.py`
   and guarded by `tests/test_mutation_stage.py` to prevent CI policy drift.
+- Local staged runs use `make test-mutation-stage`
+  (`MUTATION_STAGE=<report|soft|strict>`, `MUTATION_STAGE_MIN_KILLED_PERCENT=<N>`).
 - Tiered heavy lane entrypoint is `make verify-heavy`
   (`verify-ci` + heavy TM stress-profile perf gate + staged mutation gate).
 

@@ -28,6 +28,8 @@ avoid missing mandatory tasks.
     workflow-dispatch default `soft`; scheduled run defaults to `strict`.
   - Stage mapping:
     `report -> warn/0`, `soft -> warn/<threshold>`, `strict -> fail/<threshold>`.
+  - Local staged helper:
+    `MUTATION_STAGE=<report|soft|strict> MUTATION_STAGE_MIN_KILLED_PERCENT=<N> make test-mutation-stage`
   - Local strict ratchet trial command:
     `MUTATION_SCORE_MODE=fail MUTATION_MIN_KILLED_PERCENT=<N> make test-mutation`
 - **Update docs** whenever behavior, UX, or workflows change
