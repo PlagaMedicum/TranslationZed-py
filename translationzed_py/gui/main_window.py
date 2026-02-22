@@ -49,6 +49,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -380,6 +381,68 @@ def _patch_message_boxes_for_tests() -> None:
     _TEST_DIALOGS_PATCHED = True
 
 
+def _prepare_message_box(
+    msg: QMessageBox,
+    *,
+    min_width: int = 560,
+    min_height: int = 260,
+) -> QMessageBox:
+    """Apply consistent sizing/resizability policy to GUI message boxes."""
+    # Be tolerant to test doubles that may not implement every Qt API.
+    with contextlib.suppress(Exception):
+        msg.setSizeGripEnabled(True)
+    with contextlib.suppress(Exception):
+        msg.setWindowFlag(Qt.WindowType.MSWindowsFixedSizeDialogHint, False)
+        msg.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, True)
+    layout = None
+    with contextlib.suppress(Exception):
+        layout = msg.layout()
+    if layout is not None:
+        with contextlib.suppress(Exception):
+            layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+    with contextlib.suppress(Exception):
+        msg.setMinimumSize(min_width, min_height)
+        hint = msg.sizeHint()
+        msg.resize(max(min_width, hint.width()), max(min_height, hint.height()))
+    return msg
+
+
+def _show_warning_box(parent: QWidget, title: str, text: str) -> int:
+    """Show a warning message with the standard resizable dialog policy."""
+    if _in_test_mode():
+        result = QMessageBox.warning(parent, title, text)
+        return 0 if result is None else int(result)
+    msg = QMessageBox(parent)
+    msg.setIcon(QMessageBox.Warning)
+    msg.setWindowTitle(title)
+    msg.setText(text)
+    return int(_prepare_message_box(msg).exec())
+
+
+def _show_critical_box(parent: QWidget, title: str, text: str) -> int:
+    """Show an error message with the standard resizable dialog policy."""
+    if _in_test_mode():
+        result = QMessageBox.critical(parent, title, text)
+        return 0 if result is None else int(result)
+    msg = QMessageBox(parent)
+    msg.setIcon(QMessageBox.Critical)
+    msg.setWindowTitle(title)
+    msg.setText(text)
+    return int(_prepare_message_box(msg).exec())
+
+
+def _show_info_box(parent: QWidget, title: str, text: str) -> int:
+    """Show an informational message with the standard resizable dialog policy."""
+    if _in_test_mode():
+        result = QMessageBox.information(parent, title, text)
+        return 0 if result is None else int(result)
+    msg = QMessageBox(parent)
+    msg.setIcon(QMessageBox.Information)
+    msg.setWindowTitle(title)
+    msg.setText(text)
+    return int(_prepare_message_box(msg).exec())
+
+
 _DETAIL_LAZY_THRESHOLD = 100_000
 
 
@@ -435,7 +498,7 @@ class MainWindow(QMainWindow):
             self._default_root = str(self._root)
             self._preferences_service.persist_default_root(self._default_root)
         if not self._root.exists():
-            QMessageBox.warning(self, "Invalid project root", str(self._root))
+            _show_warning_box(self, "Invalid project root", str(self._root))
             self._startup_aborted = True
             return
         self.setWindowTitle(f"TranslationZed-Py – {self._root}")
@@ -1595,7 +1658,7 @@ class MainWindow(QMainWindow):
         try:
             self._locales, errors = scan_root_with_errors(self._root)
         except Exception as exc:
-            QMessageBox.critical(self, "Invalid language.txt", str(exc))
+            _show_critical_box(self, "Invalid language.txt", str(exc))
             self._locales = {}
             self._selected_locales = []
             return
@@ -1608,7 +1671,7 @@ class MainWindow(QMainWindow):
                 "Fix those files to enable the locales."
             )
             msg.setDetailedText("\n".join(errors))
-            msg.exec()
+            _prepare_message_box(msg).exec()
         self._schedule_cache_migration()
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
         self._files_by_locale.clear()
@@ -1648,7 +1711,7 @@ class MainWindow(QMainWindow):
             self._tm_store = TMStore(self._root)
         except Exception as exc:
             self._tm_store = None
-            QMessageBox.warning(self, "TM init failed", str(exc))
+            _show_warning_box(self, "TM init failed", str(exc))
 
     def _ensure_tm_store(self) -> bool:
         if self._tm_store is None:
@@ -1743,7 +1806,7 @@ class MainWindow(QMainWindow):
             tm_dir.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             if interactive:
-                QMessageBox.warning(self, "TM import folder", str(exc))
+                _show_warning_box(self, "TM import folder", str(exc))
             else:
                 self.statusBar().showMessage(
                     f"TM import folder unavailable: {exc}", 5000
@@ -1859,7 +1922,7 @@ class MainWindow(QMainWindow):
                 if report.failures:
                     details.append("Failures:\n" + "\n".join(report.failures))
                 msg.setDetailedText("\n\n".join(details))
-                msg.exec()
+                _prepare_message_box(msg).exec()
             elif show_summary and report.imported_files:
                 msg = QMessageBox(self)
                 msg.setIcon(QMessageBox.Information)
@@ -1869,7 +1932,7 @@ class MainWindow(QMainWindow):
                     "Imported:\n"
                     + "\n".join(f"- {name}" for name in report.imported_files)
                 )
-                msg.exec()
+                _prepare_message_box(msg).exec()
             elif show_summary and not parts:
                 msg = QMessageBox(self)
                 msg.setIcon(QMessageBox.Information)
@@ -1880,7 +1943,7 @@ class MainWindow(QMainWindow):
                         "Checked:\n"
                         + "\n".join(f"- {name}" for name in report.checked_files)
                     )
-                msg.exec()
+                _prepare_message_box(msg).exec()
 
     def _copy_tmx_to_import_dir(self, source: Path) -> Path:
         source = source.resolve()
@@ -1977,7 +2040,7 @@ class MainWindow(QMainWindow):
         )
         ack = msg.addButton("Continue", QMessageBox.AcceptRole)
         msg.addButton("Dismiss", QMessageBox.RejectRole)
-        msg.exec()
+        _prepare_message_box(msg).exec()
         if msg.clickedButton() is ack:
             _write_en_hash_cache(self._root, computed)
         return True
@@ -1993,7 +2056,7 @@ class MainWindow(QMainWindow):
             | QMessageBox.StandardButton.No
             | QMessageBox.StandardButton.Cancel
         )
-        result = msg.exec()
+        result = _prepare_message_box(msg).exec()
         if result == QMessageBox.StandardButton.Yes:
             return "yes"
         if result == QMessageBox.StandardButton.No:
@@ -2013,7 +2076,7 @@ class MainWindow(QMainWindow):
 
     def _import_tmx(self) -> None:
         if not self._ensure_tm_store():
-            QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
+            _show_warning_box(self, "TM unavailable", "TM store is not available.")
             return
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -2036,7 +2099,7 @@ class MainWindow(QMainWindow):
         try:
             dest = self._copy_tmx_to_import_dir(Path(path))
         except Exception as exc:
-            QMessageBox.warning(self, "TM import failed", str(exc))
+            _show_warning_box(self, "TM import failed", str(exc))
             return
         self._sync_tm_import_folder(
             interactive=True,
@@ -2053,7 +2116,7 @@ class MainWindow(QMainWindow):
 
     def _export_tmx(self) -> None:
         if not self._ensure_tm_store():
-            QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
+            _show_warning_box(self, "TM unavailable", "TM store is not available.")
             return
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -2079,7 +2142,7 @@ class MainWindow(QMainWindow):
         source_locale = dialog.source_locale()
         target_locale = dialog.target_locale()
         if not source_locale or not target_locale:
-            QMessageBox.warning(
+            _show_warning_box(
                 self, "Invalid locales", "Source/target locales required."
             )
             return
@@ -2088,9 +2151,9 @@ class MainWindow(QMainWindow):
                 Path(path), source_locale=source_locale, target_locale=target_locale
             )
         except Exception as exc:
-            QMessageBox.warning(self, "TMX export failed", str(exc))
+            _show_warning_box(self, "TMX export failed", str(exc))
             return
-        QMessageBox.information(
+        _show_info_box(
             self,
             "TMX export complete",
             f"Exported {count} translation unit(s).",
@@ -2098,11 +2161,11 @@ class MainWindow(QMainWindow):
 
     def _rebuild_tm_selected(self) -> None:
         if not self._ensure_tm_store():
-            QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
+            _show_warning_box(self, "TM unavailable", "TM store is not available.")
             return
         locales = [loc for loc in self._selected_locales if loc != "EN"]
         if not locales:
-            QMessageBox.information(self, "TM rebuild", "No locales selected.")
+            _show_info_box(self, "TM rebuild", "No locales selected.")
             return
         self._start_tm_rebuild(locales, interactive=True, force=True)
 
@@ -2131,7 +2194,7 @@ class MainWindow(QMainWindow):
 
     def _show_tm_diagnostics(self) -> None:
         if not self._ensure_tm_store():
-            QMessageBox.warning(self, "TM unavailable", "TM store is not available.")
+            _show_warning_box(self, "TM unavailable", "TM store is not available.")
             return
         assert self._tm_store is not None
         policy = self._tm_query_policy()
@@ -2167,7 +2230,7 @@ class MainWindow(QMainWindow):
         )
         if not locale_specs:
             if interactive:
-                QMessageBox.information(self, "TM rebuild", "No TM entries found.")
+                _show_info_box(self, "TM rebuild", "No TM entries found.")
             return
         if self._tm_rebuild_pool is None:
             self._tm_rebuild_pool = ThreadPoolExecutor(
@@ -2205,7 +2268,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             message = f"TM rebuild failed: {exc}"
             if self._tm_rebuild_interactive:
-                QMessageBox.warning(self, "TM rebuild failed", message)
+                _show_warning_box(self, "TM rebuild failed", message)
             else:
                 self.statusBar().showMessage(message, 5000)
             return
@@ -2417,7 +2480,7 @@ class MainWindow(QMainWindow):
             msg.setWindowTitle("TM preferences")
             msg.setText("Some TM file operations failed.")
             msg.setDetailedText("\n".join(report.failures))
-            msg.exec()
+            _prepare_message_box(msg).exec()
 
     def _confirm_tm_file_deletion(self, remove_paths: set[str]) -> bool:
         confirm = QMessageBox(self)
@@ -2432,7 +2495,7 @@ class MainWindow(QMainWindow):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
         )
         confirm.setDefaultButton(QMessageBox.StandardButton.Cancel)
-        return confirm.exec() == QMessageBox.StandardButton.Yes
+        return _prepare_message_box(confirm).exec() == QMessageBox.StandardButton.Yes
 
     def _switch_locales(self) -> None:
         if not self._write_cache_current():
@@ -2639,7 +2702,7 @@ class MainWindow(QMainWindow):
                         last_opened=int(time.time()),
                     )
                 except Exception as exc:
-                    QMessageBox.warning(self, "Cache migration failed", str(exc))
+                    _show_warning_box(self, "Cache migration failed", str(exc))
 
             # (re)create undo/redo actions bound to this file's stack
             for action in list(self.menu_edit.actions()):
@@ -3094,7 +3157,7 @@ class MainWindow(QMainWindow):
             self.fs_model.set_dirty(self._current_pf.path, False)
             self._set_saved_status()
         except Exception as exc:
-            QMessageBox.critical(self, "Save failed", str(exc))
+            _show_critical_box(self, "Save failed", str(exc))
             return False
         return True
 
@@ -3109,7 +3172,7 @@ class MainWindow(QMainWindow):
     def _can_write_originals(self, action: str) -> bool:
         if self._open_flow_depth <= 0:
             return True
-        QMessageBox.warning(
+        _show_warning_box(
             self,
             "Operation blocked",
             f"Cannot {action} while file open/read flow is active.",
@@ -3128,7 +3191,7 @@ class MainWindow(QMainWindow):
         )
 
     def _notify_nothing_to_write(self) -> None:
-        QMessageBox.information(self, "Nothing to write", "No draft changes to write.")
+        _show_info_box(self, "Nothing to write", "No draft changes to write.")
 
     def _show_save_files_dialog(self, files: list[Path]) -> str:
         rel_files = list(
@@ -3243,7 +3306,7 @@ class MainWindow(QMainWindow):
         legacy_paths = _legacy_cache_paths(self._root)
         callbacks = _CacheMigrationScheduleCallbacks(
             migrate_all=lambda: _migrate_status_caches(self._root, self._locales),
-            warn=lambda message: QMessageBox.warning(
+            warn=lambda message: _show_warning_box(
                 self,
                 "Cache migration failed",
                 message,
@@ -3266,7 +3329,7 @@ class MainWindow(QMainWindow):
                 self._locales,
                 list(paths),
             ),
-            warn=lambda message: QMessageBox.warning(
+            warn=lambda message: _show_warning_box(
                 self,
                 "Cache migration failed",
                 message,
@@ -3316,7 +3379,7 @@ class MainWindow(QMainWindow):
             msg.setDetailedText(warning.detailed_text)
             purge = msg.addButton("Purge", QMessageBox.AcceptRole)
             msg.addButton("Dismiss", QMessageBox.RejectRole)
-            msg.exec()
+            _prepare_message_box(msg).exec()
             if msg.clickedButton() is purge:
                 for path in warning.orphan_paths:
                     try:
@@ -3340,7 +3403,7 @@ class MainWindow(QMainWindow):
         if plan.aborted:
             return
         if plan.warning_message:
-            QMessageBox.warning(
+            _show_warning_box(
                 self,
                 "Save incomplete",
                 f"Some files could not be written:\n{plan.warning_message}",
@@ -3385,7 +3448,7 @@ class MainWindow(QMainWindow):
             self._report_parse_error(path, exc.original)
             return False
         except Exception as exc:
-            QMessageBox.warning(self, "Save failed", str(exc))
+            _show_warning_box(self, "Save failed", str(exc))
             return False
         if not result.had_drafts:
             return True
@@ -3409,7 +3472,7 @@ class MainWindow(QMainWindow):
                 original_values=original_values,
             )
         except Exception as exc:
-            QMessageBox.critical(self, "Cache write failed", str(exc))
+            _show_critical_box(self, "Cache write failed", str(exc))
             return False
         if self._current_model.changed_keys():
             self.fs_model.set_dirty(self._current_pf.path, True)
@@ -3446,7 +3509,7 @@ class MainWindow(QMainWindow):
                     file_path=batch.file_key,
                 )
             except Exception as exc:
-                QMessageBox.warning(self, "TM update failed", str(exc))
+                _show_warning_box(self, "TM update failed", str(exc))
                 continue
             self._tm_workflow.mark_batch_flushed(batch.file_key)
 
@@ -3552,7 +3615,7 @@ class MainWindow(QMainWindow):
                 case_sensitive=self._search_case_sensitive,
             )
         except _ReplaceRequestError:
-            QMessageBox.warning(self, "Invalid regex", "Regex pattern is invalid.")
+            _show_warning_box(self, "Invalid regex", "Regex pattern is invalid.")
             return None
 
     def _files_for_scope(self, scope: str) -> list[Path]:
@@ -3603,7 +3666,7 @@ class MainWindow(QMainWindow):
                 callbacks=callbacks,
             )
         except re.error as exc:
-            QMessageBox.warning(self, "Replace failed", str(exc))
+            _show_warning_box(self, "Replace failed", str(exc))
             return
         if changed:
             self._schedule_search()
@@ -3634,7 +3697,7 @@ class MainWindow(QMainWindow):
                 callbacks=callbacks,
             )
         except re.error as exc:
-            QMessageBox.warning(self, "Replace failed", str(exc))
+            _show_warning_box(self, "Replace failed", str(exc))
             return None
 
     def _replace_all_count_in_file(
@@ -3671,7 +3734,7 @@ class MainWindow(QMainWindow):
             self._report_parse_error(exc.path, exc.original)
             return None
         except re.error as exc:
-            QMessageBox.warning(self, "Replace failed", str(exc))
+            _show_warning_box(self, "Replace failed", str(exc))
             return None
 
     def _replace_all(self) -> None:
@@ -3779,7 +3842,7 @@ class MainWindow(QMainWindow):
                 callbacks=callbacks,
             )
         except re.error as exc:
-            QMessageBox.warning(self, "Replace failed", str(exc))
+            _show_warning_box(self, "Replace failed", str(exc))
             return False
         return True
 
@@ -3827,7 +3890,7 @@ class MainWindow(QMainWindow):
             self._report_parse_error(exc.path, exc.original)
             return False
         except re.error as exc:
-            QMessageBox.warning(self, "Replace failed", str(exc))
+            _show_warning_box(self, "Replace failed", str(exc))
             return False
         if result.changed_any:
             self.fs_model.set_dirty(path, True)
@@ -3835,7 +3898,7 @@ class MainWindow(QMainWindow):
 
     def _report_parse_error(self, path: Path, exc: Exception) -> None:
         message = f"{path}\n\n{exc}"
-        QMessageBox.warning(self, "Parse error", message)
+        _show_warning_box(self, "Parse error", message)
         print(f"[Parse error] {path}", file=sys.stderr)
         traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
 
@@ -4107,7 +4170,7 @@ class MainWindow(QMainWindow):
     def _apply_merge_resolutions(self) -> None:
         for _key, _orig_item, _cache_item, btn_original, btn_cache in self._merge_rows:
             if not (btn_original.isChecked() or btn_cache.isChecked()):
-                QMessageBox.warning(
+                _show_warning_box(
                     self,
                     "Incomplete selection",
                     "Choose Original or Cache for every row.",
