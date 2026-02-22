@@ -12,7 +12,7 @@ MUTATION_STAGE_MIN_KILLED_PERCENT ?= 25
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-check lint lint-check typecheck arch-check \
 	test test-cov test-perf test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
-	verify-heavy verify-fast release-check release-check-if-tag release-dry-run \
+	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build bench bench-check bench-advisory test-mutation \
 	test-mutation-stage \
 	test-warnings run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
@@ -180,7 +180,10 @@ verify-ci:
 	fi
 
 ## tiered heavy verification (advisory mutation + optional extra checks)
-verify-heavy: verify-ci test-perf-heavy test-mutation
+verify-heavy-extra: test-perf-heavy test-mutation
+
+## tiered heavy verification (strict base + heavy extras)
+verify-heavy: verify-ci verify-heavy-extra
 
 ## fastest strict developer gate
 verify-fast: check

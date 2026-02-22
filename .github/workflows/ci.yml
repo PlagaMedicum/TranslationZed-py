@@ -108,9 +108,14 @@ jobs:
             --min-killed-percent "${MUTATION_STAGE_MIN_KILLED_PERCENT}" \
             --out-env "$GITHUB_ENV"
       - name: Heavy verification (staged mutation gate)
+        shell: bash
         run: |
-          make verify-heavy \
-            BENCH_COMPARE_MODE=warn \
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            make bench-check \
+              BENCH_COMPARE_MODE=fail \
+              BENCH_REGRESSION_THRESHOLD_PERCENT=20
+          fi
+          make verify-heavy-extra \
             MUTATION_SCORE_MODE=${{ env.MUTATION_EFFECTIVE_MODE }} \
             MUTATION_MIN_KILLED_PERCENT=${{ env.MUTATION_EFFECTIVE_MIN_KILLED_PERCENT }}
       - name: Upload heavy artifacts
