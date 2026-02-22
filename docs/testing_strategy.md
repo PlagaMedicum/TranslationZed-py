@@ -179,10 +179,17 @@ _Last updated: 2026-02-22_
   (`MUTATION_STAGE=<report|soft|strict>`, `MUTATION_STAGE_MIN_KILLED_PERCENT=<N>`).
 - Mutation shell runner strict/advisory behavior is guarded by
   `tests/test_mutation_script.py`.
+- Mutation promotion readiness is evaluated with
+  `make mutation-promotion-check`, which checks ordered mutation summaries and
+  requires a qualifying tail streak before changing default stage policy.
 - Local tiered heavy entrypoint is `make verify-heavy`
   (`verify-ci` + heavy TM stress-profile perf gate + staged mutation gate).
 - CI heavy lane uses `make verify-heavy-extra` after the verify job has already
   completed, so strict base gates are not duplicated in the same workflow run.
+- Criteria-gated mutation promotion policy:
+  keep workflow-dispatch heavy runs defaulted to `soft`; promote default to
+  `strict` only after two consecutive scheduled heavy runs pass strict-stage
+  criteria (`mode=fail`, threshold pass, no mutmut execution failures).
 
 ### 2.10 Warning-safety gate
 - Default pytest-based gates run with `-W error::ResourceWarning` so
@@ -403,15 +410,17 @@ They include:
 - No critical integration gaps are currently tracked in strict automated lanes.
 
 **System / functional / regression / smoke gaps**
-- Mutation testing is advisory in default lanes; fail-under controls exist but are
-  not yet enforced in strict CI by default.
+- Mutation testing remains non-blocking in default PR lanes; strict enforcement is
+  active in staged heavy runs, and promotion of default strict behavior is
+  explicitly criteria-gated.
 
 **Planned test expansions:**
 - Golden save fixtures derived from real PZ files (small slices) that include
   tricky comments/spacing/concat chains and raw tables.
 - Locale‑driven encoding save tests (write via GUI/controller and compare bytes).
 - Regression suite for previously reported parse/saver failures (screenshots).
-- Mutation score ratchet from advisory to blocking threshold after baseline stabilization.
+- Mutation score ratchet from `soft` default to `strict` default after
+  checker-confirmed consecutive scheduled heavy-run evidence.
 - Large-string GUI guards are already covered by
   `tests/test_delegates_behaviors.py` (delegate elide/render paths) and
   `tests/test_main_window_detail_helpers.py` (detail-panel lazy-load threshold paths).
