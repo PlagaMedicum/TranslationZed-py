@@ -118,6 +118,13 @@ jobs:
           make verify-heavy-extra \
             MUTATION_SCORE_MODE=${{ env.MUTATION_EFFECTIVE_MODE }} \
             MUTATION_MIN_KILLED_PERCENT=${{ env.MUTATION_EFFECTIVE_MIN_KILLED_PERCENT }}
+      - name: Upload heavy mutation summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: heavy-mutation-summary
+          path: artifacts/mutation/summary.json
+          if-no-files-found: ignore
       - name: Upload heavy artifacts
         if: always()
         uses: actions/upload-artifact@v4
