@@ -852,6 +852,10 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] Strict mutation runner contract hardened:
        `MUTATION_SCORE_MODE=fail` now blocks on both mutmut execution failures
        and summary threshold failures; guarded by `tests/test_mutation_script.py`.
+     - [✓] Added mutation-promotion readiness checker:
+       `scripts/check_mutation_promotion.py` + `make mutation-promotion-check`
+       evaluate ordered mutation summaries with deterministic `0/1/2` exits
+       and optional JSON output for promotion evidence.
      - [✓] CI heavy-lane de-dup applied:
        added `make verify-heavy-extra` (perf-heavy + mutation) and switched
        heavy workflow execution to extras-only after `verify` pass; schedule-heavy
