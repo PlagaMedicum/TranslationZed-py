@@ -849,6 +849,9 @@ A9 [✓] **Verification-overhaul milestone**
      - [✓] Added local staged mutation entrypoint:
        `make test-mutation-stage` (stage-profile wrapper over `test-mutation`)
        for `report`/`soft`/`strict` ratchet trials.
+     - [✓] Strict mutation runner contract hardened:
+       `MUTATION_SCORE_MODE=fail` now blocks on both mutmut execution failures
+       and summary threshold failures; guarded by `tests/test_mutation_script.py`.
      - [→] Ongoing verification-overhaul focus remains on ratchet progression
        (promoting staged mutation from soft to strict default after baseline stabilizes).
 

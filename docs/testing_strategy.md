@@ -158,6 +158,8 @@ _Last updated: 2026-02-22_
   and guarded by regression test `tests/test_mutmut_config.py`.
 - Current mutation mode is **advisory** (`make test-mutation`): reports are
   published without blocking until baseline quality is stabilized.
+- In strict mode (`MUTATION_SCORE_MODE=fail`), the gate fails on either
+  mutmut execution errors or below-threshold mutation score summary.
 - Mutation summary artifacts now include `artifacts/mutation/summary.json` and
   `artifacts/mutation/summary.txt`; optional staged ratcheting is supported via
   `MUTATION_SCORE_MODE={warn|fail|off}` and
@@ -173,6 +175,8 @@ _Last updated: 2026-02-22_
   and guarded by `tests/test_mutation_stage.py` to prevent CI policy drift.
 - Local staged runs use `make test-mutation-stage`
   (`MUTATION_STAGE=<report|soft|strict>`, `MUTATION_STAGE_MIN_KILLED_PERCENT=<N>`).
+- Mutation shell runner strict/advisory behavior is guarded by
+  `tests/test_mutation_script.py`.
 - Tiered heavy lane entrypoint is `make verify-heavy`
   (`verify-ci` + heavy TM stress-profile perf gate + staged mutation gate).
 
