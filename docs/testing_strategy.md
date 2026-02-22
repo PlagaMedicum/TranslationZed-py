@@ -147,6 +147,9 @@ _Last updated: 2026-02-22_
 - Scheduled CI heavy lane still runs strict benchmark regression once
   (`make bench-check`, fail mode) because dedicated benchmark job is skipped on schedule.
 - Local verify runs benchmark compare in advisory mode (`BENCH_COMPARE_MODE=warn`).
+- Local `make verify` uses change-scoped formatter auto-fix (`make fmt-changed`)
+  to keep runtime practical; strict full-repo format enforcement remains in
+  `make fmt-check` (CI/release lanes).
 
 ### 2.9 Property and mutation testing
 - Property-based tests (Hypothesis) are part of the default suite for:

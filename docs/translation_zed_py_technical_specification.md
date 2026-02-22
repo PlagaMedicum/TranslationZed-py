@@ -821,6 +821,8 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 
 - **Coding style**:
   - local autofix path: `make fmt` + `make lint`,
+  - local verify path uses `make fmt-changed` (changed Python files only) to
+    keep runtime practical while preserving autofix behavior,
   - strict check-only path: `make fmt-check` + `make lint-check`,
   - ruff target version aligned to project minimum Python support (`>=3.10`).
 - **Type safety**: `mypy --strict` on `translationzed_py` (`make typecheck`).

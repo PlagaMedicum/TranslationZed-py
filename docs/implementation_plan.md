@@ -856,6 +856,10 @@ A9 [✓] **Verification-overhaul milestone**
        `scripts/check_mutation_promotion.py` + `make mutation-promotion-check`
        evaluate ordered mutation summaries with deterministic `0/1/2` exits
        and optional JSON output for promotion evidence.
+     - [✓] Local verify runtime guard for formatter lane:
+       added `make fmt-changed` (change-scoped black autofix) and switched
+       `verify-core` to use it, while CI/release strict lanes continue to use
+       full-repo `fmt-check`.
      - [✓] CI heavy-lane de-dup applied:
        added `make verify-heavy-extra` (perf-heavy + mutation) and switched
        heavy workflow execution to extras-only after `verify` pass; schedule-heavy

@@ -18,6 +18,8 @@ avoid missing mandatory tasks.
     security/docstyle/docs-build checks, encoding-integrity
     gates, read-only repo-clean gate, and perf scenarios
   - Warns (does not fail) when auto-fixers modify tracked files
+  - Local formatter auto-fix is change-scoped (`fmt-changed`) to keep runtime practical;
+    strict full-repo formatting remains enforced by CI `fmt-check` gates
   - Avoid duplicate reruns by default: `make verify` already executes the strict
     coverage pytest lane (`make test-cov`) once
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
