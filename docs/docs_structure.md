@@ -1,5 +1,5 @@
 # TranslationZed-Py — Documentation Structure
-_Last updated: 2026-02-20_
+_Last updated: 2026-02-22_
 
 ## 1) Purpose
 
@@ -71,6 +71,9 @@ changes should be propagated to keep docs coherent.
 - If a statement appears in two docs, one must be marked as derived.
 - When side-panel quick actions exist, plan/spec wording must distinguish
   **primary control surface** vs **quick action** to avoid contradictory wording.
+- `docs/implementation_plan.md` may include short **superseded** notes for
+  historical context, but its current-state behavior text must not conflict with
+  normative specs (`technical_spec` / `use_case_ux_spec`).
 
 ## 4) Update Protocol
 
