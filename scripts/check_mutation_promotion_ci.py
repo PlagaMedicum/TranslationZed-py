@@ -175,7 +175,10 @@ def _fetch_named_artifact(
     payload = _github_request_json(url=url, token=token)
     artifacts = payload.get("artifacts")
     if not isinstance(artifacts, list):
-        raise ValueError(f"Invalid artifacts payload for run {run_id}: 'artifacts' must be a list.")
+        raise ValueError(
+            f"Invalid artifacts payload for run {run_id}: "
+            "'artifacts' must be a list."
+        )
     candidates: list[dict[str, Any]] = []
     for index, value in enumerate(artifacts):
         if not isinstance(value, dict):
