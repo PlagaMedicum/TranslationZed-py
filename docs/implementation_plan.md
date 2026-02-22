@@ -843,6 +843,9 @@ A9 [✓] **Verification-overhaul milestone**
        heavy CI lane now applies thresholded mutation gate in staged mode
        with explicit profiles (`report`/`soft`/`strict`),
        workflow-dispatch default `soft`, and scheduled heavy runs default `strict`.
+     - [✓] Mutation stage-profile resolution is centralized in
+       `scripts/mutation_stage.py` and regression-tested
+       (`tests/test_mutation_stage.py`) to avoid CI policy drift.
      - [→] Ongoing verification-overhaul focus remains on ratchet progression
        (promoting staged mutation from soft to strict default after baseline stabilizes).
 

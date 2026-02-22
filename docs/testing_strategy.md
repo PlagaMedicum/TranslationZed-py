@@ -169,6 +169,8 @@ _Last updated: 2026-02-22_
   `report -> mode=warn, min=0`,
   `soft -> mode=warn, min=<threshold>`,
   `strict -> mode=fail, min=<threshold>`.
+- Stage-profile resolution is centralized in `scripts/mutation_stage.py`
+  and guarded by `tests/test_mutation_stage.py` to prevent CI policy drift.
 - Tiered heavy lane entrypoint is `make verify-heavy`
   (`verify-ci` + heavy TM stress-profile perf gate + staged mutation gate).
 
