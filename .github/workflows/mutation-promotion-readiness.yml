@@ -1,0 +1,112 @@
+name: Mutation Promotion Readiness
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to evaluate scheduled CI runs on"
+        required: false
+        default: main
+        type: string
+      required_consecutive:
+        description: "Required qualifying tail streak"
+        required: false
+        default: "2"
+        type: string
+      min_killed_percent:
+        description: "Minimum killed mutant percent for qualifying runs"
+        required: false
+        default: "25"
+        type: string
+      require_mode:
+        description: "Required gate mode for qualifying runs"
+        required: false
+        default: fail
+        type: choice
+        options:
+          - warn
+          - fail
+          - off
+
+jobs:
+  readiness:
+    if: >-
+      ${{
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.event == 'schedule') ||
+        github.event_name == 'workflow_dispatch'
+      }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Evaluate promotion readiness
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            branch="${{ github.event.workflow_run.head_branch }}"
+            required_consecutive="2"
+            min_killed_percent="25"
+            require_mode="fail"
+          else
+            branch="${{ github.event.inputs.branch }}"
+            required_consecutive="${{ github.event.inputs.required_consecutive }}"
+            min_killed_percent="${{ github.event.inputs.min_killed_percent }}"
+            require_mode="${{ github.event.inputs.require_mode }}"
+          fi
+
+          make mutation-promotion-readiness \
+            MUTATION_PROMOTION_REPO="${{ github.repository }}" \
+            MUTATION_PROMOTION_WORKFLOW="ci.yml" \
+            MUTATION_PROMOTION_BRANCH="$branch" \
+            MUTATION_PROMOTION_EVENT="schedule" \
+            MUTATION_PROMOTION_ARTIFACT_NAME="heavy-mutation-summary" \
+            MUTATION_PROMOTION_REQUIRED_CONSECUTIVE="$required_consecutive" \
+            MUTATION_PROMOTION_MIN_KILLED_PERCENT="$min_killed_percent" \
+            MUTATION_PROMOTION_REQUIRE_MODE="$require_mode" \
+            MUTATION_PROMOTION_OUT_JSON="artifacts/mutation/promotion-readiness.json"
+          checker_status=$?
+          set -e
+
+          if [ "$checker_status" -eq 2 ]; then
+            echo "Promotion readiness check failed due to invalid input/API format."
+            exit 2
+          fi
+
+          if [ "$checker_status" -eq 1 ]; then
+            echo "PROMOTION_READY=false" >> "$GITHUB_ENV"
+            echo "PROMOTION_CHECK_STATUS=not-ready" >> "$GITHUB_ENV"
+          else
+            echo "PROMOTION_READY=true" >> "$GITHUB_ENV"
+            echo "PROMOTION_CHECK_STATUS=ready" >> "$GITHUB_ENV"
+          fi
+      - name: Upload readiness artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-promotion-readiness
+          path: artifacts/mutation/promotion-readiness.json
+          if-no-files-found: ignore
+      - name: Publish readiness summary
+        if: always()
+        shell: bash
+        run: |
+          echo "Mutation promotion readiness: ${PROMOTION_CHECK_STATUS:-unavailable}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${PROMOTION_READY:-false}" = "true" ]; then
+            echo "Ready for manual reviewed default flip (\`soft\` -> \`strict\`) in \`.github/workflows/ci.yml\`." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${PROMOTION_READY:-false}" = "false" ]; then
+            echo "Not ready yet; keep workflow-dispatch default at \`soft\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Readiness output unavailable due to checker error." >> "$GITHUB_STEP_SUMMARY"
+          fi
