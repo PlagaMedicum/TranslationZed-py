@@ -867,6 +867,10 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
     `MUTATION_MIN_KILLED_PERCENT=<threshold>` (staged rollout uses explicit profiles:
     `report`=`warn/0`, `soft`=`warn/<threshold>`, `strict`=`fail/<threshold>`;
     workflow-dispatch defaults to `soft`, schedule defaults to `strict`).
+  - mutation default-stage promotion is criteria-gated and evaluated via
+    `make mutation-promotion-check` over ordered scheduled heavy-run summaries;
+    promote workflow-dispatch default from `soft` to `strict` only when
+    readiness passes (two consecutive strict-qualified runs).
 
 ---
 
