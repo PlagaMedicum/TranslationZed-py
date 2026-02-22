@@ -5,14 +5,15 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      mutation_mode:
-        description: "Mutation gate mode for heavy lane (`warn` or `fail`)"
+      mutation_stage:
+        description: "Mutation stage profile for heavy lane (`report`, `soft`, `strict`)"
         required: false
-        default: warn
+        default: soft
         type: choice
         options:
-          - warn
-          - fail
+          - report
+          - soft
+          - strict
       mutation_min_killed_percent:
         description: "Minimum killed-mutant percentage for heavy mutation gate"
         required: false
@@ -84,7 +85,7 @@ jobs:
     needs: verify
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     env:
-      MUTATION_STAGE_MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mutation_mode || 'warn' }}
+      MUTATION_STAGE: ${{ github.event_name == 'schedule' && 'strict' || github.event_name == 'workflow_dispatch' && github.event.inputs.mutation_stage || 'soft' }}
       MUTATION_STAGE_MIN_KILLED_PERCENT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mutation_min_killed_percent || '25' }}
     steps:
       - uses: actions/checkout@v4
@@ -99,12 +100,33 @@ jobs:
         run: |
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
+      - name: Resolve mutation stage profile
+        shell: bash
+        run: |
+          case "${MUTATION_STAGE}" in
+            report)
+              echo "MUTATION_EFFECTIVE_MODE=warn" >> "$GITHUB_ENV"
+              echo "MUTATION_EFFECTIVE_MIN_KILLED_PERCENT=0" >> "$GITHUB_ENV"
+              ;;
+            soft)
+              echo "MUTATION_EFFECTIVE_MODE=warn" >> "$GITHUB_ENV"
+              echo "MUTATION_EFFECTIVE_MIN_KILLED_PERCENT=${MUTATION_STAGE_MIN_KILLED_PERCENT}" >> "$GITHUB_ENV"
+              ;;
+            strict)
+              echo "MUTATION_EFFECTIVE_MODE=fail" >> "$GITHUB_ENV"
+              echo "MUTATION_EFFECTIVE_MIN_KILLED_PERCENT=${MUTATION_STAGE_MIN_KILLED_PERCENT}" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "Unsupported mutation stage profile: ${MUTATION_STAGE}" >&2
+              exit 2
+              ;;
+          esac
       - name: Heavy verification (staged mutation gate)
         run: |
           make verify-heavy \
             BENCH_COMPARE_MODE=warn \
-            MUTATION_SCORE_MODE=${{ env.MUTATION_STAGE_MODE }} \
-            MUTATION_MIN_KILLED_PERCENT=${{ env.MUTATION_STAGE_MIN_KILLED_PERCENT }}
+            MUTATION_SCORE_MODE=${{ env.MUTATION_EFFECTIVE_MODE }} \
+            MUTATION_MIN_KILLED_PERCENT=${{ env.MUTATION_EFFECTIVE_MIN_KILLED_PERCENT }}
       - name: Upload heavy artifacts
         if: always()
         uses: actions/upload-artifact@v4
