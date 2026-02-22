@@ -388,7 +388,8 @@ They include:
   `tests/test_main_window_tm_sync_report.py`).
 - GUI message-dialog policy:
   warning/error/info flows route through resizable message-box helpers, while
-  custom `QMessageBox(self)` dialogs apply shared size/resizability preparation
+  custom `QMessageBox(self)` dialogs apply shared screen-aware min/max size
+  preparation
   before execution (covered across main-window dialog-flow tests).
 - Architecture guardrail checks: import-boundary allowlist + line-budget watchdog
   for `gui/main_window.py` (`tests/test_architecture_guard.py`, `make arch-check`).
