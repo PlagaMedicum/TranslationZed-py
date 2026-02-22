@@ -81,8 +81,29 @@ def _require_bool(value: Any, *, field: str) -> bool:
     return value
 
 
+def _validate_https_url(
+    *,
+    url: str,
+    field: str,
+    allowed_hosts: set[str] | None = None,
+) -> None:
+    """Validate URL has HTTPS scheme and optionally a whitelisted host."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError(f"Invalid '{field}': expected HTTPS URL.")
+    if allowed_hosts is not None and parsed.netloc not in allowed_hosts:
+        raise ValueError(
+            f"Invalid '{field}': host '{parsed.netloc}' is not in allowlist."
+        )
+
+
 def _github_request_json(*, url: str, token: str) -> dict[str, Any]:
     """Fetch a GitHub API endpoint and parse JSON object payload."""
+    _validate_https_url(
+        url=url,
+        field="github_api_url",
+        allowed_hosts={"api.github.com"},
+    )
     request = urllib.request.Request(
         url=url,
         headers={
@@ -94,7 +115,7 @@ def _github_request_json(*, url: str, token: str) -> dict[str, Any]:
         method="GET",
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=30) as response:  # nosec B310
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raise ValueError(f"GitHub API request failed ({exc.code}) for '{url}'.") from exc
@@ -109,6 +130,11 @@ def _github_request_json(*, url: str, token: str) -> dict[str, Any]:
 
 def _github_download_bytes(*, url: str, token: str) -> bytes:
     """Download binary content from a GitHub API artifact URL."""
+    _validate_https_url(
+        url=url,
+        field="artifact_archive_download_url",
+        allowed_hosts={"api.github.com"},
+    )
     request = urllib.request.Request(
         url=url,
         headers={
@@ -120,7 +146,7 @@ def _github_download_bytes(*, url: str, token: str) -> bytes:
         method="GET",
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with urllib.request.urlopen(request, timeout=60) as response:  # nosec B310
             return response.read()
     except urllib.error.HTTPError as exc:
         raise ValueError(
