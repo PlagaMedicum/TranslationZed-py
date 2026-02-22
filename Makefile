@@ -118,7 +118,13 @@ mutation-promotion-readiness:
 		echo "MUTATION_PROMOTION_REPO is required (example: owner/repo)."; \
 		exit 2; \
 	fi
-	$(VENV)/bin/python scripts/check_mutation_promotion_ci.py \
+	@set -e; \
+	if [ -x "$(VENV)/bin/python" ]; then \
+		py_bin="$(VENV)/bin/python"; \
+	else \
+		py_bin="$(PY)"; \
+	fi; \
+	"$$py_bin" scripts/check_mutation_promotion_ci.py \
 		--repo "$(MUTATION_PROMOTION_REPO)" \
 		--workflow "$(MUTATION_PROMOTION_WORKFLOW)" \
 		--branch "$(MUTATION_PROMOTION_BRANCH)" \
