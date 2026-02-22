@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${VENV:-.venv}"
 PY="${PY:-python}"
-VENV_PY="$ROOT_DIR/$VENV/bin/python"
+VENV_PY="${VENV_PY_OVERRIDE:-$ROOT_DIR/$VENV/bin/python}"
 PYTEST_RESOURCE_WARNING_FILTER="${PYTEST_RESOURCE_WARNING_FILTER:-error::ResourceWarning}"
 
 ensure_venv() {

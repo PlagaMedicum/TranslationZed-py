@@ -39,8 +39,11 @@ if [ "$summary_status" -ne 0 ]; then
   echo "mutation score gate did not pass; see $ARTIFACTS_DIR/summary.txt" >&2
 fi
 
-if [ "$MODE" = "fail" ] && [ "$summary_status" -ne 0 ]; then
-  exit 1
+if [ "$MODE" = "fail" ]; then
+  if [ "$run_status" -ne 0 ] || [ "$results_status" -ne 0 ] || [ "$summary_status" -ne 0 ]; then
+    echo "mutation strict gate failed (mutmut execution and/or score gate)." >&2
+    exit 1
+  fi
 fi
 
 # Advisory-by-default policy: only explicit fail mode can block the pipeline.
