@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ from translationzed_py.core.languagetool import (
     LT_STATUS_OFFLINE,
     LT_STATUS_OK,
     LanguageToolCheckResult,
+    LanguageToolMatch,
 )
 from translationzed_py.core.languagetool import check_text as _lt_check_text
 from translationzed_py.core.languagetool import (
@@ -43,6 +45,15 @@ from translationzed_py.core.languagetool import (
 
 LT_EDITOR_DEBOUNCE_MS = 320
 LT_ISSUE_UNDERLINE_COLOR = QColor(210, 48, 48, 210)
+
+
+@dataclass(frozen=True, slots=True)
+class LTEditorIssueSpan:
+    """Represent one inline editor issue span mapped to a LT match."""
+
+    start: int
+    end: int
+    match: LanguageToolMatch
 
 
 def apply_loaded_preferences(win: Any, loaded: Any) -> None:
@@ -161,28 +172,41 @@ def _lt_status_text(result: LanguageToolCheckResult | None) -> str:
 def _build_issue_selections(
     *,
     editor: QPlainTextEdit,
-    result: LanguageToolCheckResult | None,
+    spans: tuple[LTEditorIssueSpan, ...],
 ) -> list[QTextEdit.ExtraSelection]:
-    if result is None or result.status != LT_STATUS_OK or not result.matches:
+    if not spans:
         return []
-    text_len = len(editor.document().toPlainText())
     fmt = QTextCharFormat()
     fmt.setUnderlineStyle(QTextCharFormat.SpellCheckUnderline)
     fmt.setUnderlineColor(LT_ISSUE_UNDERLINE_COLOR)
     selections: list[QTextEdit.ExtraSelection] = []
-    for match in result.matches:
-        start = max(0, int(match.offset))
-        end = min(text_len, start + max(0, int(match.length)))
-        if end <= start:
-            continue
+    for span in spans:
         cursor = QTextCursor(editor.document())
-        cursor.setPosition(start)
-        cursor.setPosition(end, QTextCursor.KeepAnchor)
+        cursor.setPosition(span.start)
+        cursor.setPosition(span.end, QTextCursor.KeepAnchor)
         selection = QTextEdit.ExtraSelection()
         selection.cursor = cursor
         selection.format = fmt
         selections.append(selection)
     return selections
+
+
+def _build_issue_spans(
+    *,
+    editor: QPlainTextEdit,
+    result: LanguageToolCheckResult | None,
+) -> tuple[LTEditorIssueSpan, ...]:
+    if result is None or result.status != LT_STATUS_OK or not result.matches:
+        return ()
+    text_len = len(editor.document().toPlainText())
+    spans: list[LTEditorIssueSpan] = []
+    for match in result.matches:
+        start = max(0, int(match.offset))
+        end = min(text_len, start + max(0, int(match.length)))
+        if end <= start:
+            continue
+        spans.append(LTEditorIssueSpan(start=start, end=end, match=match))
+    return tuple(spans)
 
 
 def _run_check_job(
@@ -224,6 +248,7 @@ def resolve_language_for_path(win: Any, path: Path | None) -> str:
 def clear_editor_state(win: Any, *, status_text: str) -> None:
     """Clear current editor LT highlights and set compact status text."""
     win._lt_last_result = None
+    win._lt_issue_spans = ()
     if hasattr(win, "_detail_translation") and win._detail_translation is not None:
         win._detail_translation.setExtraSelections([])
     if (
@@ -352,8 +377,40 @@ def apply_editor_result(win: Any, result: LanguageToolCheckResult | None) -> Non
     """Apply LT check result to detail editor UI indicator and underlines."""
     win._lt_last_result = result
     win._detail_lt_status_label.setText(_lt_status_text(result))
-    selections = _build_issue_selections(editor=win._detail_translation, result=result)
+    spans = _build_issue_spans(editor=win._detail_translation, result=result)
+    win._lt_issue_spans = spans
+    selections = _build_issue_selections(editor=win._detail_translation, spans=spans)
     win._detail_translation.setExtraSelections(selections)
+
+
+def issue_at_position(win: Any, position: int) -> LTEditorIssueSpan | None:
+    """Return LT issue span that contains the given editor cursor position."""
+    pos = max(0, int(position))
+    spans = tuple(getattr(win, "_lt_issue_spans", ()) or ())
+    for span in spans:
+        if span.start <= pos < span.end:
+            return span
+    return None
+
+
+def apply_issue_replacement(
+    win: Any,
+    *,
+    span: LTEditorIssueSpan,
+    replacement: str,
+) -> bool:
+    """Replace issue span text with one suggested replacement."""
+    editor = win._detail_translation
+    text_len = len(editor.document().toPlainText())
+    start = max(0, min(text_len, int(span.start)))
+    end = max(start, min(text_len, int(span.end)))
+    if end <= start:
+        return False
+    cursor = QTextCursor(editor.document())
+    cursor.setPosition(start)
+    cursor.setPosition(end, QTextCursor.KeepAnchor)
+    cursor.insertText(str(replacement))
+    return True
 
 
 def shutdown_workers(win: Any) -> None:

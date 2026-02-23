@@ -54,6 +54,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QProgressBar,
@@ -314,6 +315,10 @@ _LEFT_PANEL_FILES = 0
 _LEFT_PANEL_TM = 1
 _LEFT_PANEL_SEARCH = 2
 _LEFT_PANEL_QA = 3
+_LT_HINT_MAX_REPLACEMENTS = 6
+_PREF_TAB_SEARCH = "search"
+_PREF_TAB_QA = "qa"
+_PREF_TAB_TM = "tm"
 
 
 def _in_test_mode() -> bool:
@@ -482,10 +487,11 @@ _DETAIL_LAZY_THRESHOLD = 100_000
 
 
 class _CommitPlainTextEdit(QPlainTextEdit):
-    def __init__(self, commit_cb, parent=None, *, focus_cb=None) -> None:
+    def __init__(self, commit_cb, parent=None, *, focus_cb=None, click_cb=None) -> None:
         super().__init__(parent)
         self._commit_cb = commit_cb
         self._focus_cb = focus_cb
+        self._click_cb = click_cb
 
     def focusOutEvent(self, event) -> None:  # noqa: N802
         super().focusOutEvent(event)
@@ -496,6 +502,16 @@ class _CommitPlainTextEdit(QPlainTextEdit):
         super().focusInEvent(event)
         if self._focus_cb:
             self._focus_cb()
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        super().mouseReleaseEvent(event)
+        if not self._click_cb:
+            return
+        if getattr(event, "button", lambda: None)() != Qt.LeftButton:
+            return
+        local_pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+        global_pos = self.viewport().mapToGlobal(local_pos)
+        self._click_cb(local_pos, global_pos)
 
 
 class MainWindow(QMainWindow):
@@ -608,6 +624,8 @@ class MainWindow(QMainWindow):
         self._lt_pending_payload: tuple[int, Path, int, str] | None = None
         self._lt_inflight_payload: tuple[int, Path, int, str] | None = None
         self._lt_last_result: Any | None = None
+        self._lt_issue_spans: tuple[Any, ...] = ()
+        self._lt_hint_menu: QMenu | None = None
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -1027,6 +1045,21 @@ class MainWindow(QMainWindow):
         tm_layout.setContentsMargins(4, 0, 4, 4)
         tm_layout.setSpacing(4)
         self._tm_status_label = QLabel("Select a row to see TM suggestions.")
+        self._tm_status_label.setWordWrap(True)
+        tm_header = QHBoxLayout()
+        tm_header.setContentsMargins(0, 0, 0, 0)
+        tm_header.setSpacing(6)
+        tm_header.addWidget(self._tm_status_label, 1)
+        self._tm_prefs_btn = QToolButton(self._tm_panel)
+        self._tm_prefs_btn.setAutoRaise(True)
+        self._tm_prefs_btn.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
+        )
+        self._tm_prefs_btn.setToolTip("Open Preferences -> TM")
+        self._tm_prefs_btn.clicked.connect(
+            lambda _checked=False: self._open_preferences(initial_tab=_PREF_TAB_TM)
+        )
+        tm_header.addWidget(self._tm_prefs_btn)
         tm_filter_row = QHBoxLayout()
         tm_filter_row.setContentsMargins(0, 0, 0, 0)
         tm_filter_row.setSpacing(6)
@@ -1097,7 +1130,7 @@ class MainWindow(QMainWindow):
         self._tm_apply_btn = QPushButton("Apply", self._tm_panel)
         self._tm_apply_btn.setEnabled(False)
         self._tm_apply_btn.clicked.connect(self._apply_tm_selection)
-        tm_layout.addWidget(self._tm_status_label)
+        tm_layout.addLayout(tm_header)
         tm_layout.addLayout(tm_filter_row)
         tm_layout.addWidget(self._tm_progress)
         tm_layout.addWidget(self._tm_content_splitter, 1)
@@ -1108,16 +1141,30 @@ class MainWindow(QMainWindow):
         search_layout = QVBoxLayout(self._search_panel)
         search_layout.setContentsMargins(6, 0, 6, 6)
         search_layout.setSpacing(6)
+        search_header = QHBoxLayout()
+        search_header.setContentsMargins(0, 0, 0, 0)
+        search_header.setSpacing(6)
         self._search_status_label = QLabel(
             "Press Enter in the search box to populate results.",
             self._search_panel,
         )
         self._search_status_label.setWordWrap(True)
+        search_header.addWidget(self._search_status_label, 1)
+        self._search_prefs_btn = QToolButton(self._search_panel)
+        self._search_prefs_btn.setAutoRaise(True)
+        self._search_prefs_btn.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
+        )
+        self._search_prefs_btn.setToolTip("Open Preferences -> Search / Replace")
+        self._search_prefs_btn.clicked.connect(
+            lambda _checked=False: self._open_preferences(initial_tab=_PREF_TAB_SEARCH)
+        )
+        search_header.addWidget(self._search_prefs_btn)
         self._search_results_list = QListWidget(self._search_panel)
         self._search_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._search_results_list.itemActivated.connect(self._open_search_result_item)
         self._search_results_list.itemClicked.connect(self._open_search_result_item)
-        search_layout.addWidget(self._search_status_label)
+        search_layout.addLayout(search_header)
         search_layout.addWidget(self._search_results_list)
         self._left_stack.addWidget(self._search_panel)
 
@@ -1142,6 +1189,16 @@ class MainWindow(QMainWindow):
         self._qa_refresh_btn.setText("Run QA")
         self._qa_refresh_btn.setToolTip("Run QA checks for current file")
         self._qa_refresh_btn.clicked.connect(self._start_qa_scan_for_current_file)
+        self._qa_prefs_btn = QToolButton(self._qa_panel)
+        self._qa_prefs_btn.setAutoRaise(True)
+        self._qa_prefs_btn.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
+        )
+        self._qa_prefs_btn.setToolTip("Open Preferences -> QA")
+        self._qa_prefs_btn.clicked.connect(
+            lambda _checked=False: self._open_preferences(initial_tab=_PREF_TAB_QA)
+        )
+        qa_header.addWidget(self._qa_prefs_btn)
         qa_header.addWidget(self._qa_refresh_btn)
         self._qa_progress = QProgressBar(self._qa_panel)
         self._qa_progress.setTextVisible(False)
@@ -1273,6 +1330,7 @@ class MainWindow(QMainWindow):
             self._commit_detail_translation,
             self._detail_panel,
             focus_cb=self._load_pending_detail_text,
+            click_cb=self._on_detail_translation_clicked,
         )
         self._detail_translation.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self._detail_translation.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -1334,7 +1392,9 @@ class MainWindow(QMainWindow):
         self.addAction(act_exit)
         act_prefs = QAction("&Preferences…", self)
         act_prefs.setShortcut(QKeySequence.StandardKey.Preferences)
-        act_prefs.triggered.connect(self._open_preferences)
+        act_prefs.triggered.connect(
+            lambda _checked=False: self._open_preferences()
+        )
         self.addAction(act_prefs)
         self.menu_general.addAction(act_open)
         self.menu_general.addAction(act_save)
@@ -1550,6 +1610,93 @@ class MainWindow(QMainWindow):
         self._detail_dirty = True
         self._refresh_detail_translation_count()
         self._schedule_languagetool_editor_check()
+
+    def _on_detail_translation_clicked(self, local_pos: QPoint, global_pos: QPoint) -> None:
+        """Show LT hint popup when user clicks an underlined LT issue span."""
+        if self._detail_translation.isReadOnly():
+            return
+        cursor = self._detail_translation.cursorForPosition(local_pos)
+        self._show_languagetool_hint_for_position(
+            cursor.position(),
+            global_pos=global_pos,
+        )
+
+    def _show_languagetool_hint_for_position(
+        self,
+        position: int,
+        *,
+        global_pos: QPoint | None = None,
+    ) -> bool:
+        """Open LT issue popup for a cursor position when issue metadata is present."""
+        span = self._find_languagetool_issue_at(position)
+        if span is None:
+            return False
+        existing_menu = self._lt_hint_menu
+        if existing_menu is not None:
+            self._lt_hint_menu = None
+            existing_menu.close()
+            existing_menu.deleteLater()
+        menu = QMenu(self)
+        message = span.match.message.strip() or "LanguageTool issue"
+        issue_action = menu.addAction(message)
+        issue_action.setEnabled(False)
+        meta_parts: list[str] = []
+        if span.match.rule_id:
+            meta_parts.append(span.match.rule_id)
+        if span.match.category_id:
+            meta_parts.append(span.match.category_id)
+        if meta_parts:
+            meta_action = menu.addAction(" / ".join(meta_parts))
+            meta_action.setEnabled(False)
+        menu.addSeparator()
+        replacements: list[str] = []
+        for replacement in span.match.replacements:
+            candidate = str(replacement).strip()
+            if not candidate or candidate in replacements:
+                continue
+            replacements.append(candidate)
+            if len(replacements) >= _LT_HINT_MAX_REPLACEMENTS:
+                break
+        if replacements:
+            for replacement in replacements:
+                action = menu.addAction(f"Replace with: {replacement}")
+                action.triggered.connect(
+                    lambda _checked=False, repl=replacement, issue=span: (
+                        self._apply_languagetool_hint_replacement(issue, repl)
+                    )
+                )
+        else:
+            none_action = menu.addAction("No quick fixes available.")
+            none_action.setEnabled(False)
+        self._lt_hint_menu = menu
+
+        def _clear_hint_menu() -> None:
+            if self._lt_hint_menu is menu:
+                self._lt_hint_menu = None
+
+        menu.aboutToHide.connect(_clear_hint_menu)
+        menu.popup(global_pos or QCursor.pos())
+        return True
+
+    def _apply_languagetool_hint_replacement(
+        self,
+        span: _lt_adapter.LTEditorIssueSpan,
+        replacement: str,
+    ) -> None:
+        """Apply selected LT suggestion replacement and trigger immediate re-check."""
+        self._detail_translation.blockSignals(True)
+        try:
+            applied = self._apply_languagetool_issue_replacement(
+                span=span,
+                replacement=replacement,
+            )
+        finally:
+            self._detail_translation.blockSignals(False)
+        if not applied:
+            return
+        self._detail_dirty = True
+        self._refresh_detail_translation_count()
+        self._schedule_languagetool_editor_check(immediate=True)
 
     def _set_detail_char_counts(
         self,
@@ -2365,7 +2512,7 @@ class MainWindow(QMainWindow):
         if self._left_stack.currentIndex() == 1:
             self._update_tm_suggestions()
 
-    def _open_preferences(self) -> None:
+    def _open_preferences(self, *, initial_tab: str | None = None) -> None:
         prefs = {
             "default_root": self._default_root,
             "tm_import_dir": self._tm_import_dir,
@@ -2405,7 +2552,12 @@ class MainWindow(QMainWindow):
                     }
                     for rec in self._tm_store.list_import_files()
                 ]
-        dialog = PreferencesDialog(prefs, tm_files=tm_files, parent=self)
+        dialog = PreferencesDialog(
+            prefs,
+            tm_files=tm_files,
+            initial_tab=initial_tab,
+            parent=self,
+        )
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
         self._apply_preferences(dialog.values())
@@ -4720,6 +4872,8 @@ class MainWindow(QMainWindow):
     _start_languagetool_editor_check = _lt_adapter.start_editor_check
     _poll_languagetool_editor_check = _lt_adapter.poll_editor_check
     _apply_languagetool_editor_result = _lt_adapter.apply_editor_result
+    _find_languagetool_issue_at = _lt_adapter.issue_at_position
+    _apply_languagetool_issue_replacement = _lt_adapter.apply_issue_replacement
 
     def _schedule_qa_refresh(self, *, immediate: bool = False) -> None:
         if not self._qa_auto_refresh:
@@ -5611,6 +5765,11 @@ class MainWindow(QMainWindow):
         self._set_qa_progress_visible(False)
 
     def _shutdown_languagetool_workers(self) -> None:
+        menu = self._lt_hint_menu
+        self._lt_hint_menu = None
+        if menu is not None:
+            menu.close()
+            menu.deleteLater()
         _lt_adapter.shutdown_workers(self)
 
     def _stop_timers(self) -> None:

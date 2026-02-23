@@ -45,6 +45,12 @@ _LT_MODES = [
     ("On", "on"),
     ("Off", "off"),
 ]
+_PREF_TAB_GENERAL = "general"
+_PREF_TAB_SEARCH = "search"
+_PREF_TAB_QA = "qa"
+_PREF_TAB_LANGUAGETOOL = "languagetool"
+_PREF_TAB_TM = "tm"
+_PREF_TAB_VIEW = "view"
 _TM_PATH_ROLE = Qt.UserRole + 1
 _TM_IS_PENDING_ROLE = Qt.UserRole + 2
 _TM_STATUS_ROLE = Qt.UserRole + 3
@@ -59,6 +65,7 @@ class PreferencesDialog(QDialog):
         prefs: dict,
         *,
         tm_files: list[dict[str, object]] | None = None,
+        initial_tab: str | None = None,
         parent=None,
     ) -> None:
         """Initialize dialog controls from persisted preferences and TM state."""
@@ -78,12 +85,26 @@ class PreferencesDialog(QDialog):
         self._tm_zero_segment_banner: QLabel | None = None
 
         tabs = QTabWidget(self)
-        tabs.addTab(self._build_general_tab(), "General")
-        tabs.addTab(self._build_search_tab(), "Search / Replace")
-        tabs.addTab(self._build_qa_tab(), "QA")
-        tabs.addTab(self._build_languagetool_tab(), "LanguageTool")
-        tabs.addTab(self._build_tm_tab(), "TM")
-        tabs.addTab(self._build_view_tab(), "View")
+        self._tab_index_by_key: dict[str, int] = {}
+        self._tab_index_by_key[_PREF_TAB_GENERAL] = tabs.addTab(
+            self._build_general_tab(), "General"
+        )
+        self._tab_index_by_key[_PREF_TAB_SEARCH] = tabs.addTab(
+            self._build_search_tab(), "Search / Replace"
+        )
+        self._tab_index_by_key[_PREF_TAB_QA] = tabs.addTab(self._build_qa_tab(), "QA")
+        self._tab_index_by_key[_PREF_TAB_LANGUAGETOOL] = tabs.addTab(
+            self._build_languagetool_tab(),
+            "LanguageTool",
+        )
+        self._tab_index_by_key[_PREF_TAB_TM] = tabs.addTab(self._build_tm_tab(), "TM")
+        self._tab_index_by_key[_PREF_TAB_VIEW] = tabs.addTab(
+            self._build_view_tab(),
+            "View",
+        )
+        initial_key = str(initial_tab or "").strip().lower()
+        if initial_key in self._tab_index_by_key:
+            tabs.setCurrentIndex(self._tab_index_by_key[initial_key])
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
@@ -274,6 +295,43 @@ class PreferencesDialog(QDialog):
         layout.addWidget(self._qa_auto_refresh_check)
         layout.addWidget(self._qa_auto_mark_check)
         layout.addWidget(self._qa_auto_mark_touched_check)
+        qa_lt_label = QLabel(
+            "LanguageTool in manual QA scans",
+            widget,
+        )
+        qa_lt_label.setWordWrap(True)
+        self._qa_lt_check = QCheckBox(
+            "Include LanguageTool findings in manual QA scans",
+            widget,
+        )
+        self._qa_lt_check.setChecked(bool(self._prefs.get("qa_check_languagetool", False)))
+        self._qa_lt_max_rows_spin = QSpinBox(widget)
+        self._qa_lt_max_rows_spin.setRange(1, 5000)
+        try:
+            qa_lt_max_rows = int(self._prefs.get("qa_languagetool_max_rows", 500))
+        except (TypeError, ValueError):
+            qa_lt_max_rows = 500
+        self._qa_lt_max_rows_spin.setValue(max(1, min(5000, qa_lt_max_rows)))
+        self._qa_lt_automark_check = QCheckBox(
+            "Allow LT findings to participate in QA auto-mark",
+            widget,
+        )
+        self._qa_lt_automark_check.setChecked(
+            bool(self._prefs.get("qa_languagetool_automark", False))
+        )
+        self._qa_lt_check.toggled.connect(self._sync_qa_languagetool_controls)
+        qa_lt_row = QWidget(widget)
+        qa_lt_layout = QHBoxLayout(qa_lt_row)
+        qa_lt_layout.setContentsMargins(0, 0, 0, 0)
+        qa_lt_layout.setSpacing(6)
+        qa_lt_layout.addWidget(QLabel("LT max rows", widget))
+        qa_lt_layout.addWidget(self._qa_lt_max_rows_spin)
+        qa_lt_layout.addStretch(1)
+        layout.addWidget(qa_lt_label)
+        layout.addWidget(self._qa_lt_check)
+        layout.addWidget(qa_lt_row)
+        layout.addWidget(self._qa_lt_automark_check)
+        self._sync_qa_languagetool_controls(self._qa_lt_check.isChecked())
         layout.addStretch(1)
         return widget
 
@@ -329,39 +387,6 @@ class PreferencesDialog(QDialog):
         layout.addWidget(locale_map_label)
         layout.addWidget(self._lt_locale_map_edit)
 
-        self._qa_lt_check = QCheckBox(
-            "Include LanguageTool findings in manual QA scans",
-            widget,
-        )
-        self._qa_lt_check.setChecked(bool(self._prefs.get("qa_check_languagetool", False)))
-        self._qa_lt_max_rows_spin = QSpinBox(widget)
-        self._qa_lt_max_rows_spin.setRange(1, 5000)
-        try:
-            qa_lt_max_rows = int(self._prefs.get("qa_languagetool_max_rows", 500))
-        except (TypeError, ValueError):
-            qa_lt_max_rows = 500
-        self._qa_lt_max_rows_spin.setValue(max(1, min(5000, qa_lt_max_rows)))
-        self._qa_lt_automark_check = QCheckBox(
-            "Allow LT findings to participate in QA auto-mark",
-            widget,
-        )
-        self._qa_lt_automark_check.setChecked(
-            bool(self._prefs.get("qa_languagetool_automark", False))
-        )
-        self._qa_lt_check.toggled.connect(self._sync_qa_languagetool_controls)
-
-        qa_lt_row = QWidget(widget)
-        qa_lt_layout = QHBoxLayout(qa_lt_row)
-        qa_lt_layout.setContentsMargins(0, 0, 0, 0)
-        qa_lt_layout.setSpacing(6)
-        qa_lt_layout.addWidget(QLabel("QA max rows", widget))
-        qa_lt_layout.addWidget(self._qa_lt_max_rows_spin)
-        qa_lt_layout.addStretch(1)
-
-        layout.addWidget(self._qa_lt_check)
-        layout.addWidget(qa_lt_row)
-        layout.addWidget(self._qa_lt_automark_check)
-        self._sync_qa_languagetool_controls(self._qa_lt_check.isChecked())
         layout.addStretch(1)
         return widget
 
