@@ -18,6 +18,9 @@ avoid missing mandatory tasks.
     security/docstyle/docs-build checks, encoding-integrity
     gates, read-only repo-clean gate, perf scenarios, and LanguageTool
     integration checks (core endpoint/level semantics + GUI/QA adapters)
+  - Preference bootstrap hygiene:
+    deprecated settings keys are auto-pruned from `.tzp/config/settings.env`,
+    and missing required defaults are auto-backfilled
   - Warns (does not fail) when auto-fixers modify tracked files
   - Local formatter auto-fix is change-scoped (`fmt-changed`) to keep runtime practical;
     strict full-repo formatting remains enforced by CI `fmt-check` gates

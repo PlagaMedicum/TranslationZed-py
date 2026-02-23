@@ -360,7 +360,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  3 | Selecting a finding jumps to file/row in the main table. |
 |  4 | When no findings exist, SYS shows explicit empty-state text. |
 |  5 | User may jump between findings with **F8** (next) / **Shift+F8** (previous); SYS wraps at boundaries and shows `QA i/n` hint in status bar. |
-| **Notes** | Current active checks are `qa.trailing`, `qa.newlines`, opt-in `qa.tokens` (`QA_CHECK_ESCAPES=true`), and opt-in `qa.same_source` (`QA_CHECK_SAME_AS_SOURCE=true`). QA list labels include severity/group tags (`warning/format`, `warning/content`). Refresh is manual by default via explicit **Run QA** action in QA panel; optional background mode is controlled by `QA_AUTO_REFRESH`. If `QA_AUTO_MARK_FOR_REVIEW=true`, findings in **Untouched** rows are auto-marked to **For review**. Optional `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true` extends auto-marking to non-Untouched rows (Translated/Proofread). |
+| **Notes** | Current active checks are `qa.trailing`, `qa.newlines`, opt-in `qa.tokens` (`QA_CHECK_ESCAPES=true`), and opt-in `qa.same_source` (`QA_CHECK_SAME_AS_SOURCE=true`). QA list labels include severity/group tags (`warning/format`, `warning/content`). Refresh is manual by default via explicit **Run QA** action in QA panel; optional background mode is controlled by `QA_AUTO_REFRESH`. If `QA_AUTO_MARK_FOR_REVIEW=true`, findings in **Untouched** rows are auto-marked to **For review**. Optional split toggles `QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=true` and `QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=true` independently extend auto-marking to non-Untouched rows. |
 | **Post-condition** | QA context is visible without blocking normal editing/search/TM workflows. |
 
 ### UC-13n  Source Reference Locale Switch
@@ -489,8 +489,10 @@ UNTOUCHED ──────────────────────▶ 
    plus translation-equals-source. QA runs manually by default via **Run QA** in the QA panel
    (`QA_AUTO_REFRESH=false`); optional background auto-refresh can be enabled in Preferences.
    Optional `QA_AUTO_MARK_FOR_REVIEW=true` auto-marks findings in **Untouched** rows to
-   **For review**; optional `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true` extends this to
-   non-Untouched rows.
+   **For review**; optional split toggles
+   `QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=true` and
+   `QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=true` independently extend this to
+   `Translated`/`Proofread` rows.
 13. **Responsiveness and explainability invariants**:
    - UI should never appear stalled: long-running work must keep the interface interactive
      (no visible freezes).

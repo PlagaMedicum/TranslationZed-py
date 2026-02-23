@@ -342,7 +342,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Checks are opt‑in per locale or project; results are non‑blocking warnings by default.
   - Manual QA refresh is default (`Run QA`); background refresh is optional (`QA_AUTO_REFRESH`).
   - Auto-mark defaults to Untouched rows only (`QA_AUTO_MARK_FOR_REVIEW`);
-    optional extension covers touched rows (`QA_AUTO_MARK_TOUCHED_FOR_REVIEW`).
+    optional split extensions cover non-Untouched rows independently
+    (`QA_AUTO_MARK_TRANSLATED_FOR_REVIEW`, `QA_AUTO_MARK_PROOFREAD_FOR_REVIEW`).
 
 ### Step 31 — LanguageTool integration [✓]
 - Touchpoints: `core/languagetool.py`, Preferences, detail-editor inline highlighting,
@@ -902,6 +903,18 @@ A9 [✓] **Verification-overhaul milestone**
        criteria (effective `MUTATION_SCORE_MODE=fail` threshold pass and no
        mutmut execution failures), and apply the default flip via a manual
        reviewed commit.
+     - [✓] A9 continuation (contract finalization): deprecated QA combined
+       auto-mark key (`QA_AUTO_MARK_TOUCHED_FOR_REVIEW`) removed from active
+       contract; canonical split keys are
+       `QA_AUTO_MARK_TRANSLATED_FOR_REVIEW` +
+       `QA_AUTO_MARK_PROOFREAD_FOR_REVIEW`.
+     - [✓] Preferences hygiene contract enforced:
+       deprecated settings params are auto-pruned from
+       `.tzp/config/settings.env`, and missing required defaults are
+       auto-backfilled during bootstrap/save.
+     - [✓] Sidebar/table layout regression guard hardened:
+       splitter moves relayout the main table even when Files tree is not the
+       active left tab (TM/Search/QA), with explicit regression coverage.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
@@ -1073,6 +1086,14 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
     UX; QA LT scan controls belong to Preferences -> QA.
   - TM panel compactness takes priority over dedicated locale-variants rendering;
     keep TM Source/TM Translation previews in compact mode.
+  - Remove deprecated combined QA auto-mark key now
+    (`QA_AUTO_MARK_TOUCHED_FOR_REVIEW`); keep only split status keys
+    (`QA_AUTO_MARK_TRANSLATED_FOR_REVIEW`,
+    `QA_AUTO_MARK_PROOFREAD_FOR_REVIEW`).
+  - Settings hygiene policy: deprecated params are auto-removed from persisted
+    `settings.env`; missing required defaults are auto-added automatically.
+  - A9 continuation remains tracked as appended A9 notes (no new milestone
+    section added).
 
 ---
 

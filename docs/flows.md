@@ -153,6 +153,7 @@ User presses Run QA (QA panel)
   -> update compact QA list (<path>:<row> · <check-code> · <excerpt>)
   -> if QA_AUTO_MARK_FOR_REVIEW=true:
        - mark Untouched findings as For review
-       - include touched rows only when QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true
+       - include Translated rows only when QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=true
+       - include Proofread rows only when QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=true
   -> no file writes happen until explicit save
 ```

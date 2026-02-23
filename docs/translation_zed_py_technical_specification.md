@@ -308,6 +308,7 @@ Algorithm:
 - Legacy settings fallback:
   - if canonical file is missing, load reads legacy `<runtime-root>/.tzp-config/settings.env`.
   - `ensure_defaults()` writes canonical `.tzp/config/settings.env`, preserving known values.
+  - Deprecated keys are auto-pruned during bootstrap/save, and missing required defaults are auto-backfilled.
 - Keys:
   - `PROMPT_WRITE_ON_EXIT=true|false`
   - `WRAP_TEXT=true|false`
@@ -318,7 +319,8 @@ Algorithm:
   - `QA_CHECK_SAME_AS_SOURCE=true|false` (default `false`)
   - `QA_AUTO_REFRESH=true|false` (default `false`)
   - `QA_AUTO_MARK_FOR_REVIEW=true|false` (default `false`)
-  - `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true|false` (default `false`)
+  - `QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=true|false` (default `false`)
+  - `QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=true|false` (default `false`)
   - `LT_EDITOR_MODE=auto|on|off` (default `auto`)
   - `LT_SERVER_URL=<url>` (default `http://127.0.0.1:8081`)
   - `LT_TIMEOUT_MS=<int>` (default `1200`)
@@ -533,9 +535,10 @@ if dirty_files and not prompt_save():
   QA navigation actions (`F8` next, `Shift+F8` previous) traverse findings with wrap;
   status bar reports `QA i/n` hint and selected finding summary.
   If `QA_AUTO_MARK_FOR_REVIEW=true`, rows with findings in **Untouched** status
-  are auto-marked to **For review**. If
-  `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true`, auto-mark also applies to non-Untouched
-  rows (e.g., Translated/Proofread).
+  are auto-marked to **For review**.
+  `QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=true` additionally applies auto-mark to
+  **Translated** rows; `QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=true` additionally
+  applies auto-mark to **Proofread** rows.
   LT findings participate in auto-mark only when both `QA_AUTO_MARK_FOR_REVIEW=true`
   and `QA_LANGUAGETOOL_AUTOMARK=true`.
   Detail-editor LanguageTool checks are debounced/non-blocking and use browser-style

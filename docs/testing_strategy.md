@@ -52,7 +52,11 @@ _Last updated: 2026-02-23_
 - QA auto-mark guard:
   - `QA_AUTO_MARK_FOR_REVIEW=false` keeps statuses untouched.
   - `QA_AUTO_MARK_FOR_REVIEW=true` mutates affected **Untouched** rows to **For review**.
-  - `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true` additionally allows auto-mark on non-Untouched rows.
+  - `QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=true` additionally allows auto-mark on `Translated` rows.
+  - `QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=true` additionally allows auto-mark on `Proofread` rows.
+- Preference hygiene guard:
+  - deprecated settings keys are auto-pruned from `settings.env` during bootstrap/save;
+    missing required defaults are auto-backfilled.
 - QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
 - QA same-as-source checks: opt-in `qa.same_source` findings and severity/group label rendering are validated in core + panel tests.
 - QA navigation checks: `F8`/`Shift+F8` next-prev traversal moves between findings with wrap and updates status-bar hint.
