@@ -569,6 +569,10 @@ def test_tm_panel_source_and_translation_previews_are_resizable(tmp_path, qtbot)
     assert win._tm_target_label.text() == "TM Translation"
     assert win._tm_source_preview.maximumHeight() > 1000
     assert win._tm_target_preview.maximumHeight() > 1000
+    assert win._tm_status_label.text() == "Select row for TM suggestions."
+    assert win._tm_origin_project_cb.text() == "Proj"
+    assert win._tm_origin_import_cb.text() == "Imp"
+    assert win._tm_prefs_btn.icon().isNull() is False
 
 
 def test_side_panel_preference_shortcuts_open_matching_tabs(tmp_path, qtbot, monkeypatch):

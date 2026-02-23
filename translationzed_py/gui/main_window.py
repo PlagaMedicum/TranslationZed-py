@@ -483,6 +483,14 @@ def _show_info_box(parent: QWidget, title: str, text: str) -> int:
     return int(_prepare_message_box(msg).exec())
 
 
+def _preferences_icon(style: QStyle) -> QIcon:
+    """Return a stable settings icon with theme fallback."""
+    return QIcon.fromTheme(
+        "preferences-system",
+        style.standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView),
+    )
+
+
 _DETAIL_LAZY_THRESHOLD = 100_000
 
 
@@ -1042,19 +1050,17 @@ class MainWindow(QMainWindow):
 
         self._tm_panel = QWidget(self._left_panel)
         tm_layout = QVBoxLayout(self._tm_panel)
-        tm_layout.setContentsMargins(4, 0, 4, 4)
-        tm_layout.setSpacing(4)
-        self._tm_status_label = QLabel("Select a row to see TM suggestions.")
-        self._tm_status_label.setWordWrap(True)
+        tm_layout.setContentsMargins(3, 0, 3, 3)
+        tm_layout.setSpacing(3)
+        self._tm_status_label = QLabel("Select row for TM suggestions.")
+        self._tm_status_label.setWordWrap(False)
         tm_header = QHBoxLayout()
         tm_header.setContentsMargins(0, 0, 0, 0)
-        tm_header.setSpacing(6)
+        tm_header.setSpacing(4)
         tm_header.addWidget(self._tm_status_label, 1)
         self._tm_prefs_btn = QToolButton(self._tm_panel)
         self._tm_prefs_btn.setAutoRaise(True)
-        self._tm_prefs_btn.setIcon(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
-        )
+        self._tm_prefs_btn.setIcon(_preferences_icon(self.style()))
         self._tm_prefs_btn.setToolTip("Open Preferences -> TM")
         self._tm_prefs_btn.clicked.connect(
             lambda _checked=False: self._open_preferences(initial_tab=_PREF_TAB_TM)
@@ -1062,26 +1068,33 @@ class MainWindow(QMainWindow):
         tm_header.addWidget(self._tm_prefs_btn)
         tm_filter_row = QHBoxLayout()
         tm_filter_row.setContentsMargins(0, 0, 0, 0)
-        tm_filter_row.setSpacing(6)
-        tm_score_label = QLabel("Min score", self._tm_panel)
+        tm_filter_row.setSpacing(4)
+        tm_score_label = QLabel("Score", self._tm_panel)
         tm_score_label.setToolTip("Minimum TM score threshold (5..100)")
         tm_filter_row.addWidget(tm_score_label)
         self._tm_score_spin = QSpinBox(self._tm_panel)
         self._tm_score_spin.setRange(5, 100)
         self._tm_score_spin.setValue(self._tm_min_score)
         self._tm_score_spin.setSuffix("%")
+        self._tm_score_spin.setMinimumWidth(74)
         self._tm_score_spin.setToolTip(
             "Lower score increases recall and returns more neighboring suggestions"
         )
         self._tm_score_spin.valueChanged.connect(self._on_tm_filters_changed)
         tm_filter_row.addWidget(self._tm_score_spin)
         tm_filter_row.addStretch(1)
-        self._tm_origin_project_cb = QCheckBox("Project", self._tm_panel)
+        self._tm_origin_project_cb = QCheckBox("Proj", self._tm_panel)
+        self._tm_origin_project_cb.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon)
+        )
         self._tm_origin_project_cb.setToolTip("Include project TM entries")
         self._tm_origin_project_cb.setChecked(self._tm_origin_project)
         self._tm_origin_project_cb.toggled.connect(self._on_tm_filters_changed)
         tm_filter_row.addWidget(self._tm_origin_project_cb)
-        self._tm_origin_import_cb = QCheckBox("Imported", self._tm_panel)
+        self._tm_origin_import_cb = QCheckBox("Imp", self._tm_panel)
+        self._tm_origin_import_cb.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton)
+        )
         self._tm_origin_import_cb.setToolTip("Include imported TM entries")
         self._tm_origin_import_cb.setChecked(self._tm_origin_import)
         self._tm_origin_import_cb.toggled.connect(self._on_tm_filters_changed)
@@ -1152,9 +1165,7 @@ class MainWindow(QMainWindow):
         search_header.addWidget(self._search_status_label, 1)
         self._search_prefs_btn = QToolButton(self._search_panel)
         self._search_prefs_btn.setAutoRaise(True)
-        self._search_prefs_btn.setIcon(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
-        )
+        self._search_prefs_btn.setIcon(_preferences_icon(self.style()))
         self._search_prefs_btn.setToolTip("Open Preferences -> Search / Replace")
         self._search_prefs_btn.clicked.connect(
             lambda _checked=False: self._open_preferences(initial_tab=_PREF_TAB_SEARCH)
@@ -1191,9 +1202,7 @@ class MainWindow(QMainWindow):
         self._qa_refresh_btn.clicked.connect(self._start_qa_scan_for_current_file)
         self._qa_prefs_btn = QToolButton(self._qa_panel)
         self._qa_prefs_btn.setAutoRaise(True)
-        self._qa_prefs_btn.setIcon(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView)
-        )
+        self._qa_prefs_btn.setIcon(_preferences_icon(self.style()))
         self._qa_prefs_btn.setToolTip("Open Preferences -> QA")
         self._qa_prefs_btn.clicked.connect(
             lambda _checked=False: self._open_preferences(initial_tab=_PREF_TAB_QA)
