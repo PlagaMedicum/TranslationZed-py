@@ -41,6 +41,12 @@ _TOOLTIP_LARGE_THRESHOLD = 5000
 _ROW_KIND_BASE = "base"
 _ROW_KIND_VIRTUAL = "virtual"
 _STATUS_PRIORITY = {status: idx for idx, status in enumerate(STATUS_ORDER)}
+DIFF_MARKER_ROLE = int(Qt.UserRole) + 41
+_DIFF_MARKER_TOOLTIP = {
+    "NEW": "NEW in EN (missing in locale)",
+    "REMOVED": "Present in locale (missing in EN)",
+    "MODIFIED": "EN source changed since snapshot baseline",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -787,8 +793,10 @@ class TranslationModel(QAbstractTableModel):
         key_text = entry.key if entry is not None else (virtual.key if virtual else "")
         status = entry.status if entry is not None else Status.UNTOUCHED
         marker = self._diff_marker_by_key.get(key_text)
-        key_display = f"[{marker}] {key_text}" if marker else key_text
+        key_display = key_text
 
+        if role == DIFF_MARKER_ROLE and index.column() == 0:
+            return marker or None
         if role == Qt.TextAlignmentRole and index.column() == 0:
             return Qt.AlignRight | Qt.AlignVCenter
         if role == Qt.ToolTipRole:
@@ -796,7 +804,10 @@ class TranslationModel(QAbstractTableModel):
                 case 0:
                     if not key_text:
                         return ""
-                    return f"{marker}: {key_text}" if marker else key_text
+                    if marker:
+                        label = _DIFF_MARKER_TOOLTIP.get(marker, marker)
+                        return f"{label}\n{key_text}"
+                    return key_text
                 case 1:
                     return self._tooltip_source(index.row())
                 case 2:

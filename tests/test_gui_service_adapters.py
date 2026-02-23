@@ -3081,8 +3081,8 @@ def test_on_header_resized_covers_key_status_and_unknown_column_paths(
     monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: calls.append("reflow"))
 
     win._on_header_resized(0, win._key_column_width, 40)
-    assert win._key_column_width == 60
-    assert win._prefs_extras["TABLE_KEY_WIDTH"] == "60"
+    assert win._key_column_width == 96
+    assert win._prefs_extras["TABLE_KEY_WIDTH"] == "96"
     assert calls == ["layout", "reflow"]
 
     calls.clear()

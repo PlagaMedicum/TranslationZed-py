@@ -483,8 +483,8 @@ if dirty_files and not prompt_save():
 - Status column header dropdown supports:
   - priority sort order (`Untouched`, `For review`, `Translated`, `Proofread`)
   - visibility filter by status set (non-persistent; resets on reopen/file switch).
-- EN-diff table markers are rendered in Key column as compact badges:
-  `[NEW]`, `[REMOVED]`, `[MODIFIED]`.
+- EN-diff table markers are rendered in Key column as compact icon badges
+  (style-default icons for `NEW`, `REMOVED`, `MODIFIED`) with marker tooltips.
 - EN-diff baseline is snapshot-driven (`.tzp/cache/en_diff_snapshot.json`):
   - `NEW`: key exists in EN and not in locale,
   - `REMOVED`: key exists in locale and not in EN (marker only, no auto-delete),

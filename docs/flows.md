@@ -70,7 +70,7 @@ User edits cell
 File open/refresh
   -> compare EN + locale maps against .tzp/cache/en_diff_snapshot.json baseline
   -> classify badges:
-       [NEW] (EN-only), [REMOVED] (locale-only), [MODIFIED] (EN changed vs snapshot)
+       NEW (EN-only), REMOVED (locale-only), MODIFIED (EN changed vs snapshot)
   -> render editable virtual NEW rows in EN order
 
 User: Save

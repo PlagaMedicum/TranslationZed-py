@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt
 
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
+from translationzed_py.gui.entry_model import DIFF_MARKER_ROLE
 
 
 @pytest.fixture(autouse=True)
@@ -60,7 +61,8 @@ def test_file_open_adds_virtual_new_rows_and_badges(qtbot, tmp_path) -> None:
     assert model.rowCount() == 2
     row_b = _find_row_by_key(win, "B")
     assert row_b >= 0
-    assert model.data(model.index(row_b, 0), Qt.DisplayRole) == "[NEW] B"
+    assert model.data(model.index(row_b, 0), Qt.DisplayRole) == "B"
+    assert model.data(model.index(row_b, 0), DIFF_MARKER_ROLE) == "NEW"
     assert model.data(model.index(row_b, 1), Qt.EditRole) == "Source B"
 
 
@@ -151,5 +153,6 @@ def test_en_diff_resolves_locale_suffix_reference_paths(qtbot, tmp_path) -> None
     row_b = _find_row_by_key(win, "B")
     assert row_a >= 0
     assert row_b >= 0
-    assert "[REMOVED]" not in str(model.data(model.index(row_a, 0), Qt.DisplayRole))
-    assert model.data(model.index(row_b, 0), Qt.DisplayRole) == "[NEW] B"
+    assert model.data(model.index(row_a, 0), DIFF_MARKER_ROLE) is None
+    assert model.data(model.index(row_b, 0), Qt.DisplayRole) == "B"
+    assert model.data(model.index(row_b, 0), DIFF_MARKER_ROLE) == "NEW"

@@ -313,6 +313,8 @@ _PREF_TAB_SEARCH = "search"
 _PREF_TAB_QA = "qa"
 _PREF_TAB_TM = "tm"
 _TREE_PANEL_DEFAULT_MAX_FRACTION = 0.25
+_TABLE_KEY_DEFAULT_WIDTH = 150
+_TABLE_KEY_MIN_WIDTH = 96
 _LIST_PLACEHOLDER_ROLE = int(Qt.UserRole) + 7
 _TM_DEFAULT_PLACEHOLDER = "Select row to see Translation Memory suggestions."
 _SEARCH_DEFAULT_PLACEHOLDER = "Press Enter in the search box to populate results."
@@ -3114,13 +3116,13 @@ class MainWindow(QMainWindow):
         header = self.table.horizontalHeader()
         header.setStretchLastSection(False)
         if self._key_column_width is None:
-            self._key_column_width = 120
+            self._key_column_width = _TABLE_KEY_DEFAULT_WIDTH
         if self._status_column_width is None:
             metrics = self.table.fontMetrics()
             labels = [st.label() for st in STATUS_ORDER]
             max_label = max(labels, key=metrics.horizontalAdvance)
             self._status_column_width = metrics.horizontalAdvance(max_label) + 24
-        key_width = int(self._key_column_width or 0)
+        key_width = max(_TABLE_KEY_MIN_WIDTH, int(self._key_column_width or 0))
         status_width = int(self._status_column_width or 0)
         viewport_width = max(0, self.table.viewport().width())
         min_content = 90
@@ -3128,7 +3130,7 @@ class MainWindow(QMainWindow):
         if viewport_width and available < min_content * 2:
             shrink = min_content * 2 - available
             if shrink > 0:
-                key_width = max(80, key_width - shrink)
+                key_width = max(_TABLE_KEY_MIN_WIDTH, key_width - shrink)
                 available = max(0, viewport_width - key_width - status_width)
         ratio = self._source_translation_ratio or 0.5
         source_width = int(round(available * ratio))
@@ -3455,7 +3457,7 @@ class MainWindow(QMainWindow):
         if self._table_layout_guard or not self.table.model():
             return
         if logical_index == 0:
-            self._key_column_width = max(60, _new)
+            self._key_column_width = max(_TABLE_KEY_MIN_WIDTH, _new)
             self._prefs_extras["TABLE_KEY_WIDTH"] = str(self._key_column_width)
             self._apply_table_layout()
             self._schedule_resize_reflow()

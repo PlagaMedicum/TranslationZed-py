@@ -41,7 +41,14 @@ from translationzed_py.core.qa_rules import (
     TAG_TOKEN_RE as _TAG_RE,
 )
 
+from .entry_model import DIFF_MARKER_ROLE
 from .perf_trace import PERF_TRACE
+
+_DIFF_MARKER_ICON_MAP = {
+    "NEW": QStyle.StandardPixmap.SP_FileIcon,
+    "MODIFIED": QStyle.StandardPixmap.SP_BrowserReload,
+    "REMOVED": QStyle.StandardPixmap.SP_TrashIcon,
+}
 
 
 class StatusDelegate(QStyledItemDelegate):
@@ -97,6 +104,12 @@ class KeyDelegate(QStyledItemDelegate):
         super().initStyleOption(option, index)
         option.displayAlignment = Qt.AlignRight | Qt.AlignVCenter
         option.textElideMode = Qt.ElideLeft
+        marker = str(index.data(DIFF_MARKER_ROLE) or "").strip().upper()
+        marker_icon = _DIFF_MARKER_ICON_MAP.get(marker)
+        if marker_icon is None:
+            return
+        style = option.widget.style() if option.widget is not None else QApplication.style()
+        option.icon = style.standardIcon(marker_icon)
 
 
 class MultiLineEditDelegate(QStyledItemDelegate):

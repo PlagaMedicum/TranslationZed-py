@@ -242,7 +242,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | File open/refresh and Save action with edited virtual `NEW` rows. |
 | **Main Success Scenario** |
 |  1 | SYS classifies keys using EN snapshot baseline as `NEW`, `REMOVED`, `MODIFIED`. |
-|  2 | SYS renders compact key badges `[NEW]`, `[REMOVED]`, `[MODIFIED]`. |
+|  2 | SYS renders compact key icon badges for `NEW` / `REMOVED` / `MODIFIED` with tooltip detail. |
 |  3 | SYS shows editable virtual rows for `NEW` keys in EN order. |
 |  4 | On save with edited virtual `NEW` rows, SYS MUST show insertion prompt: **Apply / Skip / Edit / Cancel**. |
 |  5 | **Apply** inserts snippets preserving EN order and comment-copy/dedup policy. |
@@ -497,7 +497,7 @@ UNTOUCHED ──────────────────────▶ 
    - Validation priority: **empty cell = red** (overrides any status color).
    - Status column header menu supports non-persistent triage controls
      (priority sort + per-status visibility filter) for current file session.
-   - Key column may include EN-diff badges (`[NEW]`, `[REMOVED]`, `[MODIFIED]`);
+   - Key column may include EN-diff icon badges (`NEW`, `REMOVED`, `MODIFIED`);
      virtual `NEW` rows are editable and only written on explicit insertion apply.
 7. **Visualization**: highlight escape sequences and **code markers** (uppercase `<TAG...>` tokens,
    bracket tags like `[IMG=...]`, and placeholders like `%1`, `%s`, `%1$s`), plus repeated whitespace;

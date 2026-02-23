@@ -11,7 +11,11 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import Qt
 
 from translationzed_py.core.model import Entry, ParsedFile, Status
-from translationzed_py.gui.entry_model import TranslationModel, VirtualNewRow
+from translationzed_py.gui.entry_model import (
+    DIFF_MARKER_ROLE,
+    TranslationModel,
+    VirtualNewRow,
+)
 
 
 def _entry(key: str, value: str, *, status: Status) -> Entry:
@@ -42,8 +46,10 @@ def test_virtual_new_rows_render_in_en_order_and_are_editable() -> None:
     )
 
     assert model.rowCount() == 2
-    assert model.data(model.index(0, 0), Qt.DisplayRole) == "[MODIFIED] A"
-    assert model.data(model.index(1, 0), Qt.DisplayRole) == "[NEW] B"
+    assert model.data(model.index(0, 0), Qt.DisplayRole) == "A"
+    assert model.data(model.index(1, 0), Qt.DisplayRole) == "B"
+    assert model.data(model.index(0, 0), DIFF_MARKER_ROLE) == "MODIFIED"
+    assert model.data(model.index(1, 0), DIFF_MARKER_ROLE) == "NEW"
     assert model.flags(model.index(1, 2)) & Qt.ItemIsEditable
     assert not (model.flags(model.index(1, 3)) & Qt.ItemIsEditable)
 
