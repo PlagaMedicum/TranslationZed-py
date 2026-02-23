@@ -8,11 +8,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .languagetool import default_server_url as _default_lt_server_url
+from .languagetool import dump_language_map as _dump_lt_language_map
+from .languagetool import load_language_map as _load_lt_language_map
+from .languagetool import normalize_editor_mode as _normalize_lt_editor_mode
+from .languagetool import normalize_timeout_ms as _normalize_lt_timeout_ms
 from .preferences import ensure_defaults as _ensure_preferences
 from .preferences import load as _load_preferences
 from .preferences import save as _save_preferences
 
 _VALID_SCOPES = {"FILE", "LOCALE", "POOL"}
+_QA_LT_MAX_ROWS_DEFAULT = 500
+_QA_LT_MAX_ROWS_MIN = 1
+_QA_LT_MAX_ROWS_MAX = 5000
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +46,9 @@ class LoadedPreferences:
     qa_auto_refresh: bool
     qa_auto_mark_for_review: bool
     qa_auto_mark_touched_for_review: bool
+    qa_check_languagetool: bool
+    qa_languagetool_max_rows: int
+    qa_languagetool_automark: bool
     default_root: str
     search_scope: str
     replace_scope: str
@@ -45,6 +56,11 @@ class LoadedPreferences:
     last_root: str
     extras: dict[str, str]
     tm_import_dir: str
+    lt_editor_mode: str
+    lt_server_url: str
+    lt_timeout_ms: int
+    lt_picky_mode: bool
+    lt_locale_map: str
     window_geometry: str
     patched_raw: dict[str, Any] | None
 
@@ -125,6 +141,14 @@ class PreferencesService:
         qa_auto_refresh: bool = False,
         qa_auto_mark_for_review: bool = False,
         qa_auto_mark_touched_for_review: bool = False,
+        qa_check_languagetool: bool = False,
+        qa_languagetool_max_rows: int = _QA_LT_MAX_ROWS_DEFAULT,
+        qa_languagetool_automark: bool = False,
+        lt_editor_mode: str = "auto",
+        lt_server_url: str = "",
+        lt_timeout_ms: int = 1200,
+        lt_picky_mode: bool = False,
+        lt_locale_map: str = "{}",
     ) -> None:
         """Execute persist main window preferences."""
         prefs = build_persist_payload(
@@ -138,11 +162,19 @@ class PreferencesService:
             qa_auto_refresh=qa_auto_refresh,
             qa_auto_mark_for_review=qa_auto_mark_for_review,
             qa_auto_mark_touched_for_review=qa_auto_mark_touched_for_review,
+            qa_check_languagetool=qa_check_languagetool,
+            qa_languagetool_max_rows=qa_languagetool_max_rows,
+            qa_languagetool_automark=qa_languagetool_automark,
             last_root=last_root,
             last_locales=last_locales,
             window_geometry=window_geometry,
             default_root=default_root,
             tm_import_dir=tm_import_dir,
+            lt_editor_mode=lt_editor_mode,
+            lt_server_url=lt_server_url,
+            lt_timeout_ms=lt_timeout_ms,
+            lt_picky_mode=lt_picky_mode,
+            lt_locale_map=lt_locale_map,
             search_scope=search_scope,
             replace_scope=replace_scope,
             extras=extras,
@@ -178,6 +210,15 @@ def normalize_scope(value: object, *, default: str = "FILE") -> str:
     if raw in _VALID_SCOPES:
         return raw
     return default
+
+
+def normalize_qa_languagetool_max_rows(value: object) -> int:
+    """Normalize QA LanguageTool row cap."""
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = _QA_LT_MAX_ROWS_DEFAULT
+    return max(_QA_LT_MAX_ROWS_MIN, min(_QA_LT_MAX_ROWS_MAX, parsed))
 
 
 def resolve_qa_preferences(
@@ -223,6 +264,11 @@ def normalize_loaded_preferences(
     qa_auto_mark_touched_for_review = bool(
         raw.get("qa_auto_mark_touched_for_review", False)
     )
+    qa_check_languagetool = bool(raw.get("qa_check_languagetool", False))
+    qa_languagetool_max_rows = normalize_qa_languagetool_max_rows(
+        raw.get("qa_languagetool_max_rows", _QA_LT_MAX_ROWS_DEFAULT)
+    )
+    qa_languagetool_automark = bool(raw.get("qa_languagetool_automark", False))
     default_root = str(raw.get("default_root", "") or fallback_default_root)
     search_scope = normalize_scope(raw.get("search_scope", "FILE"), default="FILE")
     replace_scope = normalize_scope(raw.get("replace_scope", "FILE"), default="FILE")
@@ -230,6 +276,14 @@ def normalize_loaded_preferences(
     last_root = str(raw.get("last_root", "") or fallback_last_root)
     extras = dict(raw.get("__extras__", {}))
     tm_import_dir = str(raw.get("tm_import_dir", "")).strip() or default_tm_import_dir
+    lt_editor_mode = _normalize_lt_editor_mode(raw.get("lt_editor_mode", "auto"))
+    lt_server_url = (
+        str(raw.get("lt_server_url", "")).strip() or _default_lt_server_url()
+    )
+    lt_timeout_ms = _normalize_lt_timeout_ms(raw.get("lt_timeout_ms", 1200))
+    lt_picky_mode = bool(raw.get("lt_picky_mode", False))
+    lt_locale_map_data = _load_lt_language_map(raw.get("lt_locale_map", "{}"))
+    lt_locale_map = _dump_lt_language_map(lt_locale_map_data) if lt_locale_map_data else "{}"
     window_geometry = str(raw.get("window_geometry", "")).strip()
 
     patched_raw: dict[str, Any] | None = None
@@ -258,6 +312,9 @@ def normalize_loaded_preferences(
         qa_auto_refresh=qa_auto_refresh,
         qa_auto_mark_for_review=qa_auto_mark_for_review,
         qa_auto_mark_touched_for_review=qa_auto_mark_touched_for_review,
+        qa_check_languagetool=qa_check_languagetool,
+        qa_languagetool_max_rows=qa_languagetool_max_rows,
+        qa_languagetool_automark=qa_languagetool_automark,
         default_root=default_root,
         search_scope=search_scope,
         replace_scope=replace_scope,
@@ -265,6 +322,11 @@ def normalize_loaded_preferences(
         last_root=last_root,
         extras=extras,
         tm_import_dir=tm_import_dir,
+        lt_editor_mode=lt_editor_mode,
+        lt_server_url=lt_server_url,
+        lt_timeout_ms=lt_timeout_ms,
+        lt_picky_mode=lt_picky_mode,
+        lt_locale_map=lt_locale_map,
         window_geometry=window_geometry,
         patched_raw=patched_raw,
     )
@@ -290,6 +352,14 @@ def build_persist_payload(
     qa_auto_refresh: bool = False,
     qa_auto_mark_for_review: bool = False,
     qa_auto_mark_touched_for_review: bool = False,
+    qa_check_languagetool: bool = False,
+    qa_languagetool_max_rows: int = _QA_LT_MAX_ROWS_DEFAULT,
+    qa_languagetool_automark: bool = False,
+    lt_editor_mode: str = "auto",
+    lt_server_url: str = "",
+    lt_timeout_ms: int = 1200,
+    lt_picky_mode: bool = False,
+    lt_locale_map: str = "{}",
 ) -> dict[str, Any]:
     """Build persist payload."""
     return {
@@ -303,11 +373,23 @@ def build_persist_payload(
         "qa_auto_refresh": bool(qa_auto_refresh),
         "qa_auto_mark_for_review": bool(qa_auto_mark_for_review),
         "qa_auto_mark_touched_for_review": bool(qa_auto_mark_touched_for_review),
+        "qa_check_languagetool": bool(qa_check_languagetool),
+        "qa_languagetool_max_rows": normalize_qa_languagetool_max_rows(
+            qa_languagetool_max_rows
+        ),
+        "qa_languagetool_automark": bool(qa_languagetool_automark),
         "last_root": str(last_root),
         "last_locales": list(last_locales),
         "window_geometry": str(window_geometry),
         "default_root": str(default_root).strip(),
         "tm_import_dir": str(tm_import_dir).strip(),
+        "lt_editor_mode": _normalize_lt_editor_mode(lt_editor_mode),
+        "lt_server_url": str(lt_server_url).strip() or _default_lt_server_url(),
+        "lt_timeout_ms": _normalize_lt_timeout_ms(lt_timeout_ms),
+        "lt_picky_mode": bool(lt_picky_mode),
+        "lt_locale_map": (
+            _dump_lt_language_map(_load_lt_language_map(lt_locale_map)) or "{}"
+        ),
         "search_scope": normalize_scope(search_scope, default="FILE"),
         "replace_scope": normalize_scope(replace_scope, default="FILE"),
         "__extras__": dict(extras),

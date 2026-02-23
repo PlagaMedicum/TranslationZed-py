@@ -14,10 +14,46 @@ from translationzed_py.core.app_config import (
     load as _load_app_config,
 )
 from translationzed_py.core.atomic_io import write_text_atomic
+from translationzed_py.core.languagetool import (
+    default_server_url as _default_lt_server_url,
+)
+from translationzed_py.core.languagetool import (
+    dump_language_map as _dump_lt_language_map,
+)
+from translationzed_py.core.languagetool import (
+    load_language_map as _load_lt_language_map,
+)
+from translationzed_py.core.languagetool import (
+    normalize_editor_mode as _normalize_lt_editor_mode,
+)
+from translationzed_py.core.languagetool import (
+    normalize_timeout_ms as _normalize_lt_timeout_ms,
+)
 
 _BOOL_TRUE = {"1", "true", "yes", "on"}
 _BOOL_FALSE = {"0", "false", "no", "off"}
 _EXTRAS_KEY = "__extras__"
+_QA_LT_MAX_ROWS_DEFAULT = 500
+_QA_LT_MAX_ROWS_MIN = 1
+_QA_LT_MAX_ROWS_MAX = 5000
+
+
+def _normalize_qa_languagetool_max_rows(value: object) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = _QA_LT_MAX_ROWS_DEFAULT
+    return max(_QA_LT_MAX_ROWS_MIN, min(_QA_LT_MAX_ROWS_MAX, parsed))
+
+
+def _normalize_lt_locale_map(value: object) -> str:
+    mapping = _load_lt_language_map(value)
+    if mapping:
+        return _dump_lt_language_map(mapping)
+    raw = str(value or "").strip()
+    if raw in {"", "{}"}:
+        return raw
+    return "{}"
 
 _DEFAULTS: dict[str, Any] = {
     "prompt_write_on_exit": True,
@@ -37,6 +73,14 @@ _DEFAULTS: dict[str, Any] = {
     "search_scope": "FILE",
     "replace_scope": "FILE",
     "tm_import_dir": "",
+    "lt_editor_mode": "auto",
+    "lt_server_url": _default_lt_server_url(),
+    "lt_timeout_ms": 1200,
+    "lt_picky_mode": False,
+    "lt_locale_map": "{}",
+    "qa_check_languagetool": False,
+    "qa_languagetool_max_rows": _QA_LT_MAX_ROWS_DEFAULT,
+    "qa_languagetool_automark": False,
 }
 _REQUIRED_PREF_KEYS = (
     "prompt_write_on_exit",
@@ -52,6 +96,14 @@ _REQUIRED_PREF_KEYS = (
     "search_scope",
     "replace_scope",
     "tm_import_dir",
+    "lt_editor_mode",
+    "lt_server_url",
+    "lt_timeout_ms",
+    "lt_picky_mode",
+    "lt_locale_map",
+    "qa_check_languagetool",
+    "qa_languagetool_max_rows",
+    "qa_languagetool_automark",
 )
 
 
@@ -241,6 +293,36 @@ def _parse_env(path: Path) -> dict[str, Any]:
                     out["replace_scope"] = value
             elif key == "TM_IMPORT_DIR":
                 out["tm_import_dir"] = value
+            elif key == "LT_EDITOR_MODE":
+                out["lt_editor_mode"] = _normalize_lt_editor_mode(value)
+            elif key == "LT_SERVER_URL":
+                out["lt_server_url"] = value
+            elif key == "LT_TIMEOUT_MS":
+                out["lt_timeout_ms"] = _normalize_lt_timeout_ms(value)
+            elif key == "LT_PICKY_MODE":
+                val = value.lower()
+                if val in _BOOL_TRUE:
+                    out["lt_picky_mode"] = True
+                elif val in _BOOL_FALSE:
+                    out["lt_picky_mode"] = False
+            elif key == "LT_LOCALE_MAP":
+                out["lt_locale_map"] = _normalize_lt_locale_map(value)
+            elif key == "QA_CHECK_LANGUAGETOOL":
+                val = value.lower()
+                if val in _BOOL_TRUE:
+                    out["qa_check_languagetool"] = True
+                elif val in _BOOL_FALSE:
+                    out["qa_check_languagetool"] = False
+            elif key == "QA_LANGUAGETOOL_MAX_ROWS":
+                out["qa_languagetool_max_rows"] = (
+                    _normalize_qa_languagetool_max_rows(value)
+                )
+            elif key == "QA_LANGUAGETOOL_AUTOMARK":
+                val = value.lower()
+                if val in _BOOL_TRUE:
+                    out["qa_languagetool_automark"] = True
+                elif val in _BOOL_FALSE:
+                    out["qa_languagetool_automark"] = False
             else:
                 extras[key] = value
     except OSError:
@@ -264,6 +346,26 @@ def load(root: Path | None = None) -> dict[str, Any]:
         merged.get("tm_import_dir", ""),
         root,
     )
+    merged["lt_editor_mode"] = _normalize_lt_editor_mode(
+        merged.get("lt_editor_mode", "auto")
+    )
+    merged["lt_server_url"] = (
+        str(merged.get("lt_server_url", "")).strip() or _default_lt_server_url()
+    )
+    merged["lt_timeout_ms"] = _normalize_lt_timeout_ms(
+        merged.get("lt_timeout_ms", 1200)
+    )
+    merged["lt_picky_mode"] = bool(merged.get("lt_picky_mode", False))
+    merged["lt_locale_map"] = _normalize_lt_locale_map(
+        merged.get("lt_locale_map", "{}")
+    )
+    merged["qa_check_languagetool"] = bool(merged.get("qa_check_languagetool", False))
+    merged["qa_languagetool_max_rows"] = _normalize_qa_languagetool_max_rows(
+        merged.get("qa_languagetool_max_rows", _QA_LT_MAX_ROWS_DEFAULT)
+    )
+    merged["qa_languagetool_automark"] = bool(
+        merged.get("qa_languagetool_automark", False)
+    )
     if extras:
         merged[_EXTRAS_KEY] = extras
     return merged
@@ -283,6 +385,22 @@ def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
     prefs["tm_import_dir"] = _normalize_tm_import_dir(
         prefs.get("tm_import_dir", ""),
         root,
+    )
+    prefs["lt_editor_mode"] = _normalize_lt_editor_mode(
+        prefs.get("lt_editor_mode", "auto")
+    )
+    prefs["lt_server_url"] = (
+        str(prefs.get("lt_server_url", "")).strip() or _default_lt_server_url()
+    )
+    prefs["lt_timeout_ms"] = _normalize_lt_timeout_ms(prefs.get("lt_timeout_ms", 1200))
+    prefs["lt_picky_mode"] = bool(prefs.get("lt_picky_mode", False))
+    prefs["lt_locale_map"] = _normalize_lt_locale_map(prefs.get("lt_locale_map", "{}"))
+    prefs["qa_check_languagetool"] = bool(prefs.get("qa_check_languagetool", False))
+    prefs["qa_languagetool_max_rows"] = _normalize_qa_languagetool_max_rows(
+        prefs.get("qa_languagetool_max_rows", _QA_LT_MAX_ROWS_DEFAULT)
+    )
+    prefs["qa_languagetool_automark"] = bool(
+        prefs.get("qa_languagetool_automark", False)
     )
     migrated_tm_dirs = _migrate_legacy_tm_import_dirs(root)
     if extras:
@@ -329,6 +447,14 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         "SEARCH_SCOPE",
         "REPLACE_SCOPE",
         "TM_IMPORT_DIR",
+        "LT_EDITOR_MODE",
+        "LT_SERVER_URL",
+        "LT_TIMEOUT_MS",
+        "LT_PICKY_MODE",
+        "LT_LOCALE_MAP",
+        "QA_CHECK_LANGUAGETOOL",
+        "QA_LANGUAGETOOL_MAX_ROWS",
+        "QA_LANGUAGETOOL_AUTOMARK",
     }
     lines = [
         f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
@@ -355,6 +481,29 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         (
             "QA_AUTO_MARK_TOUCHED_FOR_REVIEW="
             f"{'true' if prefs.get('qa_auto_mark_touched_for_review', False) else 'false'}"
+        ),
+        (
+            "LT_EDITOR_MODE="
+            f"{_normalize_lt_editor_mode(prefs.get('lt_editor_mode', 'auto'))}"
+        ),
+        (
+            "LT_SERVER_URL="
+            f"{str(prefs.get('lt_server_url', '')).strip() or _default_lt_server_url()}"
+        ),
+        f"LT_TIMEOUT_MS={_normalize_lt_timeout_ms(prefs.get('lt_timeout_ms', 1200))}",
+        f"LT_PICKY_MODE={'true' if prefs.get('lt_picky_mode', False) else 'false'}",
+        f"LT_LOCALE_MAP={_normalize_lt_locale_map(prefs.get('lt_locale_map', '{}'))}",
+        (
+            "QA_CHECK_LANGUAGETOOL="
+            f"{'true' if prefs.get('qa_check_languagetool', False) else 'false'}"
+        ),
+        (
+            "QA_LANGUAGETOOL_MAX_ROWS="
+            f"{_normalize_qa_languagetool_max_rows(prefs.get('qa_languagetool_max_rows', _QA_LT_MAX_ROWS_DEFAULT))}"
+        ),
+        (
+            "QA_LANGUAGETOOL_AUTOMARK="
+            f"{'true' if prefs.get('qa_languagetool_automark', False) else 'false'}"
         ),
     ]
     last_root = str(prefs.get("last_root", "")).strip()

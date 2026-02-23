@@ -25,6 +25,14 @@ def test_load_is_pure_read_for_missing_settings_env(
     assert prefs["search_scope"] == "FILE"
     assert prefs["replace_scope"] == "FILE"
     assert prefs["tm_import_dir"] == str((tmp_path / ".tzp" / "tms").resolve())
+    assert prefs["lt_editor_mode"] == "auto"
+    assert prefs["lt_server_url"] == "http://127.0.0.1:8081"
+    assert prefs["lt_timeout_ms"] == 1200
+    assert prefs["lt_picky_mode"] is False
+    assert prefs["lt_locale_map"] == "{}"
+    assert prefs["qa_check_languagetool"] is False
+    assert prefs["qa_languagetool_max_rows"] == 500
+    assert prefs["qa_languagetool_automark"] is False
 
     path = tmp_path / ".tzp" / "config" / "settings.env"
     assert not path.exists()
@@ -49,6 +57,14 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert prefs["search_scope"] == "FILE"
     assert prefs["replace_scope"] == "FILE"
     assert prefs["tm_import_dir"] == str((tmp_path / ".tzp" / "tms").resolve())
+    assert prefs["lt_editor_mode"] == "auto"
+    assert prefs["lt_server_url"] == "http://127.0.0.1:8081"
+    assert prefs["lt_timeout_ms"] == 1200
+    assert prefs["lt_picky_mode"] is False
+    assert prefs["lt_locale_map"] == "{}"
+    assert prefs["qa_check_languagetool"] is False
+    assert prefs["qa_languagetool_max_rows"] == 500
+    assert prefs["qa_languagetool_automark"] is False
 
     path = tmp_path / ".tzp" / "config" / "settings.env"
     assert path.exists()
@@ -66,6 +82,14 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert "SEARCH_SCOPE=FILE" in raw
     assert "REPLACE_SCOPE=FILE" in raw
     assert f"TM_IMPORT_DIR={(tmp_path / '.tzp' / 'tms').resolve()}" in raw
+    assert "LT_EDITOR_MODE=auto" in raw
+    assert "LT_SERVER_URL=http://127.0.0.1:8081" in raw
+    assert "LT_TIMEOUT_MS=1200" in raw
+    assert "LT_PICKY_MODE=false" in raw
+    assert "LT_LOCALE_MAP={}" in raw
+    assert "QA_CHECK_LANGUAGETOOL=false" in raw
+    assert "QA_LANGUAGETOOL_MAX_ROWS=500" in raw
+    assert "QA_LANGUAGETOOL_AUTOMARK=false" in raw
 
 
 def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
@@ -186,3 +210,34 @@ def test_ensure_defaults_canonicalizes_relative_tm_import_dir(
     assert prefs["tm_import_dir"] == expected
     raw = cfg_path.read_text(encoding="utf-8")
     assert f"TM_IMPORT_DIR={expected}" in raw
+
+
+def test_ensure_defaults_normalizes_languagetool_settings(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Verify LT-related preferences normalize invalid values safely."""
+    monkeypatch.chdir(tmp_path)
+    cfg_path = tmp_path / ".tzp" / "config" / "settings.env"
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text(
+        "LT_EDITOR_MODE=invalid\n"
+        "LT_SERVER_URL=https://lt.example.org\n"
+        "LT_TIMEOUT_MS=999999\n"
+        "LT_PICKY_MODE=true\n"
+        "LT_LOCALE_MAP={bad json}\n"
+        "QA_CHECK_LANGUAGETOOL=true\n"
+        "QA_LANGUAGETOOL_MAX_ROWS=0\n"
+        "QA_LANGUAGETOOL_AUTOMARK=true\n",
+        encoding="utf-8",
+    )
+
+    prefs = preferences.ensure_defaults(tmp_path)
+
+    assert prefs["lt_editor_mode"] == "auto"
+    assert prefs["lt_server_url"] == "https://lt.example.org"
+    assert prefs["lt_timeout_ms"] == 30000
+    assert prefs["lt_picky_mode"] is True
+    assert prefs["lt_locale_map"] == "{}"
+    assert prefs["qa_check_languagetool"] is True
+    assert prefs["qa_languagetool_max_rows"] == 1
+    assert prefs["qa_languagetool_automark"] is True

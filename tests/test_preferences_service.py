@@ -9,6 +9,7 @@ from translationzed_py.core.preferences_service import (
     PreferencesService,
     build_persist_payload,
     normalize_loaded_preferences,
+    normalize_qa_languagetool_max_rows,
     normalize_scope,
     resolve_qa_preferences,
     resolve_startup_root,
@@ -63,6 +64,14 @@ def test_normalize_scope_falls_back_to_file() -> None:
     assert normalize_scope("invalid") == "FILE"
 
 
+def test_normalize_qa_languagetool_max_rows_clamps_range() -> None:
+    """Verify QA LT max-row normalizer clamps to configured bounds."""
+    assert normalize_qa_languagetool_max_rows("10") == 10
+    assert normalize_qa_languagetool_max_rows("0") == 1
+    assert normalize_qa_languagetool_max_rows("9000") == 5000
+    assert normalize_qa_languagetool_max_rows("bad") == 500
+
+
 def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
     """Verify resolve qa preferences updates flags and change marker."""
     current = (True, True, False, False, False, False, False)
@@ -106,12 +115,20 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
         "qa_auto_refresh": True,
         "qa_auto_mark_for_review": True,
         "qa_auto_mark_touched_for_review": True,
+        "qa_check_languagetool": True,
+        "qa_languagetool_max_rows": 9000,
+        "qa_languagetool_automark": True,
         "default_root": "/tmp/default",
         "search_scope": "bad-scope",
         "replace_scope": "POOL",
         "last_locales": ["BE"],
         "last_root": "/tmp/last",
         "tm_import_dir": "",
+        "lt_editor_mode": "on",
+        "lt_server_url": "https://lt.example.org",
+        "lt_timeout_ms": 1000,
+        "lt_picky_mode": True,
+        "lt_locale_map": '{"EN":"en-US"}',
         "window_geometry": "abc",
         "__extras__": {
             "LAYOUT_RESET_REV": "1",
@@ -136,12 +153,20 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
     assert result.qa_auto_refresh is True
     assert result.qa_auto_mark_for_review is True
     assert result.qa_auto_mark_touched_for_review is True
+    assert result.qa_check_languagetool is True
+    assert result.qa_languagetool_max_rows == 5000
+    assert result.qa_languagetool_automark is True
     assert result.default_root == "/tmp/default"
     assert result.search_scope == "FILE"
     assert result.replace_scope == "POOL"
     assert result.last_locales == ["BE"]
     assert result.last_root == "/tmp/last"
     assert result.tm_import_dir == "/fallback/tm"
+    assert result.lt_editor_mode == "on"
+    assert result.lt_server_url == "https://lt.example.org"
+    assert result.lt_timeout_ms == 1000
+    assert result.lt_picky_mode is True
+    assert result.lt_locale_map == '{"EN":"en-US"}'
     assert result.window_geometry == ""
     assert result.extras["LAYOUT_RESET_REV"] == "3"
     assert "TABLE_KEY_WIDTH" not in result.extras
@@ -172,6 +197,14 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
         qa_auto_refresh=True,
         qa_auto_mark_for_review=True,
         qa_auto_mark_touched_for_review=True,
+        qa_check_languagetool=True,
+        qa_languagetool_max_rows=8000,
+        qa_languagetool_automark=True,
+        lt_editor_mode="bad",
+        lt_server_url="",
+        lt_timeout_ms=80,
+        lt_picky_mode=True,
+        lt_locale_map='{"EN":"en-US"}',
     )
     locales.append("TH")
     extras["B"] = "2"
@@ -184,6 +217,14 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
     assert payload["qa_auto_refresh"] is True
     assert payload["qa_auto_mark_for_review"] is True
     assert payload["qa_auto_mark_touched_for_review"] is True
+    assert payload["qa_check_languagetool"] is True
+    assert payload["qa_languagetool_max_rows"] == 5000
+    assert payload["qa_languagetool_automark"] is True
+    assert payload["lt_editor_mode"] == "auto"
+    assert payload["lt_server_url"] == "http://127.0.0.1:8081"
+    assert payload["lt_timeout_ms"] == 100
+    assert payload["lt_picky_mode"] is True
+    assert payload["lt_locale_map"] == '{"EN":"en-US"}'
     assert payload["last_locales"] == ["BE", "RU"]
     assert payload["__extras__"] == {"A": "1"}
     assert payload["default_root"] == "/default"
@@ -212,6 +253,14 @@ def test_preferences_service_load_normalized_bootstraps_settings(
     assert loaded.qa_auto_refresh is False
     assert loaded.qa_auto_mark_for_review is False
     assert loaded.qa_auto_mark_touched_for_review is False
+    assert loaded.qa_check_languagetool is False
+    assert loaded.qa_languagetool_max_rows == 500
+    assert loaded.qa_languagetool_automark is False
+    assert loaded.lt_editor_mode == "auto"
+    assert loaded.lt_server_url == "http://127.0.0.1:8081"
+    assert loaded.lt_timeout_ms == 1200
+    assert loaded.lt_picky_mode is False
+    assert loaded.lt_locale_map == "{}"
     assert loaded.search_scope == "FILE"
     assert (tmp_path / ".tzp" / "config" / "settings.env").exists()
 
@@ -244,6 +293,14 @@ def test_preferences_service_persist_main_window_preferences(
         qa_auto_refresh=True,
         qa_auto_mark_for_review=True,
         qa_auto_mark_touched_for_review=True,
+        qa_check_languagetool=True,
+        qa_languagetool_max_rows=64,
+        qa_languagetool_automark=True,
+        lt_editor_mode="on",
+        lt_server_url="https://lt.example.org",
+        lt_timeout_ms=2500,
+        lt_picky_mode=True,
+        lt_locale_map='{"EN":"en-US","BE":"be-BY"}',
     )
 
     saved = preferences.load(None)
@@ -259,6 +316,14 @@ def test_preferences_service_persist_main_window_preferences(
     assert saved["qa_auto_refresh"] is True
     assert saved["qa_auto_mark_for_review"] is True
     assert saved["qa_auto_mark_touched_for_review"] is True
+    assert saved["qa_check_languagetool"] is True
+    assert saved["qa_languagetool_max_rows"] == 64
+    assert saved["qa_languagetool_automark"] is True
+    assert saved["lt_editor_mode"] == "on"
+    assert saved["lt_server_url"] == "https://lt.example.org"
+    assert saved["lt_timeout_ms"] == 2500
+    assert saved["lt_picky_mode"] is True
+    assert saved["lt_locale_map"] == '{"BE":"be-BY","EN":"en-US"}'
     assert saved["__extras__"]["X"] == "1"
 
 
