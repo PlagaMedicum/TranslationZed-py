@@ -16,8 +16,7 @@ from PySide6.QtGui import QColor, QPalette, QUndoStack
 from PySide6.QtWidgets import QApplication
 
 from translationzed_py.core import Entry, Status
-from translationzed_py.core.model import STATUS_ORDER
-from translationzed_py.core.model import ParsedFile
+from translationzed_py.core.model import STATUS_ORDER, ParsedFile
 from translationzed_py.core.search import SearchRow
 from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
 
@@ -149,7 +148,9 @@ class TranslationModel(QAbstractTableModel):
                 key for key in (str(raw).strip() for raw in edited_keys) if key in known
             }
         else:
-            self._virtual_new_edited_keys.intersection_update(self._virtual_new_rows_by_key)
+            self._virtual_new_edited_keys.intersection_update(
+                self._virtual_new_rows_by_key
+            )
         for key in self._virtual_new_order:
             self._diff_marker_by_key.setdefault(key, "NEW")
         self._recompute_dirty_state()
@@ -167,9 +168,7 @@ class TranslationModel(QAbstractTableModel):
         self._set_diff_markers(marker_by_key)
         if en_order_keys is not None:
             self._en_order_keys = tuple(
-                key
-                for key in (str(raw).strip() for raw in en_order_keys)
-                if key
+                key for key in (str(raw).strip() for raw in en_order_keys) if key
             )
         self._set_virtual_new_rows(
             virtual_new_rows,
@@ -235,7 +234,9 @@ class TranslationModel(QAbstractTableModel):
             refs.append(_RowRef(kind=_ROW_KIND_VIRTUAL, key=key))
 
         if self._status_filter is not None:
-            refs = [ref for ref in refs if self._status_for_ref(ref) in self._status_filter]
+            refs = [
+                ref for ref in refs if self._status_for_ref(ref) in self._status_filter
+            ]
 
         if self._status_sort_enabled:
             indexed = list(enumerate(refs))
@@ -368,7 +369,9 @@ class TranslationModel(QAbstractTableModel):
             # Status-only edits should propagate to TM metadata updates.
             self._status_touched_rows.add(row)
         status_changed = prev_entry.status != entry.status
-        if status_changed and (self._status_sort_enabled or self._status_filter is not None):
+        if status_changed and (
+            self._status_sort_enabled or self._status_filter is not None
+        ):
             self.beginResetModel()
             self._rebuild_row_refs()
             self.endResetModel()
@@ -570,7 +573,9 @@ class TranslationModel(QAbstractTableModel):
         """Execute full source text."""
         base_index = self._base_index_for_row(row)
         if base_index is not None:
-            if self._source_by_row is not None and base_index < len(self._source_by_row):
+            if self._source_by_row is not None and base_index < len(
+                self._source_by_row
+            ):
                 return self._source_by_row[base_index] or ""
             return self._source_values.get(self._entries[base_index].key, "") or ""
         virtual = self._virtual_row_for_row(row)
@@ -709,7 +714,9 @@ class TranslationModel(QAbstractTableModel):
                 entry = self._entries[ref.index]
                 key = entry.key
                 if include_source:
-                    if self._source_by_row is not None and ref.index < len(self._source_by_row):
+                    if self._source_by_row is not None and ref.index < len(
+                        self._source_by_row
+                    ):
                         source = self._source_by_row[ref.index]
                     else:
                         source = self._source_values.get(entry.key, "")

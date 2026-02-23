@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import html
 import os
 import re
 import shutil
@@ -35,7 +34,6 @@ from PySide6.QtGui import (
     QGuiApplication,
     QIcon,
     QKeySequence,
-    QTextOption,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -87,7 +85,6 @@ from translationzed_py.core import (
     scan_root_with_errors,
 )
 from translationzed_py.core.app_config import load as _load_app_config
-from translationzed_py.core.atomic_io import write_text_atomic as _write_text_atomic
 from translationzed_py.core.conflict_service import (
     ConflictMergeRow as _ConflictMergeRow,
 )
@@ -103,16 +100,6 @@ from translationzed_py.core.conflict_service import (
 from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
-from translationzed_py.core.en_diff_service import classify_file as _classify_en_diff_file
-from translationzed_py.core.en_insert_plan import apply_insert_plan as _apply_en_insert_plan
-from translationzed_py.core.en_insert_plan import build_insert_plan as _build_en_insert_plan
-from translationzed_py.core.en_insert_plan import ENInsertPlan as _ENInsertPlan
-from translationzed_py.core.en_diff_snapshot import (
-    read_snapshot as _read_en_diff_snapshot,
-)
-from translationzed_py.core.en_diff_snapshot import (
-    update_file_snapshot as _update_en_diff_snapshot,
-)
 from translationzed_py.core.file_workflow import (
     FileWorkflowService as _FileWorkflowService,
 )
@@ -128,7 +115,8 @@ from translationzed_py.core.file_workflow import (
 from translationzed_py.core.file_workflow import (
     SaveFromCacheParseError as _SaveFromCacheParseError,
 )
-from translationzed_py.core.model import STATUS_ORDER, Status
+from translationzed_py.core.model import STATUS_ORDER
+from translationzed_py.core.model import Status as Status  # noqa: F401
 from translationzed_py.core.preferences_service import (
     PreferencesService as _PreferencesService,
 )
@@ -250,22 +238,19 @@ from translationzed_py.core.tm_import_sync import (
 )
 from translationzed_py.core.tm_query import (
     TMQueryKey,
-    TMQueryPolicy,
 )
 from translationzed_py.core.tm_rebuild import (
     TMRebuildResult,
 )
 from translationzed_py.core.tm_store import TMMatch, TMStore
 from translationzed_py.core.tm_workflow_service import (
-    TMSelectionPlan as _TMSelectionPlan,
-)
-from translationzed_py.core.tm_workflow_service import (
     TMWorkflowService as _TMWorkflowService,
 )
 
 from . import languagetool_adapter as _lt_adapter
+from . import main_window_en_diff_helpers as _en_diff_helpers
+from . import main_window_panel_helpers as _panel_helpers
 from .delegates import (
-    MAX_VISUAL_CHARS,
     KeyDelegate,
     StatusDelegate,
     TextVisualHighlighter,
@@ -280,21 +265,18 @@ from .dialogs import (
     TmLanguageDialog,
 )
 from .entry_model import TranslationModel
-from .entry_model import VirtualNewRow
 from .fs_model import FsModel
 from .perf_trace import PERF_TRACE
 from .preferences_dialog import PreferencesDialog
 from .qa_async import poll_scan as _qa_poll_scan
 from .qa_async import refresh_sync_for_test as _qa_refresh_sync_for_test
 from .qa_async import start_scan as _qa_start_scan
-from .search_scope_ui import scope_icon_for as _scope_icon_for
 from .source_lookup import LazySourceRows as _LazySourceRows
 from .source_lookup import SourceLookup as _SourceLookup
 from .source_reference_header import refresh_header_label as _source_header_refresh
 from .source_reference_state import (
     apply_source_reference_preferences_for_window as _apply_source_ref_preferences_for_window,
 )
-from .table_header import handle_header_click as _table_header_click
 from .source_reference_state import (
     effective_source_reference_mode_for_window as _effective_source_reference_mode_for_window,
 )
@@ -310,13 +292,12 @@ from .source_reference_state import (
 from .source_reference_state import (
     sync_source_reference_override_ui_for_window as _sync_source_reference_override_ui_for_window,
 )
+from .table_header import handle_header_click as _table_header_click
 from .theme import THEME_SYSTEM as _THEME_SYSTEM
 from .theme import apply_theme as _apply_app_theme
 from .theme import connect_system_theme_sync as _connect_system_theme_sync
 from .theme import disconnect_system_theme_sync as _disconnect_system_theme_sync
 from .theme import normalize_theme_mode as _normalize_theme_mode
-from .tm_preview import apply_tm_preview_highlights as _apply_tm_preview_highlights
-from .tm_preview import prepare_tm_preview_terms as _prepare_tm_preview_terms
 
 _TEST_DIALOGS_PATCHED = False
 _ORIG_QMESSAGEBOX_EXEC = None
@@ -1572,6 +1553,9 @@ class MainWindow(QMainWindow):
         widget.setToolTip(tooltip)
         return widget, action, scope
 
+    def _show_info_box(self, title: str, text: str) -> int:
+        return _show_info_box(self, title, text)
+
     def _update_detail_toggle(self, visible: bool) -> None:
         show_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
         hide_icon = self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
@@ -2305,330 +2289,23 @@ class MainWindow(QMainWindow):
     def _locale_for_string_path(self, path_key: str) -> str | None:
         return self._locale_for_path(Path(path_key))
 
-    def _stash_current_new_row_drafts(self) -> None:
-        if not (self._current_pf and self._current_model):
-            return
-        drafts = self._current_model.edited_virtual_new_values()
-        if drafts:
-            self._en_new_drafts_by_file[self._current_pf.path] = dict(drafts)
-        else:
-            self._en_new_drafts_by_file.pop(self._current_pf.path, None)
-
-    def _en_reference_path_for_locale_file(self, path: Path) -> Path | None:
-        locale = self._locale_for_path(path)
-        if not locale or locale == "EN":
-            return None
-        try:
-            rel = path.relative_to(self._root)
-        except ValueError:
-            return None
-        if len(rel.parts) < 2:
-            return None
-        en_path = self._root / "EN" / Path(*rel.parts[1:])
-        if not en_path.exists():
-            return None
-        return en_path
-
-    def _read_file_text(self, path: Path, *, encoding: str) -> str:
-        return path.read_text(encoding=encoding)
-
-    def _load_en_reference_data(
-        self,
-        locale_path: Path,
-    ) -> tuple[Path | None, str, dict[str, str], tuple[str, ...]]:
-        en_path = self._en_reference_path_for_locale_file(locale_path)
-        if en_path is None:
-            return None, "", {}, ()
-        en_meta = self._locales.get("EN", LocaleMeta("", Path(), "", "utf-8"))
-        en_encoding = en_meta.charset or "utf-8"
-        try:
-            en_parsed = parse(en_path, encoding=en_encoding)
-        except Exception:
-            return en_path, "", {}, ()
-        values = {entry.key: entry.value for entry in en_parsed.entries}
-        order = tuple(entry.key for entry in en_parsed.entries)
-        rel_key = ""
-        with contextlib.suppress(ValueError):
-            rel_key = en_path.relative_to(self._root).as_posix()
-        return en_path, rel_key, values, order
-
-    def _build_en_diff_model_state(
-        self,
-        *,
-        path: Path,
-        parsed_file: ParsedFile,
-        en_rel_key: str,
-        en_values: Mapping[str, str],
-        en_order: Sequence[str],
-    ) -> tuple[dict[str, str], list[VirtualNewRow], tuple[str, ...]]:
-        locale_values = {entry.key: entry.value for entry in parsed_file.entries}
-        snapshot = _read_en_diff_snapshot(self._root)
-        snapshot_rows = snapshot.get(en_rel_key, {}) if en_rel_key else {}
-        diff_result = _classify_en_diff_file(
-            en_values=en_values,
-            locale_values=locale_values,
-            snapshot_rows=snapshot_rows,
-        )
-        markers: dict[str, str] = {}
-        for key in diff_result.removed_keys:
-            markers[key] = "REMOVED"
-        for key in diff_result.modified_keys:
-            markers[key] = "MODIFIED"
-        drafts = self._en_new_drafts_by_file.get(path, {})
-        virtual_rows: list[VirtualNewRow] = []
-        for key in diff_result.new_keys:
-            source = str(en_values.get(key, ""))
-            value = str(drafts.get(key, ""))
-            virtual_rows.append(VirtualNewRow(key=key, source=source, value=value))
-            markers[key] = "NEW"
-        edited_keys = tuple(drafts)
-        return markers, virtual_rows, edited_keys
-
-    def _refresh_current_en_diff_state(self) -> None:
-        if not (self._current_pf and self._current_model):
-            return
-        self._stash_current_new_row_drafts()
-        markers, virtual_rows, edited_keys = self._build_en_diff_model_state(
-            path=self._current_pf.path,
-            parsed_file=self._current_pf,
-            en_rel_key=self._current_en_reference_rel,
-            en_values=self._current_en_values,
-            en_order=self._current_en_order,
-        )
-        self._current_model.apply_diff_state(
-            marker_by_key=markers,
-            virtual_new_rows=virtual_rows,
-            en_order_keys=self._current_en_order,
-            edited_virtual_new_keys=edited_keys,
-        )
-
-    def _update_en_snapshot_for_locale_file(self, path: Path) -> None:
-        _en_path, en_rel, en_values, _en_order = self._load_en_reference_data(path)
-        if not en_rel or not en_values:
-            return
-        _update_en_diff_snapshot(
-            self._root,
-            en_rel,
-            en_values,
-        )
-
-    def _insertion_enabled_for_path(self, path: Path) -> bool:
-        locale = self._locale_for_path(path)
-        if not locale or locale == "EN":
-            return False
-        try:
-            rel = path.relative_to(self._root).as_posix()
-        except ValueError:
-            rel = path.name
-        globs = tuple(self._app_config.insertion_enabled_globs or ())
-        if not globs:
-            return False
-        return any(
-            path.match(glob) or Path(rel).match(glob) or path.name == glob
-            for glob in globs
-        )
-
-    def _build_en_insert_preview_text(
-        self,
-        *,
-        locale_text: str,
-        plan: _ENInsertPlan,
-        context_lines: int,
-    ) -> str:
-        if not plan.items:
-            return "No NEW rows to insert."
-        locale_lines = locale_text.splitlines()
-        key_line_map: dict[str, int] = {}
-        for idx, line in enumerate(locale_lines):
-            if "=" not in line:
-                continue
-            key = line.split("=", 1)[0].strip()
-            if key and key not in key_line_map:
-                key_line_map[key] = idx
-        blocks: list[str] = []
-        pad = max(0, int(context_lines))
-        for item in plan.items:
-            anchor = item.anchor_key
-            anchor_idx = key_line_map.get(anchor, -1) if anchor else -1
-            if anchor_idx >= 0:
-                before_start = max(0, anchor_idx - pad)
-                before = locale_lines[before_start : anchor_idx + 1]
-                after = locale_lines[anchor_idx + 1 : anchor_idx + 1 + pad]
-            else:
-                before = locale_lines[:pad]
-                after = locale_lines[pad : pad * 2] if pad > 0 else []
-            block_lines = [
-                f"Key: {item.key}",
-                f"Anchor: {anchor or '<file-start>'}",
-                "--- context before ---",
-                *(before or ["<none>"]),
-                "--- insertion ---",
-                *item.snippet_lines,
-                "--- context after ---",
-                *(after or ["<none>"]),
-            ]
-            blocks.append("\n".join(block_lines))
-        return "\n\n".join(blocks)
-
-    def _parse_insert_edit_payload(
-        self,
-        text: str,
-        *,
-        expected_keys: Sequence[str],
-    ) -> dict[str, str] | None:
-        lines = text.splitlines()
-        current_key = ""
-        bucket: dict[str, list[str]] = {}
-        for line in lines:
-            if line.startswith("### KEY: "):
-                current_key = line[len("### KEY: ") :].strip()
-                if current_key:
-                    bucket.setdefault(current_key, [])
-                continue
-            if current_key:
-                bucket[current_key].append(line)
-        if not bucket:
-            return None
-        expected = {str(key).strip() for key in expected_keys if str(key).strip()}
-        if set(bucket) != expected:
-            return None
-        return {key: "\n".join(lines).rstrip("\n") for key, lines in bucket.items()}
-
-    def _prompt_insert_snippet_edits(
-        self,
-        *,
-        plan: _ENInsertPlan,
-        preview_text: str,
-    ) -> dict[str, str] | None:
-        if self._test_mode:
-            return None
-        editable_seed = "\n\n".join(
-            "\n".join([f"### KEY: {item.key}", *item.snippet_lines])
-            for item in plan.items
-        )
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Edit NEW insertion snippets")
-        dialog.resize(860, 620)
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
-        hint = QLabel(
-            "Edit insertion snippets only. Keep section headers unchanged.",
-            dialog,
-        )
-        layout.addWidget(hint)
-        context_view = QPlainTextEdit(dialog)
-        context_view.setReadOnly(True)
-        context_view.setPlainText(preview_text)
-        context_view.setLineWrapMode(QPlainTextEdit.NoWrap)
-        context_view.setMinimumHeight(220)
-        layout.addWidget(context_view, 1)
-        editor = QPlainTextEdit(dialog)
-        editor.setPlainText(editable_seed)
-        editor.setLineWrapMode(QPlainTextEdit.NoWrap)
-        layout.addWidget(editor, 1)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-            dialog,
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(buttons)
-        if dialog.exec() != dialog.DialogCode.Accepted:
-            return None
-        parsed = self._parse_insert_edit_payload(
-            editor.toPlainText(),
-            expected_keys=[item.key for item in plan.items],
-        )
-        if parsed is None:
-            _show_warning_box(
-                self,
-                "Invalid snippet edit",
-                "Snippet sections are invalid. Keep `### KEY:` headers unchanged.",
-            )
-            return None
-        return parsed
-
-    def _prompt_new_row_insertion_action(
-        self,
-        *,
-        rel_path: str,
-        preview_text: str,
-        plan: _ENInsertPlan,
-    ) -> tuple[str, dict[str, str] | None]:
-        if self._test_mode:
-            return "skip", None
-        while True:
-            msg = QMessageBox(self)
-            msg.setIcon(QMessageBox.Question)
-            msg.setWindowTitle("Apply NEW rows")
-            msg.setText(f"Edited NEW rows were found for {rel_path}.")
-            msg.setInformativeText(
-                "Apply inserts snippets preserving EN order and comments."
-            )
-            msg.setDetailedText(preview_text)
-            apply_btn = msg.addButton("Apply", QMessageBox.AcceptRole)
-            skip_btn = msg.addButton("Skip", QMessageBox.ActionRole)
-            edit_btn = msg.addButton("Edit", QMessageBox.ActionRole)
-            cancel_btn = msg.addButton("Cancel", QMessageBox.RejectRole)
-            _prepare_message_box(msg).exec()
-            clicked = msg.clickedButton()
-            if clicked is apply_btn:
-                return "apply", None
-            if clicked is skip_btn:
-                return "skip", None
-            if clicked is cancel_btn or clicked is None:
-                return "cancel", None
-            if clicked is edit_btn:
-                edited = self._prompt_insert_snippet_edits(
-                    plan=plan,
-                    preview_text=preview_text,
-                )
-                if edited is None:
-                    continue
-                return "apply", edited
-
-    def _apply_new_row_insertions(
-        self,
-        *,
-        path: Path,
-        edited_new_values: Mapping[str, str],
-        edited_snippets: Mapping[str, str] | None = None,
-        en_path: Path | None = None,
-        locale_encoding: str | None = None,
-    ) -> bool:
-        if not edited_new_values:
-            return True
-        en_path = en_path or self._current_en_reference_path
-        if en_path is None:
-            return True
-        en_encoding = self._locales.get("EN", LocaleMeta("", Path(), "", "utf-8")).charset or "utf-8"
-        target_encoding = locale_encoding or self._current_encoding
-        try:
-            en_text = self._read_file_text(en_path, encoding=en_encoding)
-            locale_text = self._read_file_text(path, encoding=target_encoding)
-        except OSError as exc:
-            _show_warning_box(self, "Insertion failed", str(exc))
-            return False
-        plan = _build_en_insert_plan(
-            en_text=en_text,
-            locale_text=locale_text,
-            edited_new_values=edited_new_values,
-            comment_prefixes=(self._app_config.comment_prefix, "#", "--"),
-        )
-        if not plan.items:
-            return True
-        merged = _apply_en_insert_plan(
-            locale_text=locale_text,
-            plan=plan,
-            edited_snippets=edited_snippets,
-        )
-        try:
-            _write_text_atomic(path, merged, encoding=target_encoding)
-        except OSError as exc:
-            _show_warning_box(self, "Insertion failed", str(exc))
-            return False
-        return True
+    _stash_current_new_row_drafts = _en_diff_helpers._stash_current_new_row_drafts
+    _en_reference_path_for_locale_file = (
+        _en_diff_helpers._en_reference_path_for_locale_file
+    )
+    _read_file_text = _en_diff_helpers._read_file_text
+    _load_en_reference_data = _en_diff_helpers._load_en_reference_data
+    _build_en_diff_model_state = _en_diff_helpers._build_en_diff_model_state
+    _refresh_current_en_diff_state = _en_diff_helpers._refresh_current_en_diff_state
+    _update_en_snapshot_for_locale_file = (
+        _en_diff_helpers._update_en_snapshot_for_locale_file
+    )
+    _insertion_enabled_for_path = _en_diff_helpers._insertion_enabled_for_path
+    _build_en_insert_preview_text = _en_diff_helpers._build_en_insert_preview_text
+    _parse_insert_edit_payload = _en_diff_helpers._parse_insert_edit_payload
+    _prompt_insert_snippet_edits = _en_diff_helpers._prompt_insert_snippet_edits
+    _prompt_new_row_insertion_action = _en_diff_helpers._prompt_new_row_insertion_action
+    _apply_new_row_insertions = _en_diff_helpers._apply_new_row_insertions
 
     def _load_reference_source(
         self,
@@ -3873,7 +3550,7 @@ class MainWindow(QMainWindow):
                             str(exc),
                         )
                         return False
-                    insert_plan = _build_en_insert_plan(
+                    insert_plan = _en_diff_helpers._build_en_insert_plan(
                         en_text=en_text,
                         locale_text=locale_text,
                         edited_new_values=edited_new_values,
@@ -3887,7 +3564,9 @@ class MainWindow(QMainWindow):
                         )
                         rel_path = str(self._current_pf.path)
                         with contextlib.suppress(ValueError):
-                            rel_path = str(self._current_pf.path.relative_to(self._root))
+                            rel_path = str(
+                                self._current_pf.path.relative_to(self._root)
+                            )
                         insertion_action, insertion_edits = (
                             self._prompt_new_row_insertion_action(
                                 rel_path=rel_path,
@@ -3936,13 +3615,13 @@ class MainWindow(QMainWindow):
             )
             if not insertion_applied:
                 return False
-        if save_succeeded and self._current_en_reference_rel and self._current_en_values:
+        if (
+            save_succeeded
+            and self._current_en_reference_rel
+            and self._current_en_values
+        ):
             with contextlib.suppress(Exception):
-                _update_en_diff_snapshot(
-                    self._root,
-                    self._current_en_reference_rel,
-                    self._current_en_values,
-                )
+                self._update_en_snapshot_for_locale_file(self._current_pf.path)
         if insertion_applied:
             self._en_new_drafts_by_file.pop(self._current_pf.path, None)
         else:
@@ -4034,9 +3713,7 @@ class MainWindow(QMainWindow):
         files.update(self._pending_virtual_new_files(locales=locales))
         return sorted(files)
 
-    def _pending_virtual_new_files(
-        self, *, locales: Iterable[str] | None
-    ) -> set[Path]:
+    def _pending_virtual_new_files(self, *, locales: Iterable[str] | None) -> set[Path]:
         locale_filter = None if locales is None else set(locales)
         pending: set[Path] = set()
         for path, drafts in self._en_new_drafts_by_file.items():
@@ -4245,9 +3922,10 @@ class MainWindow(QMainWindow):
         pending_new_drafts = dict(self._en_new_drafts_by_file.get(path, {}))
         cached = _read_status_cache(self._root, path)
         locale = self._locale_for_path(path)
-        encoding = self._locales.get(
-            locale, LocaleMeta("", Path(), "", "utf-8")
-        ).charset or "utf-8"
+        encoding = (
+            self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
+            or "utf-8"
+        )
         callbacks = _SaveFromCacheCallbacks(
             parse_file=lambda file_path, enc: parse(file_path, encoding=enc),
             save_file=lambda pf, changed_values, enc: save(
@@ -4289,7 +3967,7 @@ class MainWindow(QMainWindow):
                 except OSError as exc:
                     _show_warning_box(self, "Save preview unavailable", str(exc))
                     return False
-                insert_plan = _build_en_insert_plan(
+                insert_plan = _en_diff_helpers._build_en_insert_plan(
                     en_text=en_text,
                     locale_text=locale_text,
                     edited_new_values=pending_new_drafts,
@@ -4352,7 +4030,9 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             _show_critical_box(self, "Cache write failed", str(exc))
             return False
-        if self._current_model.changed_keys() or self._current_model.has_pending_virtual_new_values():
+        if self._current_model.changed_keys() or (
+            self._current_model.has_pending_virtual_new_values()
+        ):
             self.fs_model.set_dirty(self._current_pf.path, True)
         else:
             self.fs_model.set_dirty(self._current_pf.path, False)
@@ -5520,683 +5200,58 @@ class MainWindow(QMainWindow):
             return
         self._qa_refresh_timer.start(self._qa_refresh_delay_ms)
 
-    def _set_qa_progress_visible(self, visible: bool) -> None:
-        self._qa_scan_busy = bool(visible)
-        self._qa_progress.setVisible(self._qa_scan_busy)
-        self._qa_refresh_btn.setEnabled(not self._qa_scan_busy)
-
     _refresh_qa_for_current_file = _qa_refresh_sync_for_test
     _start_qa_scan_for_current_file = _qa_start_scan
     _poll_qa_scan = _qa_poll_scan
+    _set_qa_progress_visible = _panel_helpers._set_qa_progress_visible
+    _set_qa_findings = _panel_helpers._set_qa_findings
+    _set_qa_scan_note = _panel_helpers._set_qa_scan_note
 
-    def _set_qa_findings(self, findings: Sequence[_QAFinding]) -> None:
-        self._qa_findings = tuple(findings)
-        if self._left_stack.currentIndex() == _LEFT_PANEL_QA:
-            self._refresh_qa_panel_results()
-
-    def _set_qa_scan_note(self, note: str) -> None:
-        self._qa_scan_note = str(note).strip()
-        if self._left_stack.currentIndex() == _LEFT_PANEL_QA:
-            self._refresh_qa_panel_results()
-
-    def _set_qa_panel_message(self, text: str) -> None:
-        self._qa_scan_note = ""
-        self._set_qa_list_placeholder(text)
-
-    def _refresh_qa_panel_results(self) -> None:
-        if not hasattr(self, "_qa_results_list") or self._qa_results_list is None:
-            return
-        plan = self._qa_service.build_panel_plan(
-            findings=self._qa_findings,
-            root=self._root,
-            result_limit=self._qa_panel_result_limit,
-        )
-        status_message = plan.status_message
-        if self._qa_scan_note:
-            status_message = f"{status_message} {self._qa_scan_note}"
-        if not plan.items:
-            self._set_qa_list_placeholder(status_message)
-            return
-        self._qa_results_list.clear()
-        for row in plan.items:
-            item = QListWidgetItem(row.label)
-            finding = row.finding
-            item.setData(Qt.UserRole, (str(finding.file), int(finding.row)))
-            self._qa_results_list.addItem(item)
-
-    def _open_qa_result_item(self, item: QListWidgetItem) -> None:
-        payload = item.data(Qt.UserRole)
-        if not isinstance(payload, tuple) or len(payload) != 2:
-            return
-        raw_path, raw_row = payload
-        try:
-            match = _SearchMatch(Path(str(raw_path)), int(raw_row))
-        except Exception:
-            return
-        self._select_match(match)
-
-    def _focus_qa_finding_item(self, finding: _QAFinding) -> None:
-        if not hasattr(self, "_qa_results_list") or self._qa_results_list is None:
-            return
-        target = (str(finding.file), int(finding.row))
-        for idx in range(self._qa_results_list.count()):
-            item = self._qa_results_list.item(idx)
-            payload = item.data(Qt.UserRole)
-            if payload != target:
-                continue
-            self._qa_results_list.setCurrentItem(item)
-            self._qa_results_list.scrollToItem(item)
-            return
-
-    def _navigate_qa_finding(self, direction: int) -> None:
-        if not self._qa_findings:
-            self.statusBar().showMessage("Run QA first to navigate findings.", 3000)
-            return
-        current = self.table.currentIndex()
-        current_row = current.row() if current.isValid() else None
-        current_path = self._current_pf.path if self._current_pf is not None else None
-        plan = self._qa_service.build_navigation_plan(
-            findings=self._qa_findings,
-            current_path=current_path,
-            current_row=current_row,
-            direction=direction,
-            root=self._root,
-        )
-        if plan.finding is None:
-            self.statusBar().showMessage(plan.status_message, 3000)
-            return
-        match = _SearchMatch(plan.finding.file, plan.finding.row)
-        if not self._select_match(match):
-            self.statusBar().showMessage("Unable to navigate to QA finding.", 3000)
-            return
-        if self._left_stack.currentIndex() == _LEFT_PANEL_QA:
-            self._focus_qa_finding_item(plan.finding)
-        self.statusBar().showMessage(plan.status_message, 4000)
-
-    def _qa_next_finding(self) -> None:
-        self._navigate_qa_finding(direction=1)
-
-    def _qa_prev_finding(self) -> None:
-        self._navigate_qa_finding(direction=-1)
-
-    def _next_priority_status_row(self) -> int | None:
-        if not self._current_model:
-            return None
-        total = self._current_model.rowCount()
-        if total <= 0:
-            return None
-        current = self.table.currentIndex()
-        current_row = current.row() if current.isValid() else -1
-        for status in STATUS_ORDER:
-            candidates = [
-                row
-                for row in range(total)
-                if self._current_model.status_for_row(row) == status
-            ]
-            if not candidates:
-                continue
-            for row in candidates:
-                if row > current_row:
-                    return row
-            return candidates[0]
-        return None
-
-    def _go_to_next_priority_status(self) -> None:
-        if not self._current_model:
-            return
-        target_row = self._next_priority_status_row()
-        if target_row is None:
-            _show_info_box(
-                self,
-                "Status triage complete",
-                "Proofreading is complete for this file.",
-            )
-            return
-        current = self.table.currentIndex()
-        target_column = current.column() if current.isValid() else 2
-        target_column = max(0, min(target_column, self._current_model.columnCount() - 1))
-        target = self._current_model.index(target_row, target_column)
-        self.table.selectionModel().setCurrentIndex(
-            target,
-            QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
-        )
-        self.table.scrollTo(target, QAbstractItemView.PositionAtCenter)
-
-    def _run_search(self) -> None:
-        self._search_from_anchor(direction=1, anchor_row=-1)
-
-    def _search_next(self) -> None:
-        if self._search_timer.isActive():
-            self._search_timer.stop()
-        self._search_from_anchor(direction=1)
-
-    def _search_prev(self) -> None:
-        if self._search_timer.isActive():
-            self._search_timer.stop()
-        self._search_from_anchor(direction=-1)
-
-    def _copy_selection(self) -> None:
-        sel = self.table.selectionModel()
-        if sel is None or not sel.hasSelection():
-            return
-        full_rows = [
-            idx.row()
-            for idx in sel.selectedRows()
-            if sel.isRowSelected(idx.row(), idx.parent())
-        ]
-        if full_rows:
-            lines: list[str] = []
-            for row in sorted(set(full_rows)):
-                cols = [
-                    (
-                        self._current_model.index(row, col).data(
-                            Qt.EditRole if col in (1, 2) else Qt.DisplayRole
-                        )
-                        if self._current_model
-                        else ""
-                    )
-                    for col in range(4)
-                ]
-                line = "\t".join("" if c is None else str(c) for c in cols)
-                lines.append(line)
-            QGuiApplication.clipboard().setText("\n".join(lines))
-            return
-        idx = self.table.currentIndex()
-        if not idx.isValid():
-            return
-        text = (
-            idx.data(Qt.EditRole)
-            if idx.column() in (1, 2)
-            else idx.data(Qt.DisplayRole)
-        )
-        QGuiApplication.clipboard().setText("" if text is None else str(text))
-
-    def _cut_selection(self) -> None:
-        idx = self.table.currentIndex()
-        if not idx.isValid() or idx.column() != 2:
-            return
-        self._copy_selection()
-        if self._current_model:
-            self._current_model.setData(idx, "", Qt.EditRole)
-
-    def _paste_selection(self) -> None:
-        idx = self.table.currentIndex()
-        if not idx.isValid() or idx.column() != 2:
-            return
-        if not self._current_model:
-            return
-        text = QGuiApplication.clipboard().text()
-        rows = self._selected_rows()
-        if len(rows) <= 1:
-            self._current_model.setData(idx, text, Qt.EditRole)
-            return
-        stack = self._current_model.undo_stack
-        stack.beginMacro("Set translation for selection")
-        try:
-            for row in rows:
-                model_index = self._current_model.index(row, 2)
-                self._current_model.setData(model_index, text, Qt.EditRole)
-        finally:
-            stack.endMacro()
-
-    def _toggle_wrap_text(self, checked: bool) -> None:
-        self._wrap_text_user = bool(checked)
-        self._apply_wrap_mode()
-        self._persist_preferences()
-
-    def _apply_wrap_mode(self) -> None:
-        effective = self._wrap_text_user
-        if self._wrap_text != effective:
-            self._wrap_text = effective
-            self.table.setWordWrap(self._wrap_text)
-            self._apply_row_height_mode()
-            self._clear_row_height_cache()
-            if self._wrap_text:
-                self._schedule_row_resize()
-        if getattr(self, "act_wrap", None):
-            self.act_wrap.blockSignals(True)
-            try:
-                self.act_wrap.setChecked(self._wrap_text)
-            finally:
-                self.act_wrap.blockSignals(False)
-            if self._large_file_mode:
-                self.act_wrap.setToolTip("Wrap enabled; large-file mode active")
-            else:
-                self.act_wrap.setToolTip("Wrap long strings in table")
-
-    def _update_large_file_mode(self) -> None:
-        active = self._is_large_file() if self._large_text_optimizations else False
-        if active != self._large_file_mode:
-            self._large_file_mode = active
-            self._apply_wrap_mode()
-            self._apply_text_visual_options()
-
-    def _apply_row_height_mode(self) -> None:
-        header = self.table.verticalHeader()
-        header.setDefaultSectionSize(self._default_row_height)
-        if hasattr(self.table, "setUniformRowHeights"):
-            # Available on some Qt/PySide builds; avoid AttributeError on others.
-            self.table.setUniformRowHeights(not self._wrap_text)
-        if self._wrap_text:
-            header.setSectionResizeMode(QHeaderView.Interactive)
-        else:
-            # No-wrap uses fixed row height to avoid sizeHint churn.
-            header.setSectionResizeMode(QHeaderView.Fixed)
-
-    def _text_visual_options_table(self) -> tuple[bool, bool, bool]:
-        show_ws = self._visual_whitespace
-        highlight = self._visual_highlight
-        return show_ws, highlight, self._large_text_optimizations
-
-    def _text_visual_options_detail(self) -> tuple[bool, bool, bool]:
-        return (
-            self._visual_whitespace,
-            self._visual_highlight,
-            self._large_text_optimizations,
-        )
-
-    def _apply_text_visual_options(self) -> None:
-        self._apply_detail_whitespace_options()
-        for highlighter in (
-            self._detail_source_highlighter,
-            self._detail_translation_highlighter,
-        ):
-            if highlighter:
-                highlighter.rehighlight()
-        if self.table.viewport():
-            self.table.viewport().update()
-
-    def _apply_detail_whitespace_options(self) -> None:
-        show_ws, _highlight, optimize = self._text_visual_options_detail()
-        for editor in (self._detail_source, self._detail_translation):
-            if not editor:
-                continue
-            if optimize and editor.document().characterCount() >= MAX_VISUAL_CHARS:
-                apply_ws = False
-            else:
-                apply_ws = show_ws
-            option = editor.document().defaultTextOption()
-            flags = option.flags()
-            if apply_ws:
-                flags |= (
-                    QTextOption.ShowTabsAndSpaces
-                    | QTextOption.ShowLineAndParagraphSeparators
-                )
-            else:
-                flags &= ~(
-                    QTextOption.ShowTabsAndSpaces
-                    | QTextOption.ShowLineAndParagraphSeparators
-                )
-            option.setFlags(flags)
-            editor.document().setDefaultTextOption(option)
-
-    def _toggle_prompt_on_exit(self, checked: bool) -> None:
-        self._prompt_write_on_exit = bool(checked)
-        self._persist_preferences()
-
-    def _persist_preferences(self) -> None:
-        geometry = ""
-        try:
-            geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
-        except Exception:
-            geometry = ""
-        self._preferences_service.persist_main_window_preferences(
-            prompt_write_on_exit=self._prompt_write_on_exit,
-            wrap_text=self._wrap_text_user,
-            large_text_optimizations=self._large_text_optimizations,
-            qa_check_trailing=self._qa_check_trailing,
-            qa_check_newlines=self._qa_check_newlines,
-            qa_check_escapes=self._qa_check_escapes,
-            qa_check_same_as_source=self._qa_check_same_as_source,
-            qa_auto_refresh=self._qa_auto_refresh,
-            qa_auto_mark_for_review=self._qa_auto_mark_for_review,
-            qa_auto_mark_translated_for_review=(
-                self._qa_auto_mark_translated_for_review
-            ),
-            qa_auto_mark_proofread_for_review=(self._qa_auto_mark_proofread_for_review),
-            last_root=str(self._root),
-            last_locales=list(self._selected_locales),
-            window_geometry=geometry,
-            default_root=self._default_root,
-            tm_import_dir=self._tm_import_dir,
-            search_scope=self._search_scope,
-            replace_scope=self._replace_scope,
-            extras=dict(self._prefs_extras),
-            **_lt_adapter.build_persist_kwargs(self),
-        )
-
-    def _on_model_data_changed(self, top_left, bottom_right, roles=None) -> None:
-        if not self._current_model:
-            return
-        current = self.table.currentIndex()
-        if not current.isValid():
-            self._update_status_combo_from_selection()
-            return
-        row = current.row()
-        if top_left.row() <= row <= bottom_right.row() and (
-            roles is None or Qt.EditRole in roles or Qt.DisplayRole in roles
-        ):
-            self._update_status_combo_from_selection()
-            if self._wrap_text:
-                self._clear_row_height_cache(
-                    range(top_left.row(), bottom_right.row() + 1)
-                )
-                self._schedule_row_resize()
-            if (
-                self._detail_panel.isVisible()
-                and not self._detail_translation.hasFocus()
-            ):
-                self._sync_detail_editors()
-            if self._qa_auto_refresh:
-                self._schedule_qa_refresh()
-            else:
-                self._set_qa_findings(())
-                if self._left_stack.currentIndex() == _LEFT_PANEL_QA:
-                    self._set_qa_panel_message(
-                        "Edited. Click Run QA to refresh findings."
-                    )
-
-    def _on_selection_changed(self, current, previous) -> None:
-        perf_trace = PERF_TRACE
-        perf_start = perf_trace.start("selection")
-        try:
-            if previous is not None and previous.isValid():
-                self._commit_detail_translation(previous)
-            self._update_status_combo_from_selection()
-            if self._detail_panel.isVisible():
-                self._sync_detail_editors()
-            self._update_status_bar()
-            self._schedule_tm_update()
-        finally:
-            perf_trace.stop("selection", perf_start, items=1, unit="events")
-
-    def _schedule_tm_update(self) -> None:
-        if self._tm_apply_in_progress:
-            return
-        plan = self._tm_workflow.build_update_plan(
-            has_store=self._tm_store is not None,
-            panel_index=self._left_stack.currentIndex(),
-            timer_active=self._tm_update_timer.isActive(),
-            tm_panel_index=1,
-        )
-        if not plan.run_update:
-            return
-        if plan.stop_timer:
-            self._tm_update_timer.stop()
-        if plan.start_timer:
-            self._tm_update_timer.start()
-
-    def _set_tm_progress_visible(self, visible: bool) -> None:
-        self._tm_progress.setVisible(bool(visible))
-
-    def _set_tm_list_placeholder(self, text: str) -> None:
-        """Show a non-selectable placeholder row inside the TM results list."""
-        self._tm_list.clear()
-        message = str(text).strip() or _TM_DEFAULT_PLACEHOLDER
-        item = QListWidgetItem(message)
-        item.setFlags(Qt.ItemIsEnabled)
-        item.setData(_LIST_PLACEHOLDER_ROLE, True)
-        self._tm_list.insertItem(0, item)
-
-    def _set_search_list_placeholder(self, text: str) -> None:
-        """Show a non-selectable placeholder row inside the Search results list."""
-        if (
-            not hasattr(self, "_search_results_list")
-            or self._search_results_list is None
-        ):
-            return
-        self._search_results_list.clear()
-        message = str(text).strip() or _SEARCH_DEFAULT_PLACEHOLDER
-        item = QListWidgetItem(message)
-        item.setFlags(Qt.ItemIsEnabled)
-        item.setData(_LIST_PLACEHOLDER_ROLE, True)
-        self._search_results_list.insertItem(0, item)
-
-    def _set_qa_list_placeholder(self, text: str) -> None:
-        """Show a non-selectable placeholder row inside the QA results list."""
-        if not hasattr(self, "_qa_results_list") or self._qa_results_list is None:
-            return
-        self._qa_results_list.clear()
-        message = str(text).strip() or _QA_DEFAULT_PLACEHOLDER
-        item = QListWidgetItem(message)
-        item.setFlags(Qt.ItemIsEnabled)
-        item.setData(_LIST_PLACEHOLDER_ROLE, True)
-        self._qa_results_list.insertItem(0, item)
-
-    def _update_tm_apply_state(self) -> None:
-        items = self._tm_list.selectedItems()
-        match = items[0].data(Qt.UserRole) if items else None
-        plan = self._tm_workflow.build_selection_plan(
-            match=match if isinstance(match, TMMatch) else None,
-            lookup=self._current_tm_lookup(),
-        )
-        self._tm_apply_btn.setEnabled(plan.apply_enabled)
-        self._set_tm_preview(plan)
-
-    def _set_tm_preview(self, plan: _TMSelectionPlan) -> None:
-        if not plan.apply_enabled:
-            self._tm_source_preview.clear()
-            self._tm_target_preview.clear()
-            self._tm_source_preview.setExtraSelections([])
-            self._tm_target_preview.setExtraSelections([])
-            return
-        self._tm_source_preview.setPlainText(plan.source_preview)
-        self._tm_target_preview.setPlainText(plan.target_preview)
-        terms = _prepare_tm_preview_terms(plan.query_terms)
-        with contextlib.suppress(Exception):
-            _apply_tm_preview_highlights(self._tm_source_preview, terms)
-            _apply_tm_preview_highlights(self._tm_target_preview, terms)
-
-    def _on_tm_item_double_clicked(self, _item: QListWidgetItem) -> None:
-        # Defer apply to avoid mutating list/model during Qt double-click delivery.
-        QTimer.singleShot(0, self._apply_tm_selection)
-
-    def _tm_query_policy(self) -> TMQueryPolicy:
-        return self._tm_workflow.build_filter_plan(
-            source_locale=self._tm_source_locale,
-            min_score=self._tm_min_score,
-            origin_project=self._tm_origin_project,
-            origin_import=self._tm_origin_import,
-        ).policy
-
-    def _tm_apply_filter_plan(self, plan) -> None:
-        self._tm_min_score = plan.policy.min_score
-        self._tm_origin_project = plan.policy.origin_project
-        self._tm_origin_import = plan.policy.origin_import
-        self._prefs_extras.update(plan.prefs_extras)
-        if self._tm_score_spin.value() != self._tm_min_score:
-            self._tm_score_spin.blockSignals(True)
-            try:
-                self._tm_score_spin.setValue(self._tm_min_score)
-            finally:
-                self._tm_score_spin.blockSignals(False)
-        if self._tm_origin_project_cb.isChecked() != self._tm_origin_project:
-            self._tm_origin_project_cb.blockSignals(True)
-            try:
-                self._tm_origin_project_cb.setChecked(self._tm_origin_project)
-            finally:
-                self._tm_origin_project_cb.blockSignals(False)
-        if self._tm_origin_import_cb.isChecked() != self._tm_origin_import:
-            self._tm_origin_import_cb.blockSignals(True)
-            try:
-                self._tm_origin_import_cb.setChecked(self._tm_origin_import)
-            finally:
-                self._tm_origin_import_cb.blockSignals(False)
-
-    def _on_tm_filters_changed(self) -> None:
-        plan = self._tm_workflow.build_filter_plan(
-            source_locale=self._tm_source_locale,
-            min_score=int(self._tm_score_spin.value()),
-            origin_project=bool(self._tm_origin_project_cb.isChecked()),
-            origin_import=bool(self._tm_origin_import_cb.isChecked()),
-        )
-        self._tm_apply_filter_plan(plan)
-        self._persist_preferences()
-        self._update_tm_suggestions()
-
-    def _current_tm_lookup(self) -> tuple[str, str] | None:
-        if not (self._current_model and self._current_pf):
-            return None
-        current = self.table.currentIndex()
-        if not current.isValid():
-            return None
-        source_index = self._current_model.index(current.row(), 1)
-        source_text = str(source_index.data(Qt.EditRole) or "")
-        locale = self._locale_for_path(self._current_pf.path)
-        return self._tm_workflow.build_lookup(
-            source_text=source_text,
-            target_locale=locale,
-        )
-
-    def _apply_tm_selection(self) -> None:
-        if self._tm_apply_in_progress:
-            return
-        if not (self._current_model and self._current_pf):
-            return
-        items = self._tm_list.selectedItems()
-        if not items:
-            return
-        match = items[0].data(Qt.UserRole)
-        plan = self._tm_workflow.build_apply_plan(
-            match if isinstance(match, TMMatch) else None
-        )
-        if plan is None:
-            return
-        current = self.table.currentIndex()
-        if not current.isValid():
-            return
-        self._tm_apply_in_progress = True
-        try:
-            value_index = self._current_model.index(current.row(), 2)
-            self._current_model.setData(value_index, plan.target_text, Qt.EditRole)
-            self._update_status_combo_from_selection()
-            self._flush_tm_updates(paths=[self._current_pf.path])
-            self._tm_workflow.clear_cache()
-        finally:
-            self._tm_apply_in_progress = False
-        if self._left_stack.currentIndex() == _LEFT_PANEL_TM:
-            self._update_tm_suggestions()
-        else:
-            self._schedule_tm_update()
-
-    def _update_tm_suggestions(self) -> None:
-        policy = self._tm_query_policy()
-        lookup = self._current_tm_lookup()
-        refresh = self._tm_workflow.build_refresh_plan(
-            has_store=self._tm_store is not None,
-            panel_index=self._left_stack.currentIndex(),
-            lookup=lookup,
-            policy=policy,
-            has_current_file=self._current_pf is not None,
-            tm_panel_index=1,
-        )
-        if not refresh.run_update:
-            return
-        assert self._tm_store is not None
-        if refresh.flush_current_file and self._current_pf:
-            self._flush_tm_updates(paths=[self._current_pf.path])
-        assert refresh.query_plan is not None
-        plan = refresh.query_plan
-        if plan.mode == "cached" and plan.matches is not None:
-            self._show_tm_matches(plan.matches)
-            return
-        self._set_tm_list_placeholder(plan.message)
-        self._tm_apply_btn.setEnabled(False)
-        self._set_tm_preview(
-            self._tm_workflow.build_selection_plan(match=None, lookup=None)
-        )
-        if plan.mode == "query" and plan.cache_key is not None:
-            self._start_tm_query(plan.cache_key)
-
-    def _start_tm_query(self, cache_key: TMQueryKey) -> None:
-        if not self._tm_store or self._tm_query_pool is None:
-            return
-        if (
-            self._tm_query_key == cache_key
-            and self._tm_query_future is not None
-            and not self._tm_query_future.done()
-        ):
-            return
-        self._tm_query_key = cache_key
-        request = self._tm_workflow.build_query_request(cache_key)
-        self._tm_query_future = self._tm_query_pool.submit(
-            TMStore.query_path,
-            self._tm_store.db_path,
-            request.source_text,
-            source_locale=request.source_locale,
-            target_locale=request.target_locale,
-            limit=request.limit,
-            min_score=request.min_score,
-            origins=request.origins,
-        )
-        self._set_tm_progress_visible(True)
-        if not self._tm_query_timer.isActive():
-            self._tm_query_timer.start()
-
-    def _poll_tm_query(self) -> None:
-        future = self._tm_query_future
-        cache_key = self._tm_query_key
-        if future is None:
-            self._tm_query_timer.stop()
-            self._set_tm_progress_visible(self._tm_rebuild_future is not None)
-            return
-        if not future.done():
-            return
-        self._tm_query_timer.stop()
-        self._tm_query_future = None
-        self._tm_query_key = None
-        self._set_tm_progress_visible(self._tm_rebuild_future is not None)
-        if cache_key is None:
-            return
-        try:
-            matches = future.result()
-        except Exception:
-            self._set_tm_list_placeholder("TM lookup failed.")
-            self._tm_apply_btn.setEnabled(False)
-            return
-        lookup = self._current_tm_lookup()
-        show_current = self._tm_workflow.accept_query_result(
-            cache_key=cache_key,
-            matches=matches,
-            lookup=lookup,
-            policy=self._tm_query_policy(),
-        )
-        if not show_current:
-            return
-        self._show_tm_matches(matches)
-
-    def _show_tm_matches(self, matches: list[TMMatch]) -> None:
-        self._tm_list.clear()
-        view = self._tm_workflow.build_suggestions_view(
-            matches=matches,
-            policy=self._tm_query_policy(),
-            source_preview_limit=60,
-            target_preview_limit=80,
-        )
-        if not view.items:
-            self._set_tm_list_placeholder(view.message)
-            self._tm_apply_btn.setEnabled(False)
-            self._set_tm_preview(
-                self._tm_workflow.build_selection_plan(match=None, lookup=None)
-            )
-            return
-        for view_item in view.items:
-            item = QListWidgetItem(view_item.label)
-            item.setData(Qt.UserRole, view_item.match)
-            item.setToolTip(view_item.tooltip_html)
-            self._tm_list.addItem(item)
-        if self._tm_list.count():
-            self._tm_list.setCurrentRow(0)
-        else:
-            self._set_tm_list_placeholder(view.message)
-            self._set_tm_preview(
-                self._tm_workflow.build_selection_plan(match=None, lookup=None)
-            )
-            self._tm_apply_btn.setEnabled(False)
-
-    def _tooltip_html(self, text: str) -> str:
-        escaped = html.escape(text)
-        return f'<span style="white-space: pre-wrap;">{escaped}</span>'
+    _set_qa_panel_message = _panel_helpers._set_qa_panel_message
+    _refresh_qa_panel_results = _panel_helpers._refresh_qa_panel_results
+    _open_qa_result_item = _panel_helpers._open_qa_result_item
+    _focus_qa_finding_item = _panel_helpers._focus_qa_finding_item
+    _navigate_qa_finding = _panel_helpers._navigate_qa_finding
+    _qa_next_finding = _panel_helpers._qa_next_finding
+    _qa_prev_finding = _panel_helpers._qa_prev_finding
+    _next_priority_status_row = _panel_helpers._next_priority_status_row
+    _go_to_next_priority_status = _panel_helpers._go_to_next_priority_status
+    _run_search = _panel_helpers._run_search
+    _search_next = _panel_helpers._search_next
+    _search_prev = _panel_helpers._search_prev
+    _copy_selection = _panel_helpers._copy_selection
+    _cut_selection = _panel_helpers._cut_selection
+    _paste_selection = _panel_helpers._paste_selection
+    _toggle_wrap_text = _panel_helpers._toggle_wrap_text
+    _apply_wrap_mode = _panel_helpers._apply_wrap_mode
+    _update_large_file_mode = _panel_helpers._update_large_file_mode
+    _apply_row_height_mode = _panel_helpers._apply_row_height_mode
+    _text_visual_options_table = _panel_helpers._text_visual_options_table
+    _text_visual_options_detail = _panel_helpers._text_visual_options_detail
+    _apply_text_visual_options = _panel_helpers._apply_text_visual_options
+    _apply_detail_whitespace_options = _panel_helpers._apply_detail_whitespace_options
+    _toggle_prompt_on_exit = _panel_helpers._toggle_prompt_on_exit
+    _persist_preferences = _panel_helpers._persist_preferences
+    _on_model_data_changed = _panel_helpers._on_model_data_changed
+    _on_selection_changed = _panel_helpers._on_selection_changed
+    _schedule_tm_update = _panel_helpers._schedule_tm_update
+    _set_tm_progress_visible = _panel_helpers._set_tm_progress_visible
+    _set_tm_list_placeholder = _panel_helpers._set_tm_list_placeholder
+    _set_search_list_placeholder = _panel_helpers._set_search_list_placeholder
+    _set_qa_list_placeholder = _panel_helpers._set_qa_list_placeholder
+    _update_tm_apply_state = _panel_helpers._update_tm_apply_state
+    _set_tm_preview = _panel_helpers._set_tm_preview
+    _on_tm_item_double_clicked = _panel_helpers._on_tm_item_double_clicked
+    _tm_query_policy = _panel_helpers._tm_query_policy
+    _tm_apply_filter_plan = _panel_helpers._tm_apply_filter_plan
+    _on_tm_filters_changed = _panel_helpers._on_tm_filters_changed
+    _current_tm_lookup = _panel_helpers._current_tm_lookup
+    _apply_tm_selection = _panel_helpers._apply_tm_selection
+    _update_tm_suggestions = _panel_helpers._update_tm_suggestions
+    _start_tm_query = _panel_helpers._start_tm_query
+    _poll_tm_query = _panel_helpers._poll_tm_query
+    _show_tm_matches = _panel_helpers._show_tm_matches
+    _tooltip_html = _panel_helpers._tooltip_html
 
     def showEvent(self, event) -> None:  # noqa: N802
         """Re-apply detail panel state when the window becomes visible."""
@@ -6213,210 +5268,22 @@ class MainWindow(QMainWindow):
         if self.replace_toolbar.isVisible():
             self._align_replace_bar()
 
-    def _update_status_combo_from_selection(self) -> None:
-        if not self._current_model:
-            self._set_status_combo(None)
-            return
-        rows = self._selected_rows()
-        if not rows:
-            self._set_status_combo(None)
-            return
-        statuses = {self._current_model.status_for_row(row) for row in rows}
-        statuses.discard(None)
-        if len(statuses) == 1:
-            self._set_status_combo(statuses.pop())
-        else:
-            self._set_status_combo(None)
-
-    def _set_status_combo(self, status: Status | None) -> None:
-        self._updating_status_combo = True
-        try:
-            if status is None:
-                self.status_combo.setEnabled(bool(self._selected_rows()))
-                self.status_combo.setCurrentIndex(-1)
-                return
-            self.status_combo.setEnabled(True)
-            for i in range(self.status_combo.count()):
-                if self.status_combo.itemData(i) == status:
-                    self.status_combo.setCurrentIndex(i)
-                    return
-            self.status_combo.setCurrentIndex(-1)
-        finally:
-            self._updating_status_combo = False
-
-    def _status_combo_changed(self, _index: int) -> None:
-        if self._updating_status_combo:
-            return
-        if not self._current_model:
-            return
-        status = self.status_combo.currentData()
-        if status is None:
-            return
-        rows = self._selected_rows()
-        if not rows:
-            return
-        if len(rows) == 1:
-            model_index = self._current_model.index(rows[0], 3)
-            self._current_model.setData(model_index, status, Qt.EditRole)
-            return
-        if not any(self._current_model.status_for_row(row) != status for row in rows):
-            return
-        stack = self._current_model.undo_stack
-        stack.beginMacro("Set status for selection")
-        try:
-            for row in rows:
-                model_index = self._current_model.index(row, 3)
-                self._current_model.setData(model_index, status, Qt.EditRole)
-        finally:
-            stack.endMacro()
-
-    def _set_saved_status(self) -> None:
-        self._last_saved_text = time.strftime("Saved %H:%M:%S")
-        self._update_status_bar()
-
-    def _selected_rows(self) -> list[int]:
-        sel = self.table.selectionModel()
-        if sel is None:
-            return []
-        current = self.table.currentIndex()
-        if current.isValid() and not sel.isSelected(current):
-            return [current.row()]
-        rows = {idx.row() for idx in sel.selectedRows()}
-        if not rows:
-            rows = {idx.row() for idx in sel.selectedIndexes()}
-        return sorted(rows)
-
-    def _update_status_bar(self) -> None:
-        parts: list[str] = []
-        if self._last_saved_text:
-            parts.append(self._last_saved_text)
-        if self._search_progress_text:
-            parts.append(self._search_progress_text)
-        if self._current_model:
-            idx = self.table.currentIndex()
-            if idx.isValid():
-                parts.append(f"Row {idx.row() + 1} / {self._current_model.rowCount()}")
-        if self._current_pf:
-            try:
-                rel = self._current_pf.path.relative_to(self._root)
-                parts.append(str(rel))
-            except ValueError:
-                parts.append(str(self._current_pf.path))
-        if not parts:
-            parts.append("Ready")
-        self.statusBar().showMessage(" | ".join(parts))
-        self._update_scope_indicators()
-
-    def _update_scope_indicators(self) -> None:
-        if not self._search_scope_widget or not self._replace_scope_widget:
-            return
-        search_active = bool(self.search_edit.text().strip())
-        replace_active = self.replace_toolbar.isVisible()
-        self._set_scope_indicator(
-            self._search_scope_widget,
-            self._search_scope_icon,
-            self._search_scope,
-            search_active,
-            "Search scope",
-        )
-        self._set_scope_indicator(
-            self._replace_scope_widget,
-            self._replace_scope_icon,
-            self._replace_scope,
-            replace_active,
-            "Replace scope",
-        )
-
-    def _set_scope_indicator(
-        self,
-        widget: QWidget,
-        icon_label: QLabel,
-        scope: str,
-        active: bool,
-        title: str,
-    ) -> None:
-        if not active:
-            widget.setVisible(False)
-            return
-        icon = _scope_icon_for(self, scope)
-        icon_label.setPixmap(icon.pixmap(14, 14))
-        widget.setToolTip(f"{title}: {scope.title()}")
-        widget.setVisible(True)
-
-    def _apply_status_to_rows(
-        self,
-        rows: Sequence[int],
-        *,
-        status: Status,
-        label: str,
-    ) -> None:
-        if not self._current_model:
-            return
-        unique_rows = sorted({int(row) for row in rows if int(row) >= 0})
-        if not unique_rows:
-            return
-        rows_to_change = [
-            row
-            for row in unique_rows
-            if self._current_model.status_for_row(row) != status
-        ]
-        if not rows_to_change:
-            return
-        if len(rows_to_change) == 1:
-            model_index = self._current_model.index(rows_to_change[0], 3)
-            self._current_model.setData(model_index, status, Qt.EditRole)
-            return
-        stack = self._current_model.undo_stack
-        stack.beginMacro(label)
-        try:
-            for row in rows_to_change:
-                model_index = self._current_model.index(row, 3)
-                self._current_model.setData(model_index, status, Qt.EditRole)
-        finally:
-            stack.endMacro()
-
-    def _apply_qa_auto_mark(self, findings: Sequence[_QAFinding]) -> None:
-        if self._current_model is None:
-            return
-        rows = self._qa_service.auto_mark_rows(findings)
-        allow_translated = bool(
-            getattr(self, "_qa_auto_mark_translated_for_review", False)
-        )
-        allow_proofread = bool(
-            getattr(self, "_qa_auto_mark_proofread_for_review", False)
-        )
-        rows = tuple(
-            row
-            for row in rows
-            if (
-                (status := self._current_model.status_for_row(row)) == Status.UNTOUCHED
-                or (allow_translated and status == Status.TRANSLATED)
-                or (allow_proofread and status == Status.PROOFREAD)
-            )
-        )
-        self._apply_status_to_rows(
-            rows,
-            status=Status.FOR_REVIEW,
-            label="QA auto-mark For review",
-        )
-
-    def _apply_status_to_selection(self, status: Status, label: str) -> None:
-        if not (self._current_pf and self._current_model):
-            return
-        rows = self._selected_rows()
-        if not rows:
-            return
-        self._apply_status_to_rows(rows, status=status, label=label)
-        self._update_status_combo_from_selection()
-
-    def _mark_proofread(self) -> None:
-        self._apply_status_to_selection(Status.PROOFREAD, "Mark proofread")
-
-    def _mark_translated(self) -> None:
-        self._apply_status_to_selection(Status.TRANSLATED, "Mark translated")
-
-    def _mark_for_review(self) -> None:
-        self._apply_status_to_selection(Status.FOR_REVIEW, "Mark for review")
+    _update_status_combo_from_selection = (
+        _panel_helpers._update_status_combo_from_selection
+    )
+    _set_status_combo = _panel_helpers._set_status_combo
+    _status_combo_changed = _panel_helpers._status_combo_changed
+    _set_saved_status = _panel_helpers._set_saved_status
+    _selected_rows = _panel_helpers._selected_rows
+    _update_status_bar = _panel_helpers._update_status_bar
+    _update_scope_indicators = _panel_helpers._update_scope_indicators
+    _set_scope_indicator = _panel_helpers._set_scope_indicator
+    _apply_status_to_rows = _panel_helpers._apply_status_to_rows
+    _apply_qa_auto_mark = _panel_helpers._apply_qa_auto_mark
+    _apply_status_to_selection = _panel_helpers._apply_status_to_selection
+    _mark_proofread = _panel_helpers._mark_proofread
+    _mark_translated = _panel_helpers._mark_translated
+    _mark_for_review = _panel_helpers._mark_for_review
 
     def closeEvent(self, event) -> None:  # noqa: N802
         """Guard close with save flow checks and worker shutdown."""

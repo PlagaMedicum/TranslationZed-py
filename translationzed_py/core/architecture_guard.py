@@ -43,9 +43,9 @@ DEFAULT_RULES: dict[str, BoundaryRule] = {
                 "translationzed_py.core.tm_workflow_service",
             }
         ),
-        # Growth watchdog until the remaining extraction slices land.
-        # Raised narrowly to match the current extracted-state footprint.
-        max_lines=6000,
+        # A10 hard cap: keep orchestration shell small and push feature logic
+        # into focused helper modules.
+        max_lines=5400,
     )
 }
 
