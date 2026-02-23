@@ -809,6 +809,30 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert values["qa_languagetool_automark"] is False
 
 
+def test_preferences_qa_touched_auto_mark_clears_when_base_toggle_off(tmp_path, qtbot):
+    """Verify touched-row QA auto-mark checkbox is cleared when base auto-mark is disabled."""
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {
+            "tm_import_dir": str(root / ".tzp" / "tms"),
+            "qa_auto_mark_for_review": True,
+            "qa_auto_mark_touched_for_review": True,
+        },
+        tm_files=[],
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog._qa_auto_mark_check.isChecked() is True
+    assert dialog._qa_auto_mark_touched_check.isChecked() is True
+    dialog._qa_auto_mark_check.setChecked(False)
+
+    assert dialog._qa_auto_mark_touched_check.isEnabled() is False
+    assert dialog._qa_auto_mark_touched_check.isChecked() is False
+    values = dialog.values()
+    assert values["qa_auto_mark_for_review"] is False
+    assert values["qa_auto_mark_touched_for_review"] is False
+
+
 def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
     tmp_path, qtbot, monkeypatch
 ):

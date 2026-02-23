@@ -95,6 +95,21 @@ def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
     assert unchanged is False
 
 
+def test_resolve_qa_preferences_disables_touched_when_auto_mark_disabled() -> None:
+    """Verify touched-row auto-mark cannot stay enabled when base auto-mark is off."""
+    current = (True, True, False, False, False, True, True)
+    updated, changed = resolve_qa_preferences(
+        {
+            "qa_auto_mark_for_review": False,
+            "qa_auto_mark_touched_for_review": True,
+        },
+        current=current,
+    )
+    assert updated[5] is False
+    assert updated[6] is False
+    assert changed is True
+
+
 def test_preferences_service_normalize_scope_delegates_helper() -> None:
     """Verify preferences service normalize scope delegates helper."""
     service = PreferencesService()
@@ -172,6 +187,23 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
     assert "TABLE_KEY_WIDTH" not in result.extras
     assert result.extras["KEEP_ME"] == "x"
     assert result.patched_raw is not None
+
+
+def test_normalize_loaded_preferences_disables_touched_auto_mark_without_base() -> None:
+    """Verify loaded touched-row auto-mark defaults to off when base auto-mark is off."""
+    raw = {
+        "qa_auto_mark_for_review": False,
+        "qa_auto_mark_touched_for_review": True,
+    }
+    result = normalize_loaded_preferences(
+        raw,
+        fallback_default_root="",
+        fallback_last_root="",
+        default_tm_import_dir="/fallback/tm",
+        test_mode=False,
+    )
+    assert result.qa_auto_mark_for_review is False
+    assert result.qa_auto_mark_touched_for_review is False
 
 
 def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:

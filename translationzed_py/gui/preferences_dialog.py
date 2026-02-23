@@ -276,7 +276,8 @@ class PreferencesDialog(QDialog):
             widget,
         )
         self._qa_auto_mark_touched_check.setChecked(
-            bool(self._prefs.get("qa_auto_mark_touched_for_review", False))
+            self._qa_auto_mark_check.isChecked()
+            and bool(self._prefs.get("qa_auto_mark_touched_for_review", False))
         )
         self._qa_auto_mark_touched_check.setToolTip(
             "When enabled, QA auto-mark also affects rows that are not Untouched."
@@ -284,9 +285,7 @@ class PreferencesDialog(QDialog):
         self._qa_auto_mark_touched_check.setEnabled(
             self._qa_auto_mark_check.isChecked()
         )
-        self._qa_auto_mark_check.toggled.connect(
-            self._qa_auto_mark_touched_check.setEnabled
-        )
+        self._qa_auto_mark_check.toggled.connect(self._sync_qa_auto_mark_controls)
 
         layout.addWidget(self._qa_trailing_check)
         layout.addWidget(self._qa_newlines_check)
@@ -334,6 +333,12 @@ class PreferencesDialog(QDialog):
         self._sync_qa_languagetool_controls(self._qa_lt_check.isChecked())
         layout.addStretch(1)
         return widget
+
+    def _sync_qa_auto_mark_controls(self, enabled: bool) -> None:
+        """Disable and clear touched-row auto-mark unless base auto-mark is enabled."""
+        self._qa_auto_mark_touched_check.setEnabled(enabled)
+        if not enabled:
+            self._qa_auto_mark_touched_check.setChecked(False)
 
     def _build_languagetool_tab(self) -> QWidget:
         widget = QWidget(self)

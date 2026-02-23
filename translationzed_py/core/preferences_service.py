@@ -227,14 +227,18 @@ def resolve_qa_preferences(
     current: tuple[bool, bool, bool, bool, bool, bool, bool],
 ) -> tuple[tuple[bool, bool, bool, bool, bool, bool, bool], bool]:
     """Resolve qa preferences."""
+    qa_auto_mark_for_review = bool(values.get("qa_auto_mark_for_review", current[5]))
+    qa_auto_mark_touched_for_review = qa_auto_mark_for_review and bool(
+        values.get("qa_auto_mark_touched_for_review", current[6])
+    )
     updated = (
         bool(values.get("qa_check_trailing", current[0])),
         bool(values.get("qa_check_newlines", current[1])),
         bool(values.get("qa_check_escapes", current[2])),
         bool(values.get("qa_check_same_as_source", current[3])),
         bool(values.get("qa_auto_refresh", current[4])),
-        bool(values.get("qa_auto_mark_for_review", current[5])),
-        bool(values.get("qa_auto_mark_touched_for_review", current[6])),
+        qa_auto_mark_for_review,
+        qa_auto_mark_touched_for_review,
     )
     return updated, updated != current
 
@@ -261,7 +265,7 @@ def normalize_loaded_preferences(
     qa_check_same_as_source = bool(raw.get("qa_check_same_as_source", False))
     qa_auto_refresh = bool(raw.get("qa_auto_refresh", False))
     qa_auto_mark_for_review = bool(raw.get("qa_auto_mark_for_review", False))
-    qa_auto_mark_touched_for_review = bool(
+    qa_auto_mark_touched_for_review = qa_auto_mark_for_review and bool(
         raw.get("qa_auto_mark_touched_for_review", False)
     )
     qa_check_languagetool = bool(raw.get("qa_check_languagetool", False))
