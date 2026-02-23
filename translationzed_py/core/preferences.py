@@ -456,6 +456,9 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         "QA_LANGUAGETOOL_MAX_ROWS",
         "QA_LANGUAGETOOL_AUTOMARK",
     }
+    qa_lt_max_rows = _normalize_qa_languagetool_max_rows(
+        prefs.get("qa_languagetool_max_rows", _QA_LT_MAX_ROWS_DEFAULT)
+    )
     lines = [
         f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
         f"WRAP_TEXT={'true' if prefs.get('wrap_text', False) else 'false'}",
@@ -499,7 +502,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         ),
         (
             "QA_LANGUAGETOOL_MAX_ROWS="
-            f"{_normalize_qa_languagetool_max_rows(prefs.get('qa_languagetool_max_rows', _QA_LT_MAX_ROWS_DEFAULT))}"
+            f"{qa_lt_max_rows}"
         ),
         (
             "QA_LANGUAGETOOL_AUTOMARK="

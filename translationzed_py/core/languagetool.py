@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -277,8 +276,6 @@ def _perform_check_request(
     except urllib.error.URLError as exc:
         raise LTOfflineError(f"LanguageTool endpoint unreachable: {exc}") from exc
     except TimeoutError as exc:
-        raise LTOfflineError("LanguageTool request timed out.") from exc
-    except socket.timeout as exc:
         raise LTOfflineError("LanguageTool request timed out.") from exc
 
     try:
