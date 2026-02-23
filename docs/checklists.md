@@ -56,6 +56,9 @@ avoid missing mandatory tasks.
   - Add/adjust questions when requirements are unclear or changed
 - **Confirm** `make run` still works for a known fixture (e.g. `tests/fixtures/prod_like`)
 - **Review** any UI changes with a short manual smoke test (open file, edit, save)
+  - Include A10 smoke paths when touched:
+    status-header triage controls (sort/filter + next-priority navigation) and
+    EN-diff NEW-row save prompt actions (`Apply/Skip/Edit/Cancel`).
 
 ## Before pushing tags / releases
 

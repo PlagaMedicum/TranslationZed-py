@@ -1,5 +1,5 @@
 # TranslationZed-Py — Key Flows
-_Last updated: 2026-02-18_
+_Last updated: 2026-02-23_
 
 ---
 
@@ -67,16 +67,29 @@ User edits cell
   -> detail editor bottom-right counter refreshes char counts (Source / Translation / delta)
   -> add dirty dot (●) in tree if value changed
 
+File open/refresh
+  -> compare EN + locale maps against .tzp/cache/en_diff_snapshot.json baseline
+  -> classify badges:
+       [NEW] (EN-only), [REMOVED] (locale-only), [MODIFIED] (EN changed vs snapshot)
+  -> render editable virtual NEW rows in EN order
+
 User: Save
   -> prompt Write / Cache only / Cancel
   -> prompt shows a scrollable, checkable list of draft files in selected locales
   -> user may uncheck files to exclude from current write
+  -> if edited virtual NEW rows exist:
+       show insertion prompt Apply / Skip / Edit / Cancel
+         - Apply: insert snippets preserving EN order + comment copy/dedup
+         - Skip: keep NEW drafts pending, continue save without insertion
+         - Edit: edit insertion snippets only (bounded context preview)
+         - Cancel: abort save
   -> Cache only: keep drafts in cache; originals unchanged
   -> Write:
        if conflicts for current file: block save until resolved
        saver preserves concat structure + trivia
        write file.tmp -> replace
        write .tzp/cache/<locale>/<rel>.bin (status only)
+       refresh EN snapshot baseline for written file
        remove dirty dot (●)
 ```
 
@@ -89,6 +102,15 @@ User: Status ▼ or Ctrl+P
   -> set Entry.status
   -> repaint row (color)
   -> update Status ▼ label to selected row status
+
+User: Status column header dropdown
+  -> toggle status-priority sort (Untouched -> For review -> Translated -> Proofread)
+  -> toggle per-status visibility filters
+  -> apply triage mapping in current file view (non-persistent)
+
+User: Next-priority toolbar action
+  -> find next row by status tier with wrap in current file
+  -> if exhausted: show info dialog "Proofreading is complete for this file."
 ```
 
 ---

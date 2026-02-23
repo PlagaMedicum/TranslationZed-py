@@ -52,7 +52,7 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 - **Productivity bias**: prioritize low‑latency startup and interaction; avoid
   heavyweight scans on startup.
 
-*Out of scope for current scope*: English diff colours, item/recipe generator, VCS, self‑update.
+*Out of scope for current scope*: item/recipe generator, VCS, self‑update.
 
 ---
 
@@ -85,6 +85,9 @@ translationzed_py/
 │   ├── search.py            # index + query API
 │   ├── status_cache.py      # binary per-file status store
 │   ├── en_hash_cache.py     # EN hash index + migration helpers
+│   ├── en_diff_snapshot.py  # persistent EN diff baseline snapshot helpers
+│   ├── en_diff_service.py   # NEW/REMOVED/MODIFIED classification
+│   ├── en_insert_plan.py    # deterministic NEW-row insertion planning/apply
 │   ├── conflict_service.py  # conflict policy + merge planning (non-Qt)
 │   ├── file_workflow.py     # file/cache overlay + cache-save planning (non-Qt)
 │   ├── project_session.py   # session cache scan + auto-open selection (non-Qt)
@@ -112,11 +115,15 @@ translationzed_py/
 │   ├── delegates.py         # paint/edit delegates
 │   ├── entry_model.py       # table model (Key|Source|Translation|Status)
 │   ├── fs_model.py          # file tree model
-│   ├── main_window.py       # primary GUI controller
+│   ├── main_window.py       # primary GUI controller (adapter shell; line-budget guarded)
+│   ├── main_window_en_diff_helpers.py # EN-diff + insertion workflow helpers
+│   ├── main_window_panel_helpers.py   # panel/status/search/TM helper extraction
 │   ├── search_scope_ui.py   # search-scope indicator icon helpers
 │   ├── source_lookup.py     # source-column lazy/by-row lookup adapters
 │   ├── source_reference_ui.py # source-reference selector UI helpers
 │   ├── source_reference_state.py # source-reference mode/override UI state helpers
+│   ├── status_header.py     # status-column sort/filter header menu
+│   ├── table_header.py      # table-header click dispatcher
 │   ├── perf_trace.py        # opt-in perf tracing
 │   └── preferences_dialog.py# preferences UI
 └── __main__.py              # CLI + GUI entry‑point
@@ -436,6 +443,7 @@ Algorithm:
   - `[cache]` → `extension`, `en_hash_filename`
   - `[adapters]` → `parser`, `ui`, `cache`
   - `[formats]` → `translation_ext`, `comment_prefix`
+  - `[diff]` → `insertion_enabled_globs`, `preview_context_lines`
 - Swappable adapters are selected by name; actual implementations live behind
   interfaces in the application layer (clean architecture).
 
@@ -453,6 +461,7 @@ Algorithm:
 - Toolbar:
   - side-panel toggle glyph,
   - `Status` selector,
+  - next-priority status navigation button (`Untouched -> For review -> Translated -> Proofread`),
   - regex toggle + regex help link + case-sensitive (`Aa`) toggle,
   - search box + previous/next navigation,
   - replace-bar toggle glyph,
@@ -471,6 +480,22 @@ if dirty_files and not prompt_save():
 - **Status ▼** triggers status updates through the active translation model.
 - Status UI: table shows per-row status (colors); the **Status ▼** label shows
   the currently selected row status.
+- Status column header dropdown supports:
+  - priority sort order (`Untouched`, `For review`, `Translated`, `Proofread`)
+  - visibility filter by status set (non-persistent; resets on reopen/file switch).
+- EN-diff table markers are rendered in Key column as compact badges:
+  `[NEW]`, `[REMOVED]`, `[MODIFIED]`.
+- EN-diff baseline is snapshot-driven (`.tzp/cache/en_diff_snapshot.json`):
+  - `NEW`: key exists in EN and not in locale,
+  - `REMOVED`: key exists in locale and not in EN (marker only, no auto-delete),
+  - `MODIFIED`: EN source hash differs from snapshot baseline.
+- `NEW` keys are exposed as editable virtual rows.
+  On save with edited `NEW` rows, GUI shows mandatory insertion prompt:
+  `Apply` / `Skip` / `Edit` / `Cancel`.
+  `Apply` inserts generated snippets in EN order (comment copy/dedup preserved),
+  `Skip` keeps drafts pending, `Edit` edits insertion snippets only with bounded context.
+- Architecture watchdog enforces `translationzed_py/gui/main_window.py <= 5400`
+  (`make arch-check` + `tests/test_architecture_guard.py`).
 - Locale selection uses checkboxes for multi-select; EN is excluded from the
   editable tree and used as Source. The left tree shows **one root per locale**.
 - Locale chooser ordering: locales sorted alphanumerically, **checked locales
@@ -961,16 +986,15 @@ Current builds use **cache‑only** recovery:
 
 ## 13  Backlog (Post‑v0.7)
 
-1. English diff colours (NEW / REMOVED / MODIFIED).
-2. Item/Recipe template generator.
-3. GitHub PR integration (REST v4 API).
-4. Automatic update check (GitHub Releases).
-5. Simple editor for location `description.txt` files.
-6. LanguageTool diagnostics UX extensions beyond current click-hint + quick-fix flow.
-7. Extended Translation QA rule packs (post-v0.7): domain-specific checks and
+1. Item/Recipe template generator.
+2. GitHub PR integration (REST v4 API).
+3. Automatic update check (GitHub Releases).
+4. Simple editor for location `description.txt` files.
+5. LanguageTool diagnostics UX extensions beyond current click-hint + quick-fix flow.
+6. Extended Translation QA rule packs (post-v0.7): domain-specific checks and
    project-level custom rule sets beyond the shipped baseline (`qa.trailing`,
    `qa.newlines`, `qa.tokens`, `qa.same_source`).
-8. Theme presets beyond `SYSTEM|LIGHT|DARK` (future).
+7. Theme presets beyond `SYSTEM|LIGHT|DARK` (future).
 
 ## 14  Undo / Redo
 

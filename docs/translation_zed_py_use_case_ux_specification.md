@@ -123,6 +123,20 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  2 | Table delegate re‑paints cell background **green**. |
 |  3 | Toolbar **Status ▼** label reflects the selected row status. |
 
+### UC-04d  Status Triage Sort/Filter + Next Priority Navigation
+| Field | Value |
+|-------|-------|
+| **Goal** | Prioritize unfinished strings quickly inside current file. |
+| **Primary Actor** | TR / PR |
+| **Trigger** | User opens Status column header dropdown or clicks toolbar next-priority action. |
+| **Main Success Scenario** |
+|  1 | SYS opens Status-header menu with priority sort toggle and per-status visibility filters. |
+|  2 | If sort is enabled, SYS orders rows by `Untouched -> For review -> Translated -> Proofread`. |
+|  3 | If filters are changed, SYS hides non-selected statuses without mutating file data. |
+|  4 | On next-priority action, SYS selects next row by same priority order with wrap in current file. |
+|  5 | If no row remains, SYS shows info dialog: **“Proofreading is complete for this file.”** |
+| **Post-condition** | Triage state applies only to current runtime view and resets on reopen/restart. |
+
 ### UC-05a  Search & Navigate
 | **Trigger** | Press **Enter** in search box (`Ctrl+F`) or use `F3` / `Shift+F3`. |
 | **Parameter** | Mode (Key / Source / Translation) and Regex toggle. |
@@ -219,6 +233,24 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  4 | On success, `dirty` flags cleared and baseline updated for written files. |
 |  5 | SYS writes (or updates) per‑file cache entries under `.tzp/cache/<locale>/<relative>.bin` for **edited files only** (status only; draft values cleared). |
 |  6 | Status line shows “Saved HH:MM:SS”.
+
+### UC-10c  EN Diff Markers + NEW Row Insertion on Save
+| Field | Value |
+|-------|-------|
+| **Goal** | Surface EN deltas and allow deterministic insertion of newly introduced EN keys. |
+| **Primary Actor** | SYS / TR |
+| **Trigger** | File open/refresh and Save action with edited virtual `NEW` rows. |
+| **Main Success Scenario** |
+|  1 | SYS classifies keys using EN snapshot baseline as `NEW`, `REMOVED`, `MODIFIED`. |
+|  2 | SYS renders compact key badges `[NEW]`, `[REMOVED]`, `[MODIFIED]`. |
+|  3 | SYS shows editable virtual rows for `NEW` keys in EN order. |
+|  4 | On save with edited virtual `NEW` rows, SYS MUST show insertion prompt: **Apply / Skip / Edit / Cancel**. |
+|  5 | **Apply** inserts snippets preserving EN order and comment-copy/dedup policy. |
+|  6 | **Skip** saves without insertion and keeps NEW drafts pending. |
+|  7 | **Edit** allows editing insertion snippets only (bounded context preview). |
+|  8 | **Cancel** aborts save. |
+| **Rules** | `REMOVED` is marker-only in this scope (no auto-delete). |
+| **Post-condition** | Successful save refreshes per-file EN snapshot baseline and clears stale `MODIFIED` markers. |
 
 ### UC-10b  Dirty Indicator in File Tree
 | **Trigger** | Any edit that marks a file dirty. |
@@ -386,7 +418,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | (Open|Save|Prefs) (Undo|Redo...) (...toggles) (...)|
 └────────────────────────────────────────────────────┘
 ┌─Toolbar────────────────────────────────────────────┐
-│ [◀ Files panel] [Status ▼] [Regex ? Aa] [🔍 Search] [↑][↓] [⟳ Replace] [Search in ▼] │
+│ [◀ Files panel] [Status ▼] [Next priority] [Regex ? Aa] [🔍 Search] [↑][↓] [⟳ Replace] [Search in ▼] │
 └────────────────────────────────────────────────────┘
 ┌─QSplitter──────────────────────────────────────────┐
 │◀│File Tree──────────┐┌Table (Key | Src | Trans)───┐│
@@ -463,6 +495,10 @@ UNTOUCHED ──────────────────────▶ 
      table remains visible above. Toggle is placed in the **bottom bar** and defaults to **open**.
    - Status palette: **For review** = orange, **Translated** = green, **Proofread** = light‑blue (higher priority than Translated).
    - Validation priority: **empty cell = red** (overrides any status color).
+   - Status column header menu supports non-persistent triage controls
+     (priority sort + per-status visibility filter) for current file session.
+   - Key column may include EN-diff badges (`[NEW]`, `[REMOVED]`, `[MODIFIED]`);
+     virtual `NEW` rows are editable and only written on explicit insertion apply.
 7. **Visualization**: highlight escape sequences and **code markers** (uppercase `<TAG...>` tokens,
    bracket tags like `[IMG=...]`, and placeholders like `%1`, `%s`, `%1$s`), plus repeated whitespace;
    optional glyphs for spaces (grey dots) and newlines (grey symbol). Applies to Source/Translation
@@ -509,4 +545,4 @@ UNTOUCHED ──────────────────────▶ 
    `SOURCE_REFERENCE_FALLBACK_POLICY`.
 
 ---
-_Last updated: 2026-02-18 (v0.7.0)_
+_Last updated: 2026-02-23 (v0.7.0)_

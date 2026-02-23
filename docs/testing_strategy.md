@@ -76,8 +76,17 @@ _Last updated: 2026-02-23_
   state and persisted extras coherently.
 - Source-reference search cache guard: switching source locale invalidates
   cached source rows so Source-column search results cannot reuse stale mode data.
-- Architecture guards enforce allowed GUI->core imports and `main_window.py`
-  line-budget threshold.
+- Architecture guards enforce allowed GUI->core imports and
+  `main_window.py <= 5400` line-budget threshold.
+- EN-diff integration checks:
+  - snapshot-based `NEW/REMOVED/MODIFIED` classification wiring,
+  - virtual `NEW` rows in model/view mapping,
+  - save-time insertion prompt action paths (`Apply`/`Skip`/`Edit`/`Cancel`),
+  - insertion order/comment dedup behavior and modified-marker clear-on-save.
+- Status triage integration checks:
+  - status-header sort/filter behavior,
+  - safe row mapping/edit behavior under active sort/filter,
+  - next-priority navigation wrap and completion info dialog.
 - EN hash change dialog (implemented).
 - GUI locale-bootstrap warning flows:
   malformed `language.txt` warning rendering,
@@ -428,8 +437,9 @@ They include:
   custom `QMessageBox(self)` dialogs apply shared screen-aware min/max size
   preparation
   before execution (covered across main-window dialog-flow tests).
-- Architecture guardrail checks: import-boundary allowlist + line-budget watchdog
-  for `gui/main_window.py` (`tests/test_architecture_guard.py`, `make arch-check`).
+- Architecture guardrail checks: import-boundary allowlist + strict
+  `gui/main_window.py <= 5400` watchdog
+  (`tests/test_architecture_guard.py`, `make arch-check`).
 
 **Not covered yet (automation gaps, by layer):**
 

@@ -916,7 +916,7 @@ A9 [✓] **Verification-overhaul milestone**
        splitter moves relayout the main table even when Files tree is not the
        active left tab (TM/Search/QA), with explicit regression coverage.
 
-A10 [→] **Architecture hardening + EN diff insertion + status triage UX**
+A10 [✓] **Architecture hardening + EN diff insertion + status triage UX**
    - **Problem**: `gui/main_window.py` still exceeds maintainability budget,
      EN delta awareness is missing in translation flow, and status triage needs
      explicit table-level controls.
@@ -926,54 +926,54 @@ A10 [→] **Architecture hardening + EN diff insertion + status triage UX**
        and deterministic save-time insertion,
      - status-column sort/filter and priority navigation workflow.
    - **Contract (locked)**:
-     - [ ] EN `MODIFIED` is snapshot-based (persistent baseline under runtime cache).
-     - [ ] Virtual NEW rows are editable and inserted only on explicit save-time
+     - [✓] EN `MODIFIED` is snapshot-based (persistent baseline under runtime cache).
+     - [✓] Virtual NEW rows are editable and inserted only on explicit save-time
        action when rows were edited.
-     - [ ] Save-time insertion prompt is mandatory when edited NEW rows exist:
+     - [✓] Save-time insertion prompt is mandatory when edited NEW rows exist:
        `Apply` / `Skip` / `Edit` / `Cancel`.
-     - [ ] `Edit` modifies insertion snippets only, with bounded context lines.
-     - [ ] Insertion preserves EN key order and copies leading+trailing contiguous
+     - [✓] `Edit` modifies insertion snippets only, with bounded context lines.
+     - [✓] Insertion preserves EN key order and copies leading+trailing contiguous
        comments with deduplication (no duplicate copied comments).
-     - [ ] Insertion scope is config-driven (`[diff].insertion_enabled_globs`);
+     - [✓] Insertion scope is config-driven (`[diff].insertion_enabled_globs`);
        default subset enables `*.txt` under locale directories.
-     - [ ] REMOVED is marker-only in this milestone (no auto-delete).
-     - [ ] Successful save of a file refreshes that file snapshot baseline,
+     - [✓] REMOVED is marker-only in this milestone (no auto-delete).
+     - [✓] Successful save of a file refreshes that file snapshot baseline,
        clearing stale MODIFIED markers for current EN state.
-     - [ ] Status column supports sort + visibility filter (header dropdown);
+     - [✓] Status column supports sort + visibility filter (header dropdown);
        state is non-persistent and resets on reopen.
-     - [ ] Priority navigation button scans current file with wrap in status order:
+     - [✓] Priority navigation button scans current file with wrap in status order:
        Untouched -> For review -> Translated -> Proofread; when exhausted,
        show info dialog that proofreading is complete.
    - **Execution slices**:
-     - [ ] Add `[diff]` config schema in `config/app.toml` and parse fields in
+     - [✓] Add `[diff]` config schema in `config/app.toml` and parse fields in
        `core.app_config.AppConfig` (`insertion_enabled_globs`,
        `preview_context_lines`) with defaults/override tests.
-     - [ ] Add `core.en_diff_snapshot` for snapshot read/write/normalize helpers.
-     - [ ] Add `core.en_diff_service` for deterministic NEW/REMOVED/MODIFIED
+     - [✓] Add `core.en_diff_snapshot` for snapshot read/write/normalize helpers.
+     - [✓] Add `core.en_diff_service` for deterministic NEW/REMOVED/MODIFIED
        computation from EN+locale key maps and snapshot baseline.
-     - [ ] Add `core.en_insert_plan` for ordered insertion anchoring, comment
+     - [✓] Add `core.en_insert_plan` for ordered insertion anchoring, comment
        copy/dedup logic, and preview snippet generation.
-     - [ ] Extend `gui.entry_model.TranslationModel` for row badges + virtual NEW
+     - [✓] Extend `gui.entry_model.TranslationModel` for row badges + virtual NEW
        row representation and status sort/filter row mapping.
-     - [ ] Add status-header control helper and wire into header-click dispatch.
-     - [ ] Add priority status navigation action/button in `main_window`.
-     - [ ] Add save-time NEW insertion preview/apply flow in GUI adapter.
-     - [ ] Integrate insertion apply path into both save-current and batch write
+     - [✓] Add status-header control helper and wire into header-click dispatch.
+     - [✓] Add priority status navigation action/button in `main_window`.
+     - [✓] Add save-time NEW insertion preview/apply flow in GUI adapter.
+     - [✓] Integrate insertion apply path into both save-current and batch write
        paths without regressing existing non-insertion save behavior.
-     - [ ] Extract/relocate selected main-window helper blocks into helper modules
+     - [✓] Extract/relocate selected main-window helper blocks into helper modules
        to land line-budget target while preserving behavior and tests.
-     - [ ] Tighten architecture guard max-lines threshold for
+     - [✓] Tighten architecture guard max-lines threshold for
        `translationzed_py/gui/main_window.py` to 5400.
    - **Acceptance**:
-     - [ ] `make arch-check` enforces `main_window.py <= 5400`.
-     - [ ] EN diff tests pass: snapshot recovery, deterministic classification,
+     - [✓] `make arch-check` enforces `main_window.py <= 5400`.
+     - [✓] EN diff tests pass: snapshot recovery, deterministic classification,
        save prompt actions, insertion order/comment dedup, REMOVED non-deletion,
        MODIFIED clear-on-save.
-     - [ ] Status triage tests pass: priority order sort, filter visibility,
+     - [✓] Status triage tests pass: priority order sort, filter visibility,
        safe editing under filter/sort, wrapped priority navigation + completion info.
-     - [ ] Sidebar/table strict layout regression matrix remains green
+     - [✓] Sidebar/table strict layout regression matrix remains green
        (Files/TM/Search/QA + fullscreen resize behavior).
-     - [ ] Final validation gate passes via one umbrella `make verify` run.
+     - [✓] Final validation gate passes via one umbrella `make verify` run.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
@@ -1153,6 +1153,10 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
     `settings.env`; missing required defaults are auto-added automatically.
   - A9 continuation remains tracked as appended A9 notes (no new milestone
     section added).
+  - A10 bundled delivery accepted as complete in one slice:
+    `main_window.py` hard cap landed at `<=5400` with helper-module extraction,
+    EN diff marker + virtual NEW insertion flow shipped, and status-header
+    sort/filter + next-priority navigation shipped.
 
 ---
 
@@ -1161,5 +1165,4 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
 - Source-column reference mode enhancements:
   advanced selector behavior (per-locale policy presets, multi-step fallback chains).
 - Program‑generated comments (`TZP:`) with optional write‑back
-- English diff markers (NEW / REMOVED / MODIFIED)
 - Crash recovery beyond cache (if ever needed)
