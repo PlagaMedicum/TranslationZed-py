@@ -78,6 +78,10 @@ _Last updated: 2026-02-23_
   cached source rows so Source-column search results cannot reuse stale mode data.
 - Architecture guards enforce allowed GUI->core imports and
   `main_window.py <= 5400` line-budget threshold.
+- Status-bar progress integration checks:
+  - current-file translated/proofread percentages,
+  - current-locale translated/proofread percentages,
+  - live updates after status changes and file switches.
 - EN-diff integration checks:
   - snapshot-based `NEW/REMOVED/MODIFIED` classification wiring,
   - virtual `NEW` rows in model/view mapping,

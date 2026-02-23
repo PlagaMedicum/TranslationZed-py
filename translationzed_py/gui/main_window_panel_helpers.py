@@ -19,9 +19,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from translationzed_py.core import parse_lazy
 from translationzed_py.core.model import STATUS_ORDER, Status
 from translationzed_py.core.qa_service import QAFinding as _QAFinding
 from translationzed_py.core.search import Match as _SearchMatch
+from translationzed_py.core.status_cache import read as _read_status_cache
 from translationzed_py.core.tm_query import TMQueryKey, TMQueryPolicy
 from translationzed_py.core.tm_store import TMMatch, TMStore
 from translationzed_py.core.tm_workflow_service import (
@@ -34,6 +36,129 @@ from .perf_trace import PERF_TRACE
 from .search_scope_ui import scope_icon_for as _scope_icon_for
 from .tm_preview import apply_tm_preview_highlights as _apply_tm_preview_highlights
 from .tm_preview import prepare_tm_preview_terms as _prepare_tm_preview_terms
+
+_DONE_STATUSES = {Status.TRANSLATED, Status.PROOFREAD}
+
+
+def _progress_percent(done: int, total: int) -> int:
+    if total <= 0:
+        return 0
+    return int(round((done * 100) / total))
+
+
+def _progress_counts_from_model(win) -> tuple[int, int, int] | None:
+    model = getattr(win, "_current_model", None)
+    if model is None or not hasattr(model, "status_for_row"):
+        return None
+    try:
+        total = int(model.rowCount())
+    except Exception:
+        return None
+    translated = 0
+    proofread = 0
+    for row in range(total):
+        status = model.status_for_row(row)
+        if status in _DONE_STATUSES:
+            translated += 1
+        if status == Status.PROOFREAD:
+            proofread += 1
+    return total, translated, proofread
+
+
+def _progress_counts_for_file(win, path: Path) -> tuple[int, int, int]:
+    file_cache = getattr(win, "_progress_file_counts", None)
+    if file_cache is None:
+        file_cache = {}
+        win._progress_file_counts = file_cache
+    current = getattr(win, "_current_pf", None)
+    if current is not None and current.path == path:
+        model_counts = _progress_counts_from_model(win)
+        if model_counts is not None:
+            file_cache[path] = model_counts
+            return model_counts
+    cached = file_cache.get(path)
+    if cached is not None:
+        return cached
+    locale = win._locale_for_path(path)
+    encoding = (
+        win._locales.get(locale, None).charset if locale in win._locales else None
+    ) or "utf-8"
+    try:
+        parsed = parse_lazy(path, encoding=encoding)
+    except Exception:
+        counts = (0, 0, 0)
+        file_cache[path] = counts
+        return counts
+    cache_map = _read_status_cache(win._root, path)
+    total = 0
+    translated = 0
+    proofread = 0
+    for entry in parsed.entries:
+        total += 1
+        status = entry.status
+        cached_entry = cache_map.get(win._hash_for_cache(entry, cache_map))
+        if cached_entry is not None:
+            status = cached_entry.status
+        if status in _DONE_STATUSES:
+            translated += 1
+        if status == Status.PROOFREAD:
+            proofread += 1
+    counts = (total, translated, proofread)
+    file_cache[path] = counts
+    return counts
+
+
+def _progress_locale_counts(win, locale: str) -> tuple[int, int, int]:
+    locale_cache = getattr(win, "_progress_locale_counts", None)
+    if locale_cache is None:
+        locale_cache = {}
+        win._progress_locale_counts = locale_cache
+    cached = locale_cache.get(locale)
+    if cached is not None:
+        return cached
+    totals = [0, 0, 0]
+    for path in win._files_for_locale(locale):
+        file_counts = _progress_counts_for_file(win, path)
+        totals[0] += file_counts[0]
+        totals[1] += file_counts[1]
+        totals[2] += file_counts[2]
+    result = (totals[0], totals[1], totals[2])
+    locale_cache[locale] = result
+    return result
+
+
+def _progress_segment(win) -> str | None:
+    current = getattr(win, "_current_pf", None)
+    if current is None:
+        return None
+    file_counts = _progress_counts_from_model(win)
+    if file_counts is None:
+        return None
+    locale = win._locale_for_path(current.path)
+    if not locale:
+        return None
+    file_total, file_translated, file_proofread = file_counts
+    file_cache = getattr(win, "_progress_file_counts", None)
+    if file_cache is None:
+        file_cache = {}
+        win._progress_file_counts = file_cache
+    previous_file_counts = file_cache.get(current.path)
+    file_cache[current.path] = file_counts
+    if previous_file_counts != file_counts:
+        locale_cache = getattr(win, "_progress_locale_counts", None)
+        if locale_cache is not None:
+            locale_cache.pop(locale, None)
+    locale_total, locale_translated, locale_proofread = _progress_locale_counts(
+        win, locale
+    )
+    return (
+        "Progress "
+        f"File T:{_progress_percent(file_translated, file_total)}% "
+        f"P:{_progress_percent(file_proofread, file_total)}% "
+        "| "
+        f"Locale T:{_progress_percent(locale_translated, locale_total)}% "
+        f"P:{_progress_percent(locale_proofread, locale_total)}%"
+    )
 
 
 def _set_qa_progress_visible(win, visible: bool) -> None:
@@ -840,6 +965,9 @@ def _update_status_bar(win) -> None:
             parts.append(str(rel))
         except ValueError:
             parts.append(str(win._current_pf.path))
+    progress = _progress_segment(win)
+    if progress:
+        parts.append(progress)
     if not parts:
         parts.append("Ready")
     win.statusBar().showMessage(" | ".join(parts))

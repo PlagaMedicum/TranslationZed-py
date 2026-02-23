@@ -137,6 +137,18 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  5 | If no row remains, SYS shows info dialog: **“Proofreading is complete for this file.”** |
 | **Post-condition** | Triage state applies only to current runtime view and resets on reopen/restart. |
 
+### UC-04e  Progress HUD (File + Locale)
+| Field | Value |
+|-------|-------|
+| **Goal** | Provide motivating completion progress while translating/proofreading. |
+| **Primary Actor** | SYS |
+| **Trigger** | File open, status edits, and row/status refresh events. |
+| **Main Success Scenario** |
+|  1 | SYS computes current-file percentages for translated/proofread completion. |
+|  2 | SYS computes current-locale percentages for translated/proofread completion. |
+|  3 | SYS renders compact status-bar progress text (`File T/P`, `Locale T/P`). |
+| **Post-condition** | User sees live per-file and per-locale completion progress. |
+
 ### UC-05a  Search & Navigate
 | **Trigger** | Press **Enter** in search box (`Ctrl+F`) or use `F3` / `Shift+F3`. |
 | **Parameter** | Mode (Key / Source / Translation) and Regex toggle. |

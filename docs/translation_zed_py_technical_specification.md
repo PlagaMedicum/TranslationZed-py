@@ -468,6 +468,9 @@ Algorithm:
   - search column selector (`Key|Source|Trans`).
  - Status bar:
    - Saved timestamp, row indicator, current file path.
+   - Progress HUD:
+     per-file and current-locale status progress percentages for
+     translated/proofread completion (`File T/P`, `Locale T/P`).
    - When search/replace is active, append **scope indicator(s)**:
     `Search: File|Locale|Pool`, `Replace: File|Locale|Pool`.
 - Exit guard uses `prompt_write_on_exit` (locale switch is cache‑only):

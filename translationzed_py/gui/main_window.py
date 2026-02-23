@@ -4038,6 +4038,12 @@ class MainWindow(QMainWindow):
             self.fs_model.set_dirty(self._current_pf.path, True)
         else:
             self.fs_model.set_dirty(self._current_pf.path, False)
+        if hasattr(self, "_progress_file_counts"):
+            self._progress_file_counts.pop(self._current_pf.path, None)
+        if hasattr(self, "_progress_locale_counts"):
+            locale = self._locale_for_path(self._current_pf.path)
+            if locale:
+                self._progress_locale_counts.pop(locale, None)
         if changed_rows:
             self._queue_tm_updates(self._current_pf.path, changed_rows)
         return True
