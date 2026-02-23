@@ -1888,7 +1888,8 @@ def test_search_from_anchor_delegates_to_search_replace_service(
     assert calls
     assert calls[0]["query_text"] == ""
     assert calls[0]["current_file"] == root / "BE" / "ui.txt"
-    assert win._search_status_label.text() == "No query."
+    assert win._search_results_list.count() == 1
+    assert win._search_results_list.item(0).text() == "No query."
 
 
 def test_files_for_scope_delegates_to_search_replace_service(
@@ -2743,18 +2744,19 @@ def test_refresh_search_panel_results_covers_guard_empty_query_and_empty_files(
     win._refresh_search_panel_results()
 
     win._search_results_list = mw.QListWidget()
-    win._search_status_label = mw.QLabel()
     win.search_edit.setText("   ")
     win._refresh_search_panel_results()
+    assert win._search_results_list.count() == 1
     assert (
-        win._search_status_label.text()
+        win._search_results_list.item(0).text()
         == "Press Enter in the search box to populate results."
     )
 
     win.search_edit.setText("needle")
     monkeypatch.setattr(win, "_search_files_for_scope", lambda: [])
     win._refresh_search_panel_results()
-    assert win._search_status_label.text() == "No files in current search scope."
+    assert win._search_results_list.count() == 1
+    assert win._search_results_list.item(0).text() == "No files in current search scope."
 
 
 def test_schedule_qa_refresh_covers_disabled_busy_immediate_and_timer_paths(
@@ -2803,8 +2805,8 @@ def test_qa_panel_helpers_cover_empty_plan_navigation_and_focus_paths(
     win._file_chosen(index)
 
     win._set_qa_panel_message("hello")
-    assert win._qa_status_label.text() == "hello"
-    assert win._qa_results_list.count() == 0
+    assert win._qa_results_list.count() == 1
+    assert win._qa_results_list.item(0).text() == "hello"
 
     win._qa_results_list = None
     win._refresh_qa_panel_results()

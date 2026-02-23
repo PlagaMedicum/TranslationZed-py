@@ -89,7 +89,8 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
     win._left_qa_btn.click()
-    assert win._qa_results_list.count() == 0
+    assert win._qa_results_list.count() == 1
+    assert "QA is manual." in win._qa_results_list.item(0).text()
     win._qa_refresh_btn.click()
 
     qtbot.waitUntil(lambda: win._qa_results_list.count() >= 2, timeout=1000)

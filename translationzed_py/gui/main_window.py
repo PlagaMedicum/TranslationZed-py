@@ -320,8 +320,10 @@ _PREF_TAB_SEARCH = "search"
 _PREF_TAB_QA = "qa"
 _PREF_TAB_TM = "tm"
 _TREE_PANEL_DEFAULT_MAX_FRACTION = 0.25
-_TM_PLACEHOLDER_ROLE = int(Qt.UserRole) + 7
+_LIST_PLACEHOLDER_ROLE = int(Qt.UserRole) + 7
 _TM_DEFAULT_PLACEHOLDER = "Select row to see Translation Memory suggestions."
+_SEARCH_DEFAULT_PLACEHOLDER = "Press Enter in the search box to populate results."
+_QA_DEFAULT_PLACEHOLDER = "Select a file to run QA checks."
 
 
 def _in_test_mode() -> bool:
@@ -1151,12 +1153,7 @@ class MainWindow(QMainWindow):
         search_header = QHBoxLayout()
         search_header.setContentsMargins(0, 0, 0, 0)
         search_header.setSpacing(6)
-        self._search_status_label = QLabel(
-            "Press Enter in the search box to populate results.",
-            self._search_panel,
-        )
-        self._search_status_label.setWordWrap(True)
-        search_header.addWidget(self._search_status_label, 1)
+        search_header.addStretch(1)
         self._search_prefs_btn = QToolButton(self._search_panel)
         self._search_prefs_btn.setAutoRaise(True)
         self._search_prefs_btn.setIcon(_preferences_icon(self.style()))
@@ -1169,6 +1166,7 @@ class MainWindow(QMainWindow):
         self._search_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._search_results_list.itemActivated.connect(self._open_search_result_item)
         self._search_results_list.itemClicked.connect(self._open_search_result_item)
+        self._set_search_list_placeholder(_SEARCH_DEFAULT_PLACEHOLDER)
         search_layout.addLayout(search_header)
         search_layout.addWidget(self._search_results_list)
         self._left_stack.addWidget(self._search_panel)
@@ -1180,12 +1178,7 @@ class MainWindow(QMainWindow):
         qa_header = QHBoxLayout()
         qa_header.setContentsMargins(0, 0, 0, 0)
         qa_header.setSpacing(6)
-        self._qa_status_label = QLabel(
-            "Select a file to run QA checks.",
-            self._qa_panel,
-        )
-        self._qa_status_label.setWordWrap(True)
-        qa_header.addWidget(self._qa_status_label, 1)
+        qa_header.addStretch(1)
         self._qa_refresh_btn = QToolButton(self._qa_panel)
         self._qa_refresh_btn.setAutoRaise(False)
         self._qa_refresh_btn.setIcon(
@@ -1211,6 +1204,7 @@ class MainWindow(QMainWindow):
         self._qa_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._qa_results_list.itemActivated.connect(self._open_qa_result_item)
         self._qa_results_list.itemClicked.connect(self._open_qa_result_item)
+        self._set_qa_list_placeholder(_QA_DEFAULT_PLACEHOLDER)
         qa_layout.addLayout(qa_header)
         qa_layout.addWidget(self._qa_progress)
         qa_layout.addWidget(self._qa_results_list)
@@ -4804,16 +4798,7 @@ class MainWindow(QMainWindow):
         return bool(match and self._select_match(match))
 
     def _set_search_panel_message(self, text: str) -> None:
-        if (
-            hasattr(self, "_search_status_label")
-            and self._search_status_label is not None
-        ):
-            self._search_status_label.setText(text)
-        if (
-            hasattr(self, "_search_results_list")
-            and self._search_results_list is not None
-        ):
-            self._search_results_list.clear()
+        self._set_search_list_placeholder(text)
 
     def _refresh_search_panel_results(
         self,
@@ -4871,12 +4856,14 @@ class MainWindow(QMainWindow):
             result_limit=self._search_panel_result_limit,
             iter_matches_for_file=_iter_matches_for_file,
         )
+        if not plan.items:
+            self._set_search_list_placeholder(plan.status_message)
+            return
         self._search_results_list.clear()
         for row in plan.items:
             item = QListWidgetItem(row.label)
             item.setData(Qt.UserRole, (str(row.file), int(row.row)))
             self._search_results_list.addItem(item)
-        self._search_status_label.setText(plan.status_message)
 
     def _open_search_result_item(self, item: QListWidgetItem) -> None:
         payload = item.data(Qt.UserRole)
@@ -4933,10 +4920,7 @@ class MainWindow(QMainWindow):
 
     def _set_qa_panel_message(self, text: str) -> None:
         self._qa_scan_note = ""
-        if hasattr(self, "_qa_status_label") and self._qa_status_label is not None:
-            self._qa_status_label.setText(text)
-        if hasattr(self, "_qa_results_list") and self._qa_results_list is not None:
-            self._qa_results_list.clear()
+        self._set_qa_list_placeholder(text)
 
     def _refresh_qa_panel_results(self) -> None:
         if not hasattr(self, "_qa_results_list") or self._qa_results_list is None:
@@ -4946,16 +4930,18 @@ class MainWindow(QMainWindow):
             root=self._root,
             result_limit=self._qa_panel_result_limit,
         )
+        status_message = plan.status_message
+        if self._qa_scan_note:
+            status_message = f"{status_message} {self._qa_scan_note}"
+        if not plan.items:
+            self._set_qa_list_placeholder(status_message)
+            return
         self._qa_results_list.clear()
         for row in plan.items:
             item = QListWidgetItem(row.label)
             finding = row.finding
             item.setData(Qt.UserRole, (str(finding.file), int(finding.row)))
             self._qa_results_list.addItem(item)
-        status_message = plan.status_message
-        if self._qa_scan_note:
-            status_message = f"{status_message} {self._qa_scan_note}"
-        self._qa_status_label.setText(status_message)
 
     def _open_qa_result_item(self, item: QListWidgetItem) -> None:
         payload = item.data(Qt.UserRole)
@@ -5282,8 +5268,33 @@ class MainWindow(QMainWindow):
         message = str(text).strip() or _TM_DEFAULT_PLACEHOLDER
         item = QListWidgetItem(message)
         item.setFlags(Qt.ItemIsEnabled)
-        item.setData(_TM_PLACEHOLDER_ROLE, True)
+        item.setData(_LIST_PLACEHOLDER_ROLE, True)
         self._tm_list.insertItem(0, item)
+
+    def _set_search_list_placeholder(self, text: str) -> None:
+        """Show a non-selectable placeholder row inside the Search results list."""
+        if (
+            not hasattr(self, "_search_results_list")
+            or self._search_results_list is None
+        ):
+            return
+        self._search_results_list.clear()
+        message = str(text).strip() or _SEARCH_DEFAULT_PLACEHOLDER
+        item = QListWidgetItem(message)
+        item.setFlags(Qt.ItemIsEnabled)
+        item.setData(_LIST_PLACEHOLDER_ROLE, True)
+        self._search_results_list.insertItem(0, item)
+
+    def _set_qa_list_placeholder(self, text: str) -> None:
+        """Show a non-selectable placeholder row inside the QA results list."""
+        if not hasattr(self, "_qa_results_list") or self._qa_results_list is None:
+            return
+        self._qa_results_list.clear()
+        message = str(text).strip() or _QA_DEFAULT_PLACEHOLDER
+        item = QListWidgetItem(message)
+        item.setFlags(Qt.ItemIsEnabled)
+        item.setData(_LIST_PLACEHOLDER_ROLE, True)
+        self._qa_results_list.insertItem(0, item)
 
     def _update_tm_apply_state(self) -> None:
         items = self._tm_list.selectedItems()
