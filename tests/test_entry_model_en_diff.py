@@ -32,6 +32,7 @@ def _parsed(entries: list[Entry]) -> ParsedFile:
 
 
 def test_virtual_new_rows_render_in_en_order_and_are_editable() -> None:
+    """Verify virtual NEW rows keep EN order and allow editing in value column."""
     model = TranslationModel(
         _parsed([_entry("A", "va", status=Status.PROOFREAD)]),
         source_values={"A": "sa"},
@@ -52,6 +53,7 @@ def test_virtual_new_rows_render_in_en_order_and_are_editable() -> None:
 
 
 def test_status_filter_and_sort_apply_to_row_mapping() -> None:
+    """Verify status sort/filter remaps visible model rows deterministically."""
     model = TranslationModel(
         _parsed(
             [
@@ -63,14 +65,18 @@ def test_status_filter_and_sort_apply_to_row_mapping() -> None:
         source_values={"A": "sa", "B": "sb", "C": "sc"},
     )
 
-    assert [model.data(model.index(i, 0), Qt.EditRole) for i in range(model.rowCount())] == [
+    assert [
+        model.data(model.index(i, 0), Qt.EditRole) for i in range(model.rowCount())
+    ] == [
         "A",
         "B",
         "C",
     ]
 
     model.set_status_sort_enabled(True)
-    assert [model.data(model.index(i, 0), Qt.EditRole) for i in range(model.rowCount())] == [
+    assert [
+        model.data(model.index(i, 0), Qt.EditRole) for i in range(model.rowCount())
+    ] == [
         "B",
         "C",
         "A",
@@ -78,11 +84,12 @@ def test_status_filter_and_sort_apply_to_row_mapping() -> None:
 
     model.set_status_filter({Status.UNTOUCHED, Status.FOR_REVIEW})
     assert model.rowCount() == 2
-    assert [model.data(model.index(i, 0), Qt.EditRole) for i in range(model.rowCount())] == [
+    assert [
+        model.data(model.index(i, 0), Qt.EditRole) for i in range(model.rowCount())
+    ] == [
         "B",
         "C",
     ]
 
     model.set_status_filter(None)
     assert model.rowCount() == 3
-

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-import re
 
 _KEY_LINE_RE = re.compile(r"^\s*([^\s=#][^=]*)=\s*(.*)$")
 
@@ -116,7 +116,7 @@ def _escape_literal(value: str) -> str:
 
 def _build_key_line(prefix: str, key: str, value: str) -> str:
     normalized_prefix = prefix if prefix else key
-    return f"{normalized_prefix} = \"{_escape_literal(value)}\""
+    return f'{normalized_prefix} = "{_escape_literal(value)}"'
 
 
 def build_insert_plan(
@@ -127,14 +127,18 @@ def build_insert_plan(
     comment_prefixes: Iterable[str] = ("#", "--"),
 ) -> ENInsertPlan:
     """Build deterministic insertion plan for edited NEW keys."""
-    prefixes = tuple(str(prefix).strip() for prefix in comment_prefixes if str(prefix).strip())
+    prefixes = tuple(
+        str(prefix).strip() for prefix in comment_prefixes if str(prefix).strip()
+    )
     active_prefixes = prefixes or ("#", "--")
     contexts = _parse_key_contexts(en_text, comment_prefixes=active_prefixes)
     if not contexts:
         return ENInsertPlan(items=())
     locale_keys = set(_parse_keys(locale_text))
     edited_keys = set(edited_new_values)
-    ordered_contexts = [ctx for ctx in contexts if ctx.key in edited_keys and ctx.key not in locale_keys]
+    ordered_contexts = [
+        ctx for ctx in contexts if ctx.key in edited_keys and ctx.key not in locale_keys
+    ]
     if not ordered_contexts:
         return ENInsertPlan(items=())
 

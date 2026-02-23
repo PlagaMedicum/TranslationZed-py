@@ -61,6 +61,7 @@ def _build_win(model: _Model) -> QWidget:
 
 
 def test_status_header_sort_toggle(monkeypatch, qapp) -> None:
+    """Verify status-header sort action toggles priority sorting."""
     _ = qapp
     model = _Model()
     win = _build_win(model)
@@ -89,6 +90,7 @@ def test_status_header_sort_toggle(monkeypatch, qapp) -> None:
 
 
 def test_status_header_filter_toggle_and_show_all(monkeypatch, qapp) -> None:
+    """Verify status-header filters toggle and reset via show-all action."""
     _ = qapp
     model = _Model()
     win = _build_win(model)
@@ -116,13 +118,18 @@ def test_status_header_filter_toggle_and_show_all(monkeypatch, qapp) -> None:
     monkeypatch.setattr("translationzed_py.gui.status_header.QMenu", _Menu)
 
     handle_header_click(win, 3)
-    assert model.status_filter() == {Status.FOR_REVIEW, Status.TRANSLATED, Status.PROOFREAD}
+    assert model.status_filter() == {
+        Status.FOR_REVIEW,
+        Status.TRANSLATED,
+        Status.PROOFREAD,
+    }
 
     handle_header_click(win, 3)
     assert model.status_filter() is None
 
 
 def test_status_header_ignores_non_status_column(qapp) -> None:
+    """Verify non-status header clicks do not mutate status triage state."""
     _ = qapp
     model = _Model()
     win = _build_win(model)

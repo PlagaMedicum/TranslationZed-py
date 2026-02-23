@@ -47,6 +47,7 @@ def _find_row_by_key(win: MainWindow, key: str) -> int:
 
 
 def test_file_open_adds_virtual_new_rows_and_badges(qtbot, tmp_path) -> None:
+    """Verify file-open renders NEW virtual rows and EN-diff key badges."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     win._prompt_write_on_exit = False
@@ -63,7 +64,10 @@ def test_file_open_adds_virtual_new_rows_and_badges(qtbot, tmp_path) -> None:
     assert model.data(model.index(row_b, 1), Qt.EditRole) == "Source B"
 
 
-def test_save_current_skip_keeps_new_drafts_pending(qtbot, tmp_path, monkeypatch) -> None:
+def test_save_current_skip_keeps_new_drafts_pending(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify save-skip keeps NEW row drafts pending without insertion."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     win._prompt_write_on_exit = False
@@ -89,7 +93,10 @@ def test_save_current_skip_keeps_new_drafts_pending(qtbot, tmp_path, monkeypatch
     assert win._en_new_drafts_by_file[root / "BE" / "ui.txt"]["B"] == "Draft B"
 
 
-def test_save_current_apply_inserts_edited_new_rows(qtbot, tmp_path, monkeypatch) -> None:
+def test_save_current_apply_inserts_edited_new_rows(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify save-apply inserts edited NEW rows into locale file content."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     win._prompt_write_on_exit = False
@@ -113,4 +120,3 @@ def test_save_current_apply_inserts_edited_new_rows(qtbot, tmp_path, monkeypatch
     assert 'A = "Target A"' in text
     assert 'B = "Draft B"' in text
     assert win._en_new_drafts_by_file.get(root / "BE" / "ui.txt") is None
-

@@ -93,10 +93,18 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     assert "QA is manual." in win._qa_results_list.item(0).text()
     win._qa_refresh_btn.click()
 
-    qtbot.waitUntil(lambda: win._qa_results_list.count() >= 2, timeout=1000)
-    labels = [
-        win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())
-    ]
+    def _labels() -> list[str]:
+        return [
+            win._qa_results_list.item(i).text()
+            for i in range(win._qa_results_list.count())
+        ]
+
+    qtbot.waitUntil(
+        lambda: any("trailing" in label for label in _labels())
+        and any("newlines" in label for label in _labels()),
+        timeout=3000,
+    )
+    labels = _labels()
     assert any("trailing" in label for label in labels)
     assert any("newlines" in label for label in labels)
 

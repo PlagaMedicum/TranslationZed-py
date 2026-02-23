@@ -8,6 +8,7 @@ from translationzed_py.gui.table_header import handle_header_click
 
 
 def test_table_header_dispatches_source_and_status(monkeypatch) -> None:
+    """Verify table-header dispatcher calls source and status handlers."""
     calls: list[tuple[str, int]] = []
 
     monkeypatch.setattr(
@@ -21,4 +22,3 @@ def test_table_header_dispatches_source_and_status(monkeypatch) -> None:
 
     handle_header_click(SimpleNamespace(), 3)
     assert calls == [("source", 3), ("status", 3)]
-
