@@ -344,12 +344,23 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Auto-mark defaults to Untouched rows only (`QA_AUTO_MARK_FOR_REVIEW`);
     optional extension covers touched rows (`QA_AUTO_MARK_TOUCHED_FOR_REVIEW`).
 
-### Step 31 — LanguageTool integration [≈ future]
-- Touchpoints: `core/languagetool.py`, Preferences, TM/QA suggestion surfaces
+### Step 31 — LanguageTool integration [→ in progress]
+- Touchpoints: `core/languagetool.py`, Preferences, detail-editor inline highlighting,
+  QA side panel/runs (TM integration stays out of v1 scope)
+- v1 scope lock:
+  - browser-style LanguageTool picky semantics (`level=default|picky`), not custom
+    project-side category filtering
+  - inline detail-editor underline highlighting + status-bar indicator first
+  - optional manual-QA LanguageTool findings (off by default)
+  - no TM suggestion-surface integration in this slice
 - Acceptance:
-  - Configurable server URL and enable toggle
-  - Non-blocking checks/suggestions
-  - LanguageTool suggestions never override TM ranking precedence by default
+  - Configurable server URL, mode (`auto|on|off`), timeout, picky toggle, and per-locale mapping
+  - Endpoint policy: allow `https://*` and localhost-only `http://` (`localhost`/`127.0.0.1`/`::1`)
+  - Non-blocking checks (debounced background editor checks + manual QA integration)
+  - Picky fallback policy: when `level=picky` is unsupported by endpoint, retry with
+    `level=default` and show non-blocking warning status
+  - QA cap + auto-mark controls for LanguageTool findings are configurable and separate from
+    base QA toggles
 
 ---
 
