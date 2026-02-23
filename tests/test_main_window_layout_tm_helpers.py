@@ -115,6 +115,21 @@ def test_splitter_move_handlers_persist_sizes_and_schedule_work(
     assert win._tree_width_timer.isActive() is True
 
 
+def test_initial_tree_width_caps_default_sidebar_to_quarter_of_available_width(
+    qtbot, tmp_path
+) -> None:
+    """Verify default sidebar width is capped to <= 25% of available splitter width."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win.show()
+
+    win._tree_last_width = 900
+    win._content_splitter.setSizes([900, 900])
+    width = win._initial_tree_width(lazy_tree=False)
+    assert width <= 450
+
+
 def test_tm_helper_methods_cover_path_locale_pairing_and_store_pool(
     qtbot,
     tmp_path,

@@ -319,6 +319,7 @@ _LT_HINT_MAX_REPLACEMENTS = 6
 _PREF_TAB_SEARCH = "search"
 _PREF_TAB_QA = "qa"
 _PREF_TAB_TM = "tm"
+_TREE_PANEL_DEFAULT_MAX_FRACTION = 0.25
 _TM_PLACEHOLDER_ROLE = int(Qt.UserRole) + 7
 _TM_DEFAULT_PLACEHOLDER = "Select row to see Translation Memory suggestions."
 
@@ -3224,10 +3225,30 @@ class MainWindow(QMainWindow):
     def _initial_tree_width(self, lazy_tree: bool) -> int:
         width = max(80, self._tree_last_width)
         if not lazy_tree:
-            return width
+            return min(width, self._max_default_tree_width())
         hint = self.tree.sizeHintForColumn(0)
         width = min(width, max(140, hint + 24)) if hint > 0 else min(width, 200)
-        return width
+        return min(width, self._max_default_tree_width())
+
+    def _max_default_tree_width(self) -> int:
+        """Cap default side-panel width to a quarter of available content width."""
+        available = 0
+        with contextlib.suppress(Exception):
+            sizes = self._content_splitter.sizes()
+            if sizes:
+                available = max(0, sum(int(size) for size in sizes))
+        if available <= 0:
+            available = max(0, int(self._content_splitter.width()))
+        if available <= 0:
+            available = max(0, int(self.width()))
+        if available <= 0:
+            with contextlib.suppress(Exception):
+                screen = QGuiApplication.primaryScreen()
+                if screen is not None:
+                    available = max(0, int(screen.availableGeometry().width()))
+        if available <= 0:
+            available = 1200
+        return max(140, int(available * _TREE_PANEL_DEFAULT_MAX_FRACTION))
 
     def _on_left_panel_changed(self, button) -> None:
         idx = self._left_group.id(button)
