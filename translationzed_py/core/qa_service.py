@@ -20,6 +20,7 @@ QA_CODE_TRAILING = "qa.trailing"
 QA_CODE_NEWLINES = "qa.newlines"
 QA_CODE_TOKENS = "qa.tokens"
 QA_CODE_SAME_AS_SOURCE = "qa.same_source"
+QA_CODE_LANGUAGETOOL = "qa.languagetool"
 
 
 @dataclass(frozen=True, slots=True)

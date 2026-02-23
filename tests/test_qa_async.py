@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from translationzed_py.core.qa_service import QAFinding
+from translationzed_py.core.qa_service import QA_CODE_LANGUAGETOOL, QAFinding
 from translationzed_py.gui import qa_async
 
 
@@ -114,9 +114,17 @@ class _Win:
         self._qa_check_newlines = False
         self._qa_check_escapes = True
         self._qa_check_same_as_source = False
+        self._qa_check_languagetool = False
+        self._qa_languagetool_max_rows = 500
+        self._qa_languagetool_automark = False
         self._qa_auto_mark_for_review = False
+        self._lt_server_url = "http://127.0.0.1:8081"
+        self._lt_timeout_ms = 1200
+        self._lt_picky_mode = False
+        self._qa_scan_languagetool_language = "en-US"
         self._test_mode = False
         self.messages: list[str] = []
+        self.notes: list[str] = []
         self.findings_history: list[tuple[object, ...]] = []
         self.progress_history: list[bool] = []
         self.auto_mark_history: list[tuple[object, ...]] = []
@@ -129,6 +137,10 @@ class _Win:
         """Capture status messages."""
         self.messages.append(message)
 
+    def _set_qa_scan_note(self, note: str) -> None:
+        """Capture scan note updates."""
+        self.notes.append(note)
+
     def _set_qa_progress_visible(self, visible: bool) -> None:
         """Capture progress visibility updates."""
         self.progress_history.append(visible)
@@ -136,6 +148,10 @@ class _Win:
     def _apply_qa_auto_mark(self, findings) -> None:  # type: ignore[no-untyped-def]
         """Capture auto-mark finding set."""
         self.auto_mark_history.append(tuple(findings))
+
+    def _resolve_lt_language_for_path(self, _path: Path) -> str:
+        """Resolve LanguageTool language for QA scan stubs."""
+        return "en-US"
 
 
 def test_collect_input_rows_returns_empty_without_model() -> None:
@@ -153,7 +169,7 @@ def test_run_scan_job_delegates_to_qa_service() -> None:
     win._qa_service = _QaService(findings=(finding,))
     rows = qa_async._collect_input_rows(win)
 
-    path, findings = qa_async._run_scan_job(
+    path, findings, note = qa_async._run_scan_job(
         win,
         file_path,
         rows,
@@ -165,6 +181,7 @@ def test_run_scan_job_delegates_to_qa_service() -> None:
 
     assert path == file_path
     assert findings == [finding]
+    assert note == ""
     assert win._qa_service.calls
     assert win._qa_service.calls[0]["rows"] == rows
 
@@ -175,12 +192,14 @@ def test_start_scan_sets_no_file_message_without_path_or_model() -> None:
     win._current_pf = None
     qa_async.start_scan(win)
     assert win.findings_history == [()]
+    assert win.notes[-1] == ""
     assert win.messages[-1] == "No file selected."
 
     win = _Win()
     win._current_model = None
     qa_async.start_scan(win)
     assert win.findings_history == [()]
+    assert win.notes[-1] == ""
     assert win.messages[-1] == "No file selected."
 
 
@@ -210,6 +229,8 @@ def test_start_scan_submits_job_and_respects_timer_activity(monkeypatch) -> None
     assert win._qa_scan_pool is created_pools[0]
     assert win._qa_scan_future is created_pools[0].future
     assert win._qa_scan_path == win._current_pf.path
+    assert win.notes[-1] == ""
+    assert win._qa_scan_languagetool_language == "en-US"
     assert win.progress_history == [True]
     assert win.messages[-1] == "Running QA checks..."
     assert win._qa_scan_timer.start_calls == 1
@@ -237,6 +258,7 @@ def test_poll_scan_handles_future_none_pending_and_exception() -> None:
     win._qa_scan_future = _Future(done=True, error=RuntimeError("boom"))
     qa_async.poll_scan(win)
     assert win._qa_scan_future is None
+    assert win.notes[-1] == ""
     assert win.messages[-1] == "QA failed: boom"
     assert win.progress_history == [False]
 
@@ -247,7 +269,8 @@ def test_poll_scan_ignores_stale_result_and_applies_current_result() -> None:
     stale_path = Path("/tmp/project/RU/ui.txt")
     stale_finding = QAFinding(file=stale_path, row=3, code="qa.newlines", excerpt="bad")
     stale_win._qa_scan_future = _Future(
-        done=True, payload=(stale_path, [stale_finding])
+        done=True,
+        payload=(stale_path, [stale_finding], "stale note"),
     )
     qa_async.poll_scan(stale_win)
     assert stale_win.findings_history == []
@@ -257,10 +280,116 @@ def test_poll_scan_ignores_stale_result_and_applies_current_result() -> None:
     win._qa_auto_mark_for_review = True
     path = win._current_pf.path
     finding = QAFinding(file=path, row=4, code="qa.trailing", excerpt="trim")
-    win._qa_scan_future = _Future(done=True, payload=(path, [finding]))
+    win._qa_scan_future = _Future(
+        done=True,
+        payload=(path, [finding], "LanguageTool scanned first 10 row(s) due to cap."),
+    )
     qa_async.poll_scan(win)
+    assert win.notes[-1].startswith("LanguageTool scanned first")
     assert win.findings_history == [(finding,)]
     assert win.auto_mark_history == [(finding,)]
+
+
+def test_run_scan_job_skips_languagetool_when_disabled(monkeypatch) -> None:
+    """Verify LT checks are skipped entirely when QA LT toggle is disabled."""
+    win = _Win()
+
+    def _unexpected_lt_call(**_kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("LanguageTool should not be called")
+
+    monkeypatch.setattr(qa_async, "_lt_check_text", _unexpected_lt_call)
+    path, findings, note = qa_async._run_scan_job(
+        win,
+        win._current_pf.path,
+        qa_async._collect_input_rows(win),
+        True,
+        True,
+        True,
+        True,
+    )
+    assert path == win._current_pf.path
+    assert note == ""
+    assert all(finding.code != QA_CODE_LANGUAGETOOL for finding in findings)
+
+
+def test_run_scan_job_includes_languagetool_findings_when_enabled(monkeypatch) -> None:
+    """Verify QA scan includes LT findings when QA LT is enabled."""
+    win = _Win()
+    win._qa_check_languagetool = True
+
+    def _fake_lt_check_text(**_kwargs):  # type: ignore[no-untyped-def]
+        return SimpleNamespace(
+            status="ok",
+            matches=[SimpleNamespace(message="LT issue")],
+            warning="",
+        )
+
+    monkeypatch.setattr(qa_async, "_lt_check_text", _fake_lt_check_text)
+    _path, findings, note = qa_async._run_scan_job(
+        win,
+        win._current_pf.path,
+        qa_async._collect_input_rows(win),
+        False,
+        False,
+        False,
+        False,
+    )
+    assert note == ""
+    assert any(finding.code == QA_CODE_LANGUAGETOOL for finding in findings)
+
+
+def test_run_scan_job_reports_languagetool_row_cap_note(monkeypatch) -> None:
+    """Verify LT QA scan reports cap note when rows are truncated."""
+    win = _Win()
+    win._qa_check_languagetool = True
+    win._qa_languagetool_max_rows = 1
+
+    def _fake_lt_check_text(**_kwargs):  # type: ignore[no-untyped-def]
+        return SimpleNamespace(
+            status="ok",
+            matches=[],
+            warning="",
+        )
+
+    monkeypatch.setattr(qa_async, "_lt_check_text", _fake_lt_check_text)
+    _path, _findings, note = qa_async._run_scan_job(
+        win,
+        win._current_pf.path,
+        qa_async._collect_input_rows(win),
+        False,
+        False,
+        False,
+        False,
+    )
+    assert note == "LanguageTool scanned first 1 row(s) due to cap."
+
+
+def test_poll_scan_filters_languagetool_auto_mark_by_toggle() -> None:
+    """Verify LT findings are auto-marked only when LT auto-mark toggle is enabled."""
+    win = _Win()
+    win._qa_auto_mark_for_review = True
+    path = win._current_pf.path
+    lt_finding = QAFinding(
+        file=path,
+        row=1,
+        code=QA_CODE_LANGUAGETOOL,
+        excerpt="lt",
+    )
+    base_finding = QAFinding(
+        file=path,
+        row=2,
+        code="qa.trailing",
+        excerpt="base",
+    )
+    win._qa_languagetool_automark = False
+    win._qa_scan_future = _Future(done=True, payload=(path, [lt_finding, base_finding], ""))
+    qa_async.poll_scan(win)
+    assert win.auto_mark_history[-1] == (base_finding,)
+
+    win._qa_languagetool_automark = True
+    win._qa_scan_future = _Future(done=True, payload=(path, [lt_finding, base_finding], ""))
+    qa_async.poll_scan(win)
+    assert win.auto_mark_history[-1] == (lt_finding, base_finding)
 
 
 def test_refresh_sync_for_test_polls_until_future_completes(monkeypatch) -> None:
