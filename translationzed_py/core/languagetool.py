@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import urllib.error
 import urllib.parse
@@ -220,6 +221,9 @@ def _decode_http_error_body(exc: urllib.error.HTTPError) -> str:
         return exc.read().decode("utf-8", errors="replace")
     except Exception:
         return ""
+    finally:
+        with contextlib.suppress(Exception):
+            exc.close()
 
 
 def _is_picky_unsupported_error(exc: LTRequestError) -> bool:
