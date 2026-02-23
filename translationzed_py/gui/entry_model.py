@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Literal
 
 from PySide6.QtCore import (
     QAbstractTableModel,
@@ -14,6 +16,7 @@ from PySide6.QtGui import QColor, QPalette, QUndoStack
 from PySide6.QtWidgets import QApplication
 
 from translationzed_py.core import Entry, Status
+from translationzed_py.core.model import STATUS_ORDER
 from translationzed_py.core.model import ParsedFile
 from translationzed_py.core.search import SearchRow
 from translationzed_py.gui.commands import ChangeStatusCommand, EditValueCommand
@@ -36,6 +39,27 @@ _FG_DARK_BG = QColor("#f1f1f1")
 _TOOLTIP_LIMIT = 800
 _TOOLTIP_LIMIT_LARGE = 200
 _TOOLTIP_LARGE_THRESHOLD = 5000
+_ROW_KIND_BASE = "base"
+_ROW_KIND_VIRTUAL = "virtual"
+_STATUS_PRIORITY = {status: idx for idx, status in enumerate(STATUS_ORDER)}
+
+
+@dataclass(frozen=True, slots=True)
+class VirtualNewRow:
+    """Represent one EN-only virtual row exposed in the table."""
+
+    key: str
+    source: str
+    value: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class _RowRef:
+    """Represent one displayed row reference."""
+
+    kind: Literal["base", "virtual"]
+    index: int | None = None
+    key: str = ""
 
 
 class TranslationModel(QAbstractTableModel):
@@ -48,6 +72,10 @@ class TranslationModel(QAbstractTableModel):
         baseline_by_row: dict[int, str] | None = None,
         source_values: Mapping[str, str] | None = None,
         source_by_row: Sequence[str] | None = None,
+        diff_marker_by_key: Mapping[str, str] | None = None,
+        virtual_new_rows: Sequence[VirtualNewRow] | None = None,
+        virtual_new_edited_keys: Iterable[str] | None = None,
+        en_order_keys: Sequence[str] | None = None,
     ):
         """Initialize the instance."""
         super().__init__()
@@ -63,13 +91,212 @@ class TranslationModel(QAbstractTableModel):
         self._status_touched_rows: set[int] = set()
         self._dirty = bool(self._baseline_by_row)
         self._pf.dirty = self._dirty
+        self._diff_marker_by_key: dict[str, str] = {}
+        self._virtual_new_rows_by_key: dict[str, VirtualNewRow] = {}
+        self._virtual_new_order: list[str] = []
+        self._virtual_new_edited_keys: set[str] = set()
+        self._en_order_keys = tuple(
+            key for key in (str(raw).strip() for raw in (en_order_keys or ())) if key
+        )
+        self._status_filter: set[Status] | None = None
+        self._status_sort_enabled = False
+        self._row_refs: list[_RowRef] = []
+        self._set_diff_markers(diff_marker_by_key or {})
+        self._set_virtual_new_rows(
+            virtual_new_rows or (),
+            edited_keys=virtual_new_edited_keys,
+        )
+        self._rebuild_row_refs()
         self._preview_limit: int | None = None
         self._max_value_len: int | None = None
         self._headers = list(_HEADERS)
 
         self.undo_stack = QUndoStack()
 
+    def _set_diff_markers(self, marker_by_key: Mapping[str, str]) -> None:
+        self._diff_marker_by_key = {}
+        for raw_key, raw_marker in marker_by_key.items():
+            key = str(raw_key).strip()
+            marker = str(raw_marker).strip().upper()
+            if not key or not marker:
+                continue
+            self._diff_marker_by_key[key] = marker
+
+    def _set_virtual_new_rows(
+        self,
+        rows: Sequence[VirtualNewRow],
+        *,
+        edited_keys: Iterable[str] | None = None,
+    ) -> None:
+        self._virtual_new_rows_by_key = {}
+        self._virtual_new_order = []
+        for raw in rows:
+            key = str(raw.key).strip()
+            if not key or key in self._virtual_new_rows_by_key:
+                continue
+            row = VirtualNewRow(
+                key=key,
+                source=str(raw.source or ""),
+                value=str(raw.value or ""),
+            )
+            self._virtual_new_rows_by_key[key] = row
+            self._virtual_new_order.append(key)
+            if row.value:
+                self._virtual_new_edited_keys.add(key)
+        if edited_keys is not None:
+            known = set(self._virtual_new_rows_by_key)
+            self._virtual_new_edited_keys = {
+                key for key in (str(raw).strip() for raw in edited_keys) if key in known
+            }
+        else:
+            self._virtual_new_edited_keys.intersection_update(self._virtual_new_rows_by_key)
+        for key in self._virtual_new_order:
+            self._diff_marker_by_key.setdefault(key, "NEW")
+        self._recompute_dirty_state()
+
+    def apply_diff_state(
+        self,
+        *,
+        marker_by_key: Mapping[str, str],
+        virtual_new_rows: Sequence[VirtualNewRow],
+        en_order_keys: Sequence[str] | None = None,
+        edited_virtual_new_keys: Iterable[str] | None = None,
+    ) -> None:
+        """Apply EN-diff marker/virtual-row state and rebuild row mapping."""
+        self.beginResetModel()
+        self._set_diff_markers(marker_by_key)
+        if en_order_keys is not None:
+            self._en_order_keys = tuple(
+                key
+                for key in (str(raw).strip() for raw in en_order_keys)
+                if key
+            )
+        self._set_virtual_new_rows(
+            virtual_new_rows,
+            edited_keys=edited_virtual_new_keys,
+        )
+        self._rebuild_row_refs()
+        self.endResetModel()
+
     # ---------------------------------------------------------------- helpers
+    def _recompute_dirty_state(self) -> None:
+        self._dirty = bool(self._baseline_by_row or self._virtual_new_edited_keys)
+        self._pf.dirty = self._dirty
+
+    def _status_for_ref(self, ref: _RowRef) -> Status:
+        if ref.kind == _ROW_KIND_BASE and ref.index is not None:
+            return self._entries[ref.index].status
+        return Status.UNTOUCHED
+
+    def _row_ref(self, row: int) -> _RowRef | None:
+        if 0 <= row < len(self._row_refs):
+            return self._row_refs[row]
+        return None
+
+    def _base_index_for_row(self, row: int) -> int | None:
+        ref = self._row_ref(row)
+        if ref is None or ref.kind != _ROW_KIND_BASE:
+            return None
+        return ref.index
+
+    def _virtual_row_for_row(self, row: int) -> VirtualNewRow | None:
+        ref = self._row_ref(row)
+        if ref is None or ref.kind != _ROW_KIND_VIRTUAL:
+            return None
+        return self._virtual_new_rows_by_key.get(ref.key)
+
+    def _rebuild_row_refs(self) -> None:
+        refs: list[_RowRef] = []
+        base_index_by_key: dict[str, int] = {}
+        for idx, entry in enumerate(self._entries):
+            base_index_by_key.setdefault(entry.key, idx)
+        used_base: set[int] = set()
+        used_virtual: set[str] = set()
+
+        if self._en_order_keys:
+            for key in self._en_order_keys:
+                base_idx = base_index_by_key.get(key)
+                if base_idx is not None and base_idx not in used_base:
+                    refs.append(_RowRef(kind=_ROW_KIND_BASE, index=base_idx))
+                    used_base.add(base_idx)
+                    continue
+                if key in self._virtual_new_rows_by_key and key not in used_virtual:
+                    refs.append(_RowRef(kind=_ROW_KIND_VIRTUAL, key=key))
+                    used_virtual.add(key)
+
+        for idx in range(len(self._entries)):
+            if idx in used_base:
+                continue
+            refs.append(_RowRef(kind=_ROW_KIND_BASE, index=idx))
+
+        for key in self._virtual_new_order:
+            if key in used_virtual:
+                continue
+            refs.append(_RowRef(kind=_ROW_KIND_VIRTUAL, key=key))
+
+        if self._status_filter is not None:
+            refs = [ref for ref in refs if self._status_for_ref(ref) in self._status_filter]
+
+        if self._status_sort_enabled:
+            indexed = list(enumerate(refs))
+            indexed.sort(
+                key=lambda pair: (
+                    _STATUS_PRIORITY.get(self._status_for_ref(pair[1]), 99),
+                    pair[0],
+                )
+            )
+            refs = [ref for _idx, ref in indexed]
+
+        self._row_refs = refs
+
+    def set_status_filter(self, statuses: Iterable[Status] | None) -> None:
+        """Set optional row visibility filter by status values."""
+        normalized: set[Status] | None
+        if statuses is None:
+            normalized = None
+        else:
+            candidate = {status for status in statuses if isinstance(status, Status)}
+            normalized = candidate or None
+        if normalized == self._status_filter:
+            return
+        self.beginResetModel()
+        self._status_filter = normalized
+        self._rebuild_row_refs()
+        self.endResetModel()
+
+    def status_filter(self) -> set[Status] | None:
+        """Return active status filter."""
+        if self._status_filter is None:
+            return None
+        return set(self._status_filter)
+
+    def set_status_sort_enabled(self, enabled: bool) -> None:
+        """Enable/disable status-priority sort order."""
+        next_enabled = bool(enabled)
+        if next_enabled == self._status_sort_enabled:
+            return
+        self.beginResetModel()
+        self._status_sort_enabled = next_enabled
+        self._rebuild_row_refs()
+        self.endResetModel()
+
+    def status_sort_enabled(self) -> bool:
+        """Return whether status-priority sorting is active."""
+        return self._status_sort_enabled
+
+    def has_pending_virtual_new_values(self) -> bool:
+        """Return true when edited virtual NEW rows have unsaved draft values."""
+        return bool(self._virtual_new_edited_keys)
+
+    def edited_virtual_new_values(self) -> dict[str, str]:
+        """Return edited virtual NEW rows for insertion/save-time preview."""
+        return {
+            key: self._virtual_new_rows_by_key[key].value
+            for key in self._virtual_new_order
+            if key in self._virtual_new_edited_keys
+            and key in self._virtual_new_rows_by_key
+        }
+
     def _dark_palette_active(self) -> bool:
         """Execute dark palette active."""
         app = QApplication.instance()
@@ -97,6 +324,19 @@ class TranslationModel(QAbstractTableModel):
         """Execute foreground for background."""
         return _FG_LIGHT_BG if background.lightness() >= 145 else _FG_DARK_BG
 
+    def _row_background_color(self, row: int, column: int) -> QColor | None:
+        base_index = self._base_index_for_row(row)
+        if base_index is not None:
+            return self._cell_background(base_index, column, self._entries[base_index])
+        virtual = self._virtual_row_for_row(row)
+        if virtual is None:
+            return None
+        if column == 1 and not (virtual.source or ""):
+            return self._missing_background_color()
+        if column == 2 and not (virtual.value or ""):
+            return self._missing_background_color()
+        return self._status_background_color(Status.UNTOUCHED)
+
     def _cell_background(self, row: int, column: int, entry: Entry) -> QColor | None:
         """Execute cell background."""
         if column == 0 and not (entry.key or ""):
@@ -114,6 +354,7 @@ class TranslationModel(QAbstractTableModel):
 
     def _replace_entry(self, row: int, entry: Entry, *, value_changed: bool) -> None:
         """Swap immutable Entry objects during value/status updates."""
+        prev_entry = self._entries[row]
         self._entries[row] = entry
         if value_changed:
             baseline = self._baseline_by_row.get(row)
@@ -126,16 +367,24 @@ class TranslationModel(QAbstractTableModel):
         else:
             # Status-only edits should propagate to TM metadata updates.
             self._status_touched_rows.add(row)
-        left = self.index(row, 0)
-        right = self.index(row, self.columnCount() - 1)
-        self.dataChanged.emit(
-            left,
-            right,
-            [Qt.DisplayRole, Qt.EditRole, Qt.ForegroundRole, Qt.BackgroundRole],
-        )
+        status_changed = prev_entry.status != entry.status
+        if status_changed and (self._status_sort_enabled or self._status_filter is not None):
+            self.beginResetModel()
+            self._rebuild_row_refs()
+            self.endResetModel()
+        else:
+            for view_row, ref in enumerate(self._row_refs):
+                if ref.kind != _ROW_KIND_BASE or ref.index != row:
+                    continue
+                left = self.index(view_row, 0)
+                right = self.index(view_row, self.columnCount() - 1)
+                self.dataChanged.emit(
+                    left,
+                    right,
+                    [Qt.DisplayRole, Qt.EditRole, Qt.ForegroundRole, Qt.BackgroundRole],
+                )
         if value_changed:
-            self._dirty = bool(self._baseline_by_row)
-            self._pf.dirty = self._dirty
+            self._recompute_dirty_state()
 
     def changed_values(self) -> dict[str, str]:
         """Return only values that were edited (no status-only changes)."""
@@ -214,17 +463,23 @@ class TranslationModel(QAbstractTableModel):
 
     def status_for_row(self, row: int) -> Status | None:
         """Execute status for row."""
-        if 0 <= row < len(self._entries):
-            return self._entries[row].status
+        ref = self._row_ref(row)
+        if ref is None:
+            return None
+        if ref.kind == _ROW_KIND_BASE and ref.index is not None:
+            return self._entries[ref.index].status
+        if ref.kind == _ROW_KIND_VIRTUAL:
+            return Status.UNTOUCHED
         return None
 
-    def clear_changed_values(self) -> None:
+    def clear_changed_values(self, *, clear_virtual: bool = False) -> None:
         """Execute clear changed values."""
         self._baseline_by_row.clear()
         self._changed_rows.clear()
         self._status_touched_rows.clear()
-        self._dirty = False
-        self._pf.dirty = False
+        if clear_virtual:
+            self._virtual_new_edited_keys.clear()
+        self._recompute_dirty_state()
 
     def set_preview_limit(self, limit: int | None) -> None:
         """Set preview limit."""
@@ -239,10 +494,10 @@ class TranslationModel(QAbstractTableModel):
         """Set source lookup."""
         self._source_values = source_values or {}
         self._source_by_row = source_by_row
-        if not self._entries:
+        if not self._row_refs:
             return
         top = self.index(0, 1)
-        bottom = self.index(len(self._entries) - 1, 1)
+        bottom = self.index(self.rowCount() - 1, 1)
         self.dataChanged.emit(
             top,
             bottom,
@@ -313,58 +568,82 @@ class TranslationModel(QAbstractTableModel):
 
     def _full_source_text(self, row: int) -> str:
         """Execute full source text."""
-        if self._source_by_row is not None and row < len(self._source_by_row):
-            return self._source_by_row[row] or ""
-        return self._source_values.get(self._entries[row].key, "") or ""
+        base_index = self._base_index_for_row(row)
+        if base_index is not None:
+            if self._source_by_row is not None and base_index < len(self._source_by_row):
+                return self._source_by_row[base_index] or ""
+            return self._source_values.get(self._entries[base_index].key, "") or ""
+        virtual = self._virtual_row_for_row(row)
+        if virtual is None:
+            return ""
+        return virtual.source or ""
 
     def _full_value_text(self, row: int) -> str:
         """Execute full value text."""
-        return self._entries[row].value or ""
+        base_index = self._base_index_for_row(row)
+        if base_index is not None:
+            return self._entries[base_index].value or ""
+        virtual = self._virtual_row_for_row(row)
+        if virtual is None:
+            return ""
+        return virtual.value or ""
 
     def _source_length_at(self, row: int) -> int:
         """Execute source length at."""
-        if self._source_by_row is not None and row < len(self._source_by_row):
+        base_index = self._base_index_for_row(row)
+        if base_index is None:
+            text = self._full_source_text(row)
+            return len(text) if text else 0
+        if self._source_by_row is not None and base_index < len(self._source_by_row):
             source_row = self._source_by_row
             if hasattr(source_row, "length_at"):
                 try:
-                    return int(source_row.length_at(row))
+                    return int(source_row.length_at(base_index))
                 except Exception:
-                    text = source_row[row]
+                    text = source_row[base_index]
                     return len(text) if text else 0
-            text = source_row[row]
+            text = source_row[base_index]
             return len(text) if text else 0
-        text = self._source_values.get(self._entries[row].key, "")
+        text = self._source_values.get(self._entries[base_index].key, "")
         return len(text) if text else 0
 
     def _value_length_at(self, row: int) -> int:
         """Execute value length at."""
+        base_index = self._base_index_for_row(row)
+        if base_index is None:
+            text = self._full_value_text(row)
+            return len(text) if text else 0
         entries = self._entries
         if hasattr(entries, "meta_at"):
             try:
-                meta = entries.meta_at(row)
+                meta = entries.meta_at(base_index)
                 if meta.segments:
                     return sum(meta.segments)
             except Exception:
-                text = entries[row].value
+                text = entries[base_index].value
                 return len(text) if text else 0
-        text = entries[row].value
+        text = entries[base_index].value
         return len(text) if text else 0
 
     def _preview_source_raw(self, row: int, limit: int) -> tuple[str, int]:
         """Execute preview source raw."""
         actual_len = self._source_length_at(row)
-        if self._source_by_row is not None and row < len(self._source_by_row):
+        base_index = self._base_index_for_row(row)
+        if base_index is None:
+            preview = self._full_source_text(row)
+            return preview[:limit], actual_len
+        if self._source_by_row is not None and base_index < len(self._source_by_row):
             source_row = self._source_by_row
             if hasattr(source_row, "preview_at"):
                 try:
-                    preview = source_row.preview_at(row, limit)
+                    preview = source_row.preview_at(base_index, limit)
                     return preview[:limit], actual_len
                 except Exception:
                     preview = ""
                     return preview, actual_len
-            preview = source_row[row] or ""
+            preview = source_row[base_index] or ""
             return preview[:limit], actual_len
-        preview = self._source_values.get(self._entries[row].key, "") or ""
+        preview = self._source_values.get(self._entries[base_index].key, "") or ""
         return preview[:limit], actual_len
 
     def _preview_source(self, row: int, limit: int) -> str:
@@ -374,16 +653,20 @@ class TranslationModel(QAbstractTableModel):
 
     def _preview_value_raw(self, row: int, limit: int) -> tuple[str, int]:
         """Execute preview value raw."""
+        base_index = self._base_index_for_row(row)
+        if base_index is None:
+            preview = self._full_value_text(row)
+            return preview[:limit], len(preview)
         entries = self._entries
         actual_len = self._value_length_at(row)
         if hasattr(entries, "preview_at"):
             try:
-                preview = entries.preview_at(row, limit)
+                preview = entries.preview_at(base_index, limit)
                 return preview[:limit], actual_len
             except Exception:
                 preview = ""
                 return preview, actual_len
-        preview = entries[row].value or ""
+        preview = entries[base_index].value or ""
         return preview[:limit], actual_len or len(preview)
 
     def _preview_value(self, row: int, limit: int) -> str:
@@ -413,27 +696,37 @@ class TranslationModel(QAbstractTableModel):
         preview, _ = self._preview_value_raw(row, limit)
         return self._tooltip_apply_limit(preview, actual_len, limit)
 
-    def reset_baseline(self) -> None:
+    def reset_baseline(self, *, clear_virtual: bool = False) -> None:
         """After writing to disk, treat current values as the new baseline."""
-        self.clear_changed_values()
+        self.clear_changed_values(clear_virtual=clear_virtual)
 
     def iter_search_rows(
         self, *, include_source: bool = True, include_value: bool = True
     ):
         """Yield search rows without going through QModelIndex lookups."""
-        for idx, entry in enumerate(self._entries):
-            if include_source:
-                if self._source_by_row is not None and idx < len(self._source_by_row):
-                    source = self._source_by_row[idx]
+        for idx, ref in enumerate(self._row_refs):
+            if ref.kind == _ROW_KIND_BASE and ref.index is not None:
+                entry = self._entries[ref.index]
+                key = entry.key
+                if include_source:
+                    if self._source_by_row is not None and ref.index < len(self._source_by_row):
+                        source = self._source_by_row[ref.index]
+                    else:
+                        source = self._source_values.get(entry.key, "")
                 else:
-                    source = self._source_values.get(entry.key, "")
+                    source = ""
+                value = entry.value if include_value else ""
             else:
-                source = ""
-            value = entry.value if include_value else ""
+                virtual = self._virtual_new_rows_by_key.get(ref.key)
+                if virtual is None:
+                    continue
+                key = virtual.key
+                source = virtual.source if include_source else ""
+                value = virtual.value if include_value else ""
             yield SearchRow(
                 file=self._pf.path,
                 row=idx,
-                key=entry.key,
+                key=key,
                 source=source,
                 value=value,
             )
@@ -441,7 +734,18 @@ class TranslationModel(QAbstractTableModel):
     def prefetch_rows(self, start: int, end: int) -> None:
         """Execute prefetch rows."""
         if hasattr(self._entries, "prefetch"):
-            self._entries.prefetch(start, end)
+            if not self._row_refs:
+                self._entries.prefetch(start, end)
+                return
+            base_rows = [
+                ref.index
+                for ref in self._row_refs[max(0, start) : max(0, end) + 1]
+                if ref.kind == _ROW_KIND_BASE and ref.index is not None
+            ]
+            if not base_rows:
+                self._entries.prefetch(start, end)
+                return
+            self._entries.prefetch(min(base_rows), max(base_rows))
 
     # Qt mandatory overrides ----------------------------------------------------
     def rowCount(  # noqa: N802
@@ -451,7 +755,7 @@ class TranslationModel(QAbstractTableModel):
         """Execute rowCount."""
         if parent and parent.isValid():
             return 0
-        return len(self._entries)
+        return len(self._row_refs)
 
     def columnCount(  # noqa: N802
         self,
@@ -467,62 +771,85 @@ class TranslationModel(QAbstractTableModel):
         if not index.isValid():
             return None
 
-        e = self._entries[index.row()]
+        ref = self._row_ref(index.row())
+        if ref is None:
+            return None
+        base_index = self._base_index_for_row(index.row())
+        virtual = self._virtual_row_for_row(index.row())
+        entry = self._entries[base_index] if base_index is not None else None
+        key_text = entry.key if entry is not None else (virtual.key if virtual else "")
+        status = entry.status if entry is not None else Status.UNTOUCHED
+        marker = self._diff_marker_by_key.get(key_text)
+        key_display = f"[{marker}] {key_text}" if marker else key_text
 
         if role == Qt.TextAlignmentRole and index.column() == 0:
             return Qt.AlignRight | Qt.AlignVCenter
         if role == Qt.ToolTipRole:
             match index.column():
                 case 0:
-                    return e.key or ""
+                    if not key_text:
+                        return ""
+                    return f"{marker}: {key_text}" if marker else key_text
                 case 1:
                     return self._tooltip_source(index.row())
                 case 2:
                     return self._tooltip_value(index.row())
                 case 3:
-                    return e.status.label()
+                    return status.label()
 
         # --- display text ----------------------------------------------------
         if role == Qt.DisplayRole:
             match index.column():
                 case 0:
-                    return e.key
+                    return key_display
                 case 1:
                     if self._preview_limit:
                         return self._preview_source(index.row(), self._preview_limit)
-                    if self._source_by_row is not None and index.row() < len(
-                        self._source_by_row
+                    if (
+                        base_index is not None
+                        and self._source_by_row is not None
+                        and base_index < len(self._source_by_row)
                     ):
-                        return self._source_by_row[index.row()]
-                    return self._source_values.get(e.key, "")
+                        return self._source_by_row[base_index]
+                    if base_index is not None and entry is not None:
+                        return self._source_values.get(entry.key, "")
+                    return virtual.source if virtual is not None else ""
                 case 2:
                     if self._preview_limit:
                         return self._preview_value(index.row(), self._preview_limit)
-                    return e.value
+                    if entry is not None:
+                        return entry.value
+                    return virtual.value if virtual is not None else ""
                 case 3:
-                    return e.status.label()
+                    return status.label()
 
         if role == Qt.EditRole:
             match index.column():
                 case 0:
-                    return e.key
+                    return key_text
                 case 1:
-                    if self._source_by_row is not None and index.row() < len(
-                        self._source_by_row
+                    if (
+                        base_index is not None
+                        and self._source_by_row is not None
+                        and base_index < len(self._source_by_row)
                     ):
-                        return self._source_by_row[index.row()]
-                    return self._source_values.get(e.key, "")
+                        return self._source_by_row[base_index]
+                    if base_index is not None and entry is not None:
+                        return self._source_values.get(entry.key, "")
+                    return virtual.source if virtual is not None else ""
                 case 2:
-                    return e.value
+                    if entry is not None:
+                        return entry.value
+                    return virtual.value if virtual is not None else ""
                 case 3:
-                    return e.status
+                    return status
 
         # --- background highlights -------------------------------------------
         if role == Qt.BackgroundRole:
-            return self._cell_background(index.row(), index.column(), e)
+            return self._row_background_color(index.row(), index.column())
 
         if role == Qt.ForegroundRole:
-            background = self._cell_background(index.row(), index.column(), e)
+            background = self._row_background_color(index.row(), index.column())
             if background is None:
                 return None
             return self._foreground_for_background(background)
@@ -561,6 +888,13 @@ class TranslationModel(QAbstractTableModel):
     def flags(self, index: QModelIndex):  # noqa: N802
         """Execute flags."""
         base = super().flags(index)
+        ref = self._row_ref(index.row())
+        if ref is None:
+            return base
+        if ref.kind == _ROW_KIND_VIRTUAL:
+            if index.column() == 2:
+                return base | Qt.ItemIsEditable
+            return base
         if index.column() in (2, 3):  # Translation & Status columns
             return base | Qt.ItemIsEditable
         return base
@@ -572,14 +906,45 @@ class TranslationModel(QAbstractTableModel):
 
         col = index.column()
         row = index.row()
-        e = self._entries[row]
+        ref = self._row_ref(row)
+        if ref is None:
+            return False
+        if ref.kind == _ROW_KIND_VIRTUAL:
+            if col != 2:
+                return False
+            key = ref.key
+            current_row = self._virtual_new_rows_by_key.get(key)
+            if current_row is None:
+                return False
+            next_value = str(value)
+            if next_value == current_row.value:
+                return False
+            self._virtual_new_rows_by_key[key] = VirtualNewRow(
+                key=current_row.key,
+                source=current_row.source,
+                value=next_value,
+            )
+            self._virtual_new_edited_keys.add(key)
+            self._recompute_dirty_state()
+            left = self.index(row, 2)
+            right = self.index(row, 3)
+            self.dataChanged.emit(
+                left,
+                right,
+                [Qt.DisplayRole, Qt.EditRole, Qt.BackgroundRole, Qt.ForegroundRole],
+            )
+            return True
+
+        assert ref.index is not None
+        base_row = ref.index
+        e = self._entries[base_row]
 
         # ---- value edit ----------------------------------------------------
         if col == 2:
-            e = self._entries[index.row()]
+            e = self._entries[base_row]
             if value != e.value:
-                if row not in self._baseline_by_row:
-                    self._baseline_by_row[row] = e.value
+                if base_row not in self._baseline_by_row:
+                    self._baseline_by_row[base_row] = e.value
                 new_entry = Entry(
                     e.key,
                     str(value),
@@ -592,7 +957,7 @@ class TranslationModel(QAbstractTableModel):
                 )
                 cmd = EditValueCommand(
                     self._pf,
-                    index.row(),
+                    base_row,
                     e,
                     new_entry,
                     self,
@@ -610,7 +975,7 @@ class TranslationModel(QAbstractTableModel):
                 except KeyError:
                     return False
             if st != e.status:
-                cmd = ChangeStatusCommand(self._pf, row, st, self)
+                cmd = ChangeStatusCommand(self._pf, base_row, st, self)
                 self.undo_stack.push(cmd)
                 return True
 
