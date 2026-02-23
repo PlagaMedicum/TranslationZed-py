@@ -90,7 +90,9 @@ def test_splitter_move_handlers_persist_sizes_and_schedule_work(
     monkeypatch.setattr(
         win, "_schedule_tree_width_persist", lambda: calls.append("persist")
     )
+    monkeypatch.setattr(win, "_apply_table_layout", lambda: calls.append("layout"))
     monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: calls.append("reflow"))
+    monkeypatch.setattr(win.table, "model", lambda: object(), raising=False)
 
     win._detail_panel.setVisible(False)
     win._on_main_splitter_moved(0, 0)
@@ -106,7 +108,7 @@ def test_splitter_move_handlers_persist_sizes_and_schedule_work(
     win._content_splitter.setSizes([240, 480])
     win._on_content_splitter_moved(0, 0)
     assert win._tree_last_width >= 60
-    assert calls == ["persist", "reflow"]
+    assert calls == ["persist", "layout", "reflow"]
 
     win._tree_width_timer.stop()
     mw.MainWindow._schedule_tree_width_persist(win)

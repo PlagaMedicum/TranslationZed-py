@@ -756,6 +756,9 @@ class MainWindow(QMainWindow):
 
         self._main_splitter = QSplitter(Qt.Vertical, self)
         self._content_splitter = QSplitter(Qt.Horizontal, self)
+        # Keep side panel width stable while right content consumes resize growth.
+        self._content_splitter.setStretchFactor(0, 0)
+        self._content_splitter.setStretchFactor(1, 1)
         self._main_splitter.addWidget(self._content_splitter)
         self.setCentralWidget(self._main_splitter)
         self._main_splitter.splitterMoved.connect(self._on_main_splitter_moved)
@@ -1570,6 +1573,8 @@ class MainWindow(QMainWindow):
         if len(sizes) >= 2 and sizes[0] > 0:
             self._tree_last_width = max(60, sizes[0])
             self._schedule_tree_width_persist()
+        if self.table.model():
+            self._apply_table_layout()
         self._schedule_resize_reflow()
 
     def _schedule_tree_width_persist(self) -> None:
