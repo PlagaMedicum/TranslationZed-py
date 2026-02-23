@@ -14,7 +14,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import xxhash
 from PySide6.QtCore import (
@@ -30,14 +30,11 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QAction,
-    QColor,
     QCursor,
     QDesktopServices,
     QGuiApplication,
     QIcon,
     QKeySequence,
-    QTextCharFormat,
-    QTextCursor,
     QTextOption,
 )
 from PySide6.QtWidgets import (
@@ -70,7 +67,6 @@ from PySide6.QtWidgets import (
     QTableView,
     QTableWidget,
     QTableWidgetItem,
-    QTextEdit,
     QToolBar,
     QToolButton,
     QToolTip,
@@ -107,45 +103,6 @@ from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
 from translationzed_py.core.file_workflow import (
     FileWorkflowService as _FileWorkflowService,
-)
-from translationzed_py.core.languagetool import (
-    LT_LEVEL_DEFAULT as _LT_LEVEL_DEFAULT,
-)
-from translationzed_py.core.languagetool import (
-    LT_LEVEL_PICKY as _LT_LEVEL_PICKY,
-)
-from translationzed_py.core.languagetool import (
-    LT_STATUS_OFFLINE as _LT_STATUS_OFFLINE,
-)
-from translationzed_py.core.languagetool import (
-    LT_STATUS_OK as _LT_STATUS_OK,
-)
-from translationzed_py.core.languagetool import (
-    LanguageToolCheckResult as _LanguageToolCheckResult,
-)
-from translationzed_py.core.languagetool import (
-    check_text as _lt_check_text,
-)
-from translationzed_py.core.languagetool import (
-    default_server_url as _default_lt_server_url,
-)
-from translationzed_py.core.languagetool import (
-    draft_language_map as _draft_lt_language_map,
-)
-from translationzed_py.core.languagetool import (
-    dump_language_map as _dump_lt_language_map,
-)
-from translationzed_py.core.languagetool import (
-    load_language_map as _load_lt_language_map,
-)
-from translationzed_py.core.languagetool import (
-    normalize_editor_mode as _normalize_lt_editor_mode,
-)
-from translationzed_py.core.languagetool import (
-    normalize_timeout_ms as _normalize_lt_timeout_ms,
-)
-from translationzed_py.core.languagetool import (
-    resolve_language_code as _resolve_lt_language_code,
 )
 from translationzed_py.core.file_workflow import (
     OpenFileCallbacks as _OpenFileCallbacks,
@@ -294,6 +251,7 @@ from translationzed_py.core.tm_workflow_service import (
     TMWorkflowService as _TMWorkflowService,
 )
 
+from . import languagetool_adapter as _lt_adapter
 from .delegates import (
     MAX_VISUAL_CHARS,
     KeyDelegate,
@@ -356,8 +314,6 @@ _LEFT_PANEL_FILES = 0
 _LEFT_PANEL_TM = 1
 _LEFT_PANEL_SEARCH = 2
 _LEFT_PANEL_QA = 3
-_LT_EDITOR_DEBOUNCE_MS = 320
-_LT_ISSUE_UNDERLINE_COLOR = QColor(210, 48, 48, 210)
 
 
 def _in_test_mode() -> bool:
@@ -385,72 +341,6 @@ def _int_from_pref(
     except (TypeError, ValueError):
         return default
     return max(min_value, min(max_value, parsed))
-
-
-def _lt_level_for_picky(enabled: bool) -> str:
-    return _LT_LEVEL_PICKY if enabled else _LT_LEVEL_DEFAULT
-
-
-def _lt_status_text(result: _LanguageToolCheckResult | None) -> str:
-    if result is None:
-        return "LT: idle"
-    if result.warning:
-        return "LT: picky unsupported (default used)"
-    if result.status == _LT_STATUS_OFFLINE:
-        return "LT: offline"
-    if result.status != _LT_STATUS_OK:
-        return "LT: offline"
-    if result.matches:
-        return f"LT: issues:{len(result.matches)}"
-    return "LT: ok"
-
-
-def _build_lt_issue_selections(
-    *,
-    editor: QPlainTextEdit,
-    result: _LanguageToolCheckResult | None,
-) -> list[QTextEdit.ExtraSelection]:
-    if result is None or result.status != _LT_STATUS_OK or not result.matches:
-        return []
-    text_len = len(editor.document().toPlainText())
-    fmt = QTextCharFormat()
-    fmt.setUnderlineStyle(QTextCharFormat.SpellCheckUnderline)
-    fmt.setUnderlineColor(_LT_ISSUE_UNDERLINE_COLOR)
-    selections: list[QTextEdit.ExtraSelection] = []
-    for match in result.matches:
-        start = max(0, int(match.offset))
-        end = min(text_len, start + max(0, int(match.length)))
-        if end <= start:
-            continue
-        cursor = QTextCursor(editor.document())
-        cursor.setPosition(start)
-        cursor.setPosition(end, QTextCursor.KeepAnchor)
-        selection = QTextEdit.ExtraSelection()
-        selection.cursor = cursor
-        selection.format = fmt
-        selections.append(selection)
-    return selections
-
-
-def _run_languagetool_check_job(
-    *,
-    request_id: int,
-    path: Path,
-    row: int,
-    text: str,
-    server_url: str,
-    language: str,
-    level: str,
-    timeout_ms: int,
-) -> tuple[int, Path, int, str, _LanguageToolCheckResult]:
-    result = _lt_check_text(
-        server_url=server_url,
-        language=language,
-        text=text,
-        level=level,
-        timeout_ms=timeout_ms,
-    )
-    return request_id, path, row, text, result
 
 
 def _patch_message_boxes_for_tests() -> None:
@@ -706,21 +596,19 @@ class MainWindow(QMainWindow):
         self._qa_refresh_timer.setSingleShot(True)
         self._qa_refresh_timer.timeout.connect(self._start_qa_scan_for_current_file)
         self._lt_scan_pool: ThreadPoolExecutor | None = None
-        self._lt_scan_future: (
-            Future[tuple[int, Path, int, str, _LanguageToolCheckResult]] | None
-        ) = None
+        self._lt_scan_future: Future[tuple[int, Path, int, str, Any]] | None = None
         self._lt_scan_timer = QTimer(self)
         self._lt_scan_timer.setSingleShot(False)
         self._lt_scan_timer.setInterval(50)
         self._lt_scan_timer.timeout.connect(self._poll_languagetool_editor_check)
         self._lt_debounce_timer = QTimer(self)
         self._lt_debounce_timer.setSingleShot(True)
-        self._lt_debounce_timer.setInterval(_LT_EDITOR_DEBOUNCE_MS)
+        self._lt_debounce_timer.setInterval(_lt_adapter.LT_EDITOR_DEBOUNCE_MS)
         self._lt_debounce_timer.timeout.connect(self._start_languagetool_editor_check)
         self._lt_request_seq = 0
         self._lt_pending_payload: tuple[int, Path, int, str] | None = None
         self._lt_inflight_payload: tuple[int, Path, int, str] | None = None
-        self._lt_last_result: _LanguageToolCheckResult | None = None
+        self._lt_last_result: Any | None = None
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -744,16 +632,7 @@ class MainWindow(QMainWindow):
         self._qa_auto_mark_touched_for_review = (
             normalized_prefs.qa_auto_mark_touched_for_review
         )
-        self._qa_check_languagetool = normalized_prefs.qa_check_languagetool
-        self._qa_languagetool_max_rows = normalized_prefs.qa_languagetool_max_rows
-        self._qa_languagetool_automark = normalized_prefs.qa_languagetool_automark
-        self._lt_editor_mode = _normalize_lt_editor_mode(normalized_prefs.lt_editor_mode)
-        self._lt_server_url = (
-            str(normalized_prefs.lt_server_url).strip() or _default_lt_server_url()
-        )
-        self._lt_timeout_ms = _normalize_lt_timeout_ms(normalized_prefs.lt_timeout_ms)
-        self._lt_picky_mode = bool(normalized_prefs.lt_picky_mode)
-        self._lt_locale_map = _load_lt_language_map(normalized_prefs.lt_locale_map)
+        _lt_adapter.apply_loaded_preferences(self, normalized_prefs)
         self._default_root = normalized_prefs.default_root
         self._search_scope = normalized_prefs.search_scope
         self._replace_scope = normalized_prefs.replace_scope
@@ -1870,9 +1749,7 @@ class MainWindow(QMainWindow):
             _prepare_message_box(msg).exec()
         self._schedule_cache_migration()
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
-        drafted_lt_map = _draft_lt_language_map(self._locales.keys())
-        for locale, language_code in drafted_lt_map.items():
-            self._lt_locale_map.setdefault(locale, language_code)
+        _lt_adapter.seed_locale_map_defaults(self)
         self._files_by_locale.clear()
 
         if not selectable and selected_locales is None:
@@ -2047,7 +1924,9 @@ class MainWindow(QMainWindow):
             if report.unresolved_files:
                 issue_parts.append(f"{len(report.unresolved_files)} pending mapping")
             if report.zero_segment_files:
-                issue_parts.append(f"{len(report.zero_segment_files)} imported with 0 segments")
+                issue_parts.append(
+                    f"{len(report.zero_segment_files)} imported with 0 segments"
+                )
             if issue_parts:
                 self.statusBar().showMessage(
                     "TM import sync issues: " + ", ".join(issue_parts),
@@ -2500,15 +2379,8 @@ class MainWindow(QMainWindow):
             "qa_auto_refresh": self._qa_auto_refresh,
             "qa_auto_mark_for_review": self._qa_auto_mark_for_review,
             "qa_auto_mark_touched_for_review": (self._qa_auto_mark_touched_for_review),
-            "lt_editor_mode": self._lt_editor_mode,
-            "lt_server_url": self._lt_server_url,
-            "lt_timeout_ms": self._lt_timeout_ms,
-            "lt_picky_mode": self._lt_picky_mode,
-            "lt_locale_map": _dump_lt_language_map(self._lt_locale_map) or "{}",
-            "qa_check_languagetool": self._qa_check_languagetool,
-            "qa_languagetool_max_rows": self._qa_languagetool_max_rows,
-            "qa_languagetool_automark": self._qa_languagetool_automark,
         }
+        _lt_adapter.populate_preferences_dialog_values(self, prefs)
         tm_files: list[dict[str, object]] = []
         if self._ensure_tm_store():
             with contextlib.suppress(Exception):
@@ -2619,51 +2491,13 @@ class MainWindow(QMainWindow):
             self._qa_auto_mark_for_review,
             self._qa_auto_mark_touched_for_review,
         ) = updated_qa
-        previous_qa_lt = (
-            self._qa_check_languagetool,
-            self._qa_languagetool_max_rows,
-            self._qa_languagetool_automark,
-        )
-        self._qa_check_languagetool = bool(
-            values.get("qa_check_languagetool", self._qa_check_languagetool)
-        )
-        self._qa_languagetool_max_rows = _int_from_pref(
-            values.get("qa_languagetool_max_rows", self._qa_languagetool_max_rows),
-            self._qa_languagetool_max_rows,
-            min_value=1,
-            max_value=5000,
-        )
-        self._qa_languagetool_automark = bool(
-            values.get("qa_languagetool_automark", self._qa_languagetool_automark)
-        ) and self._qa_check_languagetool
-        qa_lt_changed = previous_qa_lt != (
-            self._qa_check_languagetool,
-            self._qa_languagetool_max_rows,
-            self._qa_languagetool_automark,
-        )
+        qa_lt_changed = _lt_adapter.apply_runtime_preferences(self, values)
         if (qa_changed or qa_lt_changed) and self._current_model is not None:
             if self._qa_auto_refresh:
                 self._schedule_qa_refresh(immediate=True)
             else:
                 self._set_qa_findings(())
                 self._set_qa_panel_message("QA settings changed. Click Run QA.")
-        self._lt_editor_mode = _normalize_lt_editor_mode(
-            values.get("lt_editor_mode", self._lt_editor_mode)
-        )
-        self._lt_server_url = (
-            str(values.get("lt_server_url", self._lt_server_url)).strip()
-            or _default_lt_server_url()
-        )
-        self._lt_timeout_ms = _normalize_lt_timeout_ms(
-            values.get("lt_timeout_ms", self._lt_timeout_ms)
-        )
-        self._lt_picky_mode = bool(values.get("lt_picky_mode", self._lt_picky_mode))
-        self._lt_locale_map = _load_lt_language_map(
-            values.get("lt_locale_map", _dump_lt_language_map(self._lt_locale_map))
-        )
-        if not self._lt_locale_map:
-            self._lt_locale_map = _draft_lt_language_map(self._locales.keys())
-        self._schedule_languagetool_editor_check(immediate=True)
         _apply_source_ref_preferences_for_window(self, values)
         self._default_root = str(values.get("default_root", "")).strip()
         tm_import_dir = str(values.get("tm_import_dir", "")).strip()
@@ -4872,145 +4706,14 @@ class MainWindow(QMainWindow):
             return
         self._select_match(match)
 
-    def _effective_lt_locale_map(self) -> dict[str, str]:
-        mapping = dict(self._lt_locale_map)
-        drafted = _draft_lt_language_map(self._locales.keys())
-        for locale, language_code in drafted.items():
-            mapping.setdefault(locale, language_code)
-        return mapping
-
-    def _resolve_lt_language_for_path(self, path: Path | None) -> str:
-        locale = self._locale_for_path(path) if path is not None else None
-        return _resolve_lt_language_code(locale or "EN", self._effective_lt_locale_map())
-
-    def _clear_languagetool_editor_state(self, *, status_text: str) -> None:
-        self._lt_last_result = None
-        if hasattr(self, "_detail_translation") and self._detail_translation is not None:
-            self._detail_translation.setExtraSelections([])
-        if (
-            hasattr(self, "_detail_lt_status_label")
-            and self._detail_lt_status_label is not None
-        ):
-            self._detail_lt_status_label.setText(status_text)
-
-    def _current_languagetool_editor_payload(self) -> tuple[Path, int, str] | None:
-        if self._lt_editor_mode == "off":
-            return None
-        if not self._detail_panel.isVisible():
-            return None
-        if self._current_pf is None or self._current_model is None:
-            return None
-        if self._detail_pending_row is not None or self._detail_translation.isReadOnly():
-            return None
-        idx = self.table.currentIndex()
-        if not idx.isValid():
-            return None
-        path = self._current_pf.path
-        row = int(idx.row())
-        text = self._detail_translation.toPlainText()
-        return (path, row, text)
-
-    def _schedule_languagetool_editor_check(self, *, immediate: bool = False) -> None:
-        payload = self._current_languagetool_editor_payload()
-        if payload is None:
-            if self._lt_editor_mode == "off":
-                self._clear_languagetool_editor_state(status_text="LT: off")
-            else:
-                self._clear_languagetool_editor_state(status_text="LT: idle")
-            self._lt_pending_payload = None
-            return
-        self._lt_request_seq += 1
-        request_id = self._lt_request_seq
-        path, row, text = payload
-        self._lt_pending_payload = (request_id, path, row, text)
-        if immediate:
-            if self._lt_debounce_timer.isActive():
-                self._lt_debounce_timer.stop()
-            self._start_languagetool_editor_check()
-            return
-        self._lt_debounce_timer.start(_LT_EDITOR_DEBOUNCE_MS)
-
-    def _start_languagetool_editor_check(self) -> None:
-        pending = self._lt_pending_payload
-        if pending is None:
-            return
-        if self._lt_scan_future is not None and not self._lt_scan_future.done():
-            return
-        request_id, path, row, text = pending
-        current = self._current_languagetool_editor_payload()
-        if current is None:
-            self._lt_pending_payload = None
-            self._clear_languagetool_editor_state(status_text="LT: idle")
-            return
-        if current != (path, row, text):
-            self._lt_pending_payload = None
-            self._schedule_languagetool_editor_check(immediate=True)
-            return
-        if self._lt_scan_pool is None:
-            self._lt_scan_pool = ThreadPoolExecutor(
-                max_workers=1,
-                thread_name_prefix="tzp-lt-editor",
-            )
-        level = _lt_level_for_picky(self._lt_picky_mode)
-        language = self._resolve_lt_language_for_path(path)
-        self._lt_pending_payload = None
-        self._lt_inflight_payload = (request_id, path, row, text)
-        self._detail_lt_status_label.setText("LT: checking")
-        self._lt_scan_future = self._lt_scan_pool.submit(
-            _run_languagetool_check_job,
-            request_id=request_id,
-            path=path,
-            row=row,
-            text=text,
-            server_url=self._lt_server_url,
-            language=language,
-            level=level,
-            timeout_ms=self._lt_timeout_ms,
-        )
-        if not self._lt_scan_timer.isActive():
-            self._lt_scan_timer.start()
-
-    def _poll_languagetool_editor_check(self) -> None:
-        future = self._lt_scan_future
-        if future is None:
-            self._lt_scan_timer.stop()
-            return
-        if not future.done():
-            return
-        self._lt_scan_timer.stop()
-        self._lt_scan_future = None
-        self._lt_inflight_payload = None
-        try:
-            request_id, path, row, text, result = future.result()
-        except Exception:
-            self._clear_languagetool_editor_state(status_text="LT: offline")
-            if self._lt_pending_payload is not None:
-                self._start_languagetool_editor_check()
-            return
-        current = self._current_languagetool_editor_payload()
-        expected = (path, row, text)
-        if current != expected:
-            if self._lt_pending_payload is not None:
-                self._start_languagetool_editor_check()
-            return
-        if request_id < self._lt_request_seq and self._lt_pending_payload is not None:
-            self._start_languagetool_editor_check()
-            return
-        self._apply_languagetool_editor_result(result)
-        if self._lt_pending_payload is not None:
-            self._start_languagetool_editor_check()
-
-    def _apply_languagetool_editor_result(
-        self, result: _LanguageToolCheckResult | None
-    ) -> None:
-        self._lt_last_result = result
-        status_text = _lt_status_text(result)
-        self._detail_lt_status_label.setText(status_text)
-        selections = _build_lt_issue_selections(
-            editor=self._detail_translation,
-            result=result,
-        )
-        self._detail_translation.setExtraSelections(selections)
+    _effective_lt_locale_map = _lt_adapter.effective_locale_map
+    _resolve_lt_language_for_path = _lt_adapter.resolve_language_for_path
+    _clear_languagetool_editor_state = _lt_adapter.clear_editor_state
+    _current_languagetool_editor_payload = _lt_adapter.current_editor_payload
+    _schedule_languagetool_editor_check = _lt_adapter.schedule_editor_check
+    _start_languagetool_editor_check = _lt_adapter.start_editor_check
+    _poll_languagetool_editor_check = _lt_adapter.poll_editor_check
+    _apply_languagetool_editor_result = _lt_adapter.apply_editor_result
 
     def _schedule_qa_refresh(self, *, immediate: bool = False) -> None:
         if not self._qa_auto_refresh:
@@ -5313,22 +5016,15 @@ class MainWindow(QMainWindow):
             qa_auto_refresh=self._qa_auto_refresh,
             qa_auto_mark_for_review=self._qa_auto_mark_for_review,
             qa_auto_mark_touched_for_review=(self._qa_auto_mark_touched_for_review),
-            qa_check_languagetool=self._qa_check_languagetool,
-            qa_languagetool_max_rows=self._qa_languagetool_max_rows,
-            qa_languagetool_automark=self._qa_languagetool_automark,
             last_root=str(self._root),
             last_locales=list(self._selected_locales),
             window_geometry=geometry,
             default_root=self._default_root,
             tm_import_dir=self._tm_import_dir,
-            lt_editor_mode=self._lt_editor_mode,
-            lt_server_url=self._lt_server_url,
-            lt_timeout_ms=self._lt_timeout_ms,
-            lt_picky_mode=self._lt_picky_mode,
-            lt_locale_map=_dump_lt_language_map(self._lt_locale_map) or "{}",
             search_scope=self._search_scope,
             replace_scope=self._replace_scope,
             extras=dict(self._prefs_extras),
+            **_lt_adapter.build_persist_kwargs(self),
         )
 
     def _on_model_data_changed(self, top_left, bottom_right, roles=None) -> None:
@@ -6053,16 +5749,7 @@ class MainWindow(QMainWindow):
         self._set_qa_progress_visible(False)
 
     def _shutdown_languagetool_workers(self) -> None:
-        if self._lt_scan_future is not None:
-            with contextlib.suppress(Exception):
-                self._lt_scan_future.cancel()
-        self._lt_scan_future = None
-        self._lt_pending_payload = None
-        self._lt_inflight_payload = None
-        if self._lt_scan_pool is not None:
-            with contextlib.suppress(Exception):
-                self._lt_scan_pool.shutdown(wait=False, cancel_futures=True)
-        self._lt_scan_pool = None
+        _lt_adapter.shutdown_workers(self)
 
     def _stop_timers(self) -> None:
         timers = [
