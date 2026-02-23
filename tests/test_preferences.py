@@ -21,7 +21,6 @@ def test_load_is_pure_read_for_missing_settings_env(
     assert prefs["qa_check_same_as_source"] is False
     assert prefs["qa_auto_refresh"] is False
     assert prefs["qa_auto_mark_for_review"] is False
-    assert prefs["qa_auto_mark_touched_for_review"] is False
     assert prefs["qa_auto_mark_translated_for_review"] is False
     assert prefs["qa_auto_mark_proofread_for_review"] is False
     assert prefs["search_scope"] == "FILE"
@@ -55,7 +54,6 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert prefs["qa_check_same_as_source"] is False
     assert prefs["qa_auto_refresh"] is False
     assert prefs["qa_auto_mark_for_review"] is False
-    assert prefs["qa_auto_mark_touched_for_review"] is False
     assert prefs["qa_auto_mark_translated_for_review"] is False
     assert prefs["qa_auto_mark_proofread_for_review"] is False
     assert prefs["search_scope"] == "FILE"
@@ -82,7 +80,6 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert "QA_CHECK_SAME_AS_SOURCE=false" in raw
     assert "QA_AUTO_REFRESH=false" in raw
     assert "QA_AUTO_MARK_FOR_REVIEW=false" in raw
-    assert "QA_AUTO_MARK_TOUCHED_FOR_REVIEW=false" in raw
     assert "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=false" in raw
     assert "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=false" in raw
     assert "SEARCH_SCOPE=FILE" in raw
@@ -133,7 +130,6 @@ def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
     assert "QA_CHECK_SAME_AS_SOURCE=false" in raw
     assert "QA_AUTO_REFRESH=false" in raw
     assert "QA_AUTO_MARK_FOR_REVIEW=false" in raw
-    assert "QA_AUTO_MARK_TOUCHED_FOR_REVIEW=false" in raw
     assert "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=false" in raw
     assert "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=false" in raw
     assert "SEARCH_SCOPE=FILE" in raw
@@ -249,3 +245,26 @@ def test_ensure_defaults_normalizes_languagetool_settings(
     assert prefs["qa_check_languagetool"] is True
     assert prefs["qa_languagetool_max_rows"] == 1
     assert prefs["qa_languagetool_automark"] is True
+
+
+def test_ensure_defaults_removes_deprecated_qa_auto_mark_touched_key(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Verify deprecated touched auto-mark key is removed and split defaults are backfilled."""
+    monkeypatch.chdir(tmp_path)
+    cfg_path = tmp_path / ".tzp" / "config" / "settings.env"
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg_path.write_text(
+        "QA_AUTO_MARK_FOR_REVIEW=true\n" "QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true\n",
+        encoding="utf-8",
+    )
+
+    prefs = preferences.ensure_defaults(tmp_path)
+
+    assert prefs["qa_auto_mark_for_review"] is True
+    assert prefs["qa_auto_mark_translated_for_review"] is False
+    assert prefs["qa_auto_mark_proofread_for_review"] is False
+    raw = cfg_path.read_text(encoding="utf-8")
+    assert "QA_AUTO_MARK_TOUCHED_FOR_REVIEW=" not in raw
+    assert "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=false" in raw
+    assert "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=false" in raw

@@ -45,7 +45,6 @@ class LoadedPreferences:
     qa_check_same_as_source: bool
     qa_auto_refresh: bool
     qa_auto_mark_for_review: bool
-    qa_auto_mark_touched_for_review: bool
     qa_auto_mark_translated_for_review: bool
     qa_auto_mark_proofread_for_review: bool
     qa_check_languagetool: bool
@@ -233,16 +232,10 @@ def resolve_qa_preferences(
     """Resolve qa preferences."""
     qa_auto_mark_for_review = bool(values.get("qa_auto_mark_for_review", current[5]))
     qa_auto_mark_translated_for_review = qa_auto_mark_for_review and bool(
-        values.get(
-            "qa_auto_mark_translated_for_review",
-            values.get("qa_auto_mark_touched_for_review", current[6]),
-        )
+        values.get("qa_auto_mark_translated_for_review", current[6])
     )
     qa_auto_mark_proofread_for_review = qa_auto_mark_for_review and bool(
-        values.get(
-            "qa_auto_mark_proofread_for_review",
-            values.get("qa_auto_mark_touched_for_review", current[7]),
-        )
+        values.get("qa_auto_mark_proofread_for_review", current[7])
     )
     updated = (
         bool(values.get("qa_check_trailing", current[0])),
@@ -280,19 +273,10 @@ def normalize_loaded_preferences(
     qa_auto_refresh = bool(raw.get("qa_auto_refresh", False))
     qa_auto_mark_for_review = bool(raw.get("qa_auto_mark_for_review", False))
     qa_auto_mark_translated_for_review = qa_auto_mark_for_review and bool(
-        raw.get(
-            "qa_auto_mark_translated_for_review",
-            raw.get("qa_auto_mark_touched_for_review", False),
-        )
+        raw.get("qa_auto_mark_translated_for_review", False)
     )
     qa_auto_mark_proofread_for_review = qa_auto_mark_for_review and bool(
-        raw.get(
-            "qa_auto_mark_proofread_for_review",
-            raw.get("qa_auto_mark_touched_for_review", False),
-        )
-    )
-    qa_auto_mark_touched_for_review = bool(
-        qa_auto_mark_translated_for_review or qa_auto_mark_proofread_for_review
+        raw.get("qa_auto_mark_proofread_for_review", False)
     )
     qa_check_languagetool = bool(raw.get("qa_check_languagetool", False))
     qa_languagetool_max_rows = normalize_qa_languagetool_max_rows(
@@ -343,7 +327,6 @@ def normalize_loaded_preferences(
         qa_check_same_as_source=qa_check_same_as_source,
         qa_auto_refresh=qa_auto_refresh,
         qa_auto_mark_for_review=qa_auto_mark_for_review,
-        qa_auto_mark_touched_for_review=qa_auto_mark_touched_for_review,
         qa_auto_mark_translated_for_review=qa_auto_mark_translated_for_review,
         qa_auto_mark_proofread_for_review=qa_auto_mark_proofread_for_review,
         qa_check_languagetool=qa_check_languagetool,
@@ -403,9 +386,6 @@ def build_persist_payload(
     qa_auto_mark_proofread_for_review = bool(
         qa_auto_mark_for_review and qa_auto_mark_proofread_for_review
     )
-    qa_auto_mark_touched_for_review = bool(
-        qa_auto_mark_translated_for_review or qa_auto_mark_proofread_for_review
-    )
     return {
         "prompt_write_on_exit": bool(prompt_write_on_exit),
         "wrap_text": bool(wrap_text),
@@ -416,7 +396,6 @@ def build_persist_payload(
         "qa_check_same_as_source": bool(qa_check_same_as_source),
         "qa_auto_refresh": bool(qa_auto_refresh),
         "qa_auto_mark_for_review": bool(qa_auto_mark_for_review),
-        "qa_auto_mark_touched_for_review": qa_auto_mark_touched_for_review,
         "qa_auto_mark_translated_for_review": qa_auto_mark_translated_for_review,
         "qa_auto_mark_proofread_for_review": qa_auto_mark_proofread_for_review,
         "qa_check_languagetool": bool(qa_check_languagetool),

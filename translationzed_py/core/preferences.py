@@ -33,6 +33,8 @@ from translationzed_py.core.languagetool import (
 _BOOL_TRUE = {"1", "true", "yes", "on"}
 _BOOL_FALSE = {"0", "false", "no", "off"}
 _EXTRAS_KEY = "__extras__"
+_DEPRECATED_PARSE_FLAG = "__deprecated_keys_present__"
+_DEPRECATED_ENV_KEYS = {"QA_AUTO_MARK_TOUCHED_FOR_REVIEW"}
 _QA_LT_MAX_ROWS_DEFAULT = 500
 _QA_LT_MAX_ROWS_MIN = 1
 _QA_LT_MAX_ROWS_MAX = 5000
@@ -66,7 +68,6 @@ _DEFAULTS: dict[str, Any] = {
     "qa_check_same_as_source": False,
     "qa_auto_refresh": False,
     "qa_auto_mark_for_review": False,
-    "qa_auto_mark_touched_for_review": False,
     "qa_auto_mark_translated_for_review": False,
     "qa_auto_mark_proofread_for_review": False,
     "last_root": "",
@@ -95,7 +96,6 @@ _REQUIRED_PREF_KEYS = (
     "qa_check_same_as_source",
     "qa_auto_refresh",
     "qa_auto_mark_for_review",
-    "qa_auto_mark_touched_for_review",
     "qa_auto_mark_translated_for_review",
     "qa_auto_mark_proofread_for_review",
     "search_scope",
@@ -212,9 +212,7 @@ def _parse_env(path: Path) -> dict[str, Any]:
         return {}
     out: dict[str, Any] = {}
     extras: dict[str, str] = {}
-    legacy_touched: bool | None = None
-    translated_seen = False
-    proofread_seen = False
+    deprecated_keys_present = False
     try:
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -223,6 +221,9 @@ def _parse_env(path: Path) -> dict[str, Any]:
             key, value = line.split("=", 1)
             key = key.strip()
             value = value.strip().strip('"').strip("'")
+            if key in _DEPRECATED_ENV_KEYS:
+                deprecated_keys_present = True
+                continue
             if key == "PROMPT_WRITE_ON_EXIT":
                 val = value.lower()
                 if val in _BOOL_TRUE:
@@ -277,30 +278,18 @@ def _parse_env(path: Path) -> dict[str, Any]:
                     out["qa_auto_mark_for_review"] = True
                 elif val in _BOOL_FALSE:
                     out["qa_auto_mark_for_review"] = False
-            elif key == "QA_AUTO_MARK_TOUCHED_FOR_REVIEW":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_auto_mark_touched_for_review"] = True
-                    legacy_touched = True
-                elif val in _BOOL_FALSE:
-                    out["qa_auto_mark_touched_for_review"] = False
-                    legacy_touched = False
             elif key == "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW":
                 val = value.lower()
                 if val in _BOOL_TRUE:
                     out["qa_auto_mark_translated_for_review"] = True
-                    translated_seen = True
                 elif val in _BOOL_FALSE:
                     out["qa_auto_mark_translated_for_review"] = False
-                    translated_seen = True
             elif key == "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW":
                 val = value.lower()
                 if val in _BOOL_TRUE:
                     out["qa_auto_mark_proofread_for_review"] = True
-                    proofread_seen = True
                 elif val in _BOOL_FALSE:
                     out["qa_auto_mark_proofread_for_review"] = False
-                    proofread_seen = True
             elif key == "LAST_ROOT":
                 out["last_root"] = value
             elif key == "LAST_LOCALES":
@@ -353,11 +342,8 @@ def _parse_env(path: Path) -> dict[str, Any]:
                 extras[key] = value
     except OSError:
         return {}
-    if legacy_touched is not None:
-        if not translated_seen:
-            out["qa_auto_mark_translated_for_review"] = legacy_touched
-        if not proofread_seen:
-            out["qa_auto_mark_proofread_for_review"] = legacy_touched
+    if deprecated_keys_present:
+        out[_DEPRECATED_PARSE_FLAG] = True
     if extras:
         out[_EXTRAS_KEY] = extras
     return out
@@ -371,6 +357,7 @@ def load(root: Path | None = None) -> dict[str, Any]:
     """
     merged = dict(_DEFAULTS)
     parsed = _parse_env(_existing_config_path(root))
+    _ = bool(parsed.pop(_DEPRECATED_PARSE_FLAG, False))
     extras = dict(parsed.pop(_EXTRAS_KEY, {}))
     merged.update(parsed)
     merged["tm_import_dir"] = _normalize_tm_import_dir(
@@ -408,10 +395,6 @@ def load(root: Path | None = None) -> dict[str, Any]:
         merged.get("qa_auto_mark_for_review", False)
         and merged.get("qa_auto_mark_proofread_for_review", False)
     )
-    merged["qa_auto_mark_touched_for_review"] = bool(
-        merged.get("qa_auto_mark_translated_for_review", False)
-        or merged.get("qa_auto_mark_proofread_for_review", False)
-    )
     if extras:
         merged[_EXTRAS_KEY] = extras
     return merged
@@ -425,6 +408,7 @@ def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
     """
     path = _config_path(root)
     parsed = _parse_env(_existing_config_path(root))
+    deprecated_keys_present = bool(parsed.pop(_DEPRECATED_PARSE_FLAG, False))
     prefs = dict(_DEFAULTS)
     extras = dict(parsed.pop(_EXTRAS_KEY, {}))
     prefs.update(parsed)
@@ -448,9 +432,7 @@ def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
     prefs["qa_languagetool_automark"] = bool(
         prefs.get("qa_languagetool_automark", False)
     )
-    prefs["qa_auto_mark_for_review"] = bool(
-        prefs.get("qa_auto_mark_for_review", False)
-    )
+    prefs["qa_auto_mark_for_review"] = bool(prefs.get("qa_auto_mark_for_review", False))
     prefs["qa_auto_mark_translated_for_review"] = bool(
         prefs.get("qa_auto_mark_for_review", False)
         and prefs.get("qa_auto_mark_translated_for_review", False)
@@ -458,10 +440,6 @@ def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
     prefs["qa_auto_mark_proofread_for_review"] = bool(
         prefs.get("qa_auto_mark_for_review", False)
         and prefs.get("qa_auto_mark_proofread_for_review", False)
-    )
-    prefs["qa_auto_mark_touched_for_review"] = bool(
-        prefs.get("qa_auto_mark_translated_for_review", False)
-        or prefs.get("qa_auto_mark_proofread_for_review", False)
     )
     migrated_tm_dirs = _migrate_legacy_tm_import_dirs(root)
     if extras:
@@ -478,6 +456,7 @@ def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
         not path.exists()
         or any(key not in parsed for key in _REQUIRED_PREF_KEYS)
         or tm_dir_changed
+        or deprecated_keys_present
         or migrated_tm_dirs
     ):
         with contextlib.suppress(OSError):
@@ -500,7 +479,6 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         "QA_CHECK_SAME_AS_SOURCE",
         "QA_AUTO_REFRESH",
         "QA_AUTO_MARK_FOR_REVIEW",
-        "QA_AUTO_MARK_TOUCHED_FOR_REVIEW",
         "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW",
         "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW",
         "LAST_ROOT",
@@ -531,9 +509,6 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         qa_auto_mark_for_review
         and prefs.get("qa_auto_mark_proofread_for_review", False)
     )
-    qa_auto_mark_touched_for_review = bool(
-        qa_auto_mark_translated_for_review or qa_auto_mark_proofread_for_review
-    )
     lines = [
         f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
         f"WRAP_TEXT={'true' if prefs.get('wrap_text', False) else 'false'}",
@@ -555,10 +530,6 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         (
             "QA_AUTO_MARK_FOR_REVIEW="
             f"{'true' if qa_auto_mark_for_review else 'false'}"
-        ),
-        (
-            "QA_AUTO_MARK_TOUCHED_FOR_REVIEW="
-            f"{'true' if qa_auto_mark_touched_for_review else 'false'}"
         ),
         (
             "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW="
@@ -611,7 +582,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     if tm_import_dir:
         lines.append(f"TM_IMPORT_DIR={tm_import_dir}")
     for key, value in extras.items():
-        if key in known_keys:
+        if key in known_keys or key in _DEPRECATED_ENV_KEYS:
             continue
         lines.append(f"{key}={value}")
     lines.append("")

@@ -599,7 +599,9 @@ def test_tm_panel_source_and_translation_previews_are_resizable(tmp_path, qtbot)
     assert win._tm_prefs_btn.icon().isNull() is False
 
 
-def test_side_panel_preference_shortcuts_open_matching_tabs(tmp_path, qtbot, monkeypatch):
+def test_side_panel_preference_shortcuts_open_matching_tabs(
+    tmp_path, qtbot, monkeypatch
+):
     """Verify TM/Search/QA side panels expose shortcuts to corresponding prefs tabs."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
@@ -743,7 +745,6 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
             "qa_check_same_as_source": True,
             "qa_auto_refresh": True,
             "qa_auto_mark_for_review": True,
-            "qa_auto_mark_touched_for_review": True,
             "qa_auto_mark_translated_for_review": True,
             "qa_auto_mark_proofread_for_review": False,
             "lt_editor_mode": "on",
@@ -804,7 +805,6 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert values["qa_auto_mark_for_review"] is False
     assert values["qa_auto_mark_translated_for_review"] is False
     assert values["qa_auto_mark_proofread_for_review"] is False
-    assert values["qa_auto_mark_touched_for_review"] is False
     assert values["lt_editor_mode"] == "off"
     assert values["lt_server_url"] == "http://127.0.0.1:8081"
     assert values["lt_timeout_ms"] == 1234
@@ -822,7 +822,8 @@ def test_preferences_qa_touched_auto_mark_clears_when_base_toggle_off(tmp_path, 
         {
             "tm_import_dir": str(root / ".tzp" / "tms"),
             "qa_auto_mark_for_review": True,
-            "qa_auto_mark_touched_for_review": True,
+            "qa_auto_mark_translated_for_review": True,
+            "qa_auto_mark_proofread_for_review": True,
         },
         tm_files=[],
     )
@@ -841,7 +842,6 @@ def test_preferences_qa_touched_auto_mark_clears_when_base_toggle_off(tmp_path, 
     assert values["qa_auto_mark_for_review"] is False
     assert values["qa_auto_mark_translated_for_review"] is False
     assert values["qa_auto_mark_proofread_for_review"] is False
-    assert values["qa_auto_mark_touched_for_review"] is False
 
 
 def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
@@ -893,7 +893,6 @@ def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
     assert win._qa_auto_mark_for_review is True
     assert win._qa_auto_mark_translated_for_review is True
     assert win._qa_auto_mark_proofread_for_review is False
-    assert win._qa_auto_mark_touched_for_review is True
     assert refresh_calls == [True]
 
 

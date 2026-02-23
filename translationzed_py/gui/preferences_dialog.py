@@ -148,13 +148,6 @@ class PreferencesDialog(QDialog):
                 self._qa_auto_mark_check.isChecked()
                 and self._qa_auto_mark_proofread_check.isChecked()
             ),
-            "qa_auto_mark_touched_for_review": (
-                self._qa_auto_mark_check.isChecked()
-                and (
-                    self._qa_auto_mark_translated_check.isChecked()
-                    or self._qa_auto_mark_proofread_check.isChecked()
-                )
-            ),
             "lt_editor_mode": self._lt_editor_mode_combo.currentData(),
             "lt_server_url": self._lt_server_url_edit.text().strip(),
             "lt_timeout_ms": int(self._lt_timeout_spin.value()),
@@ -163,8 +156,7 @@ class PreferencesDialog(QDialog):
             "qa_check_languagetool": self._qa_lt_check.isChecked(),
             "qa_languagetool_max_rows": int(self._qa_lt_max_rows_spin.value()),
             "qa_languagetool_automark": (
-                self._qa_lt_check.isChecked()
-                and self._qa_lt_automark_check.isChecked()
+                self._qa_lt_check.isChecked() and self._qa_lt_automark_check.isChecked()
             ),
             "theme_mode": self._theme_mode_combo.currentData(),
             "source_reference_fallback_policy": (
@@ -282,16 +274,13 @@ class PreferencesDialog(QDialog):
         self._qa_auto_mark_check.setToolTip(
             "When enabled, rows in Untouched status with QA warnings are set to For review."
         )
-        touched_default = bool(self._prefs.get("qa_auto_mark_touched_for_review", False))
         self._qa_auto_mark_translated_check = QCheckBox(
             "Also mark translated findings as For review",
             widget,
         )
         self._qa_auto_mark_translated_check.setChecked(
             self._qa_auto_mark_check.isChecked()
-            and bool(
-                self._prefs.get("qa_auto_mark_translated_for_review", touched_default)
-            )
+            and bool(self._prefs.get("qa_auto_mark_translated_for_review", False))
         )
         self._qa_auto_mark_translated_check.setToolTip(
             "When enabled, QA auto-mark also affects rows in Translated status."
@@ -302,9 +291,7 @@ class PreferencesDialog(QDialog):
         )
         self._qa_auto_mark_proofread_check.setChecked(
             self._qa_auto_mark_check.isChecked()
-            and bool(
-                self._prefs.get("qa_auto_mark_proofread_for_review", touched_default)
-            )
+            and bool(self._prefs.get("qa_auto_mark_proofread_for_review", False))
         )
         self._qa_auto_mark_proofread_check.setToolTip(
             "When enabled, QA auto-mark also affects rows in Proofread status."
@@ -329,7 +316,9 @@ class PreferencesDialog(QDialog):
             "Include LanguageTool findings in manual QA scans",
             widget,
         )
-        self._qa_lt_check.setChecked(bool(self._prefs.get("qa_check_languagetool", False)))
+        self._qa_lt_check.setChecked(
+            bool(self._prefs.get("qa_check_languagetool", False))
+        )
         self._qa_lt_max_rows_spin = QSpinBox(widget)
         self._qa_lt_max_rows_spin.setRange(1, 5000)
         try:

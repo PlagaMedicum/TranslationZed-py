@@ -123,7 +123,6 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     win._qa_auto_refresh = False
     win._qa_auto_mark_translated_for_review = False
     win._qa_auto_mark_proofread_for_review = False
-    win._qa_auto_mark_touched_for_review = False
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
     model = win.table.model()

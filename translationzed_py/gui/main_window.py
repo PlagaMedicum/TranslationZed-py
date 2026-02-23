@@ -535,7 +535,9 @@ class _CommitPlainTextEdit(QPlainTextEdit):
         if self._skip_release_click_cb:
             self._skip_release_click_cb = False
             return
-        local_pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+        local_pos = (
+            event.position().toPoint() if hasattr(event, "position") else event.pos()
+        )
         global_pos = self.viewport().mapToGlobal(local_pos)
         self._click_cb(local_pos, global_pos)
 
@@ -546,7 +548,9 @@ class _CommitPlainTextEdit(QPlainTextEdit):
         self._skip_release_click_cb = True
         if not self._double_click_cb:
             return
-        local_pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+        local_pos = (
+            event.position().toPoint() if hasattr(event, "position") else event.pos()
+        )
         global_pos = self.viewport().mapToGlobal(local_pos)
         self._double_click_cb(local_pos, global_pos)
 
@@ -697,10 +701,6 @@ class MainWindow(QMainWindow):
         )
         self._qa_auto_mark_proofread_for_review = (
             normalized_prefs.qa_auto_mark_proofread_for_review
-        )
-        self._qa_auto_mark_touched_for_review = (
-            self._qa_auto_mark_translated_for_review
-            or self._qa_auto_mark_proofread_for_review
         )
         _lt_adapter.apply_loaded_preferences(self, normalized_prefs)
         self._default_root = normalized_prefs.default_root
@@ -1430,9 +1430,7 @@ class MainWindow(QMainWindow):
         self.addAction(act_exit)
         act_prefs = QAction("&Preferences…", self)
         act_prefs.setShortcut(QKeySequence.StandardKey.Preferences)
-        act_prefs.triggered.connect(
-            lambda _checked=False: self._open_preferences()
-        )
+        act_prefs.triggered.connect(lambda _checked=False: self._open_preferences())
         self.addAction(act_prefs)
         self.menu_general.addAction(act_open)
         self.menu_general.addAction(act_save)
@@ -1654,7 +1652,9 @@ class MainWindow(QMainWindow):
         self._cancel_pending_languagetool_hint_click()
         self._schedule_languagetool_editor_check()
 
-    def _on_detail_translation_clicked(self, local_pos: QPoint, global_pos: QPoint) -> None:
+    def _on_detail_translation_clicked(
+        self, local_pos: QPoint, global_pos: QPoint
+    ) -> None:
         """Schedule LT hint popup for single-click issue spans."""
         if self._detail_translation.isReadOnly():
             return
@@ -2607,7 +2607,6 @@ class MainWindow(QMainWindow):
             "qa_auto_mark_proofread_for_review": (
                 self._qa_auto_mark_proofread_for_review
             ),
-            "qa_auto_mark_touched_for_review": (self._qa_auto_mark_touched_for_review),
         }
         _lt_adapter.populate_preferences_dialog_values(self, prefs)
         tm_files: list[dict[str, object]] = []
@@ -2727,10 +2726,6 @@ class MainWindow(QMainWindow):
             self._qa_auto_mark_translated_for_review,
             self._qa_auto_mark_proofread_for_review,
         ) = updated_qa
-        self._qa_auto_mark_touched_for_review = (
-            self._qa_auto_mark_translated_for_review
-            or self._qa_auto_mark_proofread_for_review
-        )
         qa_lt_changed = _lt_adapter.apply_runtime_preferences(self, values)
         if (qa_changed or qa_lt_changed) and self._current_model is not None:
             if self._qa_auto_refresh:
@@ -5272,9 +5267,7 @@ class MainWindow(QMainWindow):
             qa_auto_mark_translated_for_review=(
                 self._qa_auto_mark_translated_for_review
             ),
-            qa_auto_mark_proofread_for_review=(
-                self._qa_auto_mark_proofread_for_review
-            ),
+            qa_auto_mark_proofread_for_review=(self._qa_auto_mark_proofread_for_review),
             last_root=str(self._root),
             last_locales=list(self._selected_locales),
             window_geometry=geometry,
@@ -5806,12 +5799,6 @@ class MainWindow(QMainWindow):
         allow_proofread = bool(
             getattr(self, "_qa_auto_mark_proofread_for_review", False)
         )
-        # Legacy compatibility path for tests or stale state using old combined flag.
-        if bool(getattr(self, "_qa_auto_mark_touched_for_review", False)) and not (
-            allow_translated or allow_proofread
-        ):
-            allow_translated = True
-            allow_proofread = True
         rows = tuple(
             row
             for row in rows
