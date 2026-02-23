@@ -56,6 +56,8 @@ _Last updated: 2026-02-23_
 - QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
 - QA same-as-source checks: opt-in `qa.same_source` findings and severity/group label rendering are validated in core + panel tests.
 - QA navigation checks: `F8`/`Shift+F8` next-prev traversal moves between findings with wrap and updates status-bar hint.
+- Sidebar layout invariant: resizing the left splitter must relayout the main
+  table even when Files tree is not the active left tab (TM/Search/QA).
 - LanguageTool integration checks:
   - browser-style picky level request semantics (`default`/`picky`),
   - unsupported-picky fallback to `default` with warning status,

@@ -102,9 +102,9 @@ def test_splitter_move_handlers_persist_sizes_and_schedule_work(
     assert win._detail_last_height is not None
     assert win._detail_last_height >= 70
 
-    win.tree.setVisible(False)
+    win._left_panel.setVisible(False)
     win._on_content_splitter_moved(0, 0)
-    win.tree.setVisible(True)
+    win._left_panel.setVisible(True)
     win._content_splitter.setSizes([240, 480])
     win._on_content_splitter_moved(0, 0)
     assert win._tree_last_width >= 60
@@ -113,6 +113,31 @@ def test_splitter_move_handlers_persist_sizes_and_schedule_work(
     win._tree_width_timer.stop()
     mw.MainWindow._schedule_tree_width_persist(win)
     assert win._tree_width_timer.isActive() is True
+
+
+def test_splitter_move_updates_layout_when_files_tree_tab_is_not_active(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Verify table reflow still runs when active left tab hides the Files tree widget."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win.show()
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        win, "_schedule_tree_width_persist", lambda: calls.append("persist")
+    )
+    monkeypatch.setattr(win, "_apply_table_layout", lambda: calls.append("layout"))
+    monkeypatch.setattr(win, "_schedule_resize_reflow", lambda: calls.append("reflow"))
+    monkeypatch.setattr(win.table, "model", lambda: object(), raising=False)
+
+    win._left_panel.setVisible(True)
+    win.tree.setVisible(False)
+    win._content_splitter.setSizes([260, 540])
+    win._on_content_splitter_moved(0, 0)
+
+    assert calls == ["persist", "layout", "reflow"]
 
 
 def test_initial_tree_width_caps_default_sidebar_to_quarter_of_available_width(

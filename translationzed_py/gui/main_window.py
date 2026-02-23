@@ -1593,7 +1593,9 @@ class MainWindow(QMainWindow):
             self._detail_last_height = max(min_height, sizes[1])
 
     def _on_content_splitter_moved(self, _pos: int, _index: int) -> None:
-        if not self.tree.isVisible():
+        # Splitter changes must relayout table regardless of active left-tab
+        # (Files/TM/Search/QA). Only skip when the whole left panel is hidden.
+        if not self._left_panel.isVisible():
             return
         sizes = self._content_splitter.sizes()
         if len(sizes) >= 2 and sizes[0] > 0:
