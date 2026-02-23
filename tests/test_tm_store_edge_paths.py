@@ -247,6 +247,96 @@ def test_tm_store_bootstraps_missing_legacy_columns_and_exports_tmx(
     store.close()
 
 
+def test_tm_store_upsert_falls_back_when_project_conflict_index_missing(
+    tmp_path: Path,
+) -> None:
+    """Verify project upsert remains functional when legacy DB misses conflict index."""
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    store._conn.execute("DROP INDEX IF EXISTS tm_project_key")
+    store._conn.commit()
+
+    be_path = root / "BE" / "ui.txt"
+    be_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [("k1", "Hello", "Прывітанне")],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(be_path),
+    )
+    store.upsert_project_entries(
+        [("k1", "Hello", "Прывітанне абноўлена")],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(be_path),
+    )
+    rows = store._conn.execute(
+        """
+        SELECT target_text
+        FROM tm_entries
+        WHERE origin = 'project' AND source_locale = ? AND target_locale = ?
+          AND file_path = ? AND key = ?
+        """,
+        ("EN", "BE", str(be_path), "k1"),
+    ).fetchall()
+    assert len(rows) == 1
+    assert rows[0]["target_text"] == "Прывітанне абноўлена"
+    store.close()
+
+
+def test_tm_store_bootstraps_legacy_tm_entries_missing_project_key_columns(
+    tmp_path: Path,
+) -> None:
+    """Verify bootstrap adds file_path/key columns required by project upsert."""
+    root = tmp_path / "root"
+    legacy_db = root / ".tzp-config" / "tm.sqlite"
+    legacy_db.parent.mkdir(parents=True, exist_ok=True)
+    with contextlib.closing(sqlite3.connect(legacy_db)) as conn:
+        conn.execute("""
+            CREATE TABLE tm_entries (
+                id INTEGER PRIMARY KEY,
+                source_text TEXT NOT NULL,
+                target_text TEXT NOT NULL,
+                source_norm TEXT NOT NULL,
+                source_prefix TEXT NOT NULL,
+                source_len INTEGER NOT NULL,
+                source_locale TEXT NOT NULL,
+                target_locale TEXT NOT NULL,
+                origin TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """)
+        conn.execute("""
+            CREATE TABLE tm_import_files (
+                tm_path TEXT PRIMARY KEY,
+                tm_name TEXT NOT NULL,
+                mtime_ns INTEGER NOT NULL,
+                file_size INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                note TEXT NOT NULL DEFAULT '',
+                updated_at INTEGER NOT NULL
+            )
+            """)
+        conn.commit()
+
+    store = TMStore(root)
+    cols = {
+        row["name"]
+        for row in store._conn.execute("PRAGMA table_info(tm_entries)").fetchall()
+    }
+    assert {"file_path", "key"}.issubset(cols)
+    be_path = root / "BE" / "ui.txt"
+    be_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [("k1", "A", "B")],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(be_path),
+    )
+    store.close()
+
+
 def test_tm_store_import_tmx_alias_routes_to_import_tm(tmp_path: Path) -> None:
     """Verify import_tmx delegates to TM import pipeline for TMX files."""
     root = tmp_path / "root"

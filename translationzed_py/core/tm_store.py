@@ -280,6 +280,13 @@ def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
     return tuple(ordered)
 
 
+def _is_project_upsert_conflict_mismatch(exc: sqlite3.OperationalError) -> bool:
+    """Return whether sqlite error indicates missing ON CONFLICT target support."""
+    return "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint" in str(
+        exc
+    )
+
+
 class TMStore:
     """Represent TMStore."""
 
@@ -456,6 +463,10 @@ class TMStore:
             row["name"]
             for row in self._conn.execute("PRAGMA table_info(tm_entries)").fetchall()
         }
+        if "file_path" not in cols:
+            self._conn.execute("ALTER TABLE tm_entries ADD COLUMN file_path TEXT")
+        if "key" not in cols:
+            self._conn.execute("ALTER TABLE tm_entries ADD COLUMN key TEXT")
         if "tm_name" not in cols:
             self._conn.execute("ALTER TABLE tm_entries ADD COLUMN tm_name TEXT")
         if "tm_path" not in cols:
@@ -537,9 +548,52 @@ class TMStore:
             )
         if not rows:
             return 0
-        cur = self._conn.executemany(
-            """
-            INSERT INTO tm_entries (
+        try:
+            cur = self._conn.executemany(
+                """
+                INSERT INTO tm_entries (
+                    source_text,
+                    target_text,
+                    source_norm,
+                    source_prefix,
+                    source_len,
+                    source_locale,
+                    target_locale,
+                    origin,
+                    tm_name,
+                    tm_path,
+                    file_path,
+                    key,
+                    row_status,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(origin, source_locale, target_locale, file_path, key)
+                DO UPDATE SET
+                    source_text=excluded.source_text,
+                    target_text=excluded.target_text,
+                    source_norm=excluded.source_norm,
+                    source_prefix=excluded.source_prefix,
+                    source_len=excluded.source_len,
+                    row_status=excluded.row_status,
+                    updated_at=excluded.updated_at
+                """,
+                rows,
+            )
+            count += cur.rowcount if cur.rowcount >= 0 else 0
+            self._conn.commit()
+            return count
+        except sqlite3.OperationalError as exc:
+            if not _is_project_upsert_conflict_mismatch(exc):
+                raise
+            return self._upsert_project_entries_fallback(rows)
+
+    def _upsert_project_entries_fallback(
+        self, rows: list[tuple[object, ...]]
+    ) -> int:
+        """Compatibility fallback for stores missing the expected upsert constraint."""
+        count = 0
+        for row in rows:
+            (
                 source_text,
                 target_text,
                 source_norm,
@@ -548,26 +602,70 @@ class TMStore:
                 source_locale,
                 target_locale,
                 origin,
-                tm_name,
-                tm_path,
+                _tm_name,
+                _tm_path,
                 file_path,
                 key,
                 row_status,
-                updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(origin, source_locale, target_locale, file_path, key)
-            DO UPDATE SET
-                source_text=excluded.source_text,
-                target_text=excluded.target_text,
-                source_norm=excluded.source_norm,
-                source_prefix=excluded.source_prefix,
-                source_len=excluded.source_len,
-                row_status=excluded.row_status,
-                updated_at=excluded.updated_at
-            """,
-            rows,
-        )
-        count += cur.rowcount if cur.rowcount >= 0 else 0
+                updated_at,
+            ) = row
+            cur = self._conn.execute(
+                """
+                UPDATE tm_entries
+                SET
+                    source_text = ?,
+                    target_text = ?,
+                    source_norm = ?,
+                    source_prefix = ?,
+                    source_len = ?,
+                    row_status = ?,
+                    updated_at = ?
+                WHERE origin = ?
+                  AND source_locale = ?
+                  AND target_locale = ?
+                  AND file_path IS ?
+                  AND key IS ?
+                """,
+                (
+                    source_text,
+                    target_text,
+                    source_norm,
+                    source_prefix,
+                    source_len,
+                    row_status,
+                    updated_at,
+                    origin,
+                    source_locale,
+                    target_locale,
+                    file_path,
+                    key,
+                ),
+            )
+            if cur.rowcount > 0:
+                count += cur.rowcount
+                continue
+            self._conn.execute(
+                """
+                INSERT INTO tm_entries (
+                    source_text,
+                    target_text,
+                    source_norm,
+                    source_prefix,
+                    source_len,
+                    source_locale,
+                    target_locale,
+                    origin,
+                    tm_name,
+                    tm_path,
+                    file_path,
+                    key,
+                    row_status,
+                    updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                row,
+            )
+            count += 1
         self._conn.commit()
         return count
 
