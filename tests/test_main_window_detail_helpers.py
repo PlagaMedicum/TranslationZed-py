@@ -10,6 +10,12 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
 
+from translationzed_py.core.languagetool import (
+    LT_LEVEL_DEFAULT,
+    LT_STATUS_OK,
+    LanguageToolCheckResult,
+    LanguageToolMatch,
+)
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
 
@@ -202,3 +208,128 @@ def test_sync_detail_editors_uses_pending_mode_for_large_rows(
 
     win._sync_detail_editors()
     assert pending_calls == [0]
+
+
+class _DoneFuture:
+    """Small done future stub for LT editor poll tests."""
+
+    def __init__(self, payload) -> None:  # type: ignore[no-untyped-def]
+        self._payload = payload
+
+    def done(self) -> bool:
+        return True
+
+    def result(self):  # type: ignore[no-untyped-def]
+        return self._payload
+
+
+def test_languagetool_editor_applies_status_and_underlines(
+    qtbot,
+    tmp_path,
+) -> None:
+    """Verify LT editor applies underline selections and status transitions."""
+    win, _root = _open_window_with_current_file(qtbot, tmp_path)
+    win._lt_editor_mode = "on"
+
+    issue_result = LanguageToolCheckResult(
+        status=LT_STATUS_OK,
+        matches=(
+            LanguageToolMatch(
+                offset=0,
+                length=2,
+                message="Issue",
+                replacements=(),
+                rule_id="R1",
+                category_id="GRAMMAR",
+                issue_type="grammar",
+            ),
+        ),
+        used_level=LT_LEVEL_DEFAULT,
+        fallback_used=False,
+        warning="",
+        error="",
+    )
+    win._apply_languagetool_editor_result(issue_result)
+    assert win._detail_lt_status_label.text() == "LT: issues:1"
+    assert len(win._detail_translation.extraSelections()) == 1
+
+    ok_result = LanguageToolCheckResult(
+        status=LT_STATUS_OK,
+        matches=(),
+        used_level=LT_LEVEL_DEFAULT,
+        fallback_used=False,
+        warning="",
+        error="",
+    )
+    win._apply_languagetool_editor_result(ok_result)
+    assert win._detail_lt_status_label.text() == "LT: ok"
+    assert win._detail_translation.extraSelections() == []
+
+    fallback_result = LanguageToolCheckResult(
+        status=LT_STATUS_OK,
+        matches=(),
+        used_level=LT_LEVEL_DEFAULT,
+        fallback_used=True,
+        warning="Picky unsupported by server; using default level.",
+        error="",
+    )
+    win._apply_languagetool_editor_result(fallback_result)
+    assert win._detail_lt_status_label.text() == "LT: picky unsupported (default used)"
+
+
+def test_languagetool_editor_schedule_uses_latest_pending_payload(
+    qtbot,
+    tmp_path,
+) -> None:
+    """Verify LT editor debounced scheduling keeps only latest payload state."""
+    win, _root = _open_window_with_current_file(qtbot, tmp_path)
+    win._lt_editor_mode = "on"
+    win._detail_translation.setPlainText("first")
+    win._schedule_languagetool_editor_check()
+    first_pending = win._lt_pending_payload
+    assert first_pending is not None
+
+    win._detail_translation.setPlainText("second")
+    win._schedule_languagetool_editor_check()
+    second_pending = win._lt_pending_payload
+    assert second_pending is not None
+    assert second_pending[0] > first_pending[0]
+    assert second_pending[3] == "second"
+
+
+def test_languagetool_editor_poll_ignores_stale_results(
+    qtbot,
+    tmp_path,
+) -> None:
+    """Verify LT editor poll discards stale async results for old text."""
+    win, _root = _open_window_with_current_file(qtbot, tmp_path)
+    win._lt_editor_mode = "on"
+    current_path = win._current_pf.path
+    win._detail_translation.setPlainText("new text")
+    win._lt_pending_payload = None
+    if win._lt_debounce_timer.isActive():
+        win._lt_debounce_timer.stop()
+    win._detail_lt_status_label.setText("LT: idle")
+
+    stale_result = LanguageToolCheckResult(
+        status=LT_STATUS_OK,
+        matches=(
+            LanguageToolMatch(
+                offset=0,
+                length=3,
+                message="Old issue",
+                replacements=(),
+                rule_id="R1",
+                category_id="GRAMMAR",
+                issue_type="grammar",
+            ),
+        ),
+        used_level=LT_LEVEL_DEFAULT,
+        fallback_used=False,
+        warning="",
+        error="",
+    )
+    win._lt_scan_future = _DoneFuture((1, current_path, 0, "old text", stale_result))
+    win._poll_languagetool_editor_check()
+    assert win._detail_lt_status_label.text() == "LT: idle"
+    assert win._detail_translation.extraSelections() == []
