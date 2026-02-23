@@ -8,7 +8,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QListWidgetItem, QMessageBox, QSplitter
+from PySide6.QtWidgets import QLabel, QListWidgetItem, QMessageBox, QSplitter
 
 from translationzed_py.core import preferences
 from translationzed_py.core.model import Status
@@ -574,6 +574,24 @@ def test_tm_panel_source_and_translation_previews_are_resizable(tmp_path, qtbot)
         win._tm_list.item(0).text()
         == "Select row to see Translation Memory suggestions."
     )
+    tm_header_layout = win._tm_panel.layout().itemAt(0).layout()
+    assert tm_header_layout is not None
+    header_widgets = [
+        tm_header_layout.itemAt(i).widget() for i in range(tm_header_layout.count())
+    ]
+    assert any(
+        isinstance(widget, QLabel) and widget.text() == "Min score"
+        for widget in header_widgets
+    )
+    prefs_index = next(
+        i for i, widget in enumerate(header_widgets) if widget is win._tm_prefs_btn
+    )
+    rebuild_index = next(
+        i
+        for i, widget in enumerate(header_widgets)
+        if widget is win._tm_rebuild_side_btn
+    )
+    assert prefs_index < rebuild_index
     assert win._tm_origin_project_cb.text() == "Project"
     assert win._tm_origin_import_cb.text() == "Import"
     assert win._tm_origin_project_cb.icon().isNull() is True
