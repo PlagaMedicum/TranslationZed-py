@@ -412,7 +412,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 ┌─Detail editors (optional, Poedit-style)─────────────┐
 │ Source (read‑only, scrollable, multi‑line)          │
 │ Translation (editable, scrollable, multi‑line)      │
-│ Locale variants (read-only: locale/value/status)    │
+│ Compact mode: no dedicated locale-variants block     │
 └────────────────────────────────────────────────────┘
 ┌─Status bar───────────────────────────────────────────────────────────────────┐
 │ [String editor ⌄] "Saved 12:34:56" | Row 123 / 450 | BE/sub/dir/file.txt        │

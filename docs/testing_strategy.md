@@ -374,9 +374,10 @@ They include:
 - TM preferences service: action parsing + apply pipeline (copy/remove/enable-disable), plus GUI
   integration tests for deletion confirmation behavior.
 - TM rebuild service: locale collection, rebuild ingestion, and status message formatting.
-- Cross-locale variants preview: selected key shows other opened locales only
-  (locale/value/compact status tag), excludes current locale, keeps session
-  locale order, and renders explicit empty state.
+- Cross-locale variant context cache: selected key computes other opened locales
+  only (locale/value/compact status tag), excludes current locale, and keeps
+  session locale order; this cache is covered even though compact TM UI does not
+  show a dedicated locale-variants list.
 - Save/exit orchestration service: `Write Original` and close-prompt decision flow
   plus save-batch sequencing/failure aggregation policy
   (`core.save_exit_flow` unit tests).

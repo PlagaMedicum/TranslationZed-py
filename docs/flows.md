@@ -119,7 +119,7 @@ User presses Enter in search box (or F3 / Shift+F3)
 
 ---
 
-## 8) TM Query + Locale Variants Context
+## 8) TM Query + Cross-Locale Context
 
 ```
 User selects row (TM panel active)
@@ -134,9 +134,8 @@ User selects row (TM panel active)
 
 Row selection change (multiple locales opened)
   -> collect same key in other opened locales
-  -> render read-only locale variants list:
-       session-order locale -> value + compact status tag (`U/T/FR/P`)
-  -> if none found: explicit empty-state message
+  -> keep session-order locale -> value + compact status tag (`U/T/FR/P`)
+     in internal context cache (no dedicated locale-variants UI block in compact TM panel)
 ```
 
 ---

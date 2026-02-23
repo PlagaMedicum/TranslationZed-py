@@ -548,9 +548,10 @@ if dirty_files and not prompt_save():
   to keep highlight/QA semantics aligned (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes).
   QA perf regression smoke is budgeted on committed large fixtures (`SurvivalGuide`,
   `Recorded_Media`), and QA refresh is guaranteed non-mutating until explicit save.
-- For sessions with multiple opened target locales, UI exposes a read-only
-  cross-locale variants preview for the current key (locale, value, compact
-  status tag), ordered by current session locale order.
+- For sessions with multiple opened target locales, runtime still computes
+  cross-locale variant context for the current key (ordered by session locale
+  order), but TM panel compact mode does not render a dedicated locale-variants
+  UI block.
 - Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b, UC-13l, UC-13m.
 
 ### 5.9.1  UI Guidelines (GNOME + KDE)
