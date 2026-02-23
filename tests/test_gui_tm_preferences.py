@@ -8,7 +8,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QListWidgetItem, QMessageBox
+from PySide6.QtWidgets import QLabel, QListWidgetItem, QMessageBox, QSplitter
 
 from translationzed_py.core import preferences
 from translationzed_py.core.model import Status
@@ -547,10 +547,10 @@ def test_tm_apply_keeps_status_and_is_single_undo_step(tmp_path, qtbot, monkeypa
     assert model.data(status_index, Qt.EditRole) == Status.TRANSLATED
 
 
-def test_tm_panel_shows_cross_locale_variants_in_session_order(
+def test_tm_panel_keeps_cross_locale_variants_in_session_order(
     tmp_path, qtbot, monkeypatch
 ):
-    """Verify tm panel shows cross locale variants in session order."""
+    """Verify tm locale variant cache keeps session order for internal use."""
     monkeypatch.chdir(tmp_path)
     root = tmp_path / "proj"
     for loc in ("EN", "BE", "RU", "KO"):
@@ -577,6 +577,23 @@ def test_tm_panel_shows_cross_locale_variants_in_session_order(
     assert win._tm_variants_list.count() == 2
     assert win._tm_variants_list.item(0).text().startswith("RU ·")
     assert win._tm_variants_list.item(1).text().startswith("KO ·")
+    assert win._tm_panel.layout().indexOf(win._tm_variants_list) == -1
+    labels = [label.text() for label in win._tm_panel.findChildren(QLabel)]
+    assert "Locale variants" not in labels
+
+
+def test_tm_panel_source_and_translation_previews_are_resizable(tmp_path, qtbot):
+    """Verify tm panel uses splitters to make previews resizable."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    assert isinstance(win._tm_content_splitter, QSplitter)
+    assert isinstance(win._tm_preview_splitter, QSplitter)
+    assert win._tm_content_splitter.count() == 2
+    assert win._tm_preview_splitter.count() == 2
+    assert win._tm_source_preview.maximumHeight() > 1000
+    assert win._tm_target_preview.maximumHeight() > 1000
 
 
 def test_tm_bootstrap_rebuild_runs_even_when_store_has_entries(
