@@ -319,6 +319,8 @@ _LT_HINT_MAX_REPLACEMENTS = 6
 _PREF_TAB_SEARCH = "search"
 _PREF_TAB_QA = "qa"
 _PREF_TAB_TM = "tm"
+_TM_PLACEHOLDER_ROLE = int(Qt.UserRole) + 7
+_TM_DEFAULT_PLACEHOLDER = "Select row to see Translation Memory suggestions."
 
 
 def _in_test_mode() -> bool:
@@ -1055,8 +1057,6 @@ class MainWindow(QMainWindow):
         tm_layout = QVBoxLayout(self._tm_panel)
         tm_layout.setContentsMargins(3, 0, 3, 3)
         tm_layout.setSpacing(3)
-        self._tm_status_label = QLabel("Select row for TM suggestions.")
-        self._tm_status_label.setWordWrap(False)
         tm_header = QHBoxLayout()
         tm_header.setContentsMargins(0, 0, 0, 0)
         tm_header.setSpacing(4)
@@ -1084,7 +1084,6 @@ class MainWindow(QMainWindow):
         self._tm_origin_import_cb.toggled.connect(self._on_tm_filters_changed)
         tm_header.addWidget(self._tm_origin_import_cb)
         tm_header.addStretch(1)
-        tm_header.addWidget(self._tm_status_label, 1)
         self._tm_rebuild_side_btn = QToolButton(self._tm_panel)
         self._tm_rebuild_side_btn.setAutoRaise(True)
         self._tm_rebuild_side_btn.setIcon(
@@ -1109,6 +1108,7 @@ class MainWindow(QMainWindow):
         self._tm_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._tm_list.itemSelectionChanged.connect(self._update_tm_apply_state)
         self._tm_list.itemDoubleClicked.connect(self._on_tm_item_double_clicked)
+        self._set_tm_list_placeholder(_TM_DEFAULT_PLACEHOLDER)
         self._tm_source_preview = QPlainTextEdit(self._tm_panel)
         self._tm_source_preview.setReadOnly(True)
         self._tm_source_preview.setPlaceholderText("TM source (full text)")
@@ -5255,6 +5255,15 @@ class MainWindow(QMainWindow):
     def _set_tm_progress_visible(self, visible: bool) -> None:
         self._tm_progress.setVisible(bool(visible))
 
+    def _set_tm_list_placeholder(self, text: str) -> None:
+        """Show a non-selectable placeholder row inside the TM results list."""
+        self._tm_list.clear()
+        message = str(text).strip() or _TM_DEFAULT_PLACEHOLDER
+        item = QListWidgetItem(message)
+        item.setFlags(Qt.ItemIsEnabled)
+        item.setData(_TM_PLACEHOLDER_ROLE, True)
+        self._tm_list.insertItem(0, item)
+
     def _update_tm_apply_state(self) -> None:
         items = self._tm_list.selectedItems()
         match = items[0].data(Qt.UserRole) if items else None
@@ -5392,8 +5401,7 @@ class MainWindow(QMainWindow):
         if plan.mode == "cached" and plan.matches is not None:
             self._show_tm_matches(plan.matches)
             return
-        self._tm_status_label.setText(plan.message)
-        self._tm_list.clear()
+        self._set_tm_list_placeholder(plan.message)
         self._tm_apply_btn.setEnabled(False)
         self._set_tm_preview(
             self._tm_workflow.build_selection_plan(match=None, lookup=None)
@@ -5444,7 +5452,7 @@ class MainWindow(QMainWindow):
         try:
             matches = future.result()
         except Exception:
-            self._tm_status_label.setText("TM lookup failed.")
+            self._set_tm_list_placeholder("TM lookup failed.")
             self._tm_apply_btn.setEnabled(False)
             return
         lookup = self._current_tm_lookup()
@@ -5466,8 +5474,8 @@ class MainWindow(QMainWindow):
             source_preview_limit=60,
             target_preview_limit=80,
         )
-        self._tm_status_label.setText(view.message)
         if not view.items:
+            self._set_tm_list_placeholder(view.message)
             self._tm_apply_btn.setEnabled(False)
             self._set_tm_preview(
                 self._tm_workflow.build_selection_plan(match=None, lookup=None)
@@ -5481,6 +5489,7 @@ class MainWindow(QMainWindow):
         if self._tm_list.count():
             self._tm_list.setCurrentRow(0)
         else:
+            self._set_tm_list_placeholder(view.message)
             self._set_tm_preview(
                 self._tm_workflow.build_selection_plan(match=None, lookup=None)
             )

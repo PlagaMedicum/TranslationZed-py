@@ -569,7 +569,11 @@ def test_tm_panel_source_and_translation_previews_are_resizable(tmp_path, qtbot)
     assert win._tm_target_label.text() == "TM Translation"
     assert win._tm_source_preview.maximumHeight() > 1000
     assert win._tm_target_preview.maximumHeight() > 1000
-    assert win._tm_status_label.text() == "Select row for TM suggestions."
+    assert win._tm_list.count() == 1
+    assert (
+        win._tm_list.item(0).text()
+        == "Select row to see Translation Memory suggestions."
+    )
     assert win._tm_origin_project_cb.text() == "Project"
     assert win._tm_origin_import_cb.text() == "Import"
     assert win._tm_origin_project_cb.icon().isNull() is True

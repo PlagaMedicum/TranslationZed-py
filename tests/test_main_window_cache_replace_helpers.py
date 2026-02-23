@@ -473,7 +473,8 @@ def test_tm_query_poll_and_show_matches_cover_timer_failure_and_accept_paths(
     win._tm_query_future = _ErrorFuture()  # type: ignore[assignment]
     win._tm_query_key = "k"
     win._poll_tm_query()
-    assert win._tm_status_label.text() == "TM lookup failed."
+    assert win._tm_list.count() == 1
+    assert win._tm_list.item(0).text() == "TM lookup failed."
     assert win._tm_apply_btn.isEnabled() is False
 
     shown: list[list[str]] = []
@@ -524,7 +525,8 @@ def test_tm_query_poll_and_show_matches_cover_timer_failure_and_accept_paths(
     )
     win._tm_workflow = _EmptyViewWorkflow()  # type: ignore[assignment]
     win._show_tm_matches([])
-    assert win._tm_status_label.text() == "No matches"
+    assert win._tm_list.count() == 1
+    assert win._tm_list.item(0).text() == "No matches"
     assert win._tm_apply_btn.isEnabled() is False
     assert preview_calls == ["preview-plan"]
 
@@ -999,7 +1001,8 @@ def test_show_tm_matches_and_show_resize_guard_paths(
     monkeypatch.setattr(win, "_tm_query_policy", lambda: object())
     win._tm_workflow = _Workflow()  # type: ignore[assignment]
     win._show_tm_matches([])
-    assert win._tm_status_label.text() == "Has candidate"
+    assert win._tm_list.count() == 1
+    assert win._tm_list.item(0).text() == "Has candidate"
     assert win._tm_apply_btn.isEnabled() is False
     assert preview_calls == ["fallback-preview"]
 
