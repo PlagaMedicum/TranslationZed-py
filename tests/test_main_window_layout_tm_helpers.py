@@ -118,7 +118,7 @@ def test_splitter_move_handlers_persist_sizes_and_schedule_work(
 def test_splitter_move_updates_layout_when_files_tree_tab_is_not_active(
     qtbot, tmp_path, monkeypatch
 ) -> None:
-    """Verify table reflow still runs when active left tab hides the Files tree widget."""
+    """Verify table reflow still runs on TM/Search/QA tabs where Files tree is hidden."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -133,11 +133,17 @@ def test_splitter_move_updates_layout_when_files_tree_tab_is_not_active(
     monkeypatch.setattr(win.table, "model", lambda: object(), raising=False)
 
     win._left_panel.setVisible(True)
-    win.tree.setVisible(False)
     win._content_splitter.setSizes([260, 540])
-    win._on_content_splitter_moved(0, 0)
-
-    assert calls == ["persist", "layout", "reflow"]
+    for idx in (
+        mw._LEFT_PANEL_TM,
+        mw._LEFT_PANEL_SEARCH,
+        mw._LEFT_PANEL_QA,
+    ):
+        calls.clear()
+        win._left_stack.setCurrentIndex(idx)
+        assert win.tree.isVisible() is False
+        win._on_content_splitter_moved(0, 0)
+        assert calls == ["persist", "layout", "reflow"]
 
 
 def test_initial_tree_width_caps_default_sidebar_to_quarter_of_available_width(
