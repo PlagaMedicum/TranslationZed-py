@@ -113,8 +113,8 @@ def test_apply_preferences_updates_state_and_triggers_follow_up_actions(
         mw,
         "_resolve_qa_preferences",
         lambda _values, current: (
-            (False, False, False, False, False, False, False),
-            current != (False, False, False, False, False, False, False),
+            (False, False, False, False, False, False, False, False),
+            current != (False, False, False, False, False, False, False, False),
         ),
     )
     monkeypatch.setattr(
