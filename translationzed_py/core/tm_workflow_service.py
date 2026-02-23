@@ -76,26 +76,6 @@ class TMSuggestionsView:
 
 
 @dataclass(frozen=True, slots=True)
-class TMLocaleVariantItem:
-    """Represent TMLocaleVariantItem."""
-
-    locale_code: str
-    locale_name: str
-    status_tag: str
-    value: str
-    label: str
-    tooltip_html: str
-
-
-@dataclass(frozen=True, slots=True)
-class TMLocaleVariantsView:
-    """Represent TMLocaleVariantsView."""
-
-    message: str
-    items: tuple[TMLocaleVariantItem, ...]
-
-
-@dataclass(frozen=True, slots=True)
 class TMQueryRequest:
     """Represent TMQueryRequest."""
 
@@ -637,35 +617,6 @@ class TMWorkflowService:
             for match in filtered
         )
         return TMSuggestionsView(message="TM suggestions", items=items)
-
-    def build_locale_variants_view(
-        self,
-        *,
-        variants: list[tuple[str, str, str, int | None]],
-        preview_limit: int = 80,
-    ) -> TMLocaleVariantsView:
-        """Build locale variants view."""
-        if not variants:
-            return TMLocaleVariantsView(
-                message="No locale variants available.",
-                items=(),
-            )
-        items = tuple(
-            TMLocaleVariantItem(
-                locale_code=locale_code,
-                locale_name=locale_name,
-                status_tag=_status_tag(status),
-                value=value,
-                label=(
-                    f"{locale_code} · {locale_name} [{_status_tag(status)}] · "
-                    f"{_truncate_text(value, preview_limit)}"
-                ),
-                tooltip_html=html.escape(value),
-            )
-            for locale_code, locale_name, value, status in variants
-        )
-        return TMLocaleVariantsView(message="Locale variants", items=items)
-
 
 def query_terms(source_text: str) -> list[str]:
     """Execute query terms."""

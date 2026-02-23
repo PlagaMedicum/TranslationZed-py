@@ -566,7 +566,6 @@ class MainWindow(QMainWindow):
         self._open_flow_depth = 0
         self._files_by_locale: dict[str, list[Path]] = {}
         self._en_cache: dict[Path, ParsedFile] = {}
-        self._locale_variant_pf_cache: dict[Path, tuple[int, ParsedFile]] = {}
         self._child_windows: list[MainWindow] = []
         self._tm_store: TMStore | None = None
         self._tm_workflow = _TMWorkflowService(cache_limit=128)
@@ -1078,33 +1077,20 @@ class MainWindow(QMainWindow):
         self._tm_target_preview.setReadOnly(True)
         self._tm_target_preview.setPlaceholderText("TM translation (full text)")
         self._tm_target_preview.setMinimumHeight(56)
-        self._tm_variants_list = QListWidget(self._tm_panel)
-        self._tm_variants_list.setSelectionMode(QAbstractItemView.NoSelection)
-        self._tm_variants_list.setFocusPolicy(Qt.NoFocus)
-        self._tm_variants_list.setVisible(False)
-        tm_source_container = QWidget(self._tm_panel)
-        tm_source_layout = QVBoxLayout(tm_source_container)
-        tm_source_layout.setContentsMargins(0, 0, 0, 0)
-        tm_source_layout.setSpacing(2)
-        tm_source_layout.addWidget(QLabel("Source", tm_source_container))
-        tm_source_layout.addWidget(self._tm_source_preview)
-        tm_target_container = QWidget(self._tm_panel)
-        tm_target_layout = QVBoxLayout(tm_target_container)
-        tm_target_layout.setContentsMargins(0, 0, 0, 0)
-        tm_target_layout.setSpacing(2)
-        tm_target_layout.addWidget(QLabel("Translation", tm_target_container))
-        tm_target_layout.addWidget(self._tm_target_preview)
-        self._tm_preview_splitter = QSplitter(Qt.Vertical, self._tm_panel)
-        self._tm_preview_splitter.setChildrenCollapsible(False)
-        self._tm_preview_splitter.addWidget(tm_source_container)
-        self._tm_preview_splitter.addWidget(tm_target_container)
-        self._tm_preview_splitter.setStretchFactor(0, 1)
-        self._tm_preview_splitter.setStretchFactor(1, 1)
-        self._tm_preview_splitter.setSizes([92, 92])
+        self._tm_preview_container = QWidget(self._tm_panel)
+        tm_preview_layout = QVBoxLayout(self._tm_preview_container)
+        tm_preview_layout.setContentsMargins(0, 0, 0, 0)
+        tm_preview_layout.setSpacing(2)
+        self._tm_source_label = QLabel("TM Source", self._tm_preview_container)
+        self._tm_target_label = QLabel("TM Translation", self._tm_preview_container)
+        tm_preview_layout.addWidget(self._tm_source_label)
+        tm_preview_layout.addWidget(self._tm_source_preview, 1)
+        tm_preview_layout.addWidget(self._tm_target_label)
+        tm_preview_layout.addWidget(self._tm_target_preview, 1)
         self._tm_content_splitter = QSplitter(Qt.Vertical, self._tm_panel)
         self._tm_content_splitter.setChildrenCollapsible(False)
         self._tm_content_splitter.addWidget(self._tm_list)
-        self._tm_content_splitter.addWidget(self._tm_preview_splitter)
+        self._tm_content_splitter.addWidget(self._tm_preview_container)
         self._tm_content_splitter.setStretchFactor(0, 5)
         self._tm_content_splitter.setStretchFactor(1, 3)
         self._tm_content_splitter.setSizes([320, 180])
@@ -5196,149 +5182,6 @@ class MainWindow(QMainWindow):
             target_locale=locale,
         )
 
-    def _current_tm_key(self) -> str | None:
-        if not (self._current_model and self._current_pf):
-            return None
-        current = self.table.currentIndex()
-        if not current.isValid():
-            return None
-        key_index = self._current_model.index(current.row(), 0)
-        key = str(key_index.data(Qt.EditRole) or "").strip()
-        return key or None
-
-    def _variant_path_for_locale(
-        self, path: Path, *, from_locale: str, to_locale: str
-    ) -> Path | None:
-        locale_root = self._root / from_locale
-        try:
-            rel = path.relative_to(locale_root)
-        except ValueError:
-            try:
-                rel_full = path.relative_to(self._root)
-                if rel_full.parts and rel_full.parts[0] == from_locale:
-                    rel = Path(*rel_full.parts[1:])
-                else:
-                    return None
-            except ValueError:
-                return None
-        candidate = self._root / to_locale / rel
-        if candidate.exists():
-            return candidate
-        stem = rel.stem
-        from_tokens = (from_locale, from_locale.replace(" ", "_"))
-        to_tokens = (to_locale, to_locale.replace(" ", "_"))
-        for from_token in from_tokens:
-            suffix = f"_{from_token}"
-            if not stem.endswith(suffix):
-                continue
-            stem_prefix = stem[: -len(suffix)]
-            for to_token in to_tokens:
-                alt = rel.with_name(f"{stem_prefix}_{to_token}{rel.suffix}")
-                alt_path = self._root / to_locale / alt
-                if alt_path.exists():
-                    return alt_path
-        return None
-
-    def _load_locale_variant_pf(self, path: Path, locale: str) -> ParsedFile | None:
-        try:
-            mtime_ns = path.stat().st_mtime_ns
-        except OSError:
-            return None
-        cached = self._locale_variant_pf_cache.get(path)
-        if cached is not None and cached[0] == mtime_ns:
-            return cached[1]
-        meta = self._locales.get(locale)
-        encoding = meta.charset if meta else "utf-8"
-        try:
-            pf = (
-                parse_lazy(path, encoding=encoding)
-                if self._should_parse_lazy(path)
-                else parse(path, encoding=encoding)
-            )
-        except Exception:
-            return None
-        self._locale_variant_pf_cache[path] = (mtime_ns, pf)
-        return pf
-
-    def _entry_for_key(self, entries: Sequence[Entry], key: str) -> Entry | None:
-        if hasattr(entries, "index_by_hash") and hasattr(entries, "meta_at"):
-            key_hash = int(xxhash.xxh64(key.encode("utf-8")).intdigest())
-            index_by_hash = entries.index_by_hash(bits=64)
-            for idx in index_by_hash.get(key_hash, []):
-                meta = entries.meta_at(idx)
-                if meta.key == key:
-                    return entries[idx]
-            return None
-        if hasattr(entries, "key_at"):
-            for idx in range(len(entries)):
-                if entries.key_at(idx) == key:
-                    return entries[idx]
-            return None
-        for entry in entries:
-            if entry.key == key:
-                return entry
-        return None
-
-    def _variant_value_and_status(self, path: Path, entry: Entry) -> tuple[str, int]:
-        value = entry.value or ""
-        status = int(entry.status)
-        cache_map = _read_status_cache(self._root, path)
-        if cache_map:
-            key_hash = self._hash_for_cache(entry, cache_map)
-            rec = cache_map.get(key_hash)
-            if rec is not None:
-                if rec.value is not None:
-                    value = rec.value
-                status = int(rec.status)
-        return value, status
-
-    def _collect_tm_locale_variants(self) -> list[tuple[str, str, str, int]]:
-        if not (self._current_pf and self._current_model):
-            return []
-        key = self._current_tm_key()
-        if not key:
-            return []
-        current_path = self._current_pf.path
-        current_locale = self._locale_for_path(current_path)
-        if not current_locale:
-            return []
-        out: list[tuple[str, str, str, int]] = []
-        for locale in self._selected_locales:
-            if locale in {current_locale, "EN"}:
-                continue
-            variant_path = self._variant_path_for_locale(
-                current_path,
-                from_locale=current_locale,
-                to_locale=locale,
-            )
-            if variant_path is None:
-                continue
-            variant_pf = self._load_locale_variant_pf(variant_path, locale)
-            if variant_pf is None:
-                continue
-            entry = self._entry_for_key(variant_pf.entries, key)
-            if entry is None:
-                continue
-            value, status = self._variant_value_and_status(variant_path, entry)
-            locale_meta = self._locales.get(locale)
-            locale_name = locale_meta.display_name if locale_meta else locale
-            out.append((locale, locale_name, value, status))
-        return out
-
-    def _update_tm_locale_variants(self) -> None:
-        self._tm_variants_list.clear()
-        view = self._tm_workflow.build_locale_variants_view(
-            variants=self._collect_tm_locale_variants(),
-            preview_limit=96,
-        )
-        if not view.items:
-            self._tm_variants_list.addItem(QListWidgetItem(view.message))
-            return
-        for variant in view.items:
-            item = QListWidgetItem(variant.label)
-            item.setToolTip(self._tooltip_html(variant.value))
-            self._tm_variants_list.addItem(item)
-
     def _apply_tm_selection(self) -> None:
         if self._tm_apply_in_progress:
             return
@@ -5383,7 +5226,6 @@ class MainWindow(QMainWindow):
         )
         if not refresh.run_update:
             return
-        self._update_tm_locale_variants()
         assert self._tm_store is not None
         if refresh.flush_current_file and self._current_pf:
             self._flush_tm_updates(paths=[self._current_pf.path])
