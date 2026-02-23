@@ -12,6 +12,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import QPoint, QSize
 from PySide6.QtGui import QResizeEvent, QShowEvent
 
+from translationzed_py.core.model import Status
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
 
@@ -624,6 +625,107 @@ def test_status_combo_helpers_cover_guards_single_and_macro_paths(
     assert model.undo_stack.events == ["begin", "end"]
     assert (5, 3, status_a) in model.set_calls
     assert (6, 3, status_a) in model.set_calls
+
+
+def test_next_priority_status_navigation_and_completion_message(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify priority navigation follows status tiers and reports completion."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    status_order = [
+        Status.PROOFREAD,
+        Status.FOR_REVIEW,
+        Status.TRANSLATED,
+        Status.UNTOUCHED,
+    ]
+
+    class _Model:
+        def __init__(self) -> None:
+            self._statuses = list(status_order)
+
+        def rowCount(self) -> int:  # noqa: N802
+            return len(self._statuses)
+
+        def status_for_row(self, row: int):  # type: ignore[no-untyped-def]
+            return self._statuses[row]
+
+        @staticmethod
+        def columnCount() -> int:  # noqa: N802
+            return 4
+
+        @staticmethod
+        def index(row: int, column: int):  # type: ignore[no-untyped-def]
+            return (row, column)
+
+    class _Index:
+        def __init__(self, row: int, col: int = 2, *, valid: bool = True) -> None:
+            self._row = row
+            self._col = col
+            self._valid = valid
+
+        def isValid(self) -> bool:  # noqa: N802
+            return self._valid
+
+        def row(self) -> int:
+            return self._row
+
+        def column(self) -> int:
+            return self._col
+
+    class _Selection:
+        def __init__(self) -> None:
+            self.current = None
+            self.flags = None
+
+        def setCurrentIndex(self, index, flags) -> None:  # noqa: N802
+            self.current = index
+            self.flags = flags
+
+    selection = _Selection()
+    win._current_model = _Model()  # type: ignore[assignment]
+    monkeypatch.setattr(win.table, "selectionModel", lambda: selection, raising=False)
+    monkeypatch.setattr(win.table, "currentIndex", lambda: _Index(1), raising=False)
+    scroll_calls: list[tuple[int, int]] = []
+    monkeypatch.setattr(
+        win.table,
+        "scrollTo",
+        lambda index, _hint: scroll_calls.append((index[0], index[1])),
+        raising=False,
+    )
+
+    assert win._next_priority_status_row() == 3
+    win._go_to_next_priority_status()
+    assert selection.current == (3, 2)
+    assert scroll_calls[-1] == (3, 2)
+
+    win._current_model = _Model()  # type: ignore[assignment]
+    win._current_model._statuses = [Status.PROOFREAD] * 3  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        win.table,
+        "currentIndex",
+        lambda: _Index(2),
+        raising=False,
+    )
+    assert win._next_priority_status_row() == 0
+
+    win._current_model = _Model()  # type: ignore[assignment]
+    win._current_model._statuses = []  # type: ignore[attr-defined]
+    info_calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        mw,
+        "_show_info_box",
+        lambda _parent, title, text: info_calls.append((str(title), str(text))),
+    )
+    win._go_to_next_priority_status()
+    assert info_calls[-1] == (
+        "Status triage complete",
+        "Proofreading is complete for this file.",
+    )
 
 
 def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(

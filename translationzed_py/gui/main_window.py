@@ -87,6 +87,7 @@ from translationzed_py.core import (
     scan_root_with_errors,
 )
 from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.atomic_io import write_text_atomic as _write_text_atomic
 from translationzed_py.core.conflict_service import (
     ConflictMergeRow as _ConflictMergeRow,
 )
@@ -102,6 +103,16 @@ from translationzed_py.core.conflict_service import (
 from translationzed_py.core.en_hash_cache import compute as _compute_en_hashes
 from translationzed_py.core.en_hash_cache import read as _read_en_hash_cache
 from translationzed_py.core.en_hash_cache import write as _write_en_hash_cache
+from translationzed_py.core.en_diff_service import classify_file as _classify_en_diff_file
+from translationzed_py.core.en_insert_plan import apply_insert_plan as _apply_en_insert_plan
+from translationzed_py.core.en_insert_plan import build_insert_plan as _build_en_insert_plan
+from translationzed_py.core.en_insert_plan import ENInsertPlan as _ENInsertPlan
+from translationzed_py.core.en_diff_snapshot import (
+    read_snapshot as _read_en_diff_snapshot,
+)
+from translationzed_py.core.en_diff_snapshot import (
+    update_file_snapshot as _update_en_diff_snapshot,
+)
 from translationzed_py.core.file_workflow import (
     FileWorkflowService as _FileWorkflowService,
 )
@@ -269,6 +280,7 @@ from .dialogs import (
     TmLanguageDialog,
 )
 from .entry_model import TranslationModel
+from .entry_model import VirtualNewRow
 from .fs_model import FsModel
 from .perf_trace import PERF_TRACE
 from .preferences_dialog import PreferencesDialog
@@ -278,11 +290,11 @@ from .qa_async import start_scan as _qa_start_scan
 from .search_scope_ui import scope_icon_for as _scope_icon_for
 from .source_lookup import LazySourceRows as _LazySourceRows
 from .source_lookup import SourceLookup as _SourceLookup
-from .source_reference_header import handle_header_click as _source_header_click
 from .source_reference_header import refresh_header_label as _source_header_refresh
 from .source_reference_state import (
     apply_source_reference_preferences_for_window as _apply_source_ref_preferences_for_window,
 )
+from .table_header import handle_header_click as _table_header_click
 from .source_reference_state import (
     effective_source_reference_mode_for_window as _effective_source_reference_mode_for_window,
 )
@@ -613,6 +625,11 @@ class MainWindow(QMainWindow):
         self._save_exit_flow_service = _SaveExitFlowService()
         self._current_pf = None  # type: translationzed_py.core.model.ParsedFile | None
         self._current_model: TranslationModel | None = None
+        self._en_new_drafts_by_file: dict[Path, dict[str, str]] = {}
+        self._current_en_reference_path: Path | None = None
+        self._current_en_reference_rel: str = ""
+        self._current_en_values: dict[str, str] = {}
+        self._current_en_order: tuple[str, ...] = ()
         self._opened_files: set[Path] = set()
         self._cache_map: Mapping[int, CacheEntry] = {}
         self._conflict_files: dict[Path, dict[str, str]] = {}
@@ -835,6 +852,19 @@ class MainWindow(QMainWindow):
         self.status_combo.setEnabled(False)
         self.status_combo.currentIndexChanged.connect(self._status_combo_changed)
         self.toolbar.addWidget(self.status_combo)
+        self._next_priority_btn = QToolButton(self)
+        self._next_priority_btn.setAutoRaise(True)
+        self._next_priority_btn.setIcon(
+            QIcon.fromTheme(
+                "go-next",
+                self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown),
+            )
+        )
+        self._next_priority_btn.setToolTip(
+            "Next status priority: Untouched -> For review -> Translated -> Proofread"
+        )
+        self._next_priority_btn.clicked.connect(self._go_to_next_priority_status)
+        self.toolbar.addWidget(self._next_priority_btn)
         self.source_ref_combo = QComboBox(self)
         self.source_ref_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.source_ref_combo.currentIndexChanged.connect(
@@ -2275,6 +2305,331 @@ class MainWindow(QMainWindow):
     def _locale_for_string_path(self, path_key: str) -> str | None:
         return self._locale_for_path(Path(path_key))
 
+    def _stash_current_new_row_drafts(self) -> None:
+        if not (self._current_pf and self._current_model):
+            return
+        drafts = self._current_model.edited_virtual_new_values()
+        if drafts:
+            self._en_new_drafts_by_file[self._current_pf.path] = dict(drafts)
+        else:
+            self._en_new_drafts_by_file.pop(self._current_pf.path, None)
+
+    def _en_reference_path_for_locale_file(self, path: Path) -> Path | None:
+        locale = self._locale_for_path(path)
+        if not locale or locale == "EN":
+            return None
+        try:
+            rel = path.relative_to(self._root)
+        except ValueError:
+            return None
+        if len(rel.parts) < 2:
+            return None
+        en_path = self._root / "EN" / Path(*rel.parts[1:])
+        if not en_path.exists():
+            return None
+        return en_path
+
+    def _read_file_text(self, path: Path, *, encoding: str) -> str:
+        return path.read_text(encoding=encoding)
+
+    def _load_en_reference_data(
+        self,
+        locale_path: Path,
+    ) -> tuple[Path | None, str, dict[str, str], tuple[str, ...]]:
+        en_path = self._en_reference_path_for_locale_file(locale_path)
+        if en_path is None:
+            return None, "", {}, ()
+        en_meta = self._locales.get("EN", LocaleMeta("", Path(), "", "utf-8"))
+        en_encoding = en_meta.charset or "utf-8"
+        try:
+            en_parsed = parse(en_path, encoding=en_encoding)
+        except Exception:
+            return en_path, "", {}, ()
+        values = {entry.key: entry.value for entry in en_parsed.entries}
+        order = tuple(entry.key for entry in en_parsed.entries)
+        rel_key = ""
+        with contextlib.suppress(ValueError):
+            rel_key = en_path.relative_to(self._root).as_posix()
+        return en_path, rel_key, values, order
+
+    def _build_en_diff_model_state(
+        self,
+        *,
+        path: Path,
+        parsed_file: ParsedFile,
+        en_rel_key: str,
+        en_values: Mapping[str, str],
+        en_order: Sequence[str],
+    ) -> tuple[dict[str, str], list[VirtualNewRow], tuple[str, ...]]:
+        locale_values = {entry.key: entry.value for entry in parsed_file.entries}
+        snapshot = _read_en_diff_snapshot(self._root)
+        snapshot_rows = snapshot.get(en_rel_key, {}) if en_rel_key else {}
+        diff_result = _classify_en_diff_file(
+            en_values=en_values,
+            locale_values=locale_values,
+            snapshot_rows=snapshot_rows,
+        )
+        markers: dict[str, str] = {}
+        for key in diff_result.removed_keys:
+            markers[key] = "REMOVED"
+        for key in diff_result.modified_keys:
+            markers[key] = "MODIFIED"
+        drafts = self._en_new_drafts_by_file.get(path, {})
+        virtual_rows: list[VirtualNewRow] = []
+        for key in diff_result.new_keys:
+            source = str(en_values.get(key, ""))
+            value = str(drafts.get(key, ""))
+            virtual_rows.append(VirtualNewRow(key=key, source=source, value=value))
+            markers[key] = "NEW"
+        edited_keys = tuple(drafts)
+        return markers, virtual_rows, edited_keys
+
+    def _refresh_current_en_diff_state(self) -> None:
+        if not (self._current_pf and self._current_model):
+            return
+        self._stash_current_new_row_drafts()
+        markers, virtual_rows, edited_keys = self._build_en_diff_model_state(
+            path=self._current_pf.path,
+            parsed_file=self._current_pf,
+            en_rel_key=self._current_en_reference_rel,
+            en_values=self._current_en_values,
+            en_order=self._current_en_order,
+        )
+        self._current_model.apply_diff_state(
+            marker_by_key=markers,
+            virtual_new_rows=virtual_rows,
+            en_order_keys=self._current_en_order,
+            edited_virtual_new_keys=edited_keys,
+        )
+
+    def _update_en_snapshot_for_locale_file(self, path: Path) -> None:
+        _en_path, en_rel, en_values, _en_order = self._load_en_reference_data(path)
+        if not en_rel or not en_values:
+            return
+        _update_en_diff_snapshot(
+            self._root,
+            en_rel,
+            en_values,
+        )
+
+    def _insertion_enabled_for_path(self, path: Path) -> bool:
+        locale = self._locale_for_path(path)
+        if not locale or locale == "EN":
+            return False
+        try:
+            rel = path.relative_to(self._root).as_posix()
+        except ValueError:
+            rel = path.name
+        globs = tuple(self._app_config.insertion_enabled_globs or ())
+        if not globs:
+            return False
+        return any(
+            path.match(glob) or Path(rel).match(glob) or path.name == glob
+            for glob in globs
+        )
+
+    def _build_en_insert_preview_text(
+        self,
+        *,
+        locale_text: str,
+        plan: _ENInsertPlan,
+        context_lines: int,
+    ) -> str:
+        if not plan.items:
+            return "No NEW rows to insert."
+        locale_lines = locale_text.splitlines()
+        key_line_map: dict[str, int] = {}
+        for idx, line in enumerate(locale_lines):
+            if "=" not in line:
+                continue
+            key = line.split("=", 1)[0].strip()
+            if key and key not in key_line_map:
+                key_line_map[key] = idx
+        blocks: list[str] = []
+        pad = max(0, int(context_lines))
+        for item in plan.items:
+            anchor = item.anchor_key
+            anchor_idx = key_line_map.get(anchor, -1) if anchor else -1
+            if anchor_idx >= 0:
+                before_start = max(0, anchor_idx - pad)
+                before = locale_lines[before_start : anchor_idx + 1]
+                after = locale_lines[anchor_idx + 1 : anchor_idx + 1 + pad]
+            else:
+                before = locale_lines[:pad]
+                after = locale_lines[pad : pad * 2] if pad > 0 else []
+            block_lines = [
+                f"Key: {item.key}",
+                f"Anchor: {anchor or '<file-start>'}",
+                "--- context before ---",
+                *(before or ["<none>"]),
+                "--- insertion ---",
+                *item.snippet_lines,
+                "--- context after ---",
+                *(after or ["<none>"]),
+            ]
+            blocks.append("\n".join(block_lines))
+        return "\n\n".join(blocks)
+
+    def _parse_insert_edit_payload(
+        self,
+        text: str,
+        *,
+        expected_keys: Sequence[str],
+    ) -> dict[str, str] | None:
+        lines = text.splitlines()
+        current_key = ""
+        bucket: dict[str, list[str]] = {}
+        for line in lines:
+            if line.startswith("### KEY: "):
+                current_key = line[len("### KEY: ") :].strip()
+                if current_key:
+                    bucket.setdefault(current_key, [])
+                continue
+            if current_key:
+                bucket[current_key].append(line)
+        if not bucket:
+            return None
+        expected = {str(key).strip() for key in expected_keys if str(key).strip()}
+        if set(bucket) != expected:
+            return None
+        return {key: "\n".join(lines).rstrip("\n") for key, lines in bucket.items()}
+
+    def _prompt_insert_snippet_edits(
+        self,
+        *,
+        plan: _ENInsertPlan,
+        preview_text: str,
+    ) -> dict[str, str] | None:
+        if self._test_mode:
+            return None
+        editable_seed = "\n\n".join(
+            "\n".join([f"### KEY: {item.key}", *item.snippet_lines])
+            for item in plan.items
+        )
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Edit NEW insertion snippets")
+        dialog.resize(860, 620)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+        hint = QLabel(
+            "Edit insertion snippets only. Keep section headers unchanged.",
+            dialog,
+        )
+        layout.addWidget(hint)
+        context_view = QPlainTextEdit(dialog)
+        context_view.setReadOnly(True)
+        context_view.setPlainText(preview_text)
+        context_view.setLineWrapMode(QPlainTextEdit.NoWrap)
+        context_view.setMinimumHeight(220)
+        layout.addWidget(context_view, 1)
+        editor = QPlainTextEdit(dialog)
+        editor.setPlainText(editable_seed)
+        editor.setLineWrapMode(QPlainTextEdit.NoWrap)
+        layout.addWidget(editor, 1)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+            dialog,
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return None
+        parsed = self._parse_insert_edit_payload(
+            editor.toPlainText(),
+            expected_keys=[item.key for item in plan.items],
+        )
+        if parsed is None:
+            _show_warning_box(
+                self,
+                "Invalid snippet edit",
+                "Snippet sections are invalid. Keep `### KEY:` headers unchanged.",
+            )
+            return None
+        return parsed
+
+    def _prompt_new_row_insertion_action(
+        self,
+        *,
+        rel_path: str,
+        preview_text: str,
+        plan: _ENInsertPlan,
+    ) -> tuple[str, dict[str, str] | None]:
+        if self._test_mode:
+            return "skip", None
+        while True:
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Question)
+            msg.setWindowTitle("Apply NEW rows")
+            msg.setText(f"Edited NEW rows were found for {rel_path}.")
+            msg.setInformativeText(
+                "Apply inserts snippets preserving EN order and comments."
+            )
+            msg.setDetailedText(preview_text)
+            apply_btn = msg.addButton("Apply", QMessageBox.AcceptRole)
+            skip_btn = msg.addButton("Skip", QMessageBox.ActionRole)
+            edit_btn = msg.addButton("Edit", QMessageBox.ActionRole)
+            cancel_btn = msg.addButton("Cancel", QMessageBox.RejectRole)
+            _prepare_message_box(msg).exec()
+            clicked = msg.clickedButton()
+            if clicked is apply_btn:
+                return "apply", None
+            if clicked is skip_btn:
+                return "skip", None
+            if clicked is cancel_btn or clicked is None:
+                return "cancel", None
+            if clicked is edit_btn:
+                edited = self._prompt_insert_snippet_edits(
+                    plan=plan,
+                    preview_text=preview_text,
+                )
+                if edited is None:
+                    continue
+                return "apply", edited
+
+    def _apply_new_row_insertions(
+        self,
+        *,
+        path: Path,
+        edited_new_values: Mapping[str, str],
+        edited_snippets: Mapping[str, str] | None = None,
+        en_path: Path | None = None,
+        locale_encoding: str | None = None,
+    ) -> bool:
+        if not edited_new_values:
+            return True
+        en_path = en_path or self._current_en_reference_path
+        if en_path is None:
+            return True
+        en_encoding = self._locales.get("EN", LocaleMeta("", Path(), "", "utf-8")).charset or "utf-8"
+        target_encoding = locale_encoding or self._current_encoding
+        try:
+            en_text = self._read_file_text(en_path, encoding=en_encoding)
+            locale_text = self._read_file_text(path, encoding=target_encoding)
+        except OSError as exc:
+            _show_warning_box(self, "Insertion failed", str(exc))
+            return False
+        plan = _build_en_insert_plan(
+            en_text=en_text,
+            locale_text=locale_text,
+            edited_new_values=edited_new_values,
+            comment_prefixes=(self._app_config.comment_prefix, "#", "--"),
+        )
+        if not plan.items:
+            return True
+        merged = _apply_en_insert_plan(
+            locale_text=locale_text,
+            plan=plan,
+            edited_snippets=edited_snippets,
+        )
+        try:
+            _write_text_atomic(path, merged, encoding=target_encoding)
+        except OSError as exc:
+            _show_warning_box(self, "Insertion failed", str(exc))
+            return False
+        return True
+
     def _load_reference_source(
         self,
         path: Path,
@@ -2884,6 +3239,7 @@ class MainWindow(QMainWindow):
 
     def _file_chosen(self, index) -> None:
         """Populate table when user activates a translation file."""
+        self._stash_current_new_row_drafts()
         raw_path = index.data(Qt.UserRole)  # FsModel stores absolute path string
         path = Path(raw_path) if raw_path else None
         if not (path and path.suffix == self._app_config.translation_ext):
@@ -2938,6 +3294,23 @@ class MainWindow(QMainWindow):
             source_lookup = self._load_reference_source(
                 path, locale, target_entries=pf.entries
             )
+            (
+                self._current_en_reference_path,
+                self._current_en_reference_rel,
+                self._current_en_values,
+                self._current_en_order,
+            ) = self._load_en_reference_data(path)
+            (
+                en_diff_markers,
+                en_virtual_rows,
+                en_virtual_edited_keys,
+            ) = self._build_en_diff_model_state(
+                path=path,
+                parsed_file=pf,
+                en_rel_key=self._current_en_reference_rel,
+                en_values=self._current_en_values,
+                en_order=self._current_en_order,
+            )
             self._cache_map = open_result.cache_map
             overlay = open_result.overlay
             changed_keys = overlay.changed_keys
@@ -2959,6 +3332,10 @@ class MainWindow(QMainWindow):
                 baseline_by_row=baseline_by_row,
                 source_values=source_lookup,
                 source_by_row=source_lookup.by_row,
+                diff_marker_by_key=en_diff_markers,
+                virtual_new_rows=en_virtual_rows,
+                virtual_new_edited_keys=en_virtual_edited_keys,
+                en_order_keys=self._current_en_order,
             )
             self._current_model.dataChanged.connect(self._on_model_changed)
             self._current_model.dataChanged.connect(self._on_model_data_changed)
@@ -3395,7 +3772,7 @@ class MainWindow(QMainWindow):
         )
 
     _refresh_source_header_label = _source_header_refresh
-    _on_table_header_clicked = _source_header_click
+    _on_table_header_clicked = _table_header_click
 
     def _on_header_resized(self, logical_index: int, _old: int, _new: int) -> None:
         if self._table_layout_guard or not self.table.model():
@@ -3452,13 +3829,17 @@ class MainWindow(QMainWindow):
             and self._current_model
             and self._ensure_conflicts_resolved(self._current_pf.path)
         )
+        has_virtual_new = bool(
+            self._current_model and self._current_model.has_pending_virtual_new_values()
+        )
         plan = self._file_workflow_service.build_save_current_run_plan(
             has_current_file=self._current_pf is not None,
             has_current_model=self._current_model is not None,
             conflicts_resolved=conflicts_resolved,
             has_changed_keys=bool(
                 self._current_model and self._current_model.changed_keys()
-            ),
+            )
+            or has_virtual_new,
         )
         if plan.immediate_result is not None:
             return plan.immediate_result
@@ -3467,6 +3848,55 @@ class MainWindow(QMainWindow):
         assert self._current_pf is not None
         assert self._current_model is not None
         changed = self._current_model.changed_values()
+        insertion_action = "skip"
+        insertion_edits: dict[str, str] | None = None
+        edited_new_values: dict[str, str] = {}
+        if has_virtual_new and self._insertion_enabled_for_path(self._current_pf.path):
+            edited_new_values = self._current_model.edited_virtual_new_values()
+            if edited_new_values:
+                en_path = self._current_en_reference_path
+                if en_path is not None:
+                    en_meta = self._locales.get(
+                        "EN", LocaleMeta("", Path(), "", "utf-8")
+                    )
+                    en_encoding = en_meta.charset or "utf-8"
+                    try:
+                        en_text = self._read_file_text(en_path, encoding=en_encoding)
+                        locale_text = self._read_file_text(
+                            self._current_pf.path,
+                            encoding=self._current_encoding,
+                        )
+                    except OSError as exc:
+                        _show_warning_box(
+                            self,
+                            "Save preview unavailable",
+                            str(exc),
+                        )
+                        return False
+                    insert_plan = _build_en_insert_plan(
+                        en_text=en_text,
+                        locale_text=locale_text,
+                        edited_new_values=edited_new_values,
+                        comment_prefixes=(self._app_config.comment_prefix, "#", "--"),
+                    )
+                    if insert_plan.items:
+                        preview_text = self._build_en_insert_preview_text(
+                            locale_text=locale_text,
+                            plan=insert_plan,
+                            context_lines=self._app_config.preview_context_lines,
+                        )
+                        rel_path = str(self._current_pf.path)
+                        with contextlib.suppress(ValueError):
+                            rel_path = str(self._current_pf.path.relative_to(self._root))
+                        insertion_action, insertion_edits = (
+                            self._prompt_new_row_insertion_action(
+                                rel_path=rel_path,
+                                preview_text=preview_text,
+                                plan=insert_plan,
+                            )
+                        )
+                        if insertion_action == "cancel":
+                            return False
         callbacks = _SaveCurrentCallbacks(
             save_file=lambda pf, changed_values, enc: save(
                 pf, changed_values, encoding=enc
@@ -3480,6 +3910,8 @@ class MainWindow(QMainWindow):
             ),
             now_ts=lambda: int(time.time()),
         )
+        save_succeeded = False
+        insertion_applied = False
         try:
             self._file_workflow_service.persist_current_save(
                 path=self._current_pf.path,
@@ -3488,12 +3920,41 @@ class MainWindow(QMainWindow):
                 encoding=self._current_encoding,
                 callbacks=callbacks,
             )
-            self._current_model.reset_baseline()
-            self.fs_model.set_dirty(self._current_pf.path, False)
-            self._set_saved_status()
+            save_succeeded = True
         except Exception as exc:
             _show_critical_box(self, "Save failed", str(exc))
             return False
+        if (
+            insertion_action == "apply"
+            and edited_new_values
+            and self._insertion_enabled_for_path(self._current_pf.path)
+        ):
+            insertion_applied = self._apply_new_row_insertions(
+                path=self._current_pf.path,
+                edited_new_values=edited_new_values,
+                edited_snippets=insertion_edits,
+            )
+            if not insertion_applied:
+                return False
+        if save_succeeded and self._current_en_reference_rel and self._current_en_values:
+            with contextlib.suppress(Exception):
+                _update_en_diff_snapshot(
+                    self._root,
+                    self._current_en_reference_rel,
+                    self._current_en_values,
+                )
+        if insertion_applied:
+            self._en_new_drafts_by_file.pop(self._current_pf.path, None)
+        else:
+            self._stash_current_new_row_drafts()
+        self._current_model.reset_baseline(clear_virtual=insertion_applied)
+        has_pending_new = self._current_model.has_pending_virtual_new_values()
+        self.fs_model.set_dirty(self._current_pf.path, has_pending_new)
+        self._set_saved_status()
+        if insertion_applied:
+            self._reload_file(self._current_pf.path)
+        else:
+            self._refresh_current_en_diff_state()
         return True
 
     @contextlib.contextmanager
@@ -3554,16 +4015,46 @@ class MainWindow(QMainWindow):
         return decision
 
     def _draft_files(self) -> list[Path]:
-        return self._project_session_service.collect_draft_files(
-            root=self._root,
-            locales=self._selected_locales,
+        files = set(
+            self._project_session_service.collect_draft_files(
+                root=self._root,
+                locales=self._selected_locales,
+            )
         )
+        files.update(self._pending_virtual_new_files(locales=self._selected_locales))
+        return sorted(files)
 
     def _all_draft_files(self, locales: Iterable[str] | None = None) -> list[Path]:
-        return self._project_session_service.collect_draft_files(
-            root=self._root,
-            locales=locales,
+        files = set(
+            self._project_session_service.collect_draft_files(
+                root=self._root,
+                locales=locales,
+            )
         )
+        files.update(self._pending_virtual_new_files(locales=locales))
+        return sorted(files)
+
+    def _pending_virtual_new_files(
+        self, *, locales: Iterable[str] | None
+    ) -> set[Path]:
+        locale_filter = None if locales is None else set(locales)
+        pending: set[Path] = set()
+        for path, drafts in self._en_new_drafts_by_file.items():
+            if not drafts:
+                continue
+            locale = self._locale_for_path(path)
+            if locale_filter is not None and locale not in locale_filter:
+                continue
+            pending.add(path)
+        if (
+            self._current_pf
+            and self._current_model
+            and self._current_model.has_pending_virtual_new_values()
+        ):
+            locale = self._locale_for_path(self._current_pf.path)
+            if locale_filter is None or locale in locale_filter:
+                pending.add(self._current_pf.path)
+        return pending
 
     def _mark_cached_dirty(self) -> None:
         perf_trace = PERF_TRACE
@@ -3751,11 +4242,12 @@ class MainWindow(QMainWindow):
             return False
         if not self._ensure_conflicts_resolved(path):
             return False
+        pending_new_drafts = dict(self._en_new_drafts_by_file.get(path, {}))
         cached = _read_status_cache(self._root, path)
         locale = self._locale_for_path(path)
         encoding = self._locales.get(
             locale, LocaleMeta("", Path(), "", "utf-8")
-        ).charset
+        ).charset or "utf-8"
         callbacks = _SaveFromCacheCallbacks(
             parse_file=lambda file_path, enc: parse(file_path, encoding=enc),
             save_file=lambda pf, changed_values, enc: save(
@@ -3785,9 +4277,59 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             _show_warning_box(self, "Save failed", str(exc))
             return False
-        if not result.had_drafts:
+        insertion_applied = False
+        if pending_new_drafts and self._insertion_enabled_for_path(path):
+            en_path, _en_rel, _en_values, _en_order = self._load_en_reference_data(path)
+            if en_path is not None:
+                en_meta = self._locales.get("EN", LocaleMeta("", Path(), "", "utf-8"))
+                en_encoding = en_meta.charset or "utf-8"
+                try:
+                    en_text = self._read_file_text(en_path, encoding=en_encoding)
+                    locale_text = self._read_file_text(path, encoding=encoding)
+                except OSError as exc:
+                    _show_warning_box(self, "Save preview unavailable", str(exc))
+                    return False
+                insert_plan = _build_en_insert_plan(
+                    en_text=en_text,
+                    locale_text=locale_text,
+                    edited_new_values=pending_new_drafts,
+                    comment_prefixes=(self._app_config.comment_prefix, "#", "--"),
+                )
+                if insert_plan.items:
+                    preview_text = self._build_en_insert_preview_text(
+                        locale_text=locale_text,
+                        plan=insert_plan,
+                        context_lines=self._app_config.preview_context_lines,
+                    )
+                    rel_path = str(path)
+                    with contextlib.suppress(ValueError):
+                        rel_path = str(path.relative_to(self._root))
+                    action, edited_snippets = self._prompt_new_row_insertion_action(
+                        rel_path=rel_path,
+                        preview_text=preview_text,
+                        plan=insert_plan,
+                    )
+                    if action == "cancel":
+                        return False
+                    if action == "apply":
+                        insertion_applied = self._apply_new_row_insertions(
+                            path=path,
+                            edited_new_values=pending_new_drafts,
+                            edited_snippets=edited_snippets,
+                            en_path=en_path,
+                            locale_encoding=encoding,
+                        )
+                        if not insertion_applied:
+                            return False
+        if result.had_drafts or insertion_applied:
+            with contextlib.suppress(Exception):
+                self._update_en_snapshot_for_locale_file(path)
+        if insertion_applied:
+            self._en_new_drafts_by_file.pop(path, None)
+        dirty = bool(self._en_new_drafts_by_file.get(path))
+        if not result.had_drafts and not insertion_applied and not dirty:
             return True
-        self.fs_model.set_dirty(path, False)
+        self.fs_model.set_dirty(path, dirty)
         return True
 
     def _write_cache_current(self) -> bool:
@@ -3795,6 +4337,7 @@ class MainWindow(QMainWindow):
             return True
         if self._detail_panel.isVisible():
             self._commit_detail_translation()
+        self._stash_current_new_row_drafts()
         changed_rows = self._current_model.changed_rows_with_source()
         try:
             original_values = self._current_model.baseline_values()
@@ -3809,7 +4352,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             _show_critical_box(self, "Cache write failed", str(exc))
             return False
-        if self._current_model.changed_keys():
+        if self._current_model.changed_keys() or self._current_model.has_pending_virtual_new_values():
             self.fs_model.set_dirty(self._current_pf.path, True)
         else:
             self.fs_model.set_dirty(self._current_pf.path, False)
@@ -5075,6 +5618,49 @@ class MainWindow(QMainWindow):
 
     def _qa_prev_finding(self) -> None:
         self._navigate_qa_finding(direction=-1)
+
+    def _next_priority_status_row(self) -> int | None:
+        if not self._current_model:
+            return None
+        total = self._current_model.rowCount()
+        if total <= 0:
+            return None
+        current = self.table.currentIndex()
+        current_row = current.row() if current.isValid() else -1
+        for status in STATUS_ORDER:
+            candidates = [
+                row
+                for row in range(total)
+                if self._current_model.status_for_row(row) == status
+            ]
+            if not candidates:
+                continue
+            for row in candidates:
+                if row > current_row:
+                    return row
+            return candidates[0]
+        return None
+
+    def _go_to_next_priority_status(self) -> None:
+        if not self._current_model:
+            return
+        target_row = self._next_priority_status_row()
+        if target_row is None:
+            _show_info_box(
+                self,
+                "Status triage complete",
+                "Proofreading is complete for this file.",
+            )
+            return
+        current = self.table.currentIndex()
+        target_column = current.column() if current.isValid() else 2
+        target_column = max(0, min(target_column, self._current_model.columnCount() - 1))
+        target = self._current_model.index(target_row, target_column)
+        self.table.selectionModel().setCurrentIndex(
+            target,
+            QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+        )
+        self.table.scrollTo(target, QAbstractItemView.PositionAtCenter)
 
     def _run_search(self) -> None:
         self._search_from_anchor(direction=1, anchor_row=-1)
