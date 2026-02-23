@@ -215,7 +215,7 @@ def normalize_scope(value: object, *, default: str = "FILE") -> str:
 def normalize_qa_languagetool_max_rows(value: object) -> int:
     """Normalize QA LanguageTool row cap."""
     try:
-        parsed = int(value)
+        parsed = int(str(value).strip())
     except (TypeError, ValueError):
         parsed = _QA_LT_MAX_ROWS_DEFAULT
     return max(_QA_LT_MAX_ROWS_MIN, min(_QA_LT_MAX_ROWS_MAX, parsed))
@@ -283,7 +283,9 @@ def normalize_loaded_preferences(
     lt_timeout_ms = _normalize_lt_timeout_ms(raw.get("lt_timeout_ms", 1200))
     lt_picky_mode = bool(raw.get("lt_picky_mode", False))
     lt_locale_map_data = _load_lt_language_map(raw.get("lt_locale_map", "{}"))
-    lt_locale_map = _dump_lt_language_map(lt_locale_map_data) if lt_locale_map_data else "{}"
+    lt_locale_map = (
+        _dump_lt_language_map(lt_locale_map_data) if lt_locale_map_data else "{}"
+    )
     window_geometry = str(raw.get("window_geometry", "")).strip()
 
     patched_raw: dict[str, Any] | None = None

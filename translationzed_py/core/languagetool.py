@@ -82,7 +82,7 @@ def default_server_url() -> str:
 def normalize_timeout_ms(value: object, *, default: int = _DEFAULT_TIMEOUT_MS) -> int:
     """Normalize timeout value to allowed integer milliseconds range."""
     try:
-        normalized = int(value)
+        normalized = int(str(value).strip())
     except (TypeError, ValueError):
         normalized = int(default)
     return max(100, min(_MAX_TIMEOUT_MS, normalized))
@@ -264,7 +264,9 @@ def _perform_check_request(
     )
     timeout_sec = max(0.1, float(timeout_ms) / 1000.0)
     try:
-        with urllib.request.urlopen(request, timeout=timeout_sec) as response:  # nosec B310
+        with urllib.request.urlopen(
+            request, timeout=timeout_sec
+        ) as response:  # nosec B310
             raw = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
         body = _decode_http_error_body(exc)
@@ -297,8 +299,8 @@ def _parse_matches(payload: dict[str, Any]) -> tuple[LanguageToolMatch, ...]:
         if not isinstance(item, dict):
             continue
         try:
-            offset = int(item.get("offset"))
-            length = int(item.get("length"))
+            offset = int(str(item.get("offset")).strip())
+            length = int(str(item.get("length")).strip())
         except (TypeError, ValueError):
             continue
         if offset < 0 or length <= 0:

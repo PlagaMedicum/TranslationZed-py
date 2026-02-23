@@ -40,7 +40,7 @@ _QA_LT_MAX_ROWS_MAX = 5000
 
 def _normalize_qa_languagetool_max_rows(value: object) -> int:
     try:
-        parsed = int(value)
+        parsed = int(str(value).strip())
     except (TypeError, ValueError):
         parsed = _QA_LT_MAX_ROWS_DEFAULT
     return max(_QA_LT_MAX_ROWS_MIN, min(_QA_LT_MAX_ROWS_MAX, parsed))
@@ -54,6 +54,7 @@ def _normalize_lt_locale_map(value: object) -> str:
     if raw in {"", "{}"}:
         return raw
     return "{}"
+
 
 _DEFAULTS: dict[str, Any] = {
     "prompt_write_on_exit": True,
@@ -314,8 +315,8 @@ def _parse_env(path: Path) -> dict[str, Any]:
                 elif val in _BOOL_FALSE:
                     out["qa_check_languagetool"] = False
             elif key == "QA_LANGUAGETOOL_MAX_ROWS":
-                out["qa_languagetool_max_rows"] = (
-                    _normalize_qa_languagetool_max_rows(value)
+                out["qa_languagetool_max_rows"] = _normalize_qa_languagetool_max_rows(
+                    value
                 )
             elif key == "QA_LANGUAGETOOL_AUTOMARK":
                 val = value.lower()
@@ -500,10 +501,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
             "QA_CHECK_LANGUAGETOOL="
             f"{'true' if prefs.get('qa_check_languagetool', False) else 'false'}"
         ),
-        (
-            "QA_LANGUAGETOOL_MAX_ROWS="
-            f"{qa_lt_max_rows}"
-        ),
+        ("QA_LANGUAGETOOL_MAX_ROWS=" f"{qa_lt_max_rows}"),
         (
             "QA_LANGUAGETOOL_AUTOMARK="
             f"{'true' if prefs.get('qa_languagetool_automark', False) else 'false'}"

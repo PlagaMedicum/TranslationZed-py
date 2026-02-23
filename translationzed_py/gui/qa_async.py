@@ -6,13 +6,18 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-from translationzed_py.core.languagetool import LT_LEVEL_DEFAULT
-from translationzed_py.core.languagetool import LT_LEVEL_PICKY
-from translationzed_py.core.languagetool import LT_STATUS_OFFLINE
-from translationzed_py.core.languagetool import LT_STATUS_OK
+from translationzed_py.core.languagetool import (
+    LT_LEVEL_DEFAULT,
+    LT_LEVEL_PICKY,
+    LT_STATUS_OFFLINE,
+    LT_STATUS_OK,
+)
 from translationzed_py.core.languagetool import check_text as _lt_check_text
-from translationzed_py.core.qa_service import QAFinding, QAInputRow
-from translationzed_py.core.qa_service import QA_CODE_LANGUAGETOOL
+from translationzed_py.core.qa_service import (
+    QA_CODE_LANGUAGETOOL,
+    QAFinding,
+    QAInputRow,
+)
 
 
 def _collect_input_rows(win: Any) -> tuple[QAInputRow, ...]:
