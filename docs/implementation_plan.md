@@ -350,7 +350,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
 - v1 scope lock:
   - browser-style LanguageTool picky semantics (`level=default|picky`), not custom
     project-side category filtering
-  - inline detail-editor underline highlighting + status-bar indicator first
+  - inline detail-editor underline highlighting + status-bar indicator
+  - click hint popup on LT-flagged spans with quick replacement actions
   - optional manual-QA LanguageTool findings (off by default)
   - no TM suggestion-surface integration in this slice
 - Acceptance:
@@ -361,6 +362,8 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
     `level=default` and show non-blocking warning status
   - QA cap + auto-mark controls for LanguageTool findings are configurable and separate from
     base QA toggles
+  - QA-side LT controls live in Preferences -> QA tab (not LT tab), and
+    TM/Search/QA side panels expose quick shortcuts to matching Preferences tabs
 
 ---
 
@@ -1066,6 +1069,8 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
     non-blocking warning status (`picky unsupported (default used)`).
   - Manual QA LanguageTool findings stay opt-in and non-blocking, with independent
     LT row cap and LT auto-mark participation toggle.
+  - LT click-hint popup with quick replacements is part of shipped inline-editor
+    UX; QA LT scan controls belong to Preferences -> QA.
   - TM panel compactness takes priority over dedicated locale-variants rendering;
     keep TM Source/TM Translation previews in compact mode.
 

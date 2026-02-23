@@ -513,6 +513,7 @@ if dirty_files and not prompt_save():
   it does not auto-run search.
 - Left Search side panel shows a minimal match list generated from current toolbar query/scope;
   each item is `<relative path>:<row> · <one-line excerpt>` and click navigates to that match.
+  Search panel includes a quick Preferences shortcut to open the Search/Replace tab.
   Relative paths in UI/report text are normalized to `/` separators on all platforms.
 - Left QA side panel (shipped in v0.7.0) uses core-provided finding DTOs and renders compact
   rows (`<relative path>:<row> · <check-code> · <short excerpt>`); selecting an item
@@ -526,6 +527,7 @@ if dirty_files and not prompt_save():
   Optional LanguageTool findings (`qa.languagetool`) may be added during manual QA runs
   when `QA_CHECK_LANGUAGETOOL=true`; scan depth is capped by
   `QA_LANGUAGETOOL_MAX_ROWS`, and cap/offline/fallback notes are shown in panel status.
+  QA panel includes a quick Preferences shortcut to open the QA tab.
   QA row labels include severity/group tags (`warning/format`, `warning/content`)
   alongside code labels for compact triage.
   QA navigation actions (`F8` next, `Shift+F8` previous) traverse findings with wrap;
@@ -544,6 +546,8 @@ if dirty_files and not prompt_save():
   non-blocking warning status.
   Detail-editor indicator states include `checking`, `issues:N`, `ok`, `offline`,
   and `picky unsupported (default used)`.
+  Clicking an underlined LT issue opens a compact hint popup with issue text and
+  quick replacement actions.
   Token regexes are shared from `core.qa_rules` by GUI delegates and QA scan logic
   to keep highlight/QA semantics aligned (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes).
   QA perf regression smoke is budgeted on committed large fixtures (`SurvivalGuide`,
@@ -745,6 +749,7 @@ UNTOUCHED).
   - Sync summary reports imported/unresolved/failed files; zero-segment imports are surfaced as warnings.
   - Preferences include a dedicated TM tab to enable/disable ready imports, remove imports, and queue
     new imports, with per-file segment counts and raw locale-tag metadata display.
+  - TM panel includes a quick Preferences shortcut to open the TM tab.
   - TM Preferences tab shows an inline warning banner when one or more ready imported files have
     zero segments, so low-value imports are visible without opening per-row details.
   - Preferences TM tab shows explicit `Supported now`/`Planned later` format matrix plus
@@ -958,7 +963,7 @@ Current builds use **cache‑only** recovery:
 3. GitHub PR integration (REST v4 API).
 4. Automatic update check (GitHub Releases).
 5. Simple editor for location `description.txt` files.
-6. LanguageTool UX extensions (hover details, quick-fix actions, richer diagnostics).
+6. LanguageTool diagnostics UX extensions beyond current click-hint + quick-fix flow.
 7. Extended Translation QA rule packs (post-v0.7): domain-specific checks and
    project-level custom rule sets beyond the shipped baseline (`qa.trailing`,
    `qa.newlines`, `qa.tokens`, `qa.same_source`).

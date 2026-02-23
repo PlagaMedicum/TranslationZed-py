@@ -92,10 +92,11 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Primary Actor** | SYS |
 | **Trigger** | Translation detail editor text changes (debounced background check). |
 | **Main Success Scenario** |
-|  1 | SYS submits a debounced LanguageTool check for current detail-editor text. |
-|  2 | SYS discards stale responses when row/text context changed before response arrives. |
-|  3 | SYS renders underline-only issue spans in detail editor for current response. |
-|  4 | SYS updates compact indicator with one of:
+|  1 | SYS submits a debounced LanguageTool check for current detail-editor text. |
+|  2 | SYS discards stale responses when row/text context changed before response arrives. |
+|  3 | SYS renders underline-only issue spans in detail editor for current response. |
+|  4 | On click inside an underlined issue, SYS opens a compact hint popup with issue text and quick replacement actions. |
+|  5 | SYS updates compact indicator with one of:
 |    | `checking`, `issues:N`, `ok`, `offline`, `picky unsupported (default used)`. |
 | **Rules** | Picky semantics are browser-style (`LT_PICKY_MODE=true -> level=picky`). If endpoint rejects picky level, SYS retries with `level=default` and reports non-blocking warning status. |
 | **Post-condition** | Editor remains fully interactive; LanguageTool never blocks typing/save flows. |
@@ -184,9 +185,10 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  5 | User sets **Replace scope** (File / Locale / Locale Pool). |
 |  6 | User toggles general options (Prompt on Exit, Wrap Text, etc.). |
 |  7 | User configures QA toggles (base checks, auto-refresh, auto-mark controls). |
-|  8 | User configures LanguageTool options (mode, endpoint URL, timeout, browser-style picky toggle, locale map JSON, QA LT toggles/cap). |
-|  9 | User sets **Theme** (System / Light / Dark) and toggles View options (whitespace glyphs, tag/escape highlighting, large‑text optimizations). |
-|  10 | On Apply/OK, SYS persists settings to `.tzp/config/settings.env`. |
+|  8 | User configures LanguageTool editor options (mode, endpoint URL, timeout, browser-style picky toggle, locale map JSON). |
+|  9 | User configures QA-side LanguageTool options (include LT findings, LT max rows, LT auto-mark participation) in the **QA** group. |
+|  10 | User sets **Theme** (System / Light / Dark) and toggles View options (whitespace glyphs, tag/escape highlighting, large‑text optimizations). |
+|  11 | On Apply/OK, SYS persists settings to `.tzp/config/settings.env`. |
 | **Post‑condition** | Next app launch uses the selected defaults; toolbar remains minimal. |
 
 ### UC-08  First Run - Select Default Root
@@ -248,6 +250,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  4 | If Search mode is selected, SYS shows a minimal results list (`<path>:<row> · <one-line excerpt>`) produced by toolbar search execution; selecting an item jumps to file/row. |
 |  5 | If QA mode is selected, SYS shows the QA findings list for current context (or explicit empty-state text if there are no findings). Selecting an item jumps to file/row. |
 |  6 | Manual QA runs may include optional LanguageTool findings (`qa.languagetool`) when enabled; scan-cap and fallback/offline notes are shown in panel status. |
+|  7 | TM/Search/QA panels expose quick shortcuts that open matching Preferences tabs for faster tuning. |
 
 ### UC-13b  TM Suggestions Query
 | Field | Value |
@@ -478,6 +481,7 @@ UNTOUCHED ──────────────────────▶ 
    and can be hidden/shown via a **left‑side toggle**; the detail editor pane is
    toggled from the **bottom bar**. TM panel includes filters (min score + origin
    toggles for project/import) and supports project‑TM rebuild from selected locales.
+   TM/Search/QA side panels include quick shortcuts that open corresponding Preferences tabs.
    QA tab provides finding list/navigation with explicit empty state.
 11. **Theme modes**: Preferences → View supports **System / Light / Dark**; changes apply app-wide immediately and persist.
 12. **Translation QA checks (current)**: active checks are missing trailing characters,

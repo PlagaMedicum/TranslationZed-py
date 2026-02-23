@@ -60,6 +60,7 @@ _Last updated: 2026-02-23_
   - browser-style picky level request semantics (`default`/`picky`),
   - unsupported-picky fallback to `default` with warning status,
   - inline editor debounce + stale-result discard + underline rendering,
+  - click-on-issue hint popup behavior and quick-replacement application,
   - manual QA opt-in LT findings (`qa.languagetool`) with cap note behavior,
   - LT auto-mark participation gating via `QA_LANGUAGETOOL_AUTOMARK`.
 - Source-reference selector integration: Source-column header locale switch updates
