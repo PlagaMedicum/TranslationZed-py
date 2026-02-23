@@ -1057,6 +1057,7 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout(self._left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(4)
+        self._init_progress_strip(left_layout)
 
         toggle_bar = QWidget(self._left_panel)
         toggle_layout = QHBoxLayout(toggle_bar)
@@ -1091,6 +1092,7 @@ class MainWindow(QMainWindow):
         self._left_stack = QStackedWidget(self._left_panel)
 
         self.tree = QTreeView()
+        self._install_tree_progress_delegate()
         self._init_locales(selected_locales)
         if not self._selected_locales:
             self._startup_aborted = True
@@ -1338,6 +1340,7 @@ class MainWindow(QMainWindow):
         table_layout.setContentsMargins(0, 0, 0, 0)
         table_layout.addWidget(self.table)
         self._right_stack.addWidget(self._table_container)
+        self._init_empty_table_placeholder()
         self._merge_container: QWidget | None = None
         self._content_splitter.addWidget(self._right_stack)
 
@@ -2886,7 +2889,7 @@ class MainWindow(QMainWindow):
             clear_conflict_notified=self._conflict_notified.clear,
             clear_current_file=lambda: setattr(self, "_current_pf", None),
             clear_current_model=lambda: setattr(self, "_current_model", None),
-            clear_table_model=lambda: self.table.setModel(None),
+            clear_table_model=self._clear_table_model_for_empty_state,
             clear_status_combo=lambda: self._set_status_combo(None),
         )
 
@@ -3027,6 +3030,7 @@ class MainWindow(QMainWindow):
                 self._source_translation_ratio = 0.5
             self._table_layout_guard = True
             self.table.setModel(self._current_model)
+            self._set_table_empty_state(False)
             self._clear_row_height_cache()
             self._apply_table_layout()
             self._table_layout_guard = False
@@ -3041,7 +3045,7 @@ class MainWindow(QMainWindow):
             self._sync_detail_editors()
             self._update_status_bar()
             if not self._last_saved_text:
-                self._last_saved_text = "Ready"
+                self._last_saved_text = "Ready to edit"
                 self._update_status_bar()
             if self._should_defer_post_open():
                 self._schedule_post_open_tasks(path)
@@ -4038,12 +4042,7 @@ class MainWindow(QMainWindow):
             self.fs_model.set_dirty(self._current_pf.path, True)
         else:
             self.fs_model.set_dirty(self._current_pf.path, False)
-        if hasattr(self, "_progress_file_counts"):
-            self._progress_file_counts.pop(self._current_pf.path, None)
-        if hasattr(self, "_progress_locale_counts"):
-            locale = self._locale_for_path(self._current_pf.path)
-            if locale:
-                self._progress_locale_counts.pop(locale, None)
+        self._invalidate_progress_for_path(self._current_pf.path)
         if changed_rows:
             self._queue_tm_updates(self._current_pf.path, changed_rows)
         return True
@@ -5214,7 +5213,6 @@ class MainWindow(QMainWindow):
     _set_qa_progress_visible = _panel_helpers._set_qa_progress_visible
     _set_qa_findings = _panel_helpers._set_qa_findings
     _set_qa_scan_note = _panel_helpers._set_qa_scan_note
-
     _set_qa_panel_message = _panel_helpers._set_qa_panel_message
     _refresh_qa_panel_results = _panel_helpers._refresh_qa_panel_results
     _open_qa_result_item = _panel_helpers._open_qa_result_item
@@ -5260,6 +5258,13 @@ class MainWindow(QMainWindow):
     _poll_tm_query = _panel_helpers._poll_tm_query
     _show_tm_matches = _panel_helpers._show_tm_matches
     _tooltip_html = _panel_helpers._tooltip_html
+    _refresh_progress_ui = _panel_helpers._refresh_progress_ui
+    _invalidate_progress_for_path = _panel_helpers._invalidate_progress_for_path
+    _init_progress_strip = _panel_helpers._init_progress_strip
+    _install_tree_progress_delegate = _panel_helpers._install_tree_progress_delegate
+    _init_empty_table_placeholder = _panel_helpers._init_empty_table_placeholder
+    _set_table_empty_state = _panel_helpers._set_table_empty_state
+    _clear_table_model_for_empty_state = _panel_helpers._clear_table_model_for_empty_state
 
     def showEvent(self, event) -> None:  # noqa: N802
         """Re-apply detail panel state when the window becomes visible."""
@@ -5276,14 +5281,13 @@ class MainWindow(QMainWindow):
         if self.replace_toolbar.isVisible():
             self._align_replace_bar()
 
-    _update_status_combo_from_selection = (
-        _panel_helpers._update_status_combo_from_selection
-    )
+    _update_status_combo_from_selection = _panel_helpers._update_status_combo_from_selection
     _set_status_combo = _panel_helpers._set_status_combo
     _status_combo_changed = _panel_helpers._status_combo_changed
     _set_saved_status = _panel_helpers._set_saved_status
     _selected_rows = _panel_helpers._selected_rows
     _update_status_bar = _panel_helpers._update_status_bar
+    _shutdown_progress_workers = _panel_helpers._shutdown_progress_workers
     _update_scope_indicators = _panel_helpers._update_scope_indicators
     _set_scope_indicator = _panel_helpers._set_scope_indicator
     _apply_status_to_rows = _panel_helpers._apply_status_to_rows
@@ -5316,6 +5320,7 @@ class MainWindow(QMainWindow):
         self._shutdown_qa_workers()
         self._shutdown_languagetool_workers()
         self._shutdown_tm_workers()
+        self._shutdown_progress_workers()
         if self._tm_store is not None:
             with contextlib.suppress(Exception):
                 self._tm_store.close()

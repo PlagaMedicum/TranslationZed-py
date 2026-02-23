@@ -11,7 +11,11 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import QModelIndex
 
 from translationzed_py.core.project_scanner import LocaleMeta
-from translationzed_py.gui.fs_model import FsModel
+from translationzed_py.gui.fs_model import (
+    TREE_NODE_TYPE_ROLE,
+    TREE_PROGRESS_COUNTS_ROLE,
+    FsModel,
+)
 
 
 def _locale_meta(root: Path, code: str) -> LocaleMeta:
@@ -112,3 +116,31 @@ def test_index_for_path_returns_invalid_when_not_found(tmp_path, monkeypatch) ->
     assert lazy_model.index_for_path(missing).isValid() is False
     assert lazy_model._locale_code_for_path(root) is None
     assert lazy_model._locale_code_for_path(Path("/outside/project/BE/ui.txt")) is None
+
+
+def test_progress_roles_are_supported_for_locale_and_file_nodes(
+    tmp_path, monkeypatch
+) -> None:
+    """Verify fs model stores progress payloads for locale/file rows."""
+    root = tmp_path / "project"
+    root.mkdir()
+    meta = _locale_meta(root, "BE")
+    target = root / "BE" / "ui.txt"
+    monkeypatch.setattr(
+        "translationzed_py.gui.fs_model.list_translatable_files",
+        lambda _path: [target],
+    )
+    model = FsModel(root, [meta], lazy=False)
+
+    locale_index = model.index(0, 0)
+    file_index = model.index_for_path(target)
+    assert locale_index.data(TREE_NODE_TYPE_ROLE) == "locale"
+    assert file_index.data(TREE_NODE_TYPE_ROLE) == "file"
+
+    model.set_locale_progress("BE", (1, 2, 3, 4))
+    model.set_file_progress(target, (0, 0, 1, 0))
+    assert locale_index.data(TREE_PROGRESS_COUNTS_ROLE) == (1, 2, 3, 4)
+    assert file_index.data(TREE_PROGRESS_COUNTS_ROLE) == (0, 0, 1, 0)
+
+    model.set_file_progress(target, None)
+    assert file_index.data(TREE_PROGRESS_COUNTS_ROLE) is None

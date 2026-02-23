@@ -830,7 +830,7 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
         win.table, "currentIndex", lambda: _Index(0, valid=False), raising=False
     )
     win._update_status_bar()
-    assert shown_messages[-1] == "Ready"
+    assert shown_messages[-1] == "Ready to edit"
 
     win._search_scope_widget = None
     win._replace_scope_widget = None

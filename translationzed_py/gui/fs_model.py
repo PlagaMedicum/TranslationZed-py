@@ -12,6 +12,12 @@ from translationzed_py.core.project_scanner import LocaleMeta, list_translatable
 _ABS_PATH_ROLE = int(Qt.ItemDataRole.UserRole)
 _REL_PATH_ROLE = _ABS_PATH_ROLE + 1
 _LOCALE_CODE_ROLE = _ABS_PATH_ROLE + 2
+TREE_NODE_TYPE_ROLE = _ABS_PATH_ROLE + 3
+TREE_PROGRESS_COUNTS_ROLE = _ABS_PATH_ROLE + 4
+
+_TREE_NODE_NONE = "none"
+_TREE_NODE_LOCALE = "locale"
+_TREE_NODE_FILE = "file"
 
 
 class FsModel(QStandardItemModel):
@@ -26,6 +32,7 @@ class FsModel(QStandardItemModel):
         self._lazy = lazy
         self._path_items: dict[str, QStandardItem] = {}
         self._pending_dirty: set[str] = set()
+        self._pending_progress: dict[str, tuple[int, int, int, int] | None] = {}
         self._locale_meta: dict[str, LocaleMeta] = {meta.code: meta for meta in locales}
         self._locale_items: dict[str, QStandardItem] = {}
         self._loaded_locales: set[str] = set()
@@ -35,9 +42,11 @@ class FsModel(QStandardItemModel):
             loc_item = QStandardItem(f"{meta.code} — {meta.display_name}")
             loc_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             loc_item.setData(meta.code, _LOCALE_CODE_ROLE)
+            loc_item.setData(_TREE_NODE_LOCALE, TREE_NODE_TYPE_ROLE)
             if self._lazy:
                 placeholder = QStandardItem("...")
                 placeholder.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                placeholder.setData(_TREE_NODE_NONE, TREE_NODE_TYPE_ROLE)
                 loc_item.appendRow(placeholder)
             else:
                 self._populate_locale(loc_item, meta)
@@ -79,11 +88,18 @@ class FsModel(QStandardItemModel):
             abs_path = str(txt)
             file_item.setData(abs_path, _ABS_PATH_ROLE)
             file_item.setData(rel, _REL_PATH_ROLE)
+            file_item.setData(_TREE_NODE_FILE, TREE_NODE_TYPE_ROLE)
             loc_item.appendRow(file_item)
             self._path_items[abs_path] = file_item
             if abs_path in self._pending_dirty:
                 self._apply_dirty_label(file_item, True)
                 self._pending_dirty.discard(abs_path)
+            if abs_path in self._pending_progress:
+                file_item.setData(
+                    self._normalize_progress_counts(self._pending_progress[abs_path]),
+                    TREE_PROGRESS_COUNTS_ROLE,
+                )
+                self._pending_progress.pop(abs_path, None)
 
     def set_dirty(self, path: Path, dirty: bool) -> None:
         """Toggle dirty visual marker for a file node by absolute path."""
@@ -103,6 +119,38 @@ class FsModel(QStandardItemModel):
         base = item.data(_REL_PATH_ROLE) or item.text()
         label = f"● {base}" if dirty else str(base)
         item.setText(label)
+
+    def set_locale_progress(
+        self, locale_code: str, counts: tuple[int, int, int, int] | None
+    ) -> None:
+        """Set or clear progress payload for one locale root row."""
+        item = self._locale_items.get(locale_code)
+        if item is None:
+            return
+        item.setData(self._normalize_progress_counts(counts), TREE_PROGRESS_COUNTS_ROLE)
+
+    def set_file_progress(
+        self, path: Path, counts: tuple[int, int, int, int] | None
+    ) -> None:
+        """Set or clear progress payload for one file row."""
+        abs_path = str(path)
+        item = self._path_items.get(abs_path)
+        normalized = self._normalize_progress_counts(counts)
+        if item is None:
+            self._pending_progress[abs_path] = normalized
+            if normalized is None:
+                self._pending_progress.pop(abs_path, None)
+            return
+        item.setData(normalized, TREE_PROGRESS_COUNTS_ROLE)
+
+    def _normalize_progress_counts(
+        self, counts: tuple[int, int, int, int] | None
+    ) -> tuple[int, int, int, int] | None:
+        if counts is None:
+            return None
+        if len(counts) != 4:
+            return None
+        return tuple(max(0, int(value)) for value in counts)
 
     # ------------------------------------------------------------------ helper
     def index_for_path(self, path: Path) -> QModelIndex:

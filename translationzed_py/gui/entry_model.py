@@ -481,6 +481,23 @@ class TranslationModel(QAbstractTableModel):
             return Status.UNTOUCHED
         return None
 
+    def canonical_status_counts(self) -> tuple[int, int, int, int]:
+        """Return canonical status distribution for base entries."""
+        untouched = 0
+        for_review = 0
+        translated = 0
+        proofread = 0
+        for entry in self._entries:
+            if entry.status == Status.PROOFREAD:
+                proofread += 1
+            elif entry.status == Status.TRANSLATED:
+                translated += 1
+            elif entry.status == Status.FOR_REVIEW:
+                for_review += 1
+            else:
+                untouched += 1
+        return untouched, for_review, translated, proofread
+
     def clear_changed_values(self, *, clear_virtual: bool = False) -> None:
         """Execute clear changed values."""
         self._baseline_by_row.clear()
