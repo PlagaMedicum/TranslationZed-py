@@ -344,23 +344,6 @@ def test_tm_workflow_build_suggestions_view_imported_label_has_no_status_tag() -
     assert "import [" not in view.items[0].label
 
 
-def test_tm_workflow_build_locale_variants_view_formats_compact_items() -> None:
-    """Verify tm workflow build locale variants view formats compact items."""
-    service = TMWorkflowService()
-    view = service.build_locale_variants_view(
-        variants=[
-            ("RU", "Russian", "Скінуць усё", 2),
-            ("KO", "Korean", "모두 버리기", 1),
-        ],
-        preview_limit=10,
-    )
-    assert view.message == "Locale variants"
-    assert len(view.items) == 2
-    assert view.items[0].label.startswith("RU · Russian [T]")
-    assert view.items[1].label.startswith("KO · Korean [FR]")
-    assert "모두 버리기" in view.items[1].tooltip_html
-
-
 def test_tm_workflow_build_suggestions_view_empty_and_filtered_messages() -> None:
     """Verify tm workflow build suggestions view empty and filtered messages."""
     service = TMWorkflowService()

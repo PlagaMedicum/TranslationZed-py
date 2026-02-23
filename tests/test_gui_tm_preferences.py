@@ -8,7 +8,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QListWidgetItem, QMessageBox, QSplitter
+from PySide6.QtWidgets import QListWidgetItem, QMessageBox, QSplitter
 
 from translationzed_py.core import preferences
 from translationzed_py.core.model import Status
@@ -547,51 +547,26 @@ def test_tm_apply_keeps_status_and_is_single_undo_step(tmp_path, qtbot, monkeypa
     assert model.data(status_index, Qt.EditRole) == Status.TRANSLATED
 
 
-def test_tm_panel_keeps_cross_locale_variants_in_session_order(
-    tmp_path, qtbot, monkeypatch
-):
-    """Verify tm locale variant cache keeps session order for internal use."""
-    monkeypatch.chdir(tmp_path)
-    root = tmp_path / "proj"
-    for loc in ("EN", "BE", "RU", "KO"):
-        (root / loc).mkdir(parents=True, exist_ok=True)
-        (root / loc / "language.txt").write_text(
-            f"text = {loc},\ncharset = UTF-8,\n",
-            encoding="utf-8",
-        )
-    (root / "EN" / "ui.txt").write_text('UI_KEY = "Drop one"\n', encoding="utf-8")
-    (root / "BE" / "ui.txt").write_text('UI_KEY = "Скінуць шт."\n', encoding="utf-8")
-    (root / "RU" / "ui.txt").write_text('UI_KEY = "Сбросить шт."\n', encoding="utf-8")
-    (root / "KO" / "ui.txt").write_text('UI_KEY = "하나 버리기"\n', encoding="utf-8")
-
-    win = MainWindow(str(root), selected_locales=["BE", "RU", "KO"])
+def test_tm_panel_does_not_expose_locale_variants_ui(tmp_path, qtbot):
+    """Verify compact TM panel does not include locale variants widgets."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
-    assert win._ensure_tm_store()
-    ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
-    win._file_chosen(ix)
-    model = win.table.model()
-    win.table.setCurrentIndex(model.index(0, 2))
-    win._left_stack.setCurrentIndex(1)
-    win._update_tm_suggestions()
 
-    assert win._tm_variants_list.count() == 2
-    assert win._tm_variants_list.item(0).text().startswith("RU ·")
-    assert win._tm_variants_list.item(1).text().startswith("KO ·")
-    assert win._tm_panel.layout().indexOf(win._tm_variants_list) == -1
-    labels = [label.text() for label in win._tm_panel.findChildren(QLabel)]
-    assert "Locale variants" not in labels
+    assert not hasattr(win, "_tm_variants_list")
 
 
 def test_tm_panel_source_and_translation_previews_are_resizable(tmp_path, qtbot):
-    """Verify tm panel uses splitters to make previews resizable."""
+    """Verify tm panel keeps a single resizable splitter and explicit TM labels."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
 
     assert isinstance(win._tm_content_splitter, QSplitter)
-    assert isinstance(win._tm_preview_splitter, QSplitter)
     assert win._tm_content_splitter.count() == 2
-    assert win._tm_preview_splitter.count() == 2
+    assert not hasattr(win, "_tm_preview_splitter")
+    assert win._tm_source_label.text() == "TM Source"
+    assert win._tm_target_label.text() == "TM Translation"
     assert win._tm_source_preview.maximumHeight() > 1000
     assert win._tm_target_preview.maximumHeight() > 1000
 
