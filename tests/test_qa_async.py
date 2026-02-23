@@ -116,6 +116,7 @@ class _Win:
         self._qa_check_same_as_source = False
         self._qa_check_languagetool = False
         self._qa_languagetool_max_rows = 500
+        self._qa_panel_result_limit = 500
         self._qa_languagetool_automark = False
         self._qa_auto_mark_for_review = False
         self._lt_server_url = "http://127.0.0.1:8081"
@@ -362,6 +363,88 @@ def test_run_scan_job_reports_languagetool_row_cap_note(monkeypatch) -> None:
         False,
     )
     assert note == "LanguageTool scanned first 1 row(s) due to cap."
+
+
+def test_run_scan_job_skips_languagetool_when_standard_limit_is_full(
+    monkeypatch,
+) -> None:
+    """Verify LT stage is skipped when standard findings already fill the panel cap."""
+    win = _Win()
+    win._qa_panel_result_limit = 1
+    win._qa_check_languagetool = True
+    win._qa_service = _QaService(
+        findings=(
+            QAFinding(
+                file=win._current_pf.path,
+                row=1,
+                code="qa.trailing",
+                excerpt="base",
+            ),
+        )
+    )
+
+    def _unexpected_lt_call(**_kwargs):  # type: ignore[no-untyped-def]
+        raise AssertionError("LanguageTool should not run when no panel slots remain")
+
+    monkeypatch.setattr(qa_async, "_lt_check_text", _unexpected_lt_call)
+    _path, findings, note = qa_async._run_scan_job(
+        win,
+        win._current_pf.path,
+        qa_async._collect_input_rows(win),
+        True,
+        False,
+        False,
+        False,
+    )
+    assert len(findings) == 1
+    assert findings[0].code == "qa.trailing"
+    assert note == "LanguageTool skipped: QA result limit reached by standard checks."
+
+
+def test_run_scan_job_stops_languagetool_when_result_limit_reached(monkeypatch) -> None:
+    """Verify LT stage stops early once remaining QA result slots are exhausted."""
+    win = _Win()
+    win._qa_check_languagetool = True
+    win._qa_panel_result_limit = 2
+    win._qa_service = _QaService(
+        findings=(
+            QAFinding(
+                file=win._current_pf.path,
+                row=0,
+                code="qa.trailing",
+                excerpt="base",
+            ),
+        )
+    )
+    rows = (
+        qa_async.QAInputRow(row=1, source_text="src", target_text="dst"),
+        qa_async.QAInputRow(row=2, source_text="src2", target_text="dst2"),
+    )
+    calls = {"count": 0}
+
+    def _fake_lt_check_text(**_kwargs):  # type: ignore[no-untyped-def]
+        calls["count"] += 1
+        return SimpleNamespace(
+            status="ok",
+            matches=[SimpleNamespace(message="A"), SimpleNamespace(message="B")],
+            warning="",
+        )
+
+    monkeypatch.setattr(qa_async, "_lt_check_text", _fake_lt_check_text)
+    _path, findings, note = qa_async._run_scan_job(
+        win,
+        win._current_pf.path,
+        rows,
+        True,
+        False,
+        False,
+        False,
+    )
+    assert calls["count"] == 1
+    assert len(findings) == 2
+    assert [f.code for f in findings] == ["qa.trailing", QA_CODE_LANGUAGETOOL]
+    assert "LanguageTool scanned first 1 row(s) due to cap." in note
+    assert "LanguageTool stopped at 1 finding(s) due to QA result limit." in note
 
 
 def test_poll_scan_filters_languagetool_auto_mark_by_toggle() -> None:

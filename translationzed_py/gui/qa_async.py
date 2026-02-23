@@ -44,12 +44,21 @@ def _normalize_languagetool_row_cap(value: object) -> int:
     return max(1, min(5000, parsed))
 
 
+def _normalize_result_limit(value: object) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = 500
+    return max(1, min(5000, parsed))
+
+
 def _scan_languagetool_rows(
     *,
     file: Path,
     rows: tuple[QAInputRow, ...],
     enabled: bool,
     max_rows: int,
+    max_findings: int,
     server_url: str,
     timeout_ms: int,
     picky_mode: bool,
@@ -57,11 +66,15 @@ def _scan_languagetool_rows(
 ) -> tuple[list[QAFinding], str]:
     if not enabled:
         return [], ""
+    if max_findings <= 0:
+        return [], "LanguageTool skipped: QA result limit reached."
     cap = _normalize_languagetool_row_cap(max_rows)
+    cap = min(cap, max_findings)
     scanned_rows = rows[:cap]
     findings: list[QAFinding] = []
     fallback_warned = False
     offline_errors = 0
+    capped_by_result_limit = False
     level = LT_LEVEL_PICKY if picky_mode else LT_LEVEL_DEFAULT
     for row in scanned_rows:
         text = str(row.target_text or "").strip()
@@ -82,6 +95,9 @@ def _scan_languagetool_rows(
         if result.status != LT_STATUS_OK:
             continue
         for match in result.matches:
+            if len(findings) >= max_findings:
+                capped_by_result_limit = True
+                break
             excerpt = str(match.message).strip() or "LanguageTool issue"
             findings.append(
                 QAFinding(
@@ -93,9 +109,15 @@ def _scan_languagetool_rows(
                     group="language",
                 )
             )
+        if capped_by_result_limit:
+            break
     notes: list[str] = []
     if len(rows) > cap:
         notes.append(f"LanguageTool scanned first {cap} row(s) due to cap.")
+    if capped_by_result_limit:
+        notes.append(
+            f"LanguageTool stopped at {max_findings} finding(s) due to QA result limit."
+        )
     if fallback_warned:
         notes.append("LanguageTool picky unsupported; default level used.")
     if offline_errors:
@@ -112,19 +134,32 @@ def _run_scan_job(
     check_tokens: bool,
     check_same_as_source: bool,
 ) -> tuple[Path, list[QAFinding], str]:
-    findings = win._qa_service.scan_rows(
+    result_limit = _normalize_result_limit(
+        getattr(win, "_qa_panel_result_limit", 500)
+    )
+    findings = list(
+        win._qa_service.scan_rows(
         file=path,
         rows=rows,
         check_trailing=check_trailing,
         check_newlines=check_newlines,
         check_tokens=check_tokens,
         check_same_as_source=check_same_as_source,
+        )
     )
+    remaining_slots = max(0, result_limit - len(findings))
+    if remaining_slots <= 0:
+        return (
+            path,
+            findings,
+            "LanguageTool skipped: QA result limit reached by standard checks.",
+        )
     lt_findings, lt_note = _scan_languagetool_rows(
         file=path,
         rows=rows,
         enabled=bool(getattr(win, "_qa_check_languagetool", False)),
         max_rows=int(getattr(win, "_qa_languagetool_max_rows", 500)),
+        max_findings=remaining_slots,
         server_url=str(getattr(win, "_lt_server_url", "")),
         timeout_ms=int(getattr(win, "_lt_timeout_ms", 1200)),
         picky_mode=bool(getattr(win, "_lt_picky_mode", False)),
@@ -132,6 +167,8 @@ def _run_scan_job(
     )
     merged = list(findings)
     merged.extend(lt_findings)
+    if len(merged) > result_limit:
+        merged = merged[:result_limit]
     return path, merged, lt_note
 
 

@@ -65,6 +65,37 @@ def test_build_qa_panel_plan_truncates() -> None:
     assert plan.status_message == "Showing first 2 QA findings (limit 2)."
 
 
+def test_build_qa_panel_plan_deprioritizes_same_as_source() -> None:
+    """Verify same-as-source findings are listed after other standard checks."""
+    root = Path("/tmp/proj")
+    findings = [
+        QAFinding(
+            file=root / "BE" / "ui.txt",
+            row=0,
+            code=QA_CODE_SAME_AS_SOURCE,
+            excerpt='Same text: "A"',
+            severity="warning",
+            group="content",
+        ),
+        QAFinding(
+            file=root / "BE" / "ui.txt",
+            row=10,
+            code=QA_CODE_TRAILING,
+            excerpt="S:'.' T:''",
+            severity="warning",
+            group="format",
+        ),
+    ]
+    plan = build_qa_panel_plan(
+        findings=findings,
+        root=root,
+        result_limit=1,
+    )
+    assert len(plan.items) == 1
+    assert plan.items[0].finding.code == QA_CODE_TRAILING
+    assert plan.truncated is True
+
+
 def test_qa_service_wrapper_delegates() -> None:
     """Verify qa service wrapper delegates."""
     root = Path("/tmp/proj")

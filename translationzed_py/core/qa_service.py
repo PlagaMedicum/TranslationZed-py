@@ -28,6 +28,13 @@ _QA_CODE_SHORT_LABELS = {
     QA_CODE_SAME_AS_SOURCE: "same-src",
     QA_CODE_LANGUAGETOOL: "LT",
 }
+_QA_CODE_PRIORITY = {
+    QA_CODE_TRAILING: 10,
+    QA_CODE_NEWLINES: 20,
+    QA_CODE_TOKENS: 30,
+    QA_CODE_LANGUAGETOOL: 40,
+    QA_CODE_SAME_AS_SOURCE: 90,
+}
 _QA_GROUP_SHORT_LABELS = {
     "format": "F",
     "content": "C",
@@ -180,9 +187,10 @@ def build_qa_panel_plan(
             truncated=False,
         )
     limit = max(1, int(result_limit))
+    ordered_findings = sorted(findings, key=_panel_sort_key)
     items: list[QAPanelItem] = []
     truncated = False
-    for finding in findings:
+    for finding in ordered_findings:
         items.append(
             QAPanelItem(
                 finding=finding,
@@ -190,7 +198,7 @@ def build_qa_panel_plan(
             )
         )
         if len(items) >= limit:
-            truncated = len(findings) > limit
+            truncated = len(ordered_findings) > limit
             break
     if truncated:
         return QAPanelPlan(
@@ -412,6 +420,17 @@ def _compact_path_label(path: str, *, max_chars: int = 28) -> str:
     if max_chars <= 3:
         return normalized[-max_chars:]
     return "..." + normalized[-(max_chars - 3) :]
+
+
+def _panel_sort_key(finding: QAFinding) -> tuple[int, str, int, str]:
+    """Sort findings for QA panel with low-priority same-source entries last."""
+    priority = _QA_CODE_PRIORITY.get(finding.code, 50)
+    return (
+        priority,
+        finding.file.as_posix(),
+        finding.row,
+        finding.code,
+    )
 
 
 def _finding_sort_key(finding: QAFinding) -> tuple[str, int, str]:
