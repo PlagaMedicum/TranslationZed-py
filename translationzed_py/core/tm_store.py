@@ -282,8 +282,9 @@ def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
 
 def _is_project_upsert_conflict_mismatch(exc: sqlite3.OperationalError) -> bool:
     """Return whether sqlite error indicates missing ON CONFLICT target support."""
-    return "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint" in str(
-        exc
+    return (
+        "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint"
+        in str(exc)
     )
 
 
@@ -513,7 +514,7 @@ class TMStore:
         target_locale = _normalize_locale(target_locale)
         now = int(updated_at if updated_at is not None else time.time())
         count = 0
-        rows = []
+        rows: list[tuple[object, ...]] = []
         for row in entries:
             if len(row) == 3:
                 key, source_text, target_text = row
@@ -587,9 +588,7 @@ class TMStore:
                 raise
             return self._upsert_project_entries_fallback(rows)
 
-    def _upsert_project_entries_fallback(
-        self, rows: list[tuple[object, ...]]
-    ) -> int:
+    def _upsert_project_entries_fallback(self, rows: list[tuple[object, ...]]) -> int:
         """Compatibility fallback for stores missing the expected upsert constraint."""
         count = 0
         for row in rows:
