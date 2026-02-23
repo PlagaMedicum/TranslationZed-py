@@ -144,10 +144,12 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Primary Actor** | SYS |
 | **Trigger** | File open, status edits, and row/status refresh events. |
 | **Main Success Scenario** |
-|  1 | SYS computes current-file percentages for translated/proofread completion. |
-|  2 | SYS computes current-locale percentages for translated/proofread completion. |
-|  3 | SYS renders compact status-bar progress text (`File T/P`, `Locale T/P`). |
-| **Post-condition** | User sees live per-file and per-locale completion progress. |
+|  1 | SYS computes canonical status distribution (Untouched / For review / Translated / Proofread) for current file and current locale. |
+|  2 | SYS renders a permanent sidebar progress strip above left tabs: Locale row always visible, File row visible when a file is open. |
+|  3 | SYS renders segmented bars with status colors and compact text `T:<translated_only>% P:<proofread>%` (proofread excluded from translated percent). |
+|  4 | SYS computes locale progress asynchronously (non-blocking) and refreshes strip/tree indicators when background aggregation finishes. |
+|  5 | SYS renders thin file-tree progress bars only for current locale root and current opened file row. |
+| **Post-condition** | User sees live motivating progress in sidebar/tree without cluttering status bar text. |
 
 ### UC-05a  Search & Navigate
 | **Trigger** | Press **Enter** in search box (`Ctrl+F`) or use `F3` / `Shift+F3`. |
@@ -529,8 +531,10 @@ UNTOUCHED ──────────────────────▶ 
    and can be hidden/shown via a **left‑side toggle**; the detail editor pane is
    toggled from the **bottom bar**. TM panel includes filters (min score + origin
    toggles for project/import) and supports project‑TM rebuild from selected locales.
+   Sidebar top area includes a permanent progress strip (Locale/File rows with segmented bars).
    TM/Search/QA side panels include quick shortcuts that open corresponding Preferences tabs.
    QA tab provides finding list/navigation with explicit empty state.
+   When no file is open, the main table area shows a short quick-start placeholder.
 11. **Theme modes**: Preferences → View supports **System / Light / Dark**; changes apply app-wide immediately and persist.
 12. **Translation QA checks (current)**: active checks are missing trailing characters,
    missing/extra newlines, and opt-in checks for missing escapes/code markers/placeholders

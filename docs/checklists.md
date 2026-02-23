@@ -59,6 +59,10 @@ avoid missing mandatory tasks.
   - Include A10 smoke paths when touched:
     status-header triage controls (sort/filter + next-priority navigation) and
     EN-diff NEW-row save prompt actions (`Apply/Skip/Edit/Cancel`).
+  - Include A11 smoke paths when touched:
+    sidebar progress strip (Locale/File rows + segmented bars), tree inline
+    progress indicators (current locale root + current file row), and no-file-open
+    quick-start placeholder visibility.
 
 ## Before pushing tags / releases
 

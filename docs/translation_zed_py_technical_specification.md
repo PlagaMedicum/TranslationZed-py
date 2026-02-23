@@ -467,12 +467,27 @@ Algorithm:
   - replace-bar toggle glyph,
   - search column selector (`Key|Source|Trans`).
  - Status bar:
-   - Saved timestamp, row indicator, current file path.
-   - Progress HUD:
-     per-file and current-locale status progress percentages for
-     translated/proofread completion (`File T/P`, `Locale T/P`).
+   - Saved/operation text, row indicator, current file path.
+   - Default idle fallback text is `Ready to edit`.
+   - Operational status text persists until the next status/action update.
    - When search/replace is active, append **scope indicator(s)**:
     `Search: File|Locale|Pool`, `Replace: File|Locale|Pool`.
+- Left sidebar progress strip (above Files/TM/Search/QA tabs):
+  - two compact rows: `Locale` (always for current locale) and `File` (shown when a file is open),
+  - segmented multicolor distribution bar by status:
+    Untouched (gray), For review (orange), Translated (green), Proofread (blue),
+  - percent text uses translated-only/proofread semantics: `T:<translated_only>% P:<proofread>%`,
+    where proofread is not included in translated percent.
+- Progress computation contract:
+  - current-file progress uses canonical model entry statuses (independent of table
+    sort/filter view state),
+  - locale progress is computed asynchronously (non-blocking) and refreshed with cache invalidation
+    after status edits/cache writes.
+- Main table empty-state contract:
+  when no file is open, right pane shows a short quick-start placeholder instead of a blank table.
+- File tree progress contract:
+  thin inline progress bars are rendered only for the current locale root row and the current
+  opened file row (to avoid tree clutter).
 - Exit guard uses `prompt_write_on_exit` (locale switch is cache‑only):
 
 ```python
@@ -507,6 +522,8 @@ if dirty_files and not prompt_save():
 - On startup, table opens the most recently opened file across selected locales
   (timestamp stored in cache headers). If no history exists, no file is auto-opened.
 - File tree shows a **dirty dot (●)** prefix for files with cached draft values.
+- File tree additionally renders compact inline progress bars for:
+  current locale root + current opened file row.
 - Save/Exit prompt lists draft files in selected locales and allows per-file deselection before write.
 - Detail editor bottom-right counter displays live Source/Translation char counts and Translation delta vs Source.
 - Save-batch write ordering and failure aggregation are delegated to

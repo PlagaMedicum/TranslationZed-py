@@ -975,7 +975,7 @@ A10 [✓] **Architecture hardening + EN diff insertion + status triage UX**
        (Files/TM/Search/QA + fullscreen resize behavior).
      - [✓] Final validation gate passes via one umbrella `make verify` run.
 
-A11 [→] **Motivating progress UI overhaul (visible, non-blocking, low-clutter)**
+A11 [✓] **Motivating progress UI overhaul (visible, non-blocking, low-clutter)**
    - **Problem**: progress is currently low-visibility status-bar text, competes
      with operational status messages, and does not help users triage in the file
      tree; `Ready` wording is ambiguous for regular users.
@@ -987,39 +987,39 @@ A11 [→] **Motivating progress UI overhaul (visible, non-blocking, low-clutter)
        behavior kept separate from progress rendering,
      - explicit no-file-open onboarding placeholder in main content.
    - **Contract (locked)**:
-     - [ ] Progress strip is always visible while project is open.
-     - [ ] Strip renders current locale + current file progress (file row hidden
+     - [✓] Progress strip is always visible while project is open.
+     - [✓] Strip renders current locale + current file progress (file row hidden
        when no file is open).
-     - [ ] Progress bars are multicolor segmented by status:
+     - [✓] Progress bars are multicolor segmented by status:
        Untouched (gray), For review (orange), Translated (green),
        Proofread (blue).
-     - [ ] Percent text uses `T:<translated_only>% P:<proofread_only>%`
+     - [✓] Percent text uses `T:<translated_only>% P:<proofread_only>%`
        semantics where proofread is **not** included in translated percent.
-     - [ ] File-tree progress bars are shown only for current locale root and
+     - [✓] File-tree progress bars are shown only for current locale root and
        current opened file row to avoid clutter.
-     - [ ] Locale progress is computed asynchronously (non-blocking) with
+     - [✓] Locale progress is computed asynchronously (non-blocking) with
        deterministic cache invalidation.
-     - [ ] Status-bar default fallback text is `Ready to edit`.
-     - [ ] Last operational status message is preserved until next action/status
+     - [✓] Status-bar default fallback text is `Ready to edit`.
+     - [✓] Last operational status message is preserved until next action/status
        update; progress strip remains visible during status changes.
-     - [ ] Empty main area (no file open) shows short quick-start guidance.
+     - [✓] Empty main area (no file open) shows short quick-start guidance.
    - **Execution slices**:
-     - [ ] Add `gui.progress_metrics` for status distribution and percent helpers.
-     - [ ] Add `gui.progress_widgets` for segmented bars and compact progress rows.
-     - [ ] Add `gui.tree_progress_delegate` for thin inline bars under tree labels.
-     - [ ] Extend `gui.fs_model` with progress roles/node typing for tree painting.
-     - [ ] Wire async locale progress refresh and cache invalidation hooks.
-     - [ ] Integrate strip + empty-state page without regressing splitter/table
+     - [✓] Add `gui.progress_metrics` for status distribution and percent helpers.
+     - [✓] Add `gui.progress_widgets` for segmented bars and compact progress rows.
+     - [✓] Add `gui.tree_progress_delegate` for thin inline bars under tree labels.
+     - [✓] Extend `gui.fs_model` with progress roles/node typing for tree painting.
+     - [✓] Wire async locale progress refresh and cache invalidation hooks.
+     - [✓] Integrate strip + empty-state page without regressing splitter/table
        relayout contract and without exceeding `main_window.py` line budget.
-     - [ ] Remove old inline `Progress File/Locale` status-bar text format.
+     - [✓] Remove old inline `Progress File/Locale` status-bar text format.
    - **Acceptance**:
-     - [ ] Progress semantics tests pass (translated excludes proofread).
-     - [ ] Status filter/sort does not alter computed canonical progress totals.
-     - [ ] Async locale updates are non-blocking and observable in UI tests.
-     - [ ] Tree bars render for current locale root and current opened file row.
-     - [ ] Status-bar text behavior tests pass for `Ready to edit` + last message.
-     - [ ] Empty-state placeholder tests pass (visible before first file open).
-     - [ ] Existing layout/perf/architecture guard regressions remain green.
+     - [✓] Progress semantics tests pass (translated excludes proofread).
+     - [✓] Status filter/sort does not alter computed canonical progress totals.
+     - [✓] Async locale updates are non-blocking and observable in UI tests.
+     - [✓] Tree bars render for current locale root and current opened file row.
+     - [✓] Status-bar text behavior tests pass for `Ready to edit` + last message.
+     - [✓] Empty-state placeholder tests pass (visible before first file open).
+     - [✓] Existing layout/perf/architecture guard regressions remain green.
 
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
@@ -1203,6 +1203,11 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
     `main_window.py` hard cap landed at `<=5400` with helper-module extraction,
     EN diff marker + virtual NEW insertion flow shipped, and status-header
     sort/filter + next-priority navigation shipped.
+  - A11 progress UX decision set landed:
+    progress moved out of status-bar inline text into a permanent sidebar strip,
+    tree progress indicators are limited to current locale root + current opened
+    file row, locale aggregation is async/non-blocking, and no-file-open state
+    now shows a quick-start placeholder in the main pane.
 
 ---
 

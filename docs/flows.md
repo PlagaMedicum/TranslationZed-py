@@ -32,6 +32,8 @@ User: Project ▸ Open
   -> open most recently opened file across selected locales
      (fast scan of cache headers `last_opened_unix`)
      - if no cache timestamps exist, open nothing
+     - right pane shows quick-start placeholder until a file is opened
+  -> sidebar progress strip shows locale progress row (file row appears after file open)
 ```
 
 ---
@@ -66,6 +68,9 @@ User edits cell
   -> write .tzp/cache/<locale>/<rel>.bin (status + draft value)
   -> detail editor bottom-right counter refreshes char counts (Source / Translation / delta)
   -> add dirty dot (●) in tree if value changed
+  -> refresh progress strip + tree progress indicators
+     - file row updates immediately from canonical model statuses
+     - locale row updates asynchronously (non-blocking)
 
 File open/refresh
   -> compare EN + locale maps against .tzp/cache/en_diff_snapshot.json baseline
