@@ -18,7 +18,9 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QPlainTextEdit,
     QPushButton,
+    QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -37,6 +39,11 @@ _THEME_MODES = [
 _SOURCE_REF_FALLBACKS = [
     ("EN, then file locale", "EN_THEN_TARGET"),
     ("File locale, then EN", "TARGET_THEN_EN"),
+]
+_LT_MODES = [
+    ("Auto", "auto"),
+    ("On", "on"),
+    ("Off", "off"),
 ]
 _TM_PATH_ROLE = Qt.UserRole + 1
 _TM_IS_PENDING_ROLE = Qt.UserRole + 2
@@ -74,6 +81,7 @@ class PreferencesDialog(QDialog):
         tabs.addTab(self._build_general_tab(), "General")
         tabs.addTab(self._build_search_tab(), "Search / Replace")
         tabs.addTab(self._build_qa_tab(), "QA")
+        tabs.addTab(self._build_languagetool_tab(), "LanguageTool")
         tabs.addTab(self._build_tm_tab(), "TM")
         tabs.addTab(self._build_view_tab(), "View")
 
@@ -114,6 +122,17 @@ class PreferencesDialog(QDialog):
             "qa_auto_mark_touched_for_review": (
                 self._qa_auto_mark_check.isChecked()
                 and self._qa_auto_mark_touched_check.isChecked()
+            ),
+            "lt_editor_mode": self._lt_editor_mode_combo.currentData(),
+            "lt_server_url": self._lt_server_url_edit.text().strip(),
+            "lt_timeout_ms": int(self._lt_timeout_spin.value()),
+            "lt_picky_mode": self._lt_picky_check.isChecked(),
+            "lt_locale_map": self._lt_locale_map_edit.toPlainText().strip() or "{}",
+            "qa_check_languagetool": self._qa_lt_check.isChecked(),
+            "qa_languagetool_max_rows": int(self._qa_lt_max_rows_spin.value()),
+            "qa_languagetool_automark": (
+                self._qa_lt_check.isChecked()
+                and self._qa_lt_automark_check.isChecked()
             ),
             "theme_mode": self._theme_mode_combo.currentData(),
             "source_reference_fallback_policy": (
@@ -257,6 +276,100 @@ class PreferencesDialog(QDialog):
         layout.addWidget(self._qa_auto_mark_touched_check)
         layout.addStretch(1)
         return widget
+
+    def _build_languagetool_tab(self) -> QWidget:
+        widget = QWidget(self)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        info = QLabel(
+            "Inline editor checks use LanguageTool API level semantics "
+            "(default/picky). If picky is unsupported, checks fall back to default.",
+            widget,
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        form = QFormLayout()
+        self._lt_editor_mode_combo = QComboBox(widget)
+        for label, value in _LT_MODES:
+            self._lt_editor_mode_combo.addItem(label, value)
+        lt_editor_mode = str(self._prefs.get("lt_editor_mode", "auto")).strip().lower()
+        self._set_combo_value(self._lt_editor_mode_combo, lt_editor_mode)
+
+        self._lt_server_url_edit = QLineEdit(
+            str(self._prefs.get("lt_server_url", "http://127.0.0.1:8081"))
+        )
+        self._lt_timeout_spin = QSpinBox(widget)
+        self._lt_timeout_spin.setRange(100, 30000)
+        try:
+            timeout_value = int(self._prefs.get("lt_timeout_ms", 1200))
+        except (TypeError, ValueError):
+            timeout_value = 1200
+        self._lt_timeout_spin.setValue(max(100, min(30000, timeout_value)))
+        self._lt_picky_check = QCheckBox("Browser-style picky mode", widget)
+        self._lt_picky_check.setChecked(bool(self._prefs.get("lt_picky_mode", False)))
+
+        form.addRow(QLabel("Editor mode"), self._lt_editor_mode_combo)
+        form.addRow(QLabel("Server URL"), self._lt_server_url_edit)
+        form.addRow(QLabel("Timeout (ms)"), self._lt_timeout_spin)
+        form.addRow(self._lt_picky_check)
+        layout.addLayout(form)
+
+        locale_map_label = QLabel("Locale map JSON", widget)
+        self._lt_locale_map_edit = QPlainTextEdit(widget)
+        self._lt_locale_map_edit.setPlaceholderText('{"EN":"en-US","BE":"be-BY"}')
+        self._lt_locale_map_edit.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self._lt_locale_map_edit.setTabChangesFocus(True)
+        self._lt_locale_map_edit.setMinimumHeight(110)
+        self._lt_locale_map_edit.setPlainText(
+            str(self._prefs.get("lt_locale_map", "{}")).strip() or "{}"
+        )
+        layout.addWidget(locale_map_label)
+        layout.addWidget(self._lt_locale_map_edit)
+
+        self._qa_lt_check = QCheckBox(
+            "Include LanguageTool findings in manual QA scans",
+            widget,
+        )
+        self._qa_lt_check.setChecked(bool(self._prefs.get("qa_check_languagetool", False)))
+        self._qa_lt_max_rows_spin = QSpinBox(widget)
+        self._qa_lt_max_rows_spin.setRange(1, 5000)
+        try:
+            qa_lt_max_rows = int(self._prefs.get("qa_languagetool_max_rows", 500))
+        except (TypeError, ValueError):
+            qa_lt_max_rows = 500
+        self._qa_lt_max_rows_spin.setValue(max(1, min(5000, qa_lt_max_rows)))
+        self._qa_lt_automark_check = QCheckBox(
+            "Allow LT findings to participate in QA auto-mark",
+            widget,
+        )
+        self._qa_lt_automark_check.setChecked(
+            bool(self._prefs.get("qa_languagetool_automark", False))
+        )
+        self._qa_lt_check.toggled.connect(self._sync_qa_languagetool_controls)
+
+        qa_lt_row = QWidget(widget)
+        qa_lt_layout = QHBoxLayout(qa_lt_row)
+        qa_lt_layout.setContentsMargins(0, 0, 0, 0)
+        qa_lt_layout.setSpacing(6)
+        qa_lt_layout.addWidget(QLabel("QA max rows", widget))
+        qa_lt_layout.addWidget(self._qa_lt_max_rows_spin)
+        qa_lt_layout.addStretch(1)
+
+        layout.addWidget(self._qa_lt_check)
+        layout.addWidget(qa_lt_row)
+        layout.addWidget(self._qa_lt_automark_check)
+        self._sync_qa_languagetool_controls(self._qa_lt_check.isChecked())
+        layout.addStretch(1)
+        return widget
+
+    def _sync_qa_languagetool_controls(self, enabled: bool) -> None:
+        self._qa_lt_max_rows_spin.setEnabled(bool(enabled))
+        self._qa_lt_automark_check.setEnabled(bool(enabled))
+        if not enabled:
+            self._qa_lt_automark_check.setChecked(False)
 
     def _build_view_tab(self) -> QWidget:
         widget = QWidget(self)

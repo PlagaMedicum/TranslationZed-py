@@ -704,6 +704,14 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
             "qa_auto_refresh": True,
             "qa_auto_mark_for_review": True,
             "qa_auto_mark_touched_for_review": True,
+            "lt_editor_mode": "on",
+            "lt_server_url": "https://lt.example.org",
+            "lt_timeout_ms": 900,
+            "lt_picky_mode": True,
+            "lt_locale_map": '{"EN":"en-US","BE":"be-BY"}',
+            "qa_check_languagetool": True,
+            "qa_languagetool_max_rows": 64,
+            "qa_languagetool_automark": True,
         },
         tm_files=[],
     )
@@ -716,6 +724,14 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert dialog._qa_auto_refresh_check.isChecked() is True
     assert dialog._qa_auto_mark_check.isChecked() is True
     assert dialog._qa_auto_mark_touched_check.isChecked() is True
+    assert dialog._lt_editor_mode_combo.currentData() == "on"
+    assert dialog._lt_server_url_edit.text() == "https://lt.example.org"
+    assert dialog._lt_timeout_spin.value() == 900
+    assert dialog._lt_picky_check.isChecked() is True
+    assert dialog._lt_locale_map_edit.toPlainText() == '{"EN":"en-US","BE":"be-BY"}'
+    assert dialog._qa_lt_check.isChecked() is True
+    assert dialog._qa_lt_max_rows_spin.value() == 64
+    assert dialog._qa_lt_automark_check.isChecked() is True
 
     dialog._qa_trailing_check.setChecked(True)
     dialog._qa_newlines_check.setChecked(True)
@@ -724,6 +740,16 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     dialog._qa_auto_refresh_check.setChecked(False)
     dialog._qa_auto_mark_check.setChecked(False)
     dialog._qa_auto_mark_touched_check.setChecked(False)
+    dialog._lt_editor_mode_combo.setCurrentIndex(
+        dialog._lt_editor_mode_combo.findData("off")
+    )
+    dialog._lt_server_url_edit.setText("http://127.0.0.1:8081")
+    dialog._lt_timeout_spin.setValue(1234)
+    dialog._lt_picky_check.setChecked(False)
+    dialog._lt_locale_map_edit.setPlainText('{"EN":"en-US"}')
+    dialog._qa_lt_check.setChecked(False)
+    dialog._qa_lt_max_rows_spin.setValue(10)
+    dialog._qa_lt_automark_check.setChecked(True)
 
     values = dialog.values()
     assert values["qa_check_trailing"] is True
@@ -733,6 +759,14 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert values["qa_auto_refresh"] is False
     assert values["qa_auto_mark_for_review"] is False
     assert values["qa_auto_mark_touched_for_review"] is False
+    assert values["lt_editor_mode"] == "off"
+    assert values["lt_server_url"] == "http://127.0.0.1:8081"
+    assert values["lt_timeout_ms"] == 1234
+    assert values["lt_picky_mode"] is False
+    assert values["lt_locale_map"] == '{"EN":"en-US"}'
+    assert values["qa_check_languagetool"] is False
+    assert values["qa_languagetool_max_rows"] == 10
+    assert values["qa_languagetool_automark"] is False
 
 
 def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
