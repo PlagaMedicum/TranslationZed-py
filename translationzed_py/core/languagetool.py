@@ -69,6 +69,7 @@ class LTRequestError(RuntimeError):
         code: int | None = None,
         body: str = "",
     ) -> None:
+        """Initialize request error with optional HTTP status and response body."""
         super().__init__(message)
         self.code = code
         self.body = body
