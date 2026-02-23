@@ -74,7 +74,7 @@ def test_normalize_qa_languagetool_max_rows_clamps_range() -> None:
 
 def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
     """Verify resolve qa preferences updates flags and change marker."""
-    current = (True, True, False, False, False, False, False)
+    current = (True, True, False, False, False, False, False, False)
     updated, changed = resolve_qa_preferences(
         {
             "qa_check_trailing": False,
@@ -87,7 +87,7 @@ def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
         },
         current=current,
     )
-    assert updated == (False, True, True, True, True, True, True)
+    assert updated == (False, True, True, True, True, True, True, True)
     assert changed is True
 
     same, unchanged = resolve_qa_preferences({}, current=updated)
@@ -97,7 +97,7 @@ def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
 
 def test_resolve_qa_preferences_disables_touched_when_auto_mark_disabled() -> None:
     """Verify touched-row auto-mark cannot stay enabled when base auto-mark is off."""
-    current = (True, True, False, False, False, True, True)
+    current = (True, True, False, False, False, True, True, True)
     updated, changed = resolve_qa_preferences(
         {
             "qa_auto_mark_for_review": False,
@@ -107,6 +107,7 @@ def test_resolve_qa_preferences_disables_touched_when_auto_mark_disabled() -> No
     )
     assert updated[5] is False
     assert updated[6] is False
+    assert updated[7] is False
     assert changed is True
 
 
@@ -130,6 +131,8 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
         "qa_auto_refresh": True,
         "qa_auto_mark_for_review": True,
         "qa_auto_mark_touched_for_review": True,
+        "qa_auto_mark_translated_for_review": True,
+        "qa_auto_mark_proofread_for_review": True,
         "qa_check_languagetool": True,
         "qa_languagetool_max_rows": 9000,
         "qa_languagetool_automark": True,
@@ -168,6 +171,8 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
     assert result.qa_auto_refresh is True
     assert result.qa_auto_mark_for_review is True
     assert result.qa_auto_mark_touched_for_review is True
+    assert result.qa_auto_mark_translated_for_review is True
+    assert result.qa_auto_mark_proofread_for_review is True
     assert result.qa_check_languagetool is True
     assert result.qa_languagetool_max_rows == 5000
     assert result.qa_languagetool_automark is True
@@ -204,6 +209,8 @@ def test_normalize_loaded_preferences_disables_touched_auto_mark_without_base() 
     )
     assert result.qa_auto_mark_for_review is False
     assert result.qa_auto_mark_touched_for_review is False
+    assert result.qa_auto_mark_translated_for_review is False
+    assert result.qa_auto_mark_proofread_for_review is False
 
 
 def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
@@ -228,7 +235,8 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
         qa_check_same_as_source=True,
         qa_auto_refresh=True,
         qa_auto_mark_for_review=True,
-        qa_auto_mark_touched_for_review=True,
+        qa_auto_mark_translated_for_review=True,
+        qa_auto_mark_proofread_for_review=False,
         qa_check_languagetool=True,
         qa_languagetool_max_rows=8000,
         qa_languagetool_automark=True,
@@ -248,6 +256,8 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
     assert payload["qa_check_same_as_source"] is True
     assert payload["qa_auto_refresh"] is True
     assert payload["qa_auto_mark_for_review"] is True
+    assert payload["qa_auto_mark_translated_for_review"] is True
+    assert payload["qa_auto_mark_proofread_for_review"] is False
     assert payload["qa_auto_mark_touched_for_review"] is True
     assert payload["qa_check_languagetool"] is True
     assert payload["qa_languagetool_max_rows"] == 5000
@@ -285,6 +295,8 @@ def test_preferences_service_load_normalized_bootstraps_settings(
     assert loaded.qa_auto_refresh is False
     assert loaded.qa_auto_mark_for_review is False
     assert loaded.qa_auto_mark_touched_for_review is False
+    assert loaded.qa_auto_mark_translated_for_review is False
+    assert loaded.qa_auto_mark_proofread_for_review is False
     assert loaded.qa_check_languagetool is False
     assert loaded.qa_languagetool_max_rows == 500
     assert loaded.qa_languagetool_automark is False
@@ -324,7 +336,8 @@ def test_preferences_service_persist_main_window_preferences(
         qa_check_same_as_source=True,
         qa_auto_refresh=True,
         qa_auto_mark_for_review=True,
-        qa_auto_mark_touched_for_review=True,
+        qa_auto_mark_translated_for_review=True,
+        qa_auto_mark_proofread_for_review=True,
         qa_check_languagetool=True,
         qa_languagetool_max_rows=64,
         qa_languagetool_automark=True,
@@ -347,6 +360,8 @@ def test_preferences_service_persist_main_window_preferences(
     assert saved["qa_check_same_as_source"] is True
     assert saved["qa_auto_refresh"] is True
     assert saved["qa_auto_mark_for_review"] is True
+    assert saved["qa_auto_mark_translated_for_review"] is True
+    assert saved["qa_auto_mark_proofread_for_review"] is True
     assert saved["qa_auto_mark_touched_for_review"] is True
     assert saved["qa_check_languagetool"] is True
     assert saved["qa_languagetool_max_rows"] == 64

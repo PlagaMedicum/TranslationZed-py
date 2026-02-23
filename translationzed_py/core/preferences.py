@@ -67,6 +67,8 @@ _DEFAULTS: dict[str, Any] = {
     "qa_auto_refresh": False,
     "qa_auto_mark_for_review": False,
     "qa_auto_mark_touched_for_review": False,
+    "qa_auto_mark_translated_for_review": False,
+    "qa_auto_mark_proofread_for_review": False,
     "last_root": "",
     "last_locales": [],
     "window_geometry": "",
@@ -94,6 +96,8 @@ _REQUIRED_PREF_KEYS = (
     "qa_auto_refresh",
     "qa_auto_mark_for_review",
     "qa_auto_mark_touched_for_review",
+    "qa_auto_mark_translated_for_review",
+    "qa_auto_mark_proofread_for_review",
     "search_scope",
     "replace_scope",
     "tm_import_dir",
@@ -208,6 +212,9 @@ def _parse_env(path: Path) -> dict[str, Any]:
         return {}
     out: dict[str, Any] = {}
     extras: dict[str, str] = {}
+    legacy_touched: bool | None = None
+    translated_seen = False
+    proofread_seen = False
     try:
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
@@ -274,8 +281,26 @@ def _parse_env(path: Path) -> dict[str, Any]:
                 val = value.lower()
                 if val in _BOOL_TRUE:
                     out["qa_auto_mark_touched_for_review"] = True
+                    legacy_touched = True
                 elif val in _BOOL_FALSE:
                     out["qa_auto_mark_touched_for_review"] = False
+                    legacy_touched = False
+            elif key == "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW":
+                val = value.lower()
+                if val in _BOOL_TRUE:
+                    out["qa_auto_mark_translated_for_review"] = True
+                    translated_seen = True
+                elif val in _BOOL_FALSE:
+                    out["qa_auto_mark_translated_for_review"] = False
+                    translated_seen = True
+            elif key == "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW":
+                val = value.lower()
+                if val in _BOOL_TRUE:
+                    out["qa_auto_mark_proofread_for_review"] = True
+                    proofread_seen = True
+                elif val in _BOOL_FALSE:
+                    out["qa_auto_mark_proofread_for_review"] = False
+                    proofread_seen = True
             elif key == "LAST_ROOT":
                 out["last_root"] = value
             elif key == "LAST_LOCALES":
@@ -328,6 +353,11 @@ def _parse_env(path: Path) -> dict[str, Any]:
                 extras[key] = value
     except OSError:
         return {}
+    if legacy_touched is not None:
+        if not translated_seen:
+            out["qa_auto_mark_translated_for_review"] = legacy_touched
+        if not proofread_seen:
+            out["qa_auto_mark_proofread_for_review"] = legacy_touched
     if extras:
         out[_EXTRAS_KEY] = extras
     return out
@@ -367,6 +397,21 @@ def load(root: Path | None = None) -> dict[str, Any]:
     merged["qa_languagetool_automark"] = bool(
         merged.get("qa_languagetool_automark", False)
     )
+    merged["qa_auto_mark_for_review"] = bool(
+        merged.get("qa_auto_mark_for_review", False)
+    )
+    merged["qa_auto_mark_translated_for_review"] = bool(
+        merged.get("qa_auto_mark_for_review", False)
+        and merged.get("qa_auto_mark_translated_for_review", False)
+    )
+    merged["qa_auto_mark_proofread_for_review"] = bool(
+        merged.get("qa_auto_mark_for_review", False)
+        and merged.get("qa_auto_mark_proofread_for_review", False)
+    )
+    merged["qa_auto_mark_touched_for_review"] = bool(
+        merged.get("qa_auto_mark_translated_for_review", False)
+        or merged.get("qa_auto_mark_proofread_for_review", False)
+    )
     if extras:
         merged[_EXTRAS_KEY] = extras
     return merged
@@ -402,6 +447,21 @@ def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
     )
     prefs["qa_languagetool_automark"] = bool(
         prefs.get("qa_languagetool_automark", False)
+    )
+    prefs["qa_auto_mark_for_review"] = bool(
+        prefs.get("qa_auto_mark_for_review", False)
+    )
+    prefs["qa_auto_mark_translated_for_review"] = bool(
+        prefs.get("qa_auto_mark_for_review", False)
+        and prefs.get("qa_auto_mark_translated_for_review", False)
+    )
+    prefs["qa_auto_mark_proofread_for_review"] = bool(
+        prefs.get("qa_auto_mark_for_review", False)
+        and prefs.get("qa_auto_mark_proofread_for_review", False)
+    )
+    prefs["qa_auto_mark_touched_for_review"] = bool(
+        prefs.get("qa_auto_mark_translated_for_review", False)
+        or prefs.get("qa_auto_mark_proofread_for_review", False)
     )
     migrated_tm_dirs = _migrate_legacy_tm_import_dirs(root)
     if extras:
@@ -441,6 +501,8 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         "QA_AUTO_REFRESH",
         "QA_AUTO_MARK_FOR_REVIEW",
         "QA_AUTO_MARK_TOUCHED_FOR_REVIEW",
+        "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW",
+        "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW",
         "LAST_ROOT",
         "LAST_LOCALES",
         "WINDOW_GEOMETRY",
@@ -459,6 +521,18 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     }
     qa_lt_max_rows = _normalize_qa_languagetool_max_rows(
         prefs.get("qa_languagetool_max_rows", _QA_LT_MAX_ROWS_DEFAULT)
+    )
+    qa_auto_mark_for_review = bool(prefs.get("qa_auto_mark_for_review", False))
+    qa_auto_mark_translated_for_review = bool(
+        qa_auto_mark_for_review
+        and prefs.get("qa_auto_mark_translated_for_review", False)
+    )
+    qa_auto_mark_proofread_for_review = bool(
+        qa_auto_mark_for_review
+        and prefs.get("qa_auto_mark_proofread_for_review", False)
+    )
+    qa_auto_mark_touched_for_review = bool(
+        qa_auto_mark_translated_for_review or qa_auto_mark_proofread_for_review
     )
     lines = [
         f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
@@ -480,11 +554,19 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         ),
         (
             "QA_AUTO_MARK_FOR_REVIEW="
-            f"{'true' if prefs.get('qa_auto_mark_for_review', False) else 'false'}"
+            f"{'true' if qa_auto_mark_for_review else 'false'}"
         ),
         (
             "QA_AUTO_MARK_TOUCHED_FOR_REVIEW="
-            f"{'true' if prefs.get('qa_auto_mark_touched_for_review', False) else 'false'}"
+            f"{'true' if qa_auto_mark_touched_for_review else 'false'}"
+        ),
+        (
+            "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW="
+            f"{'true' if qa_auto_mark_translated_for_review else 'false'}"
+        ),
+        (
+            "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW="
+            f"{'true' if qa_auto_mark_proofread_for_review else 'false'}"
         ),
         (
             "LT_EDITOR_MODE="

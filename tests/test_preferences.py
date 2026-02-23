@@ -22,6 +22,8 @@ def test_load_is_pure_read_for_missing_settings_env(
     assert prefs["qa_auto_refresh"] is False
     assert prefs["qa_auto_mark_for_review"] is False
     assert prefs["qa_auto_mark_touched_for_review"] is False
+    assert prefs["qa_auto_mark_translated_for_review"] is False
+    assert prefs["qa_auto_mark_proofread_for_review"] is False
     assert prefs["search_scope"] == "FILE"
     assert prefs["replace_scope"] == "FILE"
     assert prefs["tm_import_dir"] == str((tmp_path / ".tzp" / "tms").resolve())
@@ -54,6 +56,8 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert prefs["qa_auto_refresh"] is False
     assert prefs["qa_auto_mark_for_review"] is False
     assert prefs["qa_auto_mark_touched_for_review"] is False
+    assert prefs["qa_auto_mark_translated_for_review"] is False
+    assert prefs["qa_auto_mark_proofread_for_review"] is False
     assert prefs["search_scope"] == "FILE"
     assert prefs["replace_scope"] == "FILE"
     assert prefs["tm_import_dir"] == str((tmp_path / ".tzp" / "tms").resolve())
@@ -79,6 +83,8 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert "QA_AUTO_REFRESH=false" in raw
     assert "QA_AUTO_MARK_FOR_REVIEW=false" in raw
     assert "QA_AUTO_MARK_TOUCHED_FOR_REVIEW=false" in raw
+    assert "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=false" in raw
+    assert "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=false" in raw
     assert "SEARCH_SCOPE=FILE" in raw
     assert "REPLACE_SCOPE=FILE" in raw
     assert f"TM_IMPORT_DIR={(tmp_path / '.tzp' / 'tms').resolve()}" in raw
@@ -128,6 +134,8 @@ def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
     assert "QA_AUTO_REFRESH=false" in raw
     assert "QA_AUTO_MARK_FOR_REVIEW=false" in raw
     assert "QA_AUTO_MARK_TOUCHED_FOR_REVIEW=false" in raw
+    assert "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW=false" in raw
+    assert "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW=false" in raw
     assert "SEARCH_SCOPE=FILE" in raw
     assert "REPLACE_SCOPE=FILE" in raw
     assert f"TM_IMPORT_DIR={Path('/tmp/custom_tm_import').resolve()}" in raw

@@ -692,8 +692,15 @@ class MainWindow(QMainWindow):
         self._qa_check_same_as_source = normalized_prefs.qa_check_same_as_source
         self._qa_auto_refresh = normalized_prefs.qa_auto_refresh
         self._qa_auto_mark_for_review = normalized_prefs.qa_auto_mark_for_review
+        self._qa_auto_mark_translated_for_review = (
+            normalized_prefs.qa_auto_mark_translated_for_review
+        )
+        self._qa_auto_mark_proofread_for_review = (
+            normalized_prefs.qa_auto_mark_proofread_for_review
+        )
         self._qa_auto_mark_touched_for_review = (
-            normalized_prefs.qa_auto_mark_touched_for_review
+            self._qa_auto_mark_translated_for_review
+            or self._qa_auto_mark_proofread_for_review
         )
         _lt_adapter.apply_loaded_preferences(self, normalized_prefs)
         self._default_root = normalized_prefs.default_root
@@ -2592,6 +2599,12 @@ class MainWindow(QMainWindow):
             "qa_check_same_as_source": self._qa_check_same_as_source,
             "qa_auto_refresh": self._qa_auto_refresh,
             "qa_auto_mark_for_review": self._qa_auto_mark_for_review,
+            "qa_auto_mark_translated_for_review": (
+                self._qa_auto_mark_translated_for_review
+            ),
+            "qa_auto_mark_proofread_for_review": (
+                self._qa_auto_mark_proofread_for_review
+            ),
             "qa_auto_mark_touched_for_review": (self._qa_auto_mark_touched_for_review),
         }
         _lt_adapter.populate_preferences_dialog_values(self, prefs)
@@ -2698,7 +2711,8 @@ class MainWindow(QMainWindow):
             self._qa_check_same_as_source,
             self._qa_auto_refresh,
             self._qa_auto_mark_for_review,
-            self._qa_auto_mark_touched_for_review,
+            self._qa_auto_mark_translated_for_review,
+            self._qa_auto_mark_proofread_for_review,
         )
         updated_qa, qa_changed = _resolve_qa_preferences(values, current=previous_qa)
         (
@@ -2708,8 +2722,13 @@ class MainWindow(QMainWindow):
             self._qa_check_same_as_source,
             self._qa_auto_refresh,
             self._qa_auto_mark_for_review,
-            self._qa_auto_mark_touched_for_review,
+            self._qa_auto_mark_translated_for_review,
+            self._qa_auto_mark_proofread_for_review,
         ) = updated_qa
+        self._qa_auto_mark_touched_for_review = (
+            self._qa_auto_mark_translated_for_review
+            or self._qa_auto_mark_proofread_for_review
+        )
         qa_lt_changed = _lt_adapter.apply_runtime_preferences(self, values)
         if (qa_changed or qa_lt_changed) and self._current_model is not None:
             if self._qa_auto_refresh:
@@ -5248,7 +5267,12 @@ class MainWindow(QMainWindow):
             qa_check_same_as_source=self._qa_check_same_as_source,
             qa_auto_refresh=self._qa_auto_refresh,
             qa_auto_mark_for_review=self._qa_auto_mark_for_review,
-            qa_auto_mark_touched_for_review=(self._qa_auto_mark_touched_for_review),
+            qa_auto_mark_translated_for_review=(
+                self._qa_auto_mark_translated_for_review
+            ),
+            qa_auto_mark_proofread_for_review=(
+                self._qa_auto_mark_proofread_for_review
+            ),
             last_root=str(self._root),
             last_locales=list(self._selected_locales),
             window_geometry=geometry,
@@ -5774,12 +5798,27 @@ class MainWindow(QMainWindow):
         if self._current_model is None:
             return
         rows = self._qa_service.auto_mark_rows(findings)
-        if not self._qa_auto_mark_touched_for_review:
-            rows = tuple(
-                row
-                for row in rows
-                if self._current_model.status_for_row(row) == Status.UNTOUCHED
+        allow_translated = bool(
+            getattr(self, "_qa_auto_mark_translated_for_review", False)
+        )
+        allow_proofread = bool(
+            getattr(self, "_qa_auto_mark_proofread_for_review", False)
+        )
+        # Legacy compatibility path for tests or stale state using old combined flag.
+        if bool(getattr(self, "_qa_auto_mark_touched_for_review", False)) and not (
+            allow_translated or allow_proofread
+        ):
+            allow_translated = True
+            allow_proofread = True
+        rows = tuple(
+            row
+            for row in rows
+            if (
+                (status := self._current_model.status_for_row(row)) == Status.UNTOUCHED
+                or (allow_translated and status == Status.TRANSLATED)
+                or (allow_proofread and status == Status.PROOFREAD)
             )
+        )
         self._apply_status_to_rows(
             rows,
             status=Status.FOR_REVIEW,

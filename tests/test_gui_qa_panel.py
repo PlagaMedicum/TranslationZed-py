@@ -121,6 +121,8 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     win._qa_check_trailing = True
     win._qa_check_newlines = True
     win._qa_auto_refresh = False
+    win._qa_auto_mark_translated_for_review = False
+    win._qa_auto_mark_proofread_for_review = False
     win._qa_auto_mark_touched_for_review = False
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
@@ -141,8 +143,19 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     win._refresh_qa_for_current_file()
     assert model.data(status_index, Qt.EditRole) == Status.TRANSLATED
 
-    # Optional setting allows auto-marking non-Untouched statuses too.
-    win._qa_auto_mark_touched_for_review = True
+    # Optional translated setting allows auto-marking translated statuses.
+    win._qa_auto_mark_translated_for_review = True
+    win._refresh_qa_for_current_file()
+    assert model.data(status_index, Qt.EditRole) == Status.FOR_REVIEW
+
+    # Proofread rows are controlled independently.
+    model.setData(status_index, Status.PROOFREAD, Qt.EditRole)
+    win._qa_auto_mark_translated_for_review = False
+    win._qa_auto_mark_proofread_for_review = False
+    win._refresh_qa_for_current_file()
+    assert model.data(status_index, Qt.EditRole) == Status.PROOFREAD
+
+    win._qa_auto_mark_proofread_for_review = True
     win._refresh_qa_for_current_file()
     assert model.data(status_index, Qt.EditRole) == Status.FOR_REVIEW
 

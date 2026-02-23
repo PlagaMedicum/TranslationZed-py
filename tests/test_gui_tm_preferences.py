@@ -744,6 +744,8 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
             "qa_auto_refresh": True,
             "qa_auto_mark_for_review": True,
             "qa_auto_mark_touched_for_review": True,
+            "qa_auto_mark_translated_for_review": True,
+            "qa_auto_mark_proofread_for_review": False,
             "lt_editor_mode": "on",
             "lt_server_url": "https://lt.example.org",
             "lt_timeout_ms": 900,
@@ -763,7 +765,8 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert dialog._qa_same_source_check.isChecked() is True
     assert dialog._qa_auto_refresh_check.isChecked() is True
     assert dialog._qa_auto_mark_check.isChecked() is True
-    assert dialog._qa_auto_mark_touched_check.isChecked() is True
+    assert dialog._qa_auto_mark_translated_check.isChecked() is True
+    assert dialog._qa_auto_mark_proofread_check.isChecked() is False
     assert dialog._lt_editor_mode_combo.currentData() == "on"
     assert dialog._lt_server_url_edit.text() == "https://lt.example.org"
     assert dialog._lt_timeout_spin.value() == 900
@@ -779,7 +782,8 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     dialog._qa_same_source_check.setChecked(False)
     dialog._qa_auto_refresh_check.setChecked(False)
     dialog._qa_auto_mark_check.setChecked(False)
-    dialog._qa_auto_mark_touched_check.setChecked(False)
+    dialog._qa_auto_mark_translated_check.setChecked(False)
+    dialog._qa_auto_mark_proofread_check.setChecked(False)
     dialog._lt_editor_mode_combo.setCurrentIndex(
         dialog._lt_editor_mode_combo.findData("off")
     )
@@ -798,6 +802,8 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert values["qa_check_same_as_source"] is False
     assert values["qa_auto_refresh"] is False
     assert values["qa_auto_mark_for_review"] is False
+    assert values["qa_auto_mark_translated_for_review"] is False
+    assert values["qa_auto_mark_proofread_for_review"] is False
     assert values["qa_auto_mark_touched_for_review"] is False
     assert values["lt_editor_mode"] == "off"
     assert values["lt_server_url"] == "http://127.0.0.1:8081"
@@ -823,13 +829,18 @@ def test_preferences_qa_touched_auto_mark_clears_when_base_toggle_off(tmp_path, 
     qtbot.addWidget(dialog)
 
     assert dialog._qa_auto_mark_check.isChecked() is True
-    assert dialog._qa_auto_mark_touched_check.isChecked() is True
+    assert dialog._qa_auto_mark_translated_check.isChecked() is True
+    assert dialog._qa_auto_mark_proofread_check.isChecked() is True
     dialog._qa_auto_mark_check.setChecked(False)
 
-    assert dialog._qa_auto_mark_touched_check.isEnabled() is False
-    assert dialog._qa_auto_mark_touched_check.isChecked() is False
+    assert dialog._qa_auto_mark_translated_check.isEnabled() is False
+    assert dialog._qa_auto_mark_proofread_check.isEnabled() is False
+    assert dialog._qa_auto_mark_translated_check.isChecked() is False
+    assert dialog._qa_auto_mark_proofread_check.isChecked() is False
     values = dialog.values()
     assert values["qa_auto_mark_for_review"] is False
+    assert values["qa_auto_mark_translated_for_review"] is False
+    assert values["qa_auto_mark_proofread_for_review"] is False
     assert values["qa_auto_mark_touched_for_review"] is False
 
 
@@ -869,7 +880,8 @@ def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
             "qa_check_same_as_source": True,
             "qa_auto_refresh": True,
             "qa_auto_mark_for_review": True,
-            "qa_auto_mark_touched_for_review": True,
+            "qa_auto_mark_translated_for_review": True,
+            "qa_auto_mark_proofread_for_review": False,
         }
     )
 
@@ -879,6 +891,8 @@ def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
     assert win._qa_check_same_as_source is True
     assert win._qa_auto_refresh is True
     assert win._qa_auto_mark_for_review is True
+    assert win._qa_auto_mark_translated_for_review is True
+    assert win._qa_auto_mark_proofread_for_review is False
     assert win._qa_auto_mark_touched_for_review is True
     assert refresh_calls == [True]
 

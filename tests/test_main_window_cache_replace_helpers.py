@@ -862,11 +862,23 @@ def test_status_apply_helpers_cover_row_filtering_and_qa_auto_mark_paths(
         3: mw.Status.PROOFREAD,
     }
     win._qa_service = _QAService()  # type: ignore[assignment]
+    win._qa_auto_mark_translated_for_review = False
+    win._qa_auto_mark_proofread_for_review = False
     win._qa_auto_mark_touched_for_review = False
     win._apply_qa_auto_mark([object()])
     assert apply_calls[-1] == ((1,), mw.Status.FOR_REVIEW, "QA auto-mark For review")
 
-    win._qa_auto_mark_touched_for_review = True
+    win._qa_auto_mark_translated_for_review = True
+    win._apply_qa_auto_mark([object()])
+    assert apply_calls[-1] == ((1, 2), mw.Status.FOR_REVIEW, "QA auto-mark For review")
+
+    win._qa_auto_mark_translated_for_review = False
+    win._qa_auto_mark_proofread_for_review = True
+    win._apply_qa_auto_mark([object()])
+    assert apply_calls[-1] == ((1, 3), mw.Status.FOR_REVIEW, "QA auto-mark For review")
+
+    win._qa_auto_mark_translated_for_review = True
+    win._qa_auto_mark_proofread_for_review = True
     win._apply_qa_auto_mark([object()])
     assert apply_calls[-1] == (
         (1, 2, 3),
