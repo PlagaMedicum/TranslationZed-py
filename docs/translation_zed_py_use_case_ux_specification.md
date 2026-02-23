@@ -345,19 +345,6 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  4 | SYS shows diagnostics in a copyable text window (Copy + Close). |
 | **Post-condition** | User gets immediate TM-state diagnostics without mutating TM data. |
 
-### UC-13l  Cross-Locale Variants Preview
-| Field | Value |
-|-------|-------|
-| **Goal** | Show how the current key is translated in other opened locales. |
-| **Primary Actor** | TR / PR |
-| **Trigger** | Row selection changes while at least two target locales are opened. |
-| **Main Success Scenario** |
-|  1 | SYS collects the current key and finds matching entries by key in other opened target locales. |
-|  2 | SYS renders a compact read-only list with locale code/name, value, and compact row-status tag (`U/T/FR/P`) in **session locale order**. |
-|  3 | SYS excludes the currently edited locale from this preview list. |
-|  4 | If no sibling locales are opened or key is missing there, SYS shows an explicit empty state. |
-| **Post-condition** | Translator can compare cross-locale phrasing without switching files/locales. |
-
 ### UC-13m  QA Findings Side Panel
 | Field | Value |
 |-------|-------|

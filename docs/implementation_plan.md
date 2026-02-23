@@ -405,7 +405,7 @@ Execution order for v0.6.0 (strict sequence):
 4. Advance `C1` TM robustness: ranking diagnostics assertions, production-max
    stress fixtures, and short-query acceptance coverage.
 5. Deliver TM/context UX extensions: project-TM status visibility and
-   cross-locale variants context for current key (opened locales only).
+   compact TM suggestion previews for selected matches.
 6. Execute `A8` hardening: two consecutive cross-platform RC dry-runs with artifact builds.
 7. Final v0.6 polish: update docs/checklists/changelog only after steps 1..6 are green.
 
@@ -965,11 +965,8 @@ C1 [✓] **Translation memory** (Step 29).
      - [✓] Preferences TM tab format hints now use explicit **Supported now / Planned later** matrix text.
      - [✓] TM suggestions should display project-TM row status for each project-origin match
        as compact tags (`U/T/FR/P`); imported matches show no status/`n/a`.
-     - [✓] Add current-key cross-locale variants context (other opened locales only):
-       session-order locale code/name + value + compact status tag (`U/T/FR/P`).
      - [✓] Superseded note (2026-02-23): dedicated TM-side locale-variants panel
-       was removed from default compact UI to reduce clutter; variant context is
-       still computed internally for workflow continuity/tests.
+       was removed from default compact UI to reduce clutter.
      - [✓] Add TM diagnostics snapshot assertions for recall quality (`visible`, `fuzzy`, `unique_sources`, `recall_density`) on production-like data slices.
      - [✓] Add larger imported-TM stress fixture sized to **production maximum segment count**
        (auto-derived from largest committed perf corpus; validated by import+query perf gate).
@@ -1070,7 +1067,7 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
   - Manual QA LanguageTool findings stay opt-in and non-blocking, with independent
     LT row cap and LT auto-mark participation toggle.
   - TM panel compactness takes priority over dedicated locale-variants rendering;
-    keep source/translation previews resizable and keep variant context internal.
+    keep TM Source/TM Translation previews in compact mode.
 
 ---
 

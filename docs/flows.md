@@ -119,7 +119,7 @@ User presses Enter in search box (or F3 / Shift+F3)
 
 ---
 
-## 8) TM Query + Cross-Locale Context
+## 8) TM Query
 
 ```
 User selects row (TM panel active)
@@ -133,9 +133,8 @@ User selects row (TM panel active)
   -> render full Source/Translation for selected suggestion
 
 Row selection change (multiple locales opened)
-  -> collect same key in other opened locales
-  -> keep session-order locale -> value + compact status tag (`U/T/FR/P`)
-     in internal context cache (no dedicated locale-variants UI block in compact TM panel)
+  -> refresh TM query for selected source text + locale pair
+  -> render compact TM Source/TM Translation previews for selected match
 ```
 
 ---

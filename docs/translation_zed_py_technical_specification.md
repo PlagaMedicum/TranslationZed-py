@@ -158,7 +158,7 @@ This table binds technical sections to canonical UC IDs.
 | Search and replace scopes | UC-05a, UC-05b, UC-07 |
 | Conflict/orphan cache handling | UC-06, UC-06b |
 | Save, dirty marker, exit behavior | UC-10a, UC-10b, UC-11, UC-12 |
-| Side panel + TM workflows | UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j, UC-13k, UC-13l |
+| Side panel + TM workflows | UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j, UC-13k |
 
 ### 5.1  `core.project_scanner`
 
@@ -548,11 +548,7 @@ if dirty_files and not prompt_save():
   to keep highlight/QA semantics aligned (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes).
   QA perf regression smoke is budgeted on committed large fixtures (`SurvivalGuide`,
   `Recorded_Media`), and QA refresh is guaranteed non-mutating until explicit save.
-- For sessions with multiple opened target locales, runtime still computes
-  cross-locale variant context for the current key (ordered by session locale
-  order), but TM panel compact mode does not render a dedicated locale-variants
-  UI block.
-- Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b, UC-13l, UC-13m.
+- Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b, UC-13m.
 
 ### 5.9.1  UI Guidelines (GNOME + KDE)
 
@@ -785,7 +781,7 @@ UNTOUCHED).
    - Auto‑bootstrap runs once per session on first TM-panel activation for selected locales
      (even if DB already has entries), to prevent stale/partial project-index behavior.
    - Rebuild/bootstrapping runs asynchronously (background worker).
-- Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j, UC-13k, UC-13l.
+- Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j, UC-13k.
 
 ---
 
