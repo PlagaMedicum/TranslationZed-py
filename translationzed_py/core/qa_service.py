@@ -21,6 +21,23 @@ QA_CODE_NEWLINES = "qa.newlines"
 QA_CODE_TOKENS = "qa.tokens"
 QA_CODE_SAME_AS_SOURCE = "qa.same_source"
 QA_CODE_LANGUAGETOOL = "qa.languagetool"
+_QA_CODE_SHORT_LABELS = {
+    QA_CODE_TRAILING: "trailing",
+    QA_CODE_NEWLINES: "newlines",
+    QA_CODE_TOKENS: "tokens",
+    QA_CODE_SAME_AS_SOURCE: "same-src",
+    QA_CODE_LANGUAGETOOL: "LT",
+}
+_QA_GROUP_SHORT_LABELS = {
+    "format": "F",
+    "content": "C",
+    "language": "L",
+}
+_QA_SEVERITY_SHORT_LABELS = {
+    "warning": "W",
+    "error": "E",
+    "info": "I",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,14 +157,13 @@ def qa_finding_label(*, finding: QAFinding, root: Path) -> str:
         rel = finding.file.relative_to(root).as_posix()
     except ValueError:
         rel = finding.file.as_posix()
-    label = (
-        f"{rel}:{finding.row + 1} · "
-        f"{finding.severity.lower()}/{finding.group.lower()} · {finding.code}"
-    )
-    excerpt = finding.excerpt.strip()
+    rule = _short_rule_label(finding.code)
+    level = _short_level_label(finding.severity, finding.group)
+    label = f"#{finding.row + 1} {rule} {level}"
+    excerpt = _compact_excerpt(finding.excerpt, max_chars=80)
     if not excerpt:
-        return label
-    return f"{label} · {excerpt}"
+        return f"{label} · {_compact_path_label(rel)}"
+    return f"{label} · {excerpt} · {_compact_path_label(rel)}"
 
 
 def build_qa_panel_plan(
@@ -253,7 +269,7 @@ def scan_qa_rows(
                     file=file,
                     row=row.row,
                     code=QA_CODE_SAME_AS_SOURCE,
-                    excerpt="Translation equals source",
+                    excerpt=_same_source_excerpt(row.source_text),
                     severity="warning",
                     group="content",
                 )
@@ -343,6 +359,59 @@ def _tokens_excerpt(tokens: Sequence[str]) -> str:
         else:
             parts.append(f"{token}x{count}")
     return "Missing: " + ", ".join(parts[:5])
+
+
+def _same_source_excerpt(source_text: str) -> str:
+    """Build excerpt for same-as-source finding."""
+    snippet = _compact_excerpt(source_text, max_chars=56)
+    if not snippet:
+        return "Translation equals source"
+    return f'Same text: "{snippet}"'
+
+
+def _short_rule_label(code: str) -> str:
+    """Build compact rule label for QA list entries."""
+    normalized = str(code).strip()
+    if normalized in _QA_CODE_SHORT_LABELS:
+        return _QA_CODE_SHORT_LABELS[normalized]
+    if normalized.startswith("qa.") and len(normalized) > 3:
+        return normalized[3:]
+    return normalized or "qa"
+
+
+def _short_level_label(severity: str, group: str) -> str:
+    """Build compact severity/group label."""
+    severity_key = str(severity).strip().lower()
+    group_key = str(group).strip().lower()
+    severity_short = _QA_SEVERITY_SHORT_LABELS.get(
+        severity_key,
+        severity_key[:1].upper() or "U",
+    )
+    group_short = _QA_GROUP_SHORT_LABELS.get(
+        group_key,
+        group_key[:1].upper() or "U",
+    )
+    return f"{severity_short}/{group_short}"
+
+
+def _compact_excerpt(excerpt: str, *, max_chars: int) -> str:
+    """Trim, normalize, and compact excerpt text for sidebar labels."""
+    normalized = " ".join(str(excerpt).strip().split())
+    if not normalized:
+        return ""
+    if max_chars <= 3 or len(normalized) <= max_chars:
+        return normalized[:max_chars]
+    return normalized[: max_chars - 3].rstrip() + "..."
+
+
+def _compact_path_label(path: str, *, max_chars: int = 28) -> str:
+    """Compact path label to keep QA entries readable in narrow sidebars."""
+    normalized = str(path).strip()
+    if len(normalized) <= max_chars:
+        return normalized
+    if max_chars <= 3:
+        return normalized[-max_chars:]
+    return "..." + normalized[-(max_chars - 3) :]
 
 
 def _finding_sort_key(finding: QAFinding) -> tuple[str, int, str]:

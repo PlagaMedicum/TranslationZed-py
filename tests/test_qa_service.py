@@ -27,7 +27,7 @@ def test_qa_finding_label_uses_relative_posix_path() -> None:
         excerpt="Missing '.'",
     )
     assert qa_finding_label(finding=finding, root=root) == (
-        "BE/ui.txt:8 · warning/format · qa.trailing · Missing '.'"
+        "#8 trailing W/F · Missing '.' · BE/ui.txt"
     )
 
 
@@ -76,7 +76,8 @@ def test_qa_service_wrapper_delegates() -> None:
     )
     service = QAService()
     label = service.finding_label(finding=finding, root=root)
-    assert label.startswith("BE/ui.txt:1 · warning/format · qa.same_source")
+    assert label.startswith("#1 same-src W/F")
+    assert label.endswith("· BE/ui.txt")
     plan = service.build_panel_plan(findings=[finding], root=root, result_limit=10)
     assert len(plan.items) == 1
 
@@ -175,6 +176,7 @@ def test_qa_service_scan_rows_detects_same_as_source_when_enabled() -> None:
     assert len(findings) == 1
     assert findings[0].code == QA_CODE_SAME_AS_SOURCE
     assert findings[0].group == "content"
+    assert findings[0].excerpt.startswith('Same text: "Same"')
 
 
 def test_qa_service_navigation_plan_moves_and_wraps() -> None:

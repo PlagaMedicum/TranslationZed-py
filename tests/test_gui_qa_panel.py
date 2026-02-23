@@ -48,8 +48,8 @@ def test_qa_side_panel_lists_findings_and_navigates(qtbot, tmp_path: Path) -> No
     qtbot.waitUntil(lambda: win._qa_results_list.count() == 1, timeout=1000)
     item = win._qa_results_list.item(0)
     assert item is not None
-    assert "second.txt:1" in item.text()
-    assert "qa.trailing" in item.text()
+    assert "#1 trailing" in item.text()
+    assert "second.txt" in item.text()
     assert "Missing trailing" in item.text()
 
     win._open_qa_result_item(item)
@@ -96,8 +96,8 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     labels = [
         win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())
     ]
-    assert any("qa.trailing" in label for label in labels)
-    assert any("qa.newlines" in label for label in labels)
+    assert any("trailing" in label for label in labels)
+    assert any("newlines" in label for label in labels)
 
 
 def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
@@ -213,7 +213,7 @@ def test_qa_same_as_source_toggle_adds_content_group_finding(
     labels = [
         win._qa_results_list.item(i).text() for i in range(win._qa_results_list.count())
     ]
-    assert any("warning/content · qa.same_source" in label for label in labels)
+    assert any("same-src W/C" in label for label in labels)
 
 
 def test_qa_next_prev_navigation_moves_between_findings(qtbot, tmp_path: Path) -> None:
