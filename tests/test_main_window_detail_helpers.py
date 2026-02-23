@@ -333,3 +333,75 @@ def test_languagetool_editor_poll_ignores_stale_results(
     win._poll_languagetool_editor_check()
     assert win._detail_lt_status_label.text() == "LT: idle"
     assert win._detail_translation.extraSelections() == []
+
+
+def test_languagetool_hint_popup_only_shows_for_issue_positions(
+    qtbot,
+    tmp_path,
+) -> None:
+    """Verify LT hint popup opens only when clicked position has an LT issue."""
+    win, _root = _open_window_with_current_file(qtbot, tmp_path)
+    win._detail_translation.setPlainText("teh value")
+    win._lt_editor_mode = "on"
+    result = LanguageToolCheckResult(
+        status=LT_STATUS_OK,
+        matches=(
+            LanguageToolMatch(
+                offset=0,
+                length=3,
+                message="Possible typo",
+                replacements=("the", "tech"),
+                rule_id="MORFOLOGIK_RULE_EN_US",
+                category_id="TYPOS",
+                issue_type="misspelling",
+            ),
+        ),
+        used_level=LT_LEVEL_DEFAULT,
+        fallback_used=False,
+        warning="",
+        error="",
+    )
+    win._apply_languagetool_editor_result(result)
+    assert win._show_languagetool_hint_for_position(0) is True
+    assert win._lt_hint_menu is not None
+    assert win._show_languagetool_hint_for_position(7) is False
+
+
+def test_languagetool_hint_replacement_updates_text_and_rechecks(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify LT hint replacement mutates editor text and triggers immediate re-check."""
+    win, _root = _open_window_with_current_file(qtbot, tmp_path)
+    win._detail_translation.setPlainText("teh value")
+    result = LanguageToolCheckResult(
+        status=LT_STATUS_OK,
+        matches=(
+            LanguageToolMatch(
+                offset=0,
+                length=3,
+                message="Possible typo",
+                replacements=("the",),
+                rule_id="MORFOLOGIK_RULE_EN_US",
+                category_id="TYPOS",
+                issue_type="misspelling",
+            ),
+        ),
+        used_level=LT_LEVEL_DEFAULT,
+        fallback_used=False,
+        warning="",
+        error="",
+    )
+    win._apply_languagetool_editor_result(result)
+    span = win._find_languagetool_issue_at(1)
+    assert span is not None
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        win,
+        "_schedule_languagetool_editor_check",
+        lambda *, immediate=False: calls.append(bool(immediate)),
+    )
+    win._apply_languagetool_hint_replacement(span, "the")
+    assert win._detail_translation.toPlainText() == "the value"
+    assert calls == [True]

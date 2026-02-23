@@ -6,7 +6,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QListWidgetItem
+from PySide6.QtWidgets import QListWidgetItem, QTabWidget
 
 from translationzed_py.gui.preferences_dialog import (
     _TM_IS_PENDING_ROLE,
@@ -172,3 +172,12 @@ def test_update_tm_action_state_request_flags_and_browse_helpers(
     current_scope = dialog._search_scope_combo.currentData()
     PreferencesDialog._set_combo_value(dialog._search_scope_combo, "MISSING")
     assert dialog._search_scope_combo.currentData() == current_scope
+
+
+def test_initial_tab_selects_requested_preferences_section(qtbot) -> None:
+    """Verify optional initial-tab key opens the matching preferences section."""
+    dialog = PreferencesDialog({}, tm_files=[], initial_tab="qa")
+    qtbot.addWidget(dialog)
+    tabs = dialog.findChild(QTabWidget)
+    assert tabs is not None
+    assert tabs.tabText(tabs.currentIndex()) == "QA"

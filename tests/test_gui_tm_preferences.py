@@ -571,6 +571,26 @@ def test_tm_panel_source_and_translation_previews_are_resizable(tmp_path, qtbot)
     assert win._tm_target_preview.maximumHeight() > 1000
 
 
+def test_side_panel_preference_shortcuts_open_matching_tabs(tmp_path, qtbot, monkeypatch):
+    """Verify TM/Search/QA side panels expose shortcuts to corresponding prefs tabs."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    calls: list[str | None] = []
+    monkeypatch.setattr(
+        win,
+        "_open_preferences",
+        lambda *, initial_tab=None: calls.append(initial_tab),
+    )
+
+    win._tm_prefs_btn.click()
+    win._search_prefs_btn.click()
+    win._qa_prefs_btn.click()
+
+    assert calls == ["tm", "search", "qa"]
+
+
 def test_tm_bootstrap_rebuild_runs_even_when_store_has_entries(
     tmp_path, qtbot, monkeypatch
 ):
