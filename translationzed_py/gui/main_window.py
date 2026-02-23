@@ -500,11 +500,21 @@ _DETAIL_LAZY_THRESHOLD = 100_000
 
 
 class _CommitPlainTextEdit(QPlainTextEdit):
-    def __init__(self, commit_cb, parent=None, *, focus_cb=None, click_cb=None) -> None:
+    def __init__(
+        self,
+        commit_cb,
+        parent=None,
+        *,
+        focus_cb=None,
+        click_cb=None,
+        double_click_cb=None,
+    ) -> None:
         super().__init__(parent)
         self._commit_cb = commit_cb
         self._focus_cb = focus_cb
         self._click_cb = click_cb
+        self._double_click_cb = double_click_cb
+        self._skip_release_click_cb = False
 
     def focusOutEvent(self, event) -> None:  # noqa: N802
         super().focusOutEvent(event)
@@ -522,9 +532,23 @@ class _CommitPlainTextEdit(QPlainTextEdit):
             return
         if getattr(event, "button", lambda: None)() != Qt.LeftButton:
             return
+        if self._skip_release_click_cb:
+            self._skip_release_click_cb = False
+            return
         local_pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
         global_pos = self.viewport().mapToGlobal(local_pos)
         self._click_cb(local_pos, global_pos)
+
+    def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
+        super().mouseDoubleClickEvent(event)
+        if getattr(event, "button", lambda: None)() != Qt.LeftButton:
+            return
+        self._skip_release_click_cb = True
+        if not self._double_click_cb:
+            return
+        local_pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+        global_pos = self.viewport().mapToGlobal(local_pos)
+        self._double_click_cb(local_pos, global_pos)
 
 
 class MainWindow(QMainWindow):
@@ -633,12 +657,21 @@ class MainWindow(QMainWindow):
         self._lt_debounce_timer.setSingleShot(True)
         self._lt_debounce_timer.setInterval(_lt_adapter.LT_EDITOR_DEBOUNCE_MS)
         self._lt_debounce_timer.timeout.connect(self._start_languagetool_editor_check)
+        self._lt_hint_click_timer = QTimer(self)
+        self._lt_hint_click_timer.setSingleShot(True)
+        self._lt_hint_click_timer.setInterval(
+            max(220, int(QGuiApplication.styleHints().mouseDoubleClickInterval()) + 20)
+        )
+        self._lt_hint_click_timer.timeout.connect(
+            self._flush_pending_languagetool_hint_click
+        )
         self._lt_request_seq = 0
         self._lt_pending_payload: tuple[int, Path, int, str] | None = None
         self._lt_inflight_payload: tuple[int, Path, int, str] | None = None
         self._lt_last_result: Any | None = None
         self._lt_issue_spans: tuple[Any, ...] = ()
         self._lt_hint_menu: QMenu | None = None
+        self._lt_pending_hint_click: tuple[int, QPoint] | None = None
 
         if not self._smoke and not self._check_en_hash_cache():
             self._startup_aborted = True
@@ -1328,6 +1361,7 @@ class MainWindow(QMainWindow):
             self._detail_panel,
             focus_cb=self._load_pending_detail_text,
             click_cb=self._on_detail_translation_clicked,
+            double_click_cb=self._on_detail_translation_double_clicked,
         )
         self._detail_translation.setLineWrapMode(QPlainTextEdit.WidgetWidth)
         self._detail_translation.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
@@ -1608,15 +1642,43 @@ class MainWindow(QMainWindow):
             return
         self._detail_dirty = True
         self._refresh_detail_translation_count()
+        self._cancel_pending_languagetool_hint_click()
         self._schedule_languagetool_editor_check()
 
     def _on_detail_translation_clicked(self, local_pos: QPoint, global_pos: QPoint) -> None:
-        """Show LT hint popup when user clicks an underlined LT issue span."""
+        """Schedule LT hint popup for single-click issue spans."""
         if self._detail_translation.isReadOnly():
             return
         cursor = self._detail_translation.cursorForPosition(local_pos)
+        position = cursor.position()
+        if self._find_languagetool_issue_at(position) is None:
+            return
+        self._lt_pending_hint_click = (position, QPoint(global_pos))
+        self._lt_hint_click_timer.start()
+
+    def _on_detail_translation_double_clicked(
+        self,
+        _local_pos: QPoint,
+        _global_pos: QPoint,
+    ) -> None:
+        """Cancel pending single-click LT hint so double-click word selection is not blocked."""
+        self._cancel_pending_languagetool_hint_click()
+
+    def _cancel_pending_languagetool_hint_click(self) -> None:
+        """Clear any queued single-click LT hint popup request."""
+        self._lt_pending_hint_click = None
+        if self._lt_hint_click_timer.isActive():
+            self._lt_hint_click_timer.stop()
+
+    def _flush_pending_languagetool_hint_click(self) -> None:
+        """Open queued LT hint popup after the double-click grace period."""
+        pending = self._lt_pending_hint_click
+        self._lt_pending_hint_click = None
+        if pending is None:
+            return
+        position, global_pos = pending
         self._show_languagetool_hint_for_position(
-            cursor.position(),
+            position,
             global_pos=global_pos,
         )
 
@@ -5810,6 +5872,7 @@ class MainWindow(QMainWindow):
         self._set_qa_progress_visible(False)
 
     def _shutdown_languagetool_workers(self) -> None:
+        self._cancel_pending_languagetool_hint_click()
         menu = self._lt_hint_menu
         self._lt_hint_menu = None
         if menu is not None:
@@ -5829,6 +5892,7 @@ class MainWindow(QMainWindow):
             self._qa_refresh_timer,
             self._qa_scan_timer,
             self._lt_debounce_timer,
+            self._lt_hint_click_timer,
             self._lt_scan_timer,
             self._tm_update_timer,
             self._tm_flush_timer,

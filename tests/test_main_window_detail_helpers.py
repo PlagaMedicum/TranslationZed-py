@@ -367,6 +367,101 @@ def test_languagetool_hint_popup_only_shows_for_issue_positions(
     assert win._show_languagetool_hint_for_position(7) is False
 
 
+def test_languagetool_hint_popup_click_is_deferred(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify LT hint popup opens after a click delay instead of immediately."""
+    win, _root = _open_window_with_current_file(qtbot, tmp_path)
+    win._detail_translation.setPlainText("teh value")
+    result = LanguageToolCheckResult(
+        status=LT_STATUS_OK,
+        matches=(
+            LanguageToolMatch(
+                offset=0,
+                length=3,
+                message="Possible typo",
+                replacements=("the",),
+                rule_id="MORFOLOGIK_RULE_EN_US",
+                category_id="TYPOS",
+                issue_type="misspelling",
+            ),
+        ),
+        used_level=LT_LEVEL_DEFAULT,
+        fallback_used=False,
+        warning="",
+        error="",
+    )
+    win._apply_languagetool_editor_result(result)
+    cursor = win._detail_translation.textCursor()
+    cursor.setPosition(1)
+    local_pos = win._detail_translation.cursorRect(cursor).center()
+    global_pos = win._detail_translation.viewport().mapToGlobal(local_pos)
+    opened: list[tuple[int, object]] = []
+    monkeypatch.setattr(
+        win,
+        "_show_languagetool_hint_for_position",
+        lambda position, *, global_pos=None: opened.append((position, global_pos)) or True,
+    )
+
+    win._on_detail_translation_clicked(local_pos, global_pos)
+
+    assert opened == []
+    assert win._lt_hint_click_timer.isActive() is True
+    qtbot.wait(win._lt_hint_click_timer.interval() + 40)
+    assert len(opened) == 1
+    assert opened[0][0] == 1
+
+
+def test_languagetool_hint_popup_click_is_cancelled_by_double_click(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify double-click cancels queued LT hint popup to keep word selection fluid."""
+    win, _root = _open_window_with_current_file(qtbot, tmp_path)
+    win._detail_translation.setPlainText("teh value")
+    result = LanguageToolCheckResult(
+        status=LT_STATUS_OK,
+        matches=(
+            LanguageToolMatch(
+                offset=0,
+                length=3,
+                message="Possible typo",
+                replacements=("the",),
+                rule_id="MORFOLOGIK_RULE_EN_US",
+                category_id="TYPOS",
+                issue_type="misspelling",
+            ),
+        ),
+        used_level=LT_LEVEL_DEFAULT,
+        fallback_used=False,
+        warning="",
+        error="",
+    )
+    win._apply_languagetool_editor_result(result)
+    cursor = win._detail_translation.textCursor()
+    cursor.setPosition(1)
+    local_pos = win._detail_translation.cursorRect(cursor).center()
+    global_pos = win._detail_translation.viewport().mapToGlobal(local_pos)
+    opened: list[int] = []
+    monkeypatch.setattr(
+        win,
+        "_show_languagetool_hint_for_position",
+        lambda position, *, global_pos=None: opened.append(position) or True,
+    )
+
+    win._on_detail_translation_clicked(local_pos, global_pos)
+    assert win._lt_hint_click_timer.isActive() is True
+    win._on_detail_translation_double_clicked(local_pos, global_pos)
+
+    assert win._lt_hint_click_timer.isActive() is False
+    assert win._lt_pending_hint_click is None
+    qtbot.wait(win._lt_hint_click_timer.interval() + 40)
+    assert opened == []
+
+
 def test_languagetool_hint_replacement_updates_text_and_rechecks(
     qtbot,
     tmp_path,
