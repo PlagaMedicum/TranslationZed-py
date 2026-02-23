@@ -120,3 +120,36 @@ def test_save_current_apply_inserts_edited_new_rows(
     assert 'A = "Target A"' in text
     assert 'B = "Draft B"' in text
     assert win._en_new_drafts_by_file.get(root / "BE" / "ui.txt") is None
+
+
+def test_en_diff_resolves_locale_suffix_reference_paths(qtbot, tmp_path) -> None:
+    """Verify EN diff path resolution maps locale suffixes (for example _BE -> _EN)."""
+    root = tmp_path / "proj"
+    root.mkdir()
+    for locale in ("EN", "BE"):
+        (root / locale).mkdir()
+        (root / locale / "language.txt").write_text(
+            f"text = {locale},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "IG_UI_EN.txt").write_text(
+        'A = "Source A"\nB = "Source B"\n',
+        encoding="utf-8",
+    )
+    (root / "BE" / "IG_UI_BE.txt").write_text('A = "Target A"\n', encoding="utf-8")
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    win._prompt_write_on_exit = False
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "IG_UI_BE.txt")
+    win._file_chosen(ix)
+
+    model = win.table.model()
+    assert model is not None
+    assert model.rowCount() == 2
+    row_a = _find_row_by_key(win, "A")
+    row_b = _find_row_by_key(win, "B")
+    assert row_a >= 0
+    assert row_b >= 0
+    assert "[REMOVED]" not in str(model.data(model.index(row_a, 0), Qt.DisplayRole))
+    assert model.data(model.index(row_b, 0), Qt.DisplayRole) == "[NEW] B"

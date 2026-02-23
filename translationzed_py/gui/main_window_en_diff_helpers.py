@@ -33,6 +33,9 @@ from translationzed_py.core.en_insert_plan import (
 from translationzed_py.core.en_insert_plan import (
     build_insert_plan as _build_en_insert_plan,
 )
+from translationzed_py.core.source_reference_service import (
+    reference_path_for as _reference_path_for,
+)
 
 from .entry_model import VirtualNewRow
 
@@ -51,16 +54,15 @@ def _en_reference_path_for_locale_file(win, path: Path) -> Path | None:
     locale = win._locale_for_path(path)
     if not locale or locale == "EN":
         return None
-    try:
-        rel = path.relative_to(win._root)
-    except ValueError:
-        return None
-    if len(rel.parts) < 2:
-        return None
-    en_path = win._root / "EN" / Path(*rel.parts[1:])
-    if not en_path.exists():
-        return None
-    return en_path
+    en_path = _reference_path_for(
+        win._root,
+        path,
+        target_locale=locale,
+        reference_locale="EN",
+    )
+    if en_path is not None and en_path.exists():
+        return en_path
+    return None
 
 
 def _read_file_text(win, path: Path, *, encoding: str) -> str:
@@ -97,6 +99,10 @@ def _build_en_diff_model_state(
     en_values: Mapping[str, str],
     en_order: Sequence[str],
 ) -> tuple[dict[str, str], list[VirtualNewRow], tuple[str, ...]]:
+    # If EN reference cannot be resolved/parsed for this file, disable diff badges
+    # instead of incorrectly marking all locale keys as REMOVED.
+    if not en_rel_key:
+        return {}, [], ()
     locale_values = {entry.key: entry.value for entry in parsed_file.entries}
     snapshot = _read_en_diff_snapshot(win._root)
     snapshot_rows = snapshot.get(en_rel_key, {}) if en_rel_key else {}
