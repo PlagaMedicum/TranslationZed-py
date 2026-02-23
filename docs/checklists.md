@@ -1,4 +1,4 @@
-_Last updated: 2026-02-22_
+_Last updated: 2026-02-23_
 
 # Checklists
 
@@ -16,7 +16,8 @@ avoid missing mandatory tasks.
     strict `ResourceWarning` enforcement in default pytest-based test commands,
     perf tests (advisory warnings), benchmark regression compare (advisory warn mode),
     security/docstyle/docs-build checks, encoding-integrity
-    gates, read-only repo-clean gate, and perf scenarios
+    gates, read-only repo-clean gate, perf scenarios, and LanguageTool
+    integration checks (core endpoint/level semantics + GUI/QA adapters)
   - Warns (does not fail) when auto-fixers modify tracked files
   - Local formatter auto-fix is change-scoped (`fmt-changed`) to keep runtime practical;
     strict full-repo formatting remains enforced by CI `fmt-check` gates

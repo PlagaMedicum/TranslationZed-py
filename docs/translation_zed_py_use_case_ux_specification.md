@@ -1,5 +1,5 @@
 # TranslationZed‑Py — **Use‑Case & UX Specification**
-_version 0.7.0 · 2026‑02‑22_
+_version 0.7.0 · 2026‑02‑23_
 
 ---
 ## 1  Actors
@@ -85,6 +85,21 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  3 | Status-bar text updates to **“Undone”** / **“Redone”**. |
 | **Post-condition** | Stack pointer advanced; menu items auto-enabled / disabled. |
 
+### UC-03c  Inline LanguageTool Check (Detail Editor)
+| Field | Value |
+|-------|-------|
+| **Goal** | Show non-blocking grammar/spell signals while editing translation text. |
+| **Primary Actor** | SYS |
+| **Trigger** | Translation detail editor text changes (debounced background check). |
+| **Main Success Scenario** |
+|  1 | SYS submits a debounced LanguageTool check for current detail-editor text. |
+|  2 | SYS discards stale responses when row/text context changed before response arrives. |
+|  3 | SYS renders underline-only issue spans in detail editor for current response. |
+|  4 | SYS updates compact indicator with one of:
+|    | `checking`, `issues:N`, `ok`, `offline`, `picky unsupported (default used)`. |
+| **Rules** | Picky semantics are browser-style (`LT_PICKY_MODE=true -> level=picky`). If endpoint rejects picky level, SYS retries with `level=default` and reports non-blocking warning status. |
+| **Post-condition** | Editor remains fully interactive; LanguageTool never blocks typing/save flows. |
+
 
 ### UC-04a  Mark as Proofread
 | **Trigger** | `Ctrl+P` or context‑menu → **Mark Proofread** on selected rows. |
@@ -163,13 +178,15 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 | **Trigger** | General → **Preferences…** (platform standard Preferences shortcut). |
 | **Main Success Scenario** |
 |  1 | SYS opens a Preferences window with grouped sections. |
-|  2 | SYS presents groups: **General**, **Search & Replace**, **View**. |
+|  2 | SYS presents groups: **General**, **Search & Replace**, **QA**, **LanguageTool**, **TM**, **View**. |
 |  3 | User sets **Default root path** (optional). |
 |  4 | User sets **Search scope** (File / Locale / Locale Pool). |
 |  5 | User sets **Replace scope** (File / Locale / Locale Pool). |
 |  6 | User toggles general options (Prompt on Exit, Wrap Text, etc.). |
-|  7 | User sets **Theme** (System / Light / Dark) and toggles View options (whitespace glyphs, tag/escape highlighting, large‑text optimizations). |
-|  8 | On Apply/OK, SYS persists settings to `.tzp/config/settings.env`. |
+|  7 | User configures QA toggles (base checks, auto-refresh, auto-mark controls). |
+|  8 | User configures LanguageTool options (mode, endpoint URL, timeout, browser-style picky toggle, locale map JSON, QA LT toggles/cap). |
+|  9 | User sets **Theme** (System / Light / Dark) and toggles View options (whitespace glyphs, tag/escape highlighting, large‑text optimizations). |
+|  10 | On Apply/OK, SYS persists settings to `.tzp/config/settings.env`. |
 | **Post‑condition** | Next app launch uses the selected defaults; toolbar remains minimal. |
 
 ### UC-08  First Run - Select Default Root
@@ -230,6 +247,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  3 | If TM mode is selected, SYS refreshes TM suggestions for current row context. |
 |  4 | If Search mode is selected, SYS shows a minimal results list (`<path>:<row> · <one-line excerpt>`) produced by toolbar search execution; selecting an item jumps to file/row. |
 |  5 | If QA mode is selected, SYS shows the QA findings list for current context (or explicit empty-state text if there are no findings). Selecting an item jumps to file/row. |
+|  6 | Manual QA runs may include optional LanguageTool findings (`qa.languagetool`) when enabled; scan-cap and fallback/offline notes are shown in panel status. |
 
 ### UC-13b  TM Suggestions Query
 | Field | Value |

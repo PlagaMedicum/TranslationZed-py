@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-22_
+_Last updated: 2026-02-23_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.7.0 is shipped; this plan now
@@ -344,7 +344,7 @@ Steps marked [✓] are already implemented and verified; [ ] are pending.
   - Auto-mark defaults to Untouched rows only (`QA_AUTO_MARK_FOR_REVIEW`);
     optional extension covers touched rows (`QA_AUTO_MARK_TOUCHED_FOR_REVIEW`).
 
-### Step 31 — LanguageTool integration [→ in progress]
+### Step 31 — LanguageTool integration [✓]
 - Touchpoints: `core/languagetool.py`, Preferences, detail-editor inline highlighting,
   QA side panel/runs (TM integration stays out of v1 scope)
 - v1 scope lock:
@@ -974,7 +974,9 @@ C1 [✓] **Translation memory** (Step 29).
      - [✓] Add short-query ranking acceptance cases for additional pairs (`Run/Rest`, `Make item/Make new item`) with low threshold guarantees.
      - [✓] Add preferences-side inline warning banner for zero-segment imported TMs (beside existing marker in list rows).
      - [✓] Add deferred import/export format adapters (XLSX) behind the same import-workflow contract.
-   - **Deferred**: LanguageTool API (post‑v0.7).
+   - [✓] LanguageTool v1 shipped: browser-style picky semantics (`level=default|picky`),
+     unsupported-picky fallback, inline detail-editor status/underlines, and optional
+     manual QA findings (`qa.languagetool`) with row-cap and LT auto-mark toggle.
 C2 [✓] **Translation QA checks (shipped in v0.7)** (Step 30).
    - **Problem**: mechanical mismatches (trailing chars, newlines, escapes, placeholders) are easy to miss.
    - **Target**: opt‑in QA panel with per-check toggles; non-blocking warnings by default.
@@ -1057,6 +1059,14 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
     scheduled CI now evaluates readiness from heavy artifacts via
     `make mutation-promotion-readiness`; not-ready remains non-blocking evidence,
     and stage-default flips stay manual via reviewed commit.
+- **2026-02-23 decision set**:
+  - LanguageTool v1 uses browser-style picky semantics only
+    (`LT_PICKY_MODE -> level=picky`, otherwise `level=default`);
+    custom category filtering is not part of v1.
+  - If endpoint rejects picky level, retry once at default level and surface
+    non-blocking warning status (`picky unsupported (default used)`).
+  - Manual QA LanguageTool findings stay opt-in and non-blocking, with independent
+    LT row cap and LT auto-mark participation toggle.
 
 ---
 

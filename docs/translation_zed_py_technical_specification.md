@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.7.0 · 2026-02-22**\
+**Version 0.7.0 · 2026-02-23**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -319,6 +319,14 @@ Algorithm:
   - `QA_AUTO_REFRESH=true|false` (default `false`)
   - `QA_AUTO_MARK_FOR_REVIEW=true|false` (default `false`)
   - `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true|false` (default `false`)
+  - `LT_EDITOR_MODE=auto|on|off` (default `auto`)
+  - `LT_SERVER_URL=<url>` (default `http://127.0.0.1:8081`)
+  - `LT_TIMEOUT_MS=<int>` (default `1200`)
+  - `LT_PICKY_MODE=true|false` (default `false`; maps to API `level=picky` when enabled)
+  - `LT_LOCALE_MAP=<json>` (default `{}`)
+  - `QA_CHECK_LANGUAGETOOL=true|false` (default `false`)
+  - `QA_LANGUAGETOOL_MAX_ROWS=<int>` (default `500`)
+  - `QA_LANGUAGETOOL_AUTOMARK=true|false` (default `false`)
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
   - `DEFAULT_ROOT=<path>` (default project root in Preferences)
@@ -328,6 +336,9 @@ Algorithm:
   - `UI_THEME_MODE=SYSTEM|LIGHT|DARK` (optional extra key; absent means `SYSTEM`)
   - `SOURCE_REFERENCE_MODE=EN|<LOCALE_CODE>` (active extra key for source-column reference locale mode)
   - `SOURCE_REFERENCE_FALLBACK_POLICY=EN_THEN_TARGET|TARGET_THEN_EN` (optional source-reference fallback order)
+- LanguageTool endpoint policy:
+  - allow `https://*` endpoints
+  - allow `http://` only for localhost (`localhost`, `127.0.0.1`, `::1`)
 - (No last‑open metadata in settings; timestamps live in per‑file cache headers.)
 - Store: last root path, last locale(s), window geometry, wrap‑text toggle.
 - **prompt_write_on_exit**: bool; if false, exit never prompts and caches drafts only.
@@ -512,6 +523,9 @@ if dirty_files and not prompt_save():
   (`qa.same_source`, gated by `QA_CHECK_SAME_AS_SOURCE`). Refresh is manual by default
   (`Run QA` button in QA panel) and optional background auto-refresh can be enabled
   via `QA_AUTO_REFRESH=true`.
+  Optional LanguageTool findings (`qa.languagetool`) may be added during manual QA runs
+  when `QA_CHECK_LANGUAGETOOL=true`; scan depth is capped by
+  `QA_LANGUAGETOOL_MAX_ROWS`, and cap/offline/fallback notes are shown in panel status.
   QA row labels include severity/group tags (`warning/format`, `warning/content`)
   alongside code labels for compact triage.
   QA navigation actions (`F8` next, `Shift+F8` previous) traverse findings with wrap;
@@ -520,6 +534,16 @@ if dirty_files and not prompt_save():
   are auto-marked to **For review**. If
   `QA_AUTO_MARK_TOUCHED_FOR_REVIEW=true`, auto-mark also applies to non-Untouched
   rows (e.g., Translated/Proofread).
+  LT findings participate in auto-mark only when both `QA_AUTO_MARK_FOR_REVIEW=true`
+  and `QA_LANGUAGETOOL_AUTOMARK=true`.
+  Detail-editor LanguageTool checks are debounced/non-blocking and use browser-style
+  API level semantics:
+  `LT_PICKY_MODE=false -> level=default`,
+  `LT_PICKY_MODE=true -> level=picky`.
+  If picky is unsupported, runtime retries with `level=default` and exposes
+  non-blocking warning status.
+  Detail-editor indicator states include `checking`, `issues:N`, `ok`, `offline`,
+  and `picky unsupported (default used)`.
   Token regexes are shared from `core.qa_rules` by GUI delegates and QA scan logic
   to keep highlight/QA semantics aligned (`<LINE>`, `<CENTRE>`, `[img=...]`, `%1`, escapes).
   QA perf regression smoke is budgeted on committed large fixtures (`SurvivalGuide`,
@@ -937,7 +961,7 @@ Current builds use **cache‑only** recovery:
 3. GitHub PR integration (REST v4 API).
 4. Automatic update check (GitHub Releases).
 5. Simple editor for location `description.txt` files.
-6. LanguageTool server API integration for grammar/spell suggestions.
+6. LanguageTool UX extensions (hover details, quick-fix actions, richer diagnostics).
 7. Extended Translation QA rule packs (post-v0.7): domain-specific checks and
    project-level custom rule sets beyond the shipped baseline (`qa.trailing`,
    `qa.newlines`, `qa.tokens`, `qa.same_source`).

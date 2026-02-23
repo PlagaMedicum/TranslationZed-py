@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-22_
+_Last updated: 2026-02-23_
 
 ---
 
@@ -56,6 +56,12 @@ _Last updated: 2026-02-22_
 - QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
 - QA same-as-source checks: opt-in `qa.same_source` findings and severity/group label rendering are validated in core + panel tests.
 - QA navigation checks: `F8`/`Shift+F8` next-prev traversal moves between findings with wrap and updates status-bar hint.
+- LanguageTool integration checks:
+  - browser-style picky level request semantics (`default`/`picky`),
+  - unsupported-picky fallback to `default` with warning status,
+  - inline editor debounce + stale-result discard + underline rendering,
+  - manual QA opt-in LT findings (`qa.languagetool`) with cap note behavior,
+  - LT auto-mark participation gating via `QA_LANGUAGETOOL_AUTOMARK`.
 - Source-reference selector integration: Source-column header locale switch updates
   Source column rendering for project locales, persists `SOURCE_REFERENCE_MODE`, and falls back to
   `EN` when unavailable.
@@ -220,6 +226,15 @@ _Last updated: 2026-02-22_
 - These shortcuts are limited to test fixtures and do not alter production behavior.
 - Theme behavior remains covered by dedicated suites (`tests/test_gui_theme.py`,
   `tests/test_gui_tm_preferences.py`, `tests/test_main_window_tm_rebuild_prefs.py`).
+
+### 2.12 LanguageTool policy
+- Browser-style picky mode is represented strictly by API `level`:
+  `LT_PICKY_MODE=false -> level=default`,
+  `LT_PICKY_MODE=true -> level=picky`.
+- If picky level is rejected by endpoint, checks retry once with default level
+  and expose non-blocking warning status (`picky unsupported (default used)`).
+- Endpoint policy is enforced in tests:
+  `https://*` accepted, non-localhost `http://*` rejected, localhost HTTP accepted.
 
 ---
 
