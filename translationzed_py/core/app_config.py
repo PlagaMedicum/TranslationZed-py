@@ -29,6 +29,8 @@ class AppConfig:
     parser_adapter: str = "lua_v1"
     ui_adapter: str = "pyside6"
     cache_adapter: str = "binary_v1"
+    insertion_enabled_globs: tuple[str, ...] = ("*.txt",)
+    preview_context_lines: int = 3
 
 
 LEGACY_CACHE_DIR = ".tzp-cache"
@@ -64,6 +66,32 @@ def _normalize_ext(value: str) -> str:
     return value if value.startswith(".") else f".{value}"
 
 
+def _normalize_globs(value: Any, *, default: tuple[str, ...]) -> tuple[str, ...]:
+    if isinstance(value, str):
+        candidate = [value]
+    elif isinstance(value, list):
+        candidate = value
+    else:
+        return default
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in candidate:
+        glob = str(item).strip()
+        if not glob or glob in seen:
+            continue
+        seen.add(glob)
+        out.append(glob)
+    return tuple(out) if out else default
+
+
+def _normalize_preview_context_lines(value: Any, *, default: int = 3) -> int:
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(parsed, 20))
+
+
 @lru_cache(maxsize=8)
 def load(root: Path | None = None) -> AppConfig:
     """Load and merge app configuration from `config/app.toml` candidates."""
@@ -84,6 +112,8 @@ def load(root: Path | None = None) -> AppConfig:
                 parser_adapter=cfg.parser_adapter,
                 ui_adapter=cfg.ui_adapter,
                 cache_adapter=cfg.cache_adapter,
+                insertion_enabled_globs=cfg.insertion_enabled_globs,
+                preview_context_lines=cfg.preview_context_lines,
             )
         if isinstance(cache, dict):
             ext = cache.get("extension", cfg.cache_ext)
@@ -99,6 +129,8 @@ def load(root: Path | None = None) -> AppConfig:
                 parser_adapter=cfg.parser_adapter,
                 ui_adapter=cfg.ui_adapter,
                 cache_adapter=cfg.cache_adapter,
+                insertion_enabled_globs=cfg.insertion_enabled_globs,
+                preview_context_lines=cfg.preview_context_lines,
             )
         if isinstance(adapters, dict):
             cfg = AppConfig(
@@ -111,6 +143,8 @@ def load(root: Path | None = None) -> AppConfig:
                 parser_adapter=str(adapters.get("parser", cfg.parser_adapter)),
                 ui_adapter=str(adapters.get("ui", cfg.ui_adapter)),
                 cache_adapter=str(adapters.get("cache", cfg.cache_adapter)),
+                insertion_enabled_globs=cfg.insertion_enabled_globs,
+                preview_context_lines=cfg.preview_context_lines,
             )
         formats = data.get("formats", {})
         if isinstance(formats, dict):
@@ -125,5 +159,28 @@ def load(root: Path | None = None) -> AppConfig:
                 parser_adapter=cfg.parser_adapter,
                 ui_adapter=cfg.ui_adapter,
                 cache_adapter=cfg.cache_adapter,
+                insertion_enabled_globs=cfg.insertion_enabled_globs,
+                preview_context_lines=cfg.preview_context_lines,
+            )
+        diff = data.get("diff", {})
+        if isinstance(diff, dict):
+            cfg = AppConfig(
+                cache_dir=cfg.cache_dir,
+                config_dir=cfg.config_dir,
+                cache_ext=cfg.cache_ext,
+                translation_ext=cfg.translation_ext,
+                comment_prefix=cfg.comment_prefix,
+                en_hash_filename=cfg.en_hash_filename,
+                parser_adapter=cfg.parser_adapter,
+                ui_adapter=cfg.ui_adapter,
+                cache_adapter=cfg.cache_adapter,
+                insertion_enabled_globs=_normalize_globs(
+                    diff.get("insertion_enabled_globs"),
+                    default=cfg.insertion_enabled_globs,
+                ),
+                preview_context_lines=_normalize_preview_context_lines(
+                    diff.get("preview_context_lines"),
+                    default=cfg.preview_context_lines,
+                ),
             )
     return cfg

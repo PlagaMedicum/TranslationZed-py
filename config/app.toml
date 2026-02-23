@@ -14,3 +14,7 @@ cache = "binary_v1"
 [formats]
 translation_ext = ".txt"
 comment_prefix = "--"
+
+[diff]
+insertion_enabled_globs = ["*.txt"]
+preview_context_lines = 3
