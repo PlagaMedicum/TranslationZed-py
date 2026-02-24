@@ -21,11 +21,11 @@ MUTATION_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/mutation/promotion-readiness.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check \
-	test test-cov test-perf test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
+	test test-cov test-perf test-perf-scale test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build bench bench-check bench-advisory test-mutation \
 	test-mutation-stage mutation-promotion-check mutation-promotion-readiness \
-	test-warnings run clean clean-cache clean-config perf-scenarios ci-deps dist pack pack-win \
+	test-warnings run clean clean-cache clean-config perf-scenarios perf-dependency-eval ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
 
 # ─── Environment/bootstrap ─────────────────────────────────────────────────────
@@ -71,6 +71,9 @@ test-cov:
 
 test-perf:
 	VENV=$(VENV) bash scripts/test_perf.sh
+
+test-perf-scale:
+	VENV=$(VENV) bash scripts/test_perf_scale.sh
 
 test-perf-heavy:
 	VENV=$(VENV) bash scripts/test_perf_heavy.sh
@@ -166,6 +169,9 @@ perf-advisory:
 	@$(MAKE) test-perf || { \
 		echo "verify warning: test-perf failed (advisory in local verify)."; \
 	}
+	@$(MAKE) test-perf-scale || { \
+		echo "verify warning: test-perf-scale failed (advisory in local verify)."; \
+	}
 	@$(MAKE) perf-scenarios || { \
 		echo "verify warning: perf-scenarios failed (advisory in local verify)."; \
 	}
@@ -192,7 +198,7 @@ verify:
 	fi
 
 ## strict CI verification core (non-mutating)
-verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-check test-cov test-perf \
+verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-check test-cov test-perf test-perf-scale \
 	test-readonly-clean security docstyle docs-build perf-scenarios release-check-if-tag
 
 ## CI benchmark gate helper; can be skipped when a dedicated benchmark job is used.
@@ -255,6 +261,9 @@ release-dry-run:
 ## run perf scenarios against fixture translation files
 perf-scenarios:
 	VENV=$(VENV) bash scripts/perf_scenarios.sh $(ARGS)
+
+perf-dependency-eval:
+	$(VENV)/bin/python scripts/perf_dependency_eval.py $(ARGS)
 
 ## convenience runner: make run ARGS="--help"
 run:
