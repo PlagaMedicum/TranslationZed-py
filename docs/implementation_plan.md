@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation Plan (Detailed)
-_Last updated: 2026-02-23_
+_Last updated: 2026-02-24_
 
 Goal: provide a complete, step-by-step, **technical** plan with clear sequencing,
 explicit dependencies, and acceptance criteria. v0.7.0 is shipped; this plan now
@@ -1041,29 +1041,30 @@ A12 [→] **Mathematical performance program (parser + TM first; prototype-then-
        `T_search_old ~= N_rows*(C_lower + C_query_split + C_match)`;
        `T_search_new ~= N_rows*(C_lower + C_match) + C_query_split`.
    - **Execution slices**:
-     - [ ] Docs-first contract sync (`implementation_plan`, `technical_spec`,
+     - [✓] Docs-first contract sync (`implementation_plan`, `technical_spec`,
        `docs_structure`, `checklists`, new performance appendix, MkDocs nav).
-     - [ ] Add perf-analysis and dependency-eval scripts:
+     - [✓] Add perf-analysis and dependency-eval scripts:
        `scripts/perf_analyze.py`, `scripts/perf_dependency_eval.py`.
-     - [ ] Add 20k synthetic fixture builders + parser/TM perf-contract tests.
-     - [ ] Parser fast-path prototype: encoding-specific offset-map builders
+     - [✓] Add 20k synthetic fixture builders + parser/TM perf-contract tests.
+     - [✓] Parser fast-path prototype: encoding-specific offset-map builders
        (UTF-8, UTF-16LE/BE, single-byte) with generic fallback.
-     - [ ] Parser invariance/property tests for span monotonicity and
+     - [✓] Parser invariance/property tests for span monotonicity and
        legacy-equivalent parse outputs.
-     - [ ] TM prototype: single-pass candidate feature extraction, reduced repeated
+     - [✓] TM prototype: single-pass candidate feature extraction, reduced repeated
        token/stem work, bounded deterministic caches.
-     - [ ] TM cache-cap tests (token/stem/phrase caches) and eviction-order checks.
+     - [✓] TM cache-cap tests (token/stem/phrase caches) and eviction-order checks.
      - [ ] Wave-2 Search/Replace optimization (query decomposition hoisted out of
        per-row loops; row-normalization reuse), with no match-set drift.
-     - [ ] Add `make test-perf-scale`; wire strict blocking in CI/heavy lanes.
-     - [ ] Expand benchmark probes/baselines to include 20k scale and
+     - [✓] Add `make test-perf-scale`; wire strict blocking in CI/heavy lanes.
+     - [✓] Expand benchmark probes/baselines to include 20k scale and
        linux/macos/windows baseline sections.
    - **Acceptance**:
-     - [ ] Parser legacy-vs-optimized equivalence suite is green on fixture+20k corpora.
-     - [ ] TM legacy-vs-optimized bit-stability suite is green on fixed query corpora.
-     - [ ] Parser/TM 20k median targets (`45%` / `35%`) are met in A/B contract tests.
+     - [✓] Parser legacy-vs-optimized equivalence suite added for 2k/20k generated corpora.
+     - [✓] TM legacy-vs-optimized bit-stability suite added on fixed query pack.
+     - [✓] Parser/TM 20k median speedup contracts are encoded as strict perf-scale tests
+       (`TZP_PERF_PARSE_SPEEDUP_20K_PERCENT`, `TZP_PERF_TM_SPEEDUP_20K_PERCENT`).
      - [ ] Search wave-2 preserves literal/regex/case-sensitive match sets.
-     - [ ] New dependency policy is documented and enforced by checklist flow.
+     - [✓] New dependency policy is documented and enforced by checklist flow.
      - [ ] Docs quality gates pass (`make docstyle`, `make docs-build`).
 
 Priority B — **Productivity/clarity**
@@ -1253,6 +1254,19 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
     tree progress indicators were removed to reduce visual clutter, locale aggregation
     is async/non-blocking, and no-file-open state now shows a quick-start placeholder
     in the main pane.
+- **2026-02-24 decision set**:
+  - A12 Wave-1 locks parser/TM optimization under strict semantic compatibility:
+    parser fast paths may optimize offset-map construction only with legacy fallback
+    on mismatch; TM optimization may reorder computation/caching only with bit-stable
+    score/order outputs.
+  - Perf contracts are now dual-scale and strict in dedicated lane:
+    `make test-perf-scale` enforces parser/TM equivalence + 20k median speedup thresholds
+    (`45%` parser, `35%` TM by default via env-configurable gates).
+  - Cache policy is hard-capped deterministic LRU for TM helper caches
+    (token/stem/phrase/token-match) with explicit cap tests to prevent unbounded growth.
+  - Mathematical/statistical perf documentation is required for hot-path changes:
+    update `performance_math_appendix` and keep robust stats (median/MAD/CI) in
+    perf-analysis tooling output.
 
 ---
 

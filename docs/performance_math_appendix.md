@@ -3,106 +3,180 @@ _Last updated: 2026-02-24_
 
 ## 1) Purpose
 
-This appendix records concise mathematical models and proof obligations for
-performance-sensitive algorithms. It is used to reduce accidental behavioral
-regressions during optimization refactors.
+This appendix defines math-backed performance contracts for parser/TM optimization.
+It is intentionally deeper than canonical feature docs and serves as a
+proof-oriented reference when optimizing hot paths.
 
-Normative behavior still belongs to:
+Normative behavior remains in:
 - `docs/translation_zed_py_technical_specification.md`
-- `docs/translation_zed_py_use_case_ux_specification.md`
 - `docs/testing_strategy.md`
+- `docs/implementation_plan.md`
 
-## 2) Parser Cost Model
+## 2) Parser Model
 
-For one file parse:
+For one parse operation:
 
-`T_parse = T_tokenize + T_offset + T_finalize`
+\[
+T_{\text{parse}} = T_{\text{tokenize}} + T_{\text{offset}} + T_{\text{finalize}}
+\]
 
-Where:
-- `T_tokenize`: lexical scan and token classification
-- `T_offset`: byte-offset map construction for char->byte spans
-- `T_finalize`: entry assembly (segments/spans/status)
+where:
+- \(T_{\text{tokenize}}\): lexical scanning / token classification,
+- \(T_{\text{offset}}\): char→byte offset map construction,
+- \(T_{\text{finalize}}\): entry assembly and status extraction.
 
-### 2.1 Amdahl Target
+### 2.1 Amdahl Derivation For 45% Total Speedup
 
-If desired global speed factor is `F = 0.55` (45% faster), and improved fraction
-is `p`, required speedup of improved component is:
+Target total factor (faster is smaller) is:
 
-`S_required = p / (F - (1 - p))`
+\[
+F = 0.55
+\]
 
-For example, when `p = 0.70`:
+If improved fraction is \(p\), and component speedup is \(S\):
 
-`S_required = 0.70 / (0.55 - 0.30) = 2.8`
+\[
+F = (1-p) + \frac{p}{S}
+\]
 
-So the optimized fraction must be about `2.8x` faster.
+Solve for required component speedup:
 
-### 2.2 Equivalence Obligations
+\[
+S_{\text{required}} = \frac{p}{F - (1-p)}
+\]
 
-Optimized parser path must preserve:
-1) key/value/status sequence,
-2) byte span boundaries,
-3) concat segment lengths and gap bytes,
-4) deterministic handling of malformed-but-supported inputs.
+Example with \(p=0.70\):
 
-## 3) TM Query Cost Model
+\[
+S_{\text{required}} = \frac{0.70}{0.55 - 0.30} = 2.8
+\]
 
-For one query:
+So the optimized component must be roughly \(2.8\times\) faster.
 
-`T_tm = T_sql + N_c * (T_ratio + T_token + T_phrase + T_overlap)`
+### 2.2 Offset Mapping Complexity Contract
 
-Where:
-- `N_c`: fuzzy candidate count after SQL retrieval and dedupe
-- `T_ratio`: sequence similarity cost
-- `T_token`: tokenization/stemming cost
-- `T_phrase`: composed-phrase matching cost
-- `T_overlap`: token overlap scoring cost
+Given \(n\) Unicode code points:
+- legacy incremental-encoder path: \(\Theta(n)\) encoder calls,
+- UTF-8 fast path: \(\Theta(n)\) branch-only code-point width accumulation,
+- UTF-16 fast path: \(\Theta(n)\) surrogate-width accumulation,
+- single-byte fast path: \(\Theta(n)\) arithmetic progression.
 
-Optimization levers without semantic drift:
-1) reduce repeated token/stem recomputation,
-2) reduce repeated per-candidate feature extraction,
-3) keep deterministic bounded caches for reusable features.
+Fast paths are admissible only if they satisfy:
 
-## 4) Search Wave-2 Model
+\[
+\forall i \in [0,n-1]:\;\Delta_i = \text{offset}[i+1]-\text{offset}[i] = |\text{encode}(c_i)|
+\]
 
-Legacy shape:
+and
 
-`T_search_old ~= N_rows * (C_lower + C_query_split + C_match)`
+\[
+\text{offset}[0]=0,\quad \text{offset}[n]=|\text{raw-bytes-without-BOM}|
+\]
 
-Optimized shape:
+Fallback obligation: if a fast-path estimate violates final byte-length equality,
+legacy mapping is recomputed; mismatch after fallback is a hard parse error.
 
-`T_search_new ~= N_rows * (C_lower + C_match) + C_query_split`
+## 3) TM Query Model
 
-Interpretation: query decomposition/splitting is hoisted out of the row loop.
+Per query:
 
-## 5) Bounded Cache Invariants
+\[
+T_{\text{tm}} = T_{\text{sql}} + N_c\left(T_{\text{ratio}} + T_{\text{token}} + T_{\text{phrase}} + T_{\text{overlap}}\right)
+\]
 
-Any new hot-path cache must satisfy:
-1) fixed hard cap `K`,
-2) deterministic eviction order (LRU),
-3) no unbounded growth across long sessions,
-4) no behavioral drift from cache hits/misses.
+where \(N_c\) is candidate count after SQL retrieval/dedup.
 
-Proposed cap family:
-- token cache: 8192 entries
-- stem cache: 4096 entries
-- phrase cache: 2048 entries
+Optimization constraints (no scoring drift):
+- ranking/scoring formula is unchanged,
+- improvements are only from computation reuse (token/stem/phrase caches,
+  reduced repeated tokenization/stemming),
+- output order and score are bit-stable for fixed corpus/query packs.
 
-## 6) Perf Contract Measurement
+## 4) Cache-Cap Invariants
 
-For parser/TM performance contracts:
-1) use same-run A/B comparison (legacy vs optimized path),
-2) test at dual scales: fixture-scale (`~2k`) and synthetic scale (`20k`),
-3) compare medians, not single-shot timings,
-4) enforce strict semantic equivalence before accepting speed gains.
+For each cache \(C_j\) with capacity \(K_j\):
 
-## 7) Dependency Adoption Proof Gate
+\[
+|C_j(t)| \le K_j\quad\forall t
+\]
+
+with deterministic LRU eviction. Current caps:
+- token cache: `8192`
+- stem cache: `4096`
+- phrase cache: `2048`
+- token-match cache: `8192`
+
+Amortized operations are \(O(1)\) for get/put and bounded-memory by design.
+
+## 5) Search Wave-2 Cost Model
+
+Legacy model:
+
+\[
+T_{\text{search-old}} \approx N_{\text{rows}}(C_{\text{lower}} + C_{\text{query-split}} + C_{\text{match}})
+\]
+
+Hoisted model:
+
+\[
+T_{\text{search-new}} \approx N_{\text{rows}}(C_{\text{lower}} + C_{\text{match}}) + C_{\text{query-split}}
+\]
+
+This is valid only if literal/regex/case result sets remain invariant.
+
+## 6) Statistical Measurement Contract
+
+Single-shot timings are disallowed for gates. We use repeated timing and robust
+estimators:
+
+Median:
+
+\[
+\tilde{x} = \operatorname{median}(x_1,\dots,x_n)
+\]
+
+Median absolute deviation (MAD):
+
+\[
+\operatorname{MAD} = \operatorname{median}\left(|x_i - \tilde{x}|\right)
+\]
+
+Speed gain (percentage):
+
+\[
+G = 100\cdot\frac{\tilde{x}_{\text{legacy}}-\tilde{x}_{\text{new}}}{\tilde{x}_{\text{legacy}}}
+\]
+
+Confidence reporting uses bootstrap median intervals:
+- resample with replacement,
+- compute bootstrap medians,
+- report 2.5% and 97.5% quantiles.
+
+## 7) Equivalence Proof Obligations
+
+### 7.1 Parser
+
+Optimized parser must preserve:
+1. key/value/status sequence,
+2. byte spans and segment boundaries,
+3. concat gap bytes,
+4. malformed-but-supported parse behavior.
+
+### 7.2 TM
+
+For fixed corpora/query packs, optimized TM must preserve:
+1. result count under same limits/thresholds,
+2. exact score values,
+3. ordering (including tie-break paths).
+
+## 8) Dependency Trust Gate
 
 A performance dependency is admissible only if all pass:
-1) license compatibility,
-2) mature maintained upstream,
-3) Python 3.10+ cross-platform support,
-4) no hidden side effects,
-5) measured `>15%` gain vs optimized in-project baseline,
-6) bit-stable output equivalence for locked contracts.
+1. license compatibility,
+2. mature maintained upstream,
+3. Python 3.10+ cross-platform compatibility,
+4. no hidden runtime/network side effects,
+5. measured gain `>15%` over optimized pure-Python baseline,
+6. bit-stable equivalence for locked contracts.
 
-If any fails: dependency is rejected and rationale is documented.
+Any failed condition yields explicit rejection with evidence.

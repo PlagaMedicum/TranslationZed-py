@@ -559,6 +559,9 @@ UNTOUCHED ──────────────────────▶ 
    `SOURCE_REFERENCE_MODE`. Fallback behavior is configurable in Preferences
    (`EN → Target` or `Target → EN`) and persisted in
    `SOURCE_REFERENCE_FALLBACK_POLICY`.
+14. **A12 performance scope guard**: parser/TM/Search performance work in A12 is
+   internal-only and must not add user-visible mode toggles or alter ranking/editing
+   behavior contracts.
 
 ---
-_Last updated: 2026-02-23 (v0.7.0)_
+_Last updated: 2026-02-24 (v0.7.0 + A12 in progress)_

@@ -80,6 +80,8 @@ avoid missing mandatory tasks.
   5) measurable `>15%` gain on target workload,
   6) no drift on locked behavioral equivalence contracts.
 - **Attach evaluation output** from `scripts/perf_dependency_eval.py` to PR notes.
+  - Preferred command:
+    `make perf-dependency-eval ARGS="--candidate <name> --out-json artifacts/perf/dependency_<name>.json"`
 - **Reject adoption** if any gate fails; document rejection rationale in
   `docs/implementation_plan.md` decisions ledger.
 

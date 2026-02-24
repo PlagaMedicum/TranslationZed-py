@@ -913,10 +913,17 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
     `-W error::ResourceWarning` by default (single-pass strictness, no duplicate rerun).
 - **Performance**:
   - deterministic perf budget tests (`make test-perf`),
+  - dual-scale perf-contract tests (`make test-perf-scale`) for parser/TM
+    legacy-vs-optimized equivalence and 20k median speedup gates,
   - fixture-backed scenario smoke (`make perf-scenarios`),
+  - non-mutating statistical profiler/reporter (`scripts/perf_analyze.py`)
+    with robust summary stats (median/MAD/CI) and parser Amdahl guidance output,
   - benchmark suite (`pytest-benchmark`) with committed baseline and
     regression threshold gate (`make bench-check`, default fail over +20% in CI),
   - benchmark baseline is versioned per platform (`linux`, `macos`, `windows`),
+    including synthetic 20k parse/search/TM probes,
+  - performance dependency evaluation path is explicit and offline:
+    `scripts/perf_dependency_eval.py` (trust gates + measured gain/equivalence report),
   - local `make verify` runs `make bench-check BENCH_COMPARE_MODE=warn` (advisory),
   - local `make verify` treats perf budget/scenario failures as advisory warnings;
     strict blocking is enforced in `make verify-ci` and release workflows.

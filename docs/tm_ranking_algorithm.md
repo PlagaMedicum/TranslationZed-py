@@ -1,5 +1,5 @@
 # TranslationZed-Py TM Ranking Algorithm
-_Last updated: 2026-02-09_
+_Last updated: 2026-02-24_
 
 ## 1) Purpose
 
@@ -38,6 +38,8 @@ Goals:
 
 - Tokens are extracted with `re.findall(r"\\w+", text, flags=re.UNICODE)`.
 - Tokens shorter than 2 chars are ignored.
+- Repeated query/candidate tokenization is cached with deterministic bounded LRU:
+  token cache cap `8192`.
 
 ### 3.3 Token Match Semantics (prefix/affix-aware)
 
@@ -58,6 +60,8 @@ Two tokens are considered matching when one of the rules holds:
 
 This enables CAT-like prefix/affix matching on EN source strings without introducing
 heavy NLP dependencies.
+- Stemming and token-match helper paths are cached with deterministic bounded LRU:
+  stem cache cap `4096`, token-match cache cap `8192`.
 
 ## 4) Retrieval Pipeline
 
@@ -104,6 +108,8 @@ Before scoring, candidate rows pass gates:
 Composed-phrase match:
 - one-token query: token-aware matching against candidate tokens,
 - multi-token query: ordered token composition match.
+- Phrase-match helper is cached with deterministic bounded LRU:
+  phrase cache cap `2048`.
 
 ## 6) Scoring
 
@@ -169,6 +175,12 @@ Regression tests cover:
 - Production-like corpus slices also assert diagnostics snapshot minima
   (`visible`, `fuzzy`, `unique_sources`, `recall_density`) to keep recall
   quality observable in CI.
+- Bit-stability and performance contracts (A12):
+  - `tests/test_tm_query_perf_contract.py` compares optimized path vs legacy helper
+    path and asserts identical ordered results/scores for fixed query pack,
+  - same module enforces 20k-scale median speedup contract (default `>=35%`),
+  - `tests/test_tm_store_cache_caps.py` enforces bounded cache sizes and
+    deterministic LRU-eviction behavior.
 
 See `tests/test_tm_store.py` and `tests/test_tm_ranking_corpus.py` for executable examples.
 

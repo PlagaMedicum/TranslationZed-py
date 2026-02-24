@@ -152,6 +152,7 @@ User presses Enter in search box (or F3 / Shift+F3)
 ```
 User selects row (TM panel active)
   -> async TM query by source text + locale pair
+  -> reuse bounded deterministic helper caches (token/stem/phrase/token-match)
   -> rank results (exact first, fuzzy neighbors, token-aware gates)
   -> render suggestions:
        - project/import origin

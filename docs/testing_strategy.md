@@ -151,10 +151,21 @@ _Last updated: 2026-02-23_
   - source-reference locale switching latency on large fixtures.
 - `tests/test_render_workflow_service.py` enforces adaptive prefetch-window policy:
   render-heavy paths must cap prefetch margins to reduce lazy decode spikes.
+- `make test-perf-scale` runs dual-scale strict contracts for parser/TM hot paths:
+  - parser fast-path offset-map invariants:
+    `tests/test_parser_offset_map_invariants.py`,
+  - parser legacy-vs-optimized equivalence + 20k median speedup contract:
+    `tests/test_parser_perf_contract.py`,
+  - TM helper cache-cap and deterministic LRU behavior:
+    `tests/test_tm_store_cache_caps.py`,
+  - TM legacy-vs-optimized bit-stability + 20k median speedup contract:
+    `tests/test_tm_query_perf_contract.py`.
 - pytest always prints a **Performance** summary in terminal output,
   including `make verify`, to keep regressions visible.
 - Local `make verify` treats perf-budget failures as advisory warnings;
   strict perf blocking is enforced in `make verify-ci` / release gates.
+- Local `make verify` runs `test-perf-scale` in advisory mode once;
+  CI `verify-ci-core` runs `test-perf-scale` in strict mode.
 
 ### 2.7 Real‑data performance scenarios (scripted)
 - `make perf-scenarios` runs perf checks against fixture files in
@@ -167,7 +178,7 @@ _Last updated: 2026-02-23_
 
 ### 2.8 Benchmark regression gate
 - `tests/benchmarks/test_core_benchmarks.py` provides benchmark-oriented perf
-  probes for parse/search hot paths.
+  probes for parse/search/TM hot paths, including synthetic 20k-scale probes.
 - Default pytest runs skip benchmark tests (`--benchmark-skip`) to keep regular
   test latency stable.
 - `make bench` runs benchmark tests and writes JSON output under `artifacts/bench/`.
@@ -176,6 +187,10 @@ _Last updated: 2026-02-23_
   `BENCH_REGRESSION_THRESHOLD_PERCENT` (default 20%).
 - Baseline file includes dedicated platform sections (`linux`, `macos`, `windows`)
   and benchmark checks resolve against the active platform key.
+- Baseline tracks synthetic 20k probes per platform for:
+  parser (`test_bench_parse_lazy_synthetic_20k`),
+  search (`test_bench_search_translation_synthetic_20k`),
+  TM query (`test_bench_tm_query_synthetic_20k`).
 - CI enforces benchmark regression in a dedicated Linux job (`BENCH_COMPARE_MODE=fail`);
   matrix `verify-ci` jobs use `VERIFY_SKIP_BENCH=1` to avoid duplicate benchmark runs.
 - Scheduled CI heavy lane still runs strict benchmark regression once
