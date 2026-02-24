@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.7.0 · 2026-02-23**\
+**Version 0.7.0 · 2026-02-24**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -1040,6 +1040,16 @@ The stack is **per-file** and cleared on successful save or file reload.
   notice via Help/About. LICENSE text is hidden by default and expandable in that dialog.
 - **Codex usage**: permissible as a development tool, but usage must comply with OpenAI Terms/Policies.
   Generated code should be reviewed for third‑party license obligations before inclusion.
+- **Dependency admission policy (normative)**:
+  - performance or tooling dependencies MUST remain minimal and justified by measured gain,
+  - any new dependency MUST pass a strict trust gate before adoption:
+    1) license compatibility with project distribution terms,
+    2) mature/maintained upstream and stable API history,
+    3) cross-platform support for Python 3.10+ (Linux/macOS/Windows),
+    4) no hidden network/runtime side effects in default usage path,
+    5) measurable `>15%` gain versus optimized in-project baseline on target workload,
+    6) zero behavioral drift for locked contracts (bit-stable equivalence where required),
+  - if any gate fails, dependency adoption is rejected and rationale is documented.
 
 ---
 
@@ -1057,4 +1067,4 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-*Last updated: 2026-02-22 (v0.7.0)*
+*Last updated: 2026-02-24 (v0.7.0)*
