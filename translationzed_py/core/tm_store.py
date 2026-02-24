@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 import re
 import sqlite3
 import time
+from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +30,12 @@ _SHORT_QUERY_MAX_CANDIDATES = 5000
 _SHORT_QUERY_BUCKET_CANDIDATES = 2500
 _MULTI_TOKEN_LEN_PADDING = 4
 _MAX_FUZZY_SOURCE_LEN = 5000
+_TOKEN_CACHE_CAP = 8192
+_STEM_CACHE_CAP = 4096
+_PHRASE_MATCH_CACHE_CAP = 2048
+_TOKEN_MATCH_CACHE_CAP = 8192
+_QUERY_RESULT_CACHE_CAP = 256
+_TOKEN_RE = re.compile(r"\w+", flags=re.UNICODE)
 _IMPORT_VISIBLE_SQL = """
 origin != 'import'
 OR tm_path IS NULL
@@ -98,11 +106,21 @@ def _prefix(text: str, length: int = 8) -> str:
 def _query_tokens(text: str) -> tuple[str, ...]:
     """Execute query tokens."""
     tokens: list[str] = []
-    for token in re.findall(r"\w+", text, flags=re.UNICODE):
+    seen: set[str] = set()
+    for token in _TOKEN_RE.findall(text):
         if len(token) < 2:
             continue
+        if token in seen:
+            continue
+        seen.add(token)
         tokens.append(token)
-    return tuple(dict.fromkeys(tokens))
+    return tuple(tokens)
+
+
+@functools.lru_cache(maxsize=_TOKEN_CACHE_CAP)
+def _query_tokens_cached(text: str) -> tuple[str, ...]:
+    """Cache tokenization for repeated query/candidate normalization."""
+    return _query_tokens(text)
 
 
 def _stem_token(token: str) -> str:
@@ -124,18 +142,32 @@ def _stem_token(token: str) -> str:
     return token
 
 
+@functools.lru_cache(maxsize=_STEM_CACHE_CAP)
+def _stem_token_cached(token: str) -> str:
+    """Cache normalized stems used by token-matching heuristics."""
+    return _stem_token(token)
+
+
 def _token_matches(
     query_token: str,
     candidate_token: str,
     *,
     use_en_stemming: bool,
 ) -> bool:
+    return _token_matches_cached(query_token, candidate_token, use_en_stemming)
+
+
+def _token_matches_uncached(
+    query_token: str,
+    candidate_token: str,
+    use_en_stemming: bool,
+) -> bool:
     """Execute token matches."""
     if query_token == candidate_token:
         return True
     if use_en_stemming:
-        query_stem = _stem_token(query_token)
-        candidate_stem = _stem_token(candidate_token)
+        query_stem = _stem_token_cached(query_token)
+        candidate_stem = _stem_token_cached(candidate_token)
         if len(query_stem) >= 3 and query_stem == candidate_stem:
             return True
     if len(query_token) == len(candidate_token) and len(query_token) >= 4:
@@ -166,6 +198,15 @@ def _token_matches(
     return False
 
 
+@functools.lru_cache(maxsize=_TOKEN_MATCH_CACHE_CAP)
+def _token_matches_cached(
+    query_token: str,
+    candidate_token: str,
+    use_en_stemming: bool,
+) -> bool:
+    return _token_matches_uncached(query_token, candidate_token, use_en_stemming)
+
+
 def _contains_composed_phrase(
     text: str,
     query: str,
@@ -173,10 +214,18 @@ def _contains_composed_phrase(
     use_en_stemming: bool,
 ) -> bool:
     """Execute contains composed phrase."""
-    parts = _query_tokens(query)
+    return _contains_composed_phrase_cached(text, query, use_en_stemming)
+
+
+def _contains_composed_phrase_uncached(
+    text: str,
+    query: str,
+    use_en_stemming: bool,
+) -> bool:
+    parts = _query_tokens_cached(query)
     if not parts:
         return False
-    text_tokens = _query_tokens(text)
+    text_tokens = _query_tokens_cached(text)
     if not text_tokens:
         return False
     if len(parts) == 1:
@@ -201,6 +250,15 @@ def _contains_composed_phrase(
         if not found:
             return False
     return True
+
+
+@functools.lru_cache(maxsize=_PHRASE_MATCH_CACHE_CAP)
+def _contains_composed_phrase_cached(
+    text: str,
+    query: str,
+    use_en_stemming: bool,
+) -> bool:
+    return _contains_composed_phrase_uncached(text, query, use_en_stemming)
 
 
 def _soft_token_overlap(
@@ -280,6 +338,24 @@ def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
     return tuple(ordered)
 
 
+def clear_query_caches() -> None:
+    """Clear TM fuzzy-query helper caches."""
+    _query_tokens_cached.cache_clear()
+    _stem_token_cached.cache_clear()
+    _token_matches_cached.cache_clear()
+    _contains_composed_phrase_cached.cache_clear()
+
+
+def query_cache_stats() -> dict[str, object]:
+    """Return LRU cache stats for TM fuzzy-query helper caches."""
+    return {
+        "token": _query_tokens_cached.cache_info(),
+        "stem": _stem_token_cached.cache_info(),
+        "token_match": _token_matches_cached.cache_info(),
+        "phrase": _contains_composed_phrase_cached.cache_info(),
+    }
+
+
 def _is_project_upsert_conflict_mismatch(exc: sqlite3.OperationalError) -> bool:
     """Return whether sqlite error indicates missing ON CONFLICT target support."""
     return (
@@ -298,9 +374,34 @@ class TMStore:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self._path)
         self._closed = False
+        self._query_revision = 0
+        self._query_cache: OrderedDict[tuple[object, ...], tuple[TMMatch, ...]] = (
+            OrderedDict()
+        )
         self._conn.row_factory = sqlite3.Row
         self._configure()
         self._ensure_schema()
+
+    def _invalidate_query_cache(self) -> None:
+        self._query_revision += 1
+        self._query_cache.clear()
+
+    def _query_cache_get(self, key: tuple[object, ...]) -> list[TMMatch] | None:
+        if _QUERY_RESULT_CACHE_CAP <= 0:
+            return None
+        cached = self._query_cache.get(key)
+        if cached is None:
+            return None
+        self._query_cache.move_to_end(key)
+        return list(cached)
+
+    def _query_cache_put(self, key: tuple[object, ...], matches: list[TMMatch]) -> None:
+        if _QUERY_RESULT_CACHE_CAP <= 0:
+            return
+        self._query_cache[key] = tuple(matches)
+        self._query_cache.move_to_end(key)
+        while len(self._query_cache) > _QUERY_RESULT_CACHE_CAP:
+            self._query_cache.popitem(last=False)
 
     @staticmethod
     def _resolve_db_path(root: Path, config_dir: str) -> Path:
@@ -582,6 +683,7 @@ class TMStore:
             )
             count += cur.rowcount if cur.rowcount >= 0 else 0
             self._conn.commit()
+            self._invalidate_query_cache()
             return count
         except sqlite3.OperationalError as exc:
             if not _is_project_upsert_conflict_mismatch(exc):
@@ -666,6 +768,7 @@ class TMStore:
             )
             count += 1
         self._conn.commit()
+        self._invalidate_query_cache()
         return count
 
     def insert_import_pairs(
@@ -734,6 +837,7 @@ class TMStore:
         )
         count = cur.rowcount if cur.rowcount >= 0 else 0
         self._conn.commit()
+        self._invalidate_query_cache()
         return count
 
     def import_tmx(self, path: Path, *, source_locale: str, target_locale: str) -> int:
@@ -831,6 +935,7 @@ class TMStore:
             status="ready",
             note="",
         )
+        self._invalidate_query_cache()
         return count
 
     def list_import_files(self) -> list[TMImportFile]:
@@ -939,6 +1044,7 @@ class TMStore:
             ),
         )
         self._conn.commit()
+        self._invalidate_query_cache()
 
     def set_import_enabled(self, tm_path: str, enabled: bool) -> None:
         """Set import enabled."""
@@ -951,6 +1057,7 @@ class TMStore:
             (1 if enabled else 0, int(time.time()), tm_path),
         )
         self._conn.commit()
+        self._invalidate_query_cache()
 
     def delete_import_file(self, tm_path: str) -> None:
         """Delete import file."""
@@ -969,6 +1076,7 @@ class TMStore:
             (tm_path,),
         )
         self._conn.commit()
+        self._invalidate_query_cache()
 
     def has_import_entries(self, tm_path: str) -> bool:
         """Return whether import entries."""
@@ -1023,15 +1131,32 @@ class TMStore:
         origins: Iterable[str] | None = None,
     ) -> list[TMMatch]:
         """Execute query."""
-        return self._query_conn(
+        source_locale_norm = _normalize_locale(source_locale)
+        target_locale_norm = _normalize_locale(target_locale)
+        origin_list = _normalize_origins(origins)
+        cache_key = (
+            self._query_revision,
+            _normalize(source_text),
+            source_locale_norm,
+            target_locale_norm,
+            int(limit),
+            min_score if min_score is None else int(min_score),
+            origin_list,
+        )
+        cached = self._query_cache_get(cache_key)
+        if cached is not None:
+            return cached
+        matches = self._query_conn(
             self._conn,
             source_text,
-            source_locale=source_locale,
-            target_locale=target_locale,
+            source_locale=source_locale_norm,
+            target_locale=target_locale_norm,
             limit=limit,
             min_score=min_score,
-            origins=origins,
+            origins=origin_list,
         )
+        self._query_cache_put(cache_key, matches)
+        return matches
 
     @classmethod
     def query_path(
@@ -1200,7 +1325,9 @@ class TMStore:
         """Execute fuzzy candidates."""
         from difflib import SequenceMatcher
 
-        query_tokens = set(_query_tokens(norm))
+        query_token_seq = _query_tokens_cached(norm)
+        query_tokens = set(query_token_seq)
+        query_token_count = len(query_tokens)
         use_en_stemming = source_locale == "EN"
         origin_list = _normalize_origins(origins)
         if not origin_list:
@@ -1217,11 +1344,11 @@ class TMStore:
         length = len(norm)
         min_len = max(1, int(length * 0.6))
         max_len = int(length * 1.4) if length > 5 else length + 10
-        if len(query_tokens) > 1:
+        if query_token_count > 1:
             # Allow phrase-expansion neighbors (e.g. "make item" -> "make new item").
             max_len = max(
                 max_len,
-                length + max(_MULTI_TOKEN_LEN_PADDING, len(query_tokens) * 2),
+                length + max(_MULTI_TOKEN_LEN_PADDING, query_token_count * 2),
             )
         max_candidates = _MAX_FUZZY_CANDIDATES
         bucket_candidates = _FUZZY_BUCKET_CANDIDATES
@@ -1347,17 +1474,15 @@ class TMStore:
         for row in rows:
             cand_norm = row["source_norm"]
             ratio = SequenceMatcher(None, norm, cand_norm, autojunk=False).ratio()
-            composed = _contains_composed_phrase(
-                cand_norm,
-                norm,
-                use_en_stemming=use_en_stemming,
+            composed = _contains_composed_phrase_cached(
+                cand_norm, norm, use_en_stemming
             )
             overlap = 0.0
             exact_overlap = 0.0
             token_count_delta = 999
             if query_tokens:
-                cand_tokens = set(_query_tokens(cand_norm))
-                token_count_delta = abs(len(cand_tokens) - len(query_tokens))
+                cand_tokens = set(_query_tokens_cached(cand_norm))
+                token_count_delta = abs(len(cand_tokens) - query_token_count)
                 if cand_tokens:
                     overlap = _soft_token_overlap(
                         query_tokens,
@@ -1365,7 +1490,7 @@ class TMStore:
                         use_en_stemming=use_en_stemming,
                     )
                     exact_overlap = _exact_token_overlap(query_tokens, cand_tokens)
-                    if len(query_tokens) == 1:
+                    if query_token_count == 1:
                         if overlap < 0.5 and not composed:
                             continue
                     elif overlap < 0.34 and ratio < 0.75 and not composed:
@@ -1377,11 +1502,11 @@ class TMStore:
             token_bonus = int(round((overlap * 6.0) + (exact_overlap * 4.0)))
             score = min(100, score + token_bonus)
             if composed:
-                score = max(score, 90 if len(query_tokens) > 1 else 85)
+                score = max(score, 90 if query_token_count > 1 else 85)
             if score >= 100 and cand_norm != norm:
                 score = 99
             scored.append((row, score, raw_score, token_count_delta))
-        if len(query_tokens) > 1:
+        if query_token_count > 1:
             scored.sort(
                 key=lambda item: (
                     item[3],
