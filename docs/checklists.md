@@ -1,4 +1,4 @@
-_Last updated: 2026-02-23_
+_Last updated: 2026-02-24_
 
 # Checklists
 
@@ -26,6 +26,9 @@ avoid missing mandatory tasks.
     strict full-repo formatting remains enforced by CI `fmt-check` gates
   - Avoid duplicate reruns by default: `make verify` already executes the strict
     coverage pytest lane (`make test-cov`) once
+- **Run** `make test-perf-scale` when touching parser/TM/search hot paths
+  - Enforces dual-scale perf contracts (fixture-scale + synthetic 20k-scale)
+  - Use for same-run legacy-vs-optimized comparisons before tightening CI thresholds
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
   with CI (non-mutating, fail-on-drift)
 - **Run** `make verify-heavy` when you need full strict gates plus advisory mutation
@@ -63,6 +66,22 @@ avoid missing mandatory tasks.
     Project-tab progress strip (Locale/Current file rows + segmented bars),
     no-file-open quick-start placeholder visibility, and default equal
     Source/Translation columns before any manual resize.
+  - Include A12 perf-doc paths when touched:
+    update canonical contracts (`technical_spec`, `testing_strategy`,
+    `implementation_plan`) and `performance_math_appendix.md`.
+
+## Dependency trust-gate checklist
+
+- **Before adding any new dependency**, collect evidence for:
+  1) license compatibility,
+  2) maturity/maintenance status,
+  3) Python 3.10+ cross-platform compatibility,
+  4) no hidden runtime side effects,
+  5) measurable `>15%` gain on target workload,
+  6) no drift on locked behavioral equivalence contracts.
+- **Attach evaluation output** from `scripts/perf_dependency_eval.py` to PR notes.
+- **Reject adoption** if any gate fails; document rejection rationale in
+  `docs/implementation_plan.md` decisions ledger.
 
 ## Before pushing tags / releases
 
