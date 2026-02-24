@@ -9,3 +9,5 @@ verification, architecture boundaries, and release readiness.
 - Use `docs/implementation_plan.md` for execution sequencing and status.
 - Use `docs/testing_strategy.md` and `docs/checklists.md` for verification policy
   and operational gates.
+- Use `docs/performance_math_appendix.md` for optimization formulas,
+  equivalence obligations, and perf-proof guidance on hard code paths.

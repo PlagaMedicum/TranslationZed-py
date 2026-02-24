@@ -13,4 +13,5 @@ nav:
   - Architecture Overview: architecture_overview.md
   - Flows: flows.md
   - TM Ranking Algorithm: tm_ranking_algorithm.md
+  - Performance Math Appendix: performance_math_appendix.md
   - Technical Notes: technical_notes_current_state.md
