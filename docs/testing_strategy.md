@@ -78,12 +78,11 @@ _Last updated: 2026-02-23_
   cached source rows so Source-column search results cannot reuse stale mode data.
 - Architecture guards enforce allowed GUI->core imports and
   `main_window.py <= 5400` line-budget threshold.
-- Sidebar/tree progress integration checks:
-  - permanent sidebar progress strip renders locale/file rows correctly,
+- Sidebar progress integration checks:
+  - permanent Project-tab progress strip renders locale/current-file rows correctly,
   - translated/proofread percent semantics (`Translated` excludes `Proofread`),
   - canonical counts remain stable under active status sort/filter view mapping,
-  - async locale refresh updates UI without blocking interactions,
-  - thin file-tree progress payload/painting for current locale root + current file row.
+  - async locale refresh updates UI without blocking interactions.
 - Status-bar text contract checks:
   - default fallback text is `Ready to edit`,
   - operational message text and scope indicators coexist with progress strip.

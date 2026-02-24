@@ -60,9 +60,9 @@ avoid missing mandatory tasks.
     status-header triage controls (sort/filter + next-priority navigation) and
     EN-diff NEW-row save prompt actions (`Apply/Skip/Edit/Cancel`).
   - Include A11 smoke paths when touched:
-    sidebar progress strip (Locale/File rows + segmented bars), tree inline
-    progress indicators (current locale root + current file row), and no-file-open
-    quick-start placeholder visibility.
+    Project-tab progress strip (Locale/Current file rows + segmented bars),
+    no-file-open quick-start placeholder visibility, and default equal
+    Source/Translation columns before any manual resize.
 
 ## Before pushing tags / releases
 
