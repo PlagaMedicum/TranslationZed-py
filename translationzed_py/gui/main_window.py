@@ -1038,13 +1038,15 @@ class MainWindow(QMainWindow):
 
         self._key_column_width: int | None = _pref_int("TABLE_KEY_WIDTH")
         self._status_column_width: int | None = _pref_int("TABLE_STATUS_WIDTH")
-        self._source_translation_ratio = _pref_float("TABLE_SRC_RATIO") or 0.5
+        persisted_ratio = _pref_float("TABLE_SRC_RATIO")
+        self._source_translation_ratio = persisted_ratio or 0.5
         self._table_layout_guard = False
-        self._user_resized_columns = bool(_pref_float("TABLE_SRC_RATIO"))
+        self._user_resized_columns = _pref_bool("TABLE_COLUMNS_USER_RESIZED", False)
+        if not self._user_resized_columns:
+            self._source_translation_ratio = 0.5
         self._tree_last_width = _pref_int("TREE_PANEL_WIDTH") or self._tree_last_width
         self._visual_whitespace = _pref_bool("TEXT_SHOW_WHITESPACE", False)
         self._visual_highlight = _pref_bool("TEXT_HIGHLIGHT", False)
-
         # ── menu bar ───────────────────────────────────────────────────────
         menubar = self.menuBar()
         self.menu_general = menubar.addMenu("General")
@@ -1052,13 +1054,11 @@ class MainWindow(QMainWindow):
         self.menu_view = menubar.addMenu("View")
         self.menu_help = menubar.addMenu("Help")
 
-        # ── left pane: side panel (Files / TM / Search / QA) ────────────────
+        # ── left pane: side panel (Project / TM / Search / QA) ───────────────
         self._left_panel = QWidget()
         left_layout = QVBoxLayout(self._left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(4)
-        self._init_progress_strip(left_layout)
-
         toggle_bar = QWidget(self._left_panel)
         toggle_layout = QHBoxLayout(toggle_bar)
         toggle_layout.setContentsMargins(6, 4, 6, 4)
@@ -1066,7 +1066,7 @@ class MainWindow(QMainWindow):
         self._left_group = QButtonGroup(self)
         self._left_group.setExclusive(True)
         self._left_files_btn = QToolButton(self)
-        self._left_files_btn.setText("Files")
+        self._left_files_btn.setText("Project")
         self._left_files_btn.setCheckable(True)
         self._left_tm_btn = QToolButton(self)
         self._left_tm_btn.setText("TM")
@@ -1088,11 +1088,8 @@ class MainWindow(QMainWindow):
             toggle_layout.addWidget(btn)
         toggle_layout.addStretch(1)
         self._left_group.buttonClicked.connect(self._on_left_panel_changed)
-
         self._left_stack = QStackedWidget(self._left_panel)
-
         self.tree = QTreeView()
-        self._install_tree_progress_delegate()
         self._init_locales(selected_locales)
         if not self._selected_locales:
             self._startup_aborted = True
@@ -1109,8 +1106,13 @@ class MainWindow(QMainWindow):
         self._schedule_post_locale_tasks()
         self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
         self.tree.doubleClicked.connect(self._file_chosen)
-        self._left_stack.addWidget(self.tree)
-
+        self._files_panel = QWidget(self._left_panel)
+        files_layout = QVBoxLayout(self._files_panel)
+        files_layout.setContentsMargins(0, 0, 0, 0)
+        files_layout.setSpacing(4)
+        self._init_progress_strip(files_layout)
+        files_layout.addWidget(self.tree, 1)
+        self._left_stack.addWidget(self._files_panel)
         self._tm_panel = QWidget(self._left_panel)
         tm_layout = QVBoxLayout(self._tm_panel)
         tm_layout.setContentsMargins(3, 0, 3, 3)
@@ -3498,6 +3500,7 @@ class MainWindow(QMainWindow):
         if total > 0:
             self._source_translation_ratio = source_width / total
             self._user_resized_columns = True
+            self._prefs_extras["TABLE_COLUMNS_USER_RESIZED"] = "true"
             self._prefs_extras["TABLE_SRC_RATIO"] = (
                 f"{self._source_translation_ratio:.6f}"
             )
@@ -5206,7 +5209,6 @@ class MainWindow(QMainWindow):
             self._start_qa_scan_for_current_file()
             return
         self._qa_refresh_timer.start(self._qa_refresh_delay_ms)
-
     _refresh_qa_for_current_file = _qa_refresh_sync_for_test
     _start_qa_scan_for_current_file = _qa_start_scan
     _poll_qa_scan = _qa_poll_scan
@@ -5261,11 +5263,9 @@ class MainWindow(QMainWindow):
     _refresh_progress_ui = _panel_helpers._refresh_progress_ui
     _invalidate_progress_for_path = _panel_helpers._invalidate_progress_for_path
     _init_progress_strip = _panel_helpers._init_progress_strip
-    _install_tree_progress_delegate = _panel_helpers._install_tree_progress_delegate
     _init_empty_table_placeholder = _panel_helpers._init_empty_table_placeholder
     _set_table_empty_state = _panel_helpers._set_table_empty_state
     _clear_table_model_for_empty_state = _panel_helpers._clear_table_model_for_empty_state
-
     def showEvent(self, event) -> None:  # noqa: N802
         """Re-apply detail panel state when the window becomes visible."""
         super().showEvent(event)

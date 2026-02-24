@@ -45,7 +45,6 @@ from .progress_widgets import ProgressStripRow
 from .search_scope_ui import scope_icon_for as _scope_icon_for
 from .tm_preview import apply_tm_preview_highlights as _apply_tm_preview_highlights
 from .tm_preview import prepare_tm_preview_terms as _prepare_tm_preview_terms
-from .tree_progress_delegate import TreeProgressDelegate
 
 _PROGRESS_POLL_INTERVAL_MS = 70
 
@@ -341,13 +340,29 @@ def _invalidate_progress_for_path(win, path: Path | None) -> None:
         win._progress_current_model_dirty = True
 
 
-def _init_progress_strip(win, left_layout: QVBoxLayout) -> None:
-    strip = QWidget(win._left_panel)
+def _init_progress_strip(win, panel_layout: QVBoxLayout) -> None:
+    strip_parent = panel_layout.parentWidget() or win._left_panel
+    strip = QWidget(strip_parent)
     layout = QVBoxLayout(strip)
     layout.setContentsMargins(6, 4, 6, 2)
     layout.setSpacing(2)
     win._progress_locale_row = ProgressStripRow("Locale", strip)
-    win._progress_file_row = ProgressStripRow("File", strip)
+    win._progress_file_row = ProgressStripRow("Current file", strip)
+    title_width = max(
+        win._progress_locale_row.title_label.sizeHint().width(),
+        win._progress_file_row.title_label.sizeHint().width(),
+    )
+    percent_width = max(
+        win._progress_locale_row.percent_label.fontMetrics().horizontalAdvance(
+            "T:100% P:100%"
+        )
+        + 8,
+        win._progress_locale_row.percent_label.sizeHint().width(),
+    )
+    win._progress_locale_row.set_title_column_width(title_width)
+    win._progress_file_row.set_title_column_width(title_width)
+    win._progress_locale_row.set_percent_column_width(percent_width)
+    win._progress_file_row.set_percent_column_width(percent_width)
     locale_icon = win.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon)
     file_icon = win.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon)
     win._progress_locale_row.icon_label.setPixmap(locale_icon.pixmap(14, 14))
@@ -355,15 +370,9 @@ def _init_progress_strip(win, left_layout: QVBoxLayout) -> None:
     win._progress_file_row.setVisible(False)
     layout.addWidget(win._progress_locale_row)
     layout.addWidget(win._progress_file_row)
-    left_layout.addWidget(strip)
+    panel_layout.addWidget(strip)
     win._progress_strip = strip
     _refresh_progress_ui(win)
-
-
-def _install_tree_progress_delegate(win) -> None:
-    delegate = TreeProgressDelegate(win.tree)
-    win._tree_progress_delegate = delegate
-    win.tree.setItemDelegate(delegate)
 
 
 def _init_empty_table_placeholder(win) -> None:

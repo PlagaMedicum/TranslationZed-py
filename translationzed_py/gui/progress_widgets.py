@@ -74,6 +74,7 @@ class ProgressStripRow(QWidget):
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
         """Initialize one progress strip row."""
         super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
@@ -91,6 +92,14 @@ class ProgressStripRow(QWidget):
         layout.addWidget(self.bar, 1)
         layout.addWidget(self.percent_label)
 
+    def set_title_column_width(self, width: int) -> None:
+        """Force a fixed title-column width for cross-row alignment."""
+        self.title_label.setFixedWidth(max(0, int(width)))
+
+    def set_percent_column_width(self, width: int) -> None:
+        """Force a fixed percent-column width for cross-row alignment."""
+        self.percent_label.setFixedWidth(max(0, int(width)))
+
     def set_progress(self, progress: StatusProgress | None, *, loading: bool = False) -> None:
         """Update row progress display."""
         payload = progress or StatusProgress()
@@ -103,4 +112,3 @@ class ProgressStripRow(QWidget):
         proofread = proofread_percent(payload)
         self.percent_label.setText(f"T:{translated}% P:{proofread}%")
         self.setToolTip(f"T:{translated}%  P:{proofread}%")
-

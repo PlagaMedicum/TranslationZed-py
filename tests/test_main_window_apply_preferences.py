@@ -9,6 +9,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from translationzed_py.core.preferences import load as load_preferences
+from translationzed_py.core.preferences import save as save_preferences
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
 
@@ -255,6 +256,7 @@ def test_noncritical_ui_layout_and_toggle_state_persist_across_restart(
     win._prefs_extras["TABLE_KEY_WIDTH"] = "164"
     win._prefs_extras["TABLE_STATUS_WIDTH"] = "78"
     win._prefs_extras["TABLE_SRC_RATIO"] = "0.370000"
+    win._prefs_extras["TABLE_COLUMNS_USER_RESIZED"] = "1"
     win._prefs_extras["SEARCH_CASE_SENSITIVE"] = "1"
     win._persist_preferences()
 
@@ -264,6 +266,7 @@ def test_noncritical_ui_layout_and_toggle_state_persist_across_restart(
     assert extras["TABLE_KEY_WIDTH"] == "164"
     assert extras["TABLE_STATUS_WIDTH"] == "78"
     assert extras["TABLE_SRC_RATIO"] == "0.370000"
+    assert extras["TABLE_COLUMNS_USER_RESIZED"] == "1"
     assert extras["SEARCH_CASE_SENSITIVE"] == "1"
 
     win_reopen = MainWindow(str(root), selected_locales=["BE"])
@@ -273,3 +276,24 @@ def test_noncritical_ui_layout_and_toggle_state_persist_across_restart(
     assert win_reopen._status_column_width == 78
     assert win_reopen._search_case_sensitive is True
     assert abs(win_reopen._source_translation_ratio - 0.37) < 0.000001
+
+
+def test_source_translation_ratio_defaults_to_equal_without_manual_resize_flag(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify source/translation columns default to 50/50 until user resizes manually."""
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    raw = load_preferences(None)
+    extras = dict(raw.get("__extras__", {}))
+    extras["TABLE_SRC_RATIO"] = "0.370000"
+    extras.pop("TABLE_COLUMNS_USER_RESIZED", None)
+    payload = dict(raw)
+    payload["__extras__"] = extras
+    save_preferences(payload)
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    assert abs(win._source_translation_ratio - 0.5) < 0.000001
