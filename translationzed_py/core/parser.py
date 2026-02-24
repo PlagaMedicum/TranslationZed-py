@@ -68,7 +68,18 @@ _TOKEN_RE = re.compile(
 )
 
 
-def _build_offset_map(text: str, encoding: str) -> list[int]:
+_SINGLE_BYTE_ENCODING_HINTS = (
+    "cp",
+    "windows",
+    "iso-8859",
+    "iso8859",
+    "latin",
+    "koi8",
+    "mac",
+)
+
+
+def _build_offset_map_legacy(text: str, encoding: str) -> list[int]:
     encoder = codecs.getincrementalencoder(encoding)()
     offsets = [0]
     total = 0
@@ -76,6 +87,66 @@ def _build_offset_map(text: str, encoding: str) -> list[int]:
         total += len(encoder.encode(ch))
         offsets.append(total)
     return offsets
+
+
+def _build_offset_map_utf8(text: str) -> list[int]:
+    if text.isascii():
+        return list(range(len(text) + 1))
+    offsets = [0] * (len(text) + 1)
+    total = 0
+    for idx, ch in enumerate(text, start=1):
+        codepoint = ord(ch)
+        if codepoint <= 0x7F:
+            total += 1
+        elif codepoint <= 0x7FF:
+            total += 2
+        elif codepoint <= 0xFFFF:
+            total += 3
+        else:
+            total += 4
+        offsets[idx] = total
+    return offsets
+
+
+def _build_offset_map_utf16(text: str) -> list[int]:
+    offsets = [0] * (len(text) + 1)
+    total = 0
+    for idx, ch in enumerate(text, start=1):
+        total += 2 if ord(ch) <= 0xFFFF else 4
+        offsets[idx] = total
+    return offsets
+
+
+def _build_offset_map_single_byte(text: str) -> list[int]:
+    return list(range(len(text) + 1))
+
+
+def _build_offset_map(text: str, encoding: str) -> list[int]:
+    enc = encoding.lower().replace("_", "-")
+    if enc == "utf-8":
+        return _build_offset_map_utf8(text)
+    if enc in {"utf-16-le", "utf-16-be"}:
+        return _build_offset_map_utf16(text)
+    if enc.startswith(_SINGLE_BYTE_ENCODING_HINTS):
+        return _build_offset_map_single_byte(text)
+    return _build_offset_map_legacy(text, encoding)
+
+
+def _ensure_offset_map(
+    text: str,
+    encoding: str,
+    *,
+    expected_len: int,
+) -> list[int]:
+    offsets = _build_offset_map(text, encoding)
+    if offsets[-1] == expected_len:
+        return offsets
+    offsets = _build_offset_map_legacy(text, encoding)
+    if offsets[-1] == expected_len:
+        return offsets
+    raise ValueError(
+        f"Encoding length mismatch: expected {expected_len}, got {offsets[-1]}"
+    )
 
 
 def _read_string_token(text: str, pos: int) -> int:
@@ -146,12 +217,8 @@ def _read_string_token(text: str, pos: int) -> int:
 def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
     enc_for_text, bom_len = _resolve_encoding(encoding, data)
     text = _decode_text(data, enc_for_text)
-    offsets = _build_offset_map(text, enc_for_text)
     expected_len = len(data) - bom_len
-    if offsets[-1] != expected_len:
-        raise ValueError(
-            f"Encoding length mismatch: expected {expected_len}, got {offsets[-1]}"
-        )
+    offsets = _ensure_offset_map(text, enc_for_text, expected_len=expected_len)
 
     pos = 0
     last_sig: Kind | None = None
