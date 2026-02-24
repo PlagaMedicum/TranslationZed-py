@@ -147,7 +147,7 @@ Same as UC-01 but triggered via *Project ▸ Switch Locale…*.  Preconditions
 |  1 | SYS computes canonical status distribution (Untouched / For review / Translated / Proofread) for current file and current locale. |
 |  2 | SYS renders a permanent progress strip inside the **Project** side tab (above file tree): Locale row always visible, Current file row visible when a file is open. |
 |  3 | SYS renders segmented bars with status colors and compact text `T:<translated_only>% P:<proofread>%` (proofread excluded from translated percent). |
-|  4 | SYS computes locale progress asynchronously (non-blocking) and refreshes strip indicators when background aggregation finishes. |
+|  4 | SYS computes locale progress asynchronously (non-blocking) once per locale/session cache and then updates totals incrementally on row status edits (session-only cache, non-persistent). |
 | **Post-condition** | User sees live motivating progress in Project side tab without cluttering tree/status bar. |
 
 ### UC-05a  Search & Navigate

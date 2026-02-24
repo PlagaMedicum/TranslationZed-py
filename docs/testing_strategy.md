@@ -82,7 +82,8 @@ _Last updated: 2026-02-23_
   - permanent Project-tab progress strip renders locale/current-file rows correctly,
   - translated/proofread percent semantics (`Translated` excludes `Proofread`),
   - canonical counts remain stable under active status sort/filter view mapping,
-  - async locale refresh updates UI without blocking interactions.
+  - locale aggregation is async/non-blocking for first load, then session-cache
+    totals are updated incrementally on edits without full locale recompute.
 - Status-bar text contract checks:
   - default fallback text is `Ready to edit`,
   - operational message text and scope indicators coexist with progress strip.

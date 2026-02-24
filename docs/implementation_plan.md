@@ -995,8 +995,9 @@ A11 [✓] **Motivating progress UI overhaul (visible, non-blocking, low-clutter)
        semantics where proofread is **not** included in translated percent.
      - [✓] File tree has no inline progress bars; progress is displayed in the
        Project-tab strip only to keep navigation clean.
-     - [✓] Locale progress is computed asynchronously (non-blocking) with
-       deterministic cache invalidation.
+     - [✓] Locale progress is computed asynchronously (non-blocking) for initial
+       locale aggregation, then updated via session-only incremental status deltas
+       (no full recompute on file switch).
      - [✓] Status-bar default fallback text is `Ready to edit`.
      - [✓] Last operational status message is preserved until next action/status
        update; progress strip remains visible during status changes.
@@ -1005,7 +1006,8 @@ A11 [✓] **Motivating progress UI overhaul (visible, non-blocking, low-clutter)
      - [✓] Add `gui.progress_metrics` for status distribution and percent helpers.
      - [✓] Add `gui.progress_widgets` for segmented bars and compact progress rows.
      - [✓] Extend `gui.fs_model` with progress roles/node typing for tree painting.
-     - [✓] Wire async locale progress refresh and cache invalidation hooks.
+     - [✓] Wire async locale progress bootstrap plus session-cache incremental
+       update hooks.
      - [✓] Integrate strip + empty-state page without regressing splitter/table
        relayout contract and without exceeding `main_window.py` line budget.
      - [✓] Remove old inline `Progress File/Locale` status-bar text format.

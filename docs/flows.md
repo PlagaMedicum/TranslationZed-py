@@ -70,7 +70,8 @@ User edits cell
   -> add dirty dot (●) in tree if value changed
   -> refresh Project-tab progress strip
      - Current file row updates immediately from canonical model statuses
-     - Locale row updates asynchronously (non-blocking)
+     - Locale row aggregates asynchronously once, then updates incrementally from
+       in-session status deltas (session-only cache)
 
 File open/refresh
   -> compare EN + locale maps against .tzp/cache/en_diff_snapshot.json baseline

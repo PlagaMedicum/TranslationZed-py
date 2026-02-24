@@ -482,8 +482,10 @@ Algorithm:
 - Progress computation contract:
   - current-file progress uses canonical model entry statuses (independent of table
     sort/filter view state),
-  - locale progress is computed asynchronously (non-blocking) and refreshed with cache invalidation
-    after status edits/cache writes.
+  - locale progress is aggregated asynchronously once per locale/session cache
+    (non-persistent),
+    then updated incrementally on row status edits by adjusting cached status totals
+    (no full locale recompute on file switch).
 - Main table empty-state contract:
   when no file is open, right pane shows a short quick-start placeholder instead of a blank table.
 - File tree progress contract:
