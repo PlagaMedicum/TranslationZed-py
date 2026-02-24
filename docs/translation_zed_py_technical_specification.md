@@ -756,6 +756,9 @@ UNTOUCHED).
     (`U/T/FR/P` = Untouched/Translated/For review/Proofread); imported matches
     do not expose status and are rendered without status marker.
   - Query accepts min‑score and origin filters (project/import) to support TM panel filtering.
+  - Runtime query acceleration uses deterministic bounded caches:
+    token `8192`, stem `4096`, phrase `2048`, token-match `8192`,
+    and per-store query-result `256` entries (LRU eviction).
   - TM suggestion fetch depth scales with min-score to support high-recall review:
     very low thresholds return deeper candidate lists.
   - Imported rows are query-visible only when the import record is **enabled** and in **ready** state.
@@ -915,6 +918,10 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
   - deterministic perf budget tests (`make test-perf`),
   - dual-scale perf-contract tests (`make test-perf-scale`) for parser/TM
     legacy-vs-optimized equivalence and 20k median speedup gates,
+  - TM speed contracts are split into:
+    - warm-cache contract (`TZP_PERF_TM_SPEEDUP_20K_PERCENT`, default `35`),
+    - cold-cache first-pass contract (`TZP_PERF_TM_COLD_SPEEDUP_20K_PERCENT`,
+      default `3`),
   - fixture-backed scenario smoke (`make perf-scenarios`),
   - non-mutating statistical profiler/reporter (`scripts/perf_analyze.py`)
     with robust summary stats (median/MAD/CI) and parser Amdahl guidance output,

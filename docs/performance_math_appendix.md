@@ -92,6 +92,29 @@ Optimization constraints (no scoring drift):
   reduced repeated tokenization/stemming),
 - output order and score are bit-stable for fixed corpus/query packs.
 
+### 3.1 Warm/Cold Cache Decomposition
+
+Let:
+- \(T_{\text{cold}}\): first-pass latency with empty runtime caches,
+- \(T_{\text{warm}}\): steady-state latency with populated runtime caches,
+- \(h\): effective cache-hit regime share in a session (\(0 \le h \le 1\)).
+
+Expected session latency:
+
+\[
+\mathbb{E}[T_{\text{tm}}] = (1-h)T_{\text{cold}} + hT_{\text{warm}}
+\]
+
+Relative gain over legacy baseline \(T_{\text{legacy}}\):
+
+\[
+G(h) = 1 - \frac{(1-h)T_{\text{cold}} + hT_{\text{warm}}}{T_{\text{legacy}}}
+\]
+
+This motivates two separate gates:
+1. warm-cache speedup gate (steady-state throughput),
+2. cold-cache speedup gate (first-pass responsiveness).
+
 ## 4) Cache-Cap Invariants
 
 For each cache \(C_j\) with capacity \(K_j\):
@@ -105,6 +128,7 @@ with deterministic LRU eviction. Current caps:
 - stem cache: `4096`
 - phrase cache: `2048`
 - token-match cache: `8192`
+- query-result cache (per-store runtime): `256`
 
 Amortized operations are \(O(1)\) for get/put and bounded-memory by design.
 

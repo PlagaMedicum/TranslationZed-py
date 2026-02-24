@@ -158,8 +158,11 @@ _Last updated: 2026-02-23_
     `tests/test_parser_perf_contract.py`,
   - TM helper cache-cap and deterministic LRU behavior:
     `tests/test_tm_store_cache_caps.py`,
-  - TM legacy-vs-optimized bit-stability + 20k median speedup contract:
+  - TM legacy-vs-optimized bit-stability + 20k median speedup contracts:
     `tests/test_tm_query_perf_contract.py`.
+    - warm-cache target (default `TZP_PERF_TM_SPEEDUP_20K_PERCENT=35`),
+    - cold-cache first-pass target (default
+      `TZP_PERF_TM_COLD_SPEEDUP_20K_PERCENT=3`).
 - pytest always prints a **Performance** summary in terminal output,
   including `make verify`, to keep regressions visible.
 - Local `make verify` treats perf-budget failures as advisory warnings;

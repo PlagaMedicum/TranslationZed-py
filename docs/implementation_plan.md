@@ -1027,8 +1027,9 @@ A12 [→] **Mathematical performance program (parser + TM first; prototype-then-
      - parser + TM optimization wave first, strict semantics only.
      - output-compat lock: TM scores/order must stay bit-stable for fixed corpora.
      - scale contract: fixture scale (`~2k`) + synthetic stress scale (`20k`).
-     - speed goals: parser median `>=45%` faster, TM query median `>=35%` faster at
-       `20k`, measured in same-run A/B contracts.
+     - speed goals: parser offset-map median `>=45%` faster; TM query warm-cache
+       median `>=35%` faster plus separate cold-cache first-pass threshold
+       (default `>=3%`) at `20k`, measured in same-run A/B contracts.
      - rollout shape: internal prototype commits, then hardening; no user-visible flags.
      - cache policy: fixed hard caps + deterministic LRU eviction for new hot-path caches.
      - Wave-2 after Wave-1 gates: Search/Replace matcher optimization.
@@ -1062,7 +1063,9 @@ A12 [→] **Mathematical performance program (parser + TM first; prototype-then-
      - [✓] Parser legacy-vs-optimized equivalence suite added for 2k/20k generated corpora.
      - [✓] TM legacy-vs-optimized bit-stability suite added on fixed query pack.
      - [✓] Parser/TM 20k median speedup contracts are encoded as strict perf-scale tests
-       (`TZP_PERF_PARSE_SPEEDUP_20K_PERCENT`, `TZP_PERF_TM_SPEEDUP_20K_PERCENT`).
+       (`TZP_PERF_PARSE_SPEEDUP_20K_PERCENT`,
+       `TZP_PERF_TM_SPEEDUP_20K_PERCENT`,
+       `TZP_PERF_TM_COLD_SPEEDUP_20K_PERCENT`).
      - [ ] Search wave-2 preserves literal/regex/case-sensitive match sets.
      - [✓] New dependency policy is documented and enforced by checklist flow.
      - [ ] Docs quality gates pass (`make docstyle`, `make docs-build`).
@@ -1261,7 +1264,10 @@ D1 [✓] **Source-column locale switcher (deferred item #1, project-locale scope
     score/order outputs.
   - Perf contracts are now dual-scale and strict in dedicated lane:
     `make test-perf-scale` enforces parser/TM equivalence + 20k median speedup thresholds
-    (`45%` parser, `35%` TM by default via env-configurable gates).
+    (`45%` parser offset-map, `35%` TM warm-cache by default via env-configurable gates).
+  - TM perf policy now includes a separate cold-cache contract threshold
+    (`TZP_PERF_TM_COLD_SPEEDUP_20K_PERCENT`, default `3`) in addition to
+    warm-cache threshold.
   - Cache policy is hard-capped deterministic LRU for TM helper caches
     (token/stem/phrase/token-match) with explicit cap tests to prevent unbounded growth.
   - Mathematical/statistical perf documentation is required for hot-path changes:

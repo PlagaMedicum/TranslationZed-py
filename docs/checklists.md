@@ -28,6 +28,7 @@ avoid missing mandatory tasks.
     coverage pytest lane (`make test-cov`) once
 - **Run** `make test-perf-scale` when touching parser/TM/search hot paths
   - Enforces dual-scale perf contracts (fixture-scale + synthetic 20k-scale)
+  - Includes TM warm-cache and cold-cache first-pass speedup gates
   - Use for same-run legacy-vs-optimized comparisons before tightening CI thresholds
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
   with CI (non-mutating, fail-on-drift)
