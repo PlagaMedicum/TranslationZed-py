@@ -386,6 +386,11 @@ class TMStore:
         self._query_revision += 1
         self._query_cache.clear()
 
+    def clear_runtime_caches(self) -> None:
+        """Clear query result cache and fuzzy-helper caches for this runtime."""
+        self._invalidate_query_cache()
+        clear_query_caches()
+
     def _query_cache_get(self, key: tuple[object, ...]) -> list[TMMatch] | None:
         if _QUERY_RESULT_CACHE_CAP <= 0:
             return None
