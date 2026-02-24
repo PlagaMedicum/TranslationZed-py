@@ -1,5 +1,5 @@
 # TranslationZed-Py — Documentation Structure
-_Last updated: 2026-02-23_
+_Last updated: 2026-02-24_
 
 ## 1) Purpose
 
@@ -36,6 +36,13 @@ changes should be propagated to keep docs coherent.
   - Owns: candidate-retrieval stages, relevance gates, scoring formula, tie-break rules.
   - Must stay aligned with `core.tm_store` implementation and TM-related tests.
 
+- `docs/performance_math_appendix.md`
+  - Mathematical derivation appendix for complex performance-sensitive paths.
+  - Owns: concise formulas, selected derivations/proofs, equivalence obligations,
+    and complexity/cost-model notes for parser/TM/search optimization work.
+  - Non-canonical for product behavior; canonical rules still live in
+    technical/UX/testing specs.
+
 - `docs/flows.md`
   - Compact sequence-flow reference.
   - Owns: concise lifecycle diagrams for startup/open/save/conflicts.
@@ -49,6 +56,7 @@ changes should be propagated to keep docs coherent.
   - Operational command checklist.
   - Owns: pre-commit/pre-release/CI steps and verification command matrix
     (`make verify`, `make verify-ci`, heavy lanes).
+  - Owns dependency-adoption operator checklist flow (trust gate evidence).
 
 - `docs/technical_notes_current_state.md`
   - Diagnostic notes and audit findings.
@@ -64,6 +72,7 @@ changes should be propagated to keep docs coherent.
   2) Update `implementation_plan` status and ordered tasks.
   3) Update `tm_ranking_algorithm` if TM retrieval/scoring rules changed.
   4) Update `testing_strategy` if tests/budgets/scenarios change.
+  5) Update `performance_math_appendix` when optimization formulas/proof obligations change.
 
 - Do not copy full sections across docs.
   - Use short references to canonical sections instead.
