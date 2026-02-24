@@ -1,4 +1,4 @@
-"""Tests for sidebar/tree progress indicators and progress semantics."""
+"""Tests for Project-tab progress strip behavior and progress semantics."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from PySide6.QtCore import Qt
 
 from translationzed_py.core.model import Status
 from translationzed_py.gui import MainWindow
-from translationzed_py.gui.fs_model import TREE_PROGRESS_COUNTS_ROLE
+from translationzed_py.gui import main_window_panel_helpers as panel_helpers
 
 
 def _make_project(root: Path) -> None:
@@ -34,10 +34,10 @@ def _make_project(root: Path) -> None:
     )
 
 
-def test_progress_strip_and_tree_payloads_update_for_file_and_locale(
+def test_progress_strip_updates_for_file_and_locale(
     qtbot, tmp_path: Path
 ) -> None:
-    """Verify progress strip/tree payloads reflect file + locale status distribution."""
+    """Verify progress strip reflects file + locale status distribution."""
     root = tmp_path / "proj"
     root.mkdir()
     _make_project(root)
@@ -70,11 +70,52 @@ def test_progress_strip_and_tree_payloads_update_for_file_and_locale(
     assert win._progress_file_row.percent_label.text() == "T:0% P:0%"
     assert win._progress_locale_row.percent_label.text() == "T:25% P:25%"
 
-    locale_index = win.fs_model.index(0, 0)
-    locale_counts = locale_index.data(TREE_PROGRESS_COUNTS_ROLE)
-    assert locale_counts == (2, 0, 1, 1)
-    file_counts = ix_b.data(TREE_PROGRESS_COUNTS_ROLE)
-    assert file_counts == (2, 0, 0, 0)
+
+def test_locale_progress_reuses_session_cache_and_updates_incrementally(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    """Verify no locale recompute on file switch/edit after first aggregation."""
+    root = tmp_path / "proj"
+    root.mkdir()
+    _make_project(root)
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._post_locale_timer.stop()
+
+    ix_a = win.fs_model.index_for_path(root / "BE" / "a.txt")
+    win._file_chosen(ix_a)
+    win._refresh_progress_ui()
+    qtbot.waitUntil(
+        lambda: "BE" in getattr(win, "_progress_locale_progress_cache", {}),
+        timeout=3000,
+    )
+    qtbot.waitUntil(
+        lambda: getattr(win, "_progress_locale_future", None) is None,
+        timeout=3000,
+    )
+
+    scheduled: list[str] = []
+
+    def _track_schedule(*_args, **_kwargs):
+        locale = _kwargs.get("locale")
+        if locale is None and len(_args) >= 2:
+            locale = _args[1]
+        scheduled.append(str(locale))
+        return None
+
+    monkeypatch.setattr(panel_helpers, "_schedule_locale_progress_refresh", _track_schedule)
+
+    ix_b = win.fs_model.index_for_path(root / "BE" / "b.txt")
+    win._file_chosen(ix_b)
+    assert scheduled == []
+
+    model_b = win.table.model()
+    assert model_b is not None
+    assert model_b.setData(model_b.index(0, 3), Status.TRANSLATED, Qt.EditRole)
+    assert model_b.setData(model_b.index(1, 3), Status.PROOFREAD, Qt.EditRole)
+    assert scheduled == []
+    assert win._progress_locale_row.percent_label.text() == "T:25% P:25%"
 
 
 def test_progress_uses_canonical_counts_under_filter_and_sort(

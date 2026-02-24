@@ -4045,7 +4045,6 @@ class MainWindow(QMainWindow):
             self.fs_model.set_dirty(self._current_pf.path, True)
         else:
             self.fs_model.set_dirty(self._current_pf.path, False)
-        self._invalidate_progress_for_path(self._current_pf.path)
         if changed_rows:
             self._queue_tm_updates(self._current_pf.path, changed_rows)
         return True

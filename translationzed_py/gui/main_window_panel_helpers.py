@@ -140,6 +140,18 @@ def _sum_progress(values: Sequence[StatusProgress]) -> StatusProgress:
     )
 
 
+def _apply_progress_delta(
+    total: StatusProgress, before: StatusProgress, after: StatusProgress
+) -> StatusProgress:
+    """Return *total* adjusted by replacing *before* contribution with *after*."""
+    return StatusProgress(
+        untouched=max(0, total.untouched - before.untouched + after.untouched),
+        for_review=max(0, total.for_review - before.for_review + after.for_review),
+        translated=max(0, total.translated - before.translated + after.translated),
+        proofread=max(0, total.proofread - before.proofread + after.proofread),
+    )
+
+
 def _compute_locale_progress_task(
     *,
     root: Path,
@@ -207,6 +219,8 @@ def _schedule_locale_progress_refresh(win, locale: str) -> None:
     model_progress = _progress_from_model(win)
     if current_path is not None and model_progress is not None:
         current_counts = model_progress.as_tuple()
+    win._progress_locale_pending_current_path = current_path
+    win._progress_locale_pending_current_counts = current_counts
     locale_encoding = (
         win._locales.get(locale, None).charset if locale in win._locales else None
     ) or "utf-8"
@@ -240,6 +254,8 @@ def _poll_locale_progress(win) -> None:
         locale_cache = {}
         win._progress_locale_progress_cache = locale_cache
     pending_locale = getattr(win, "_progress_locale_pending", None)
+    pending_path = getattr(win, "_progress_locale_pending_current_path", None)
+    pending_counts = getattr(win, "_progress_locale_pending_current_counts", None)
     try:
         locale, counts = future.result()
     except Exception:
@@ -247,9 +263,31 @@ def _poll_locale_progress(win) -> None:
             locale_cache.pop(pending_locale, None)
         locale = None
     else:
-        locale_cache[locale] = StatusProgress.from_tuple(counts)
+        progress = StatusProgress.from_tuple(counts)
+        file_cache = getattr(win, "_progress_file_progress_cache", None)
+        if file_cache is None:
+            file_cache = {}
+            win._progress_file_progress_cache = file_cache
+        if pending_path is not None and pending_counts is not None:
+            scheduled_progress = StatusProgress.from_tuple(pending_counts)
+            latest_progress = file_cache.get(pending_path)
+            current = getattr(win, "_current_pf", None)
+            if current is not None and current.path == pending_path:
+                latest_model_progress = _progress_from_model(win)
+                if latest_model_progress is not None:
+                    latest_progress = latest_model_progress
+            if latest_progress is not None and latest_progress != scheduled_progress:
+                progress = _apply_progress_delta(
+                    progress,
+                    scheduled_progress,
+                    latest_progress,
+                )
+                file_cache[pending_path] = latest_progress
+        locale_cache[locale] = progress
     win._progress_locale_future = None
     win._progress_locale_pending = None
+    win._progress_locale_pending_current_path = None
+    win._progress_locale_pending_current_counts = None
     if timer is not None and timer.isActive():
         timer.stop()
     target_locale = getattr(win, "_progress_locale_target", None)
@@ -292,18 +330,35 @@ def _set_tree_progress(
 def _refresh_progress_ui(win) -> None:
     locale = _target_locale_for_progress(win)
     current = getattr(win, "_current_pf", None)
+    file_cache = getattr(win, "_progress_file_progress_cache", None)
+    if file_cache is None:
+        file_cache = {}
+        win._progress_file_progress_cache = file_cache
+    previous_file_progress = None
     file_progress = _progress_from_model(win) if current is not None else None
     if current is not None and file_progress is not None:
-        file_cache = getattr(win, "_progress_file_progress_cache", None)
-        if file_cache is None:
-            file_cache = {}
-            win._progress_file_progress_cache = file_cache
+        previous_file_progress = file_cache.get(current.path)
         file_cache[current.path] = file_progress
     locale_cache = getattr(win, "_progress_locale_progress_cache", None)
     if locale_cache is None:
         locale_cache = {}
         win._progress_locale_progress_cache = locale_cache
     locale_progress = locale_cache.get(locale) if locale else None
+    if (
+        locale
+        and locale_progress is not None
+        and current is not None
+        and file_progress is not None
+        and previous_file_progress is not None
+        and previous_file_progress != file_progress
+        and win._locale_for_path(current.path) == locale
+    ):
+        locale_progress = _apply_progress_delta(
+            locale_progress,
+            previous_file_progress,
+            file_progress,
+        )
+        locale_cache[locale] = locale_progress
     locale_loading = bool(locale and locale_progress is None)
     if locale_loading:
         _schedule_locale_progress_refresh(win, locale)
@@ -325,14 +380,16 @@ def _refresh_progress_ui(win) -> None:
     )
 
 
-def _invalidate_progress_for_path(win, path: Path | None) -> None:
+def _invalidate_progress_for_path(
+    win, path: Path | None, *, invalidate_locale: bool = False
+) -> None:
     if path is None:
         return
     file_cache = getattr(win, "_progress_file_progress_cache", None)
     if file_cache is not None:
         file_cache.pop(path, None)
     locale_cache = getattr(win, "_progress_locale_progress_cache", None)
-    if locale_cache is not None:
+    if invalidate_locale and locale_cache is not None:
         locale = win._locale_for_path(path)
         if locale:
             locale_cache.pop(locale, None)
@@ -341,6 +398,14 @@ def _invalidate_progress_for_path(win, path: Path | None) -> None:
 
 
 def _init_progress_strip(win, panel_layout: QVBoxLayout) -> None:
+    # Session-only progress cache; no persisted progress state is used.
+    win._progress_current_model_cache = None
+    win._progress_current_model_dirty = False
+    win._progress_file_progress_cache = {}
+    win._progress_locale_progress_cache = {}
+    win._progress_locale_target = None
+    win._progress_locale_pending_current_path = None
+    win._progress_locale_pending_current_counts = None
     strip_parent = panel_layout.parentWidget() or win._left_panel
     strip = QWidget(strip_parent)
     layout = QVBoxLayout(strip)
@@ -356,7 +421,7 @@ def _init_progress_strip(win, panel_layout: QVBoxLayout) -> None:
         win._progress_locale_row.percent_label.fontMetrics().horizontalAdvance(
             "T:100% P:100%"
         )
-        + 8,
+        + 2,
         win._progress_locale_row.percent_label.sizeHint().width(),
     )
     win._progress_locale_row.set_title_column_width(title_width)
@@ -424,6 +489,8 @@ def _shutdown_progress_workers(win) -> None:
             future.cancel()
     win._progress_locale_future = None
     win._progress_locale_pending = None
+    win._progress_locale_pending_current_path = None
+    win._progress_locale_pending_current_counts = None
     pool = getattr(win, "_progress_locale_pool", None)
     if pool is None:
         return
@@ -805,10 +872,7 @@ def _on_model_data_changed(win, top_left, bottom_right, roles=None) -> None:
     if not win._current_model:
         return
     if roles is None or Qt.EditRole in roles or Qt.DisplayRole in roles:
-        current_pf = getattr(win, "_current_pf", None)
-        _invalidate_progress_for_path(
-            win, current_pf.path if current_pf is not None else None
-        )
+        win._progress_current_model_dirty = True
         _refresh_progress_ui(win)
     current = win.table.currentIndex()
     if not current.isValid():
