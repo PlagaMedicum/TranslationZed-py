@@ -1019,6 +1019,53 @@ A11 [✓] **Motivating progress UI overhaul (visible, non-blocking, low-clutter)
      - [✓] Empty-state placeholder tests pass (visible before first file open).
      - [✓] Existing layout/perf/architecture guard regressions remain green.
 
+A12 [→] **Mathematical performance program (parser + TM first; prototype-then-harden)**
+   - **Problem**: parser offset-map construction and TM fuzzy query pipelines still
+     carry avoidable CPU cost under scaled corpora; current docs lack compact
+     formula-backed proofs/constraints for future optimization safety.
+   - **Locked decisions**:
+     - parser + TM optimization wave first, strict semantics only.
+     - output-compat lock: TM scores/order must stay bit-stable for fixed corpora.
+     - scale contract: fixture scale (`~2k`) + synthetic stress scale (`20k`).
+     - speed goals: parser median `>=45%` faster, TM query median `>=35%` faster at
+       `20k`, measured in same-run A/B contracts.
+     - rollout shape: internal prototype commits, then hardening; no user-visible flags.
+     - cache policy: fixed hard caps + deterministic LRU eviction for new hot-path caches.
+     - Wave-2 after Wave-1 gates: Search/Replace matcher optimization.
+     - dependency policy: evaluate in parallel but adopt only under strict trust gate.
+   - **Contract targets**:
+     - parser cost model: `T_parse = T_tokenize + T_offset + T_finalize`.
+     - TM query model:
+       `T_tm = T_sql + N_c * (T_ratio + T_token + T_phrase + T_overlap)`.
+     - search wave-2 model:
+       `T_search_old ~= N_rows*(C_lower + C_query_split + C_match)`;
+       `T_search_new ~= N_rows*(C_lower + C_match) + C_query_split`.
+   - **Execution slices**:
+     - [ ] Docs-first contract sync (`implementation_plan`, `technical_spec`,
+       `docs_structure`, `checklists`, new performance appendix, MkDocs nav).
+     - [ ] Add perf-analysis and dependency-eval scripts:
+       `scripts/perf_analyze.py`, `scripts/perf_dependency_eval.py`.
+     - [ ] Add 20k synthetic fixture builders + parser/TM perf-contract tests.
+     - [ ] Parser fast-path prototype: encoding-specific offset-map builders
+       (UTF-8, UTF-16LE/BE, single-byte) with generic fallback.
+     - [ ] Parser invariance/property tests for span monotonicity and
+       legacy-equivalent parse outputs.
+     - [ ] TM prototype: single-pass candidate feature extraction, reduced repeated
+       token/stem work, bounded deterministic caches.
+     - [ ] TM cache-cap tests (token/stem/phrase caches) and eviction-order checks.
+     - [ ] Wave-2 Search/Replace optimization (query decomposition hoisted out of
+       per-row loops; row-normalization reuse), with no match-set drift.
+     - [ ] Add `make test-perf-scale`; wire strict blocking in CI/heavy lanes.
+     - [ ] Expand benchmark probes/baselines to include 20k scale and
+       linux/macos/windows baseline sections.
+   - **Acceptance**:
+     - [ ] Parser legacy-vs-optimized equivalence suite is green on fixture+20k corpora.
+     - [ ] TM legacy-vs-optimized bit-stability suite is green on fixed query corpora.
+     - [ ] Parser/TM 20k median targets (`45%` / `35%`) are met in A/B contract tests.
+     - [ ] Search wave-2 preserves literal/regex/case-sensitive match sets.
+     - [ ] New dependency policy is documented and enforced by checklist flow.
+     - [ ] Docs quality gates pass (`make docstyle`, `make docs-build`).
+
 Priority B — **Productivity/clarity**
 B1 [✓] **Validation highlights** (Step 28).
    - **Problem**: errors are only visible on inspection; no per‑cell visual guidance.
