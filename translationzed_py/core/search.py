@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import enum
 import re
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
+from operator import attrgetter
 from pathlib import Path
 
 
@@ -26,6 +27,15 @@ class SearchRow:
     key: str
     source: str
     value: str
+    key_fold: str = field(init=False, repr=False, compare=False)
+    source_fold: str = field(init=False, repr=False, compare=False)
+    value_fold: str = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        """Precompute lowercase fields for case-insensitive search."""
+        object.__setattr__(self, "key_fold", (self.key or "").lower())
+        object.__setattr__(self, "source_fold", (self.source or "").lower())
+        object.__setattr__(self, "value_fold", (self.value or "").lower())
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,16 +47,70 @@ class Match:
     preview: str = ""
 
 
-def _matches_literal(text: str, query: str) -> bool:
-    if query in text:
+@dataclass(frozen=True, slots=True)
+class _LiteralQueryPlan:
+    query: str
+    parts: tuple[str, ...]
+    composed_enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SearchQueryPlan:
+    """Store precomputed query data for repeated match scans."""
+
+    matcher: re.Pattern[str] | None
+    query_text: str
+    literal_plan: _LiteralQueryPlan | None
+
+
+def _build_literal_query_plan(query: str) -> _LiteralQueryPlan:
+    parts = tuple(part for part in query.split() if part)
+    total_chars = sum(len(part) for part in parts)
+    return _LiteralQueryPlan(
+        query=query,
+        parts=parts,
+        composed_enabled=len(parts) >= 2 and total_chars >= 4,
+    )
+
+
+def prepare_search_plan(
+    query: str,
+    *,
+    is_regex: bool,
+    case_sensitive: bool,
+) -> SearchQueryPlan | None:
+    """Return reusable query plan state, or ``None`` for empty/invalid input."""
+    if not query:
+        return None
+    if is_regex:
+        try:
+            flags = re.MULTILINE
+            if not case_sensitive:
+                flags |= re.IGNORECASE
+            matcher = re.compile(query, flags)
+        except re.error:
+            return None
+        return SearchQueryPlan(matcher=matcher, query_text=query, literal_plan=None)
+    query_text = query if case_sensitive else query.lower()
+    return SearchQueryPlan(
+        matcher=None,
+        query_text=query_text,
+        literal_plan=_build_literal_query_plan(query_text),
+    )
+
+
+def _matches_literal(
+    text: str, query: str, *, plan: _LiteralQueryPlan | None = None
+) -> bool:
+    literal_plan = plan or _build_literal_query_plan(query)
+    if literal_plan.query in text:
         return True
-    parts = [part for part in query.split() if part]
     # Phrase composition mode: allow non-contiguous token matches in order,
     # but only for meaningful multi-token queries.
-    if len(parts) < 2 or sum(len(part) for part in parts) < 4:
+    if not literal_plan.composed_enabled:
         return False
     pos = 0
-    for part in parts:
+    for part in literal_plan.parts:
         found = text.find(part, pos)
         if found < 0:
             return False
@@ -54,19 +118,50 @@ def _matches_literal(text: str, query: str) -> bool:
     return True
 
 
-def _find_literal_span(text: str, query: str) -> tuple[int, int]:
-    if not text:
-        return (0, 0)
+def _match_literal_index(
+    text: str,
+    query: str,
+    *,
+    plan: _LiteralQueryPlan,
+) -> tuple[int, int]:
     direct = text.find(query)
     if direct >= 0:
         return (direct, len(query))
-    parts = [part for part in query.split() if part]
-    if not parts:
+    if not plan.composed_enabled:
+        return (-1, 0)
+    pos = 0
+    first_start = -1
+    first_len = 0
+    for idx, part in enumerate(plan.parts):
+        found = text.find(part, pos)
+        if found < 0:
+            return (-1, 0)
+        if idx == 0:
+            first_start = found
+            first_len = len(part)
+        pos = found + len(part)
+    return (first_start, first_len)
+
+
+def _find_literal_span(
+    text: str, query: str, *, plan: _LiteralQueryPlan | None = None
+) -> tuple[int, int]:
+    literal_plan = plan or _build_literal_query_plan(query)
+    if not text:
+        return (0, 0)
+    direct, direct_len = _match_literal_index(
+        text,
+        literal_plan.query,
+        plan=literal_plan,
+    )
+    if direct >= 0:
+        return (direct, direct_len)
+    if not literal_plan.parts:
         return (0, 0)
     pos = 0
     first_start = -1
     first_len = 0
-    for idx, part in enumerate(parts):
+    for idx, part in enumerate(literal_plan.parts):
         found = text.find(part, pos)
         if found < 0:
             break
@@ -76,7 +171,7 @@ def _find_literal_span(text: str, query: str) -> tuple[int, int]:
         pos = found + len(part)
     if first_start >= 0:
         return (first_start, first_len)
-    return (0, min(len(text), max(1, len(query))))
+    return (0, min(len(text), max(1, len(literal_plan.query))))
 
 
 def _compact_one_line(text: str) -> str:
@@ -101,6 +196,99 @@ def _build_preview(text: str, *, start: int, length: int, width: int) -> str:
     return snippet[: max(1, width - 1)].rstrip() + "…"
 
 
+def _row_accessors(
+    field: SearchField,
+) -> tuple[
+    Callable[[SearchRow], str],
+    Callable[[SearchRow], str],
+]:
+    if field is SearchField.KEY:
+        return attrgetter("key"), attrgetter("key_fold")
+    if field is SearchField.SOURCE:
+        return attrgetter("source"), attrgetter("source_fold")
+    return attrgetter("value"), attrgetter("value_fold")
+
+
+def _iter_matches_with_plan(
+    rows: Iterable[SearchRow],
+    *,
+    plan: SearchQueryPlan,
+    field: SearchField,
+    case_sensitive: bool,
+    include_preview: bool,
+    preview_chars: int,
+) -> Iterable[Match]:
+    raw_get, norm_get = _row_accessors(field)
+    matcher = plan.matcher
+    if matcher is not None:
+        build_preview = _build_preview
+        for row in rows:
+            text = raw_get(row) or ""
+            hit = matcher.search(text)
+            if not hit:
+                continue
+            preview = ""
+            if include_preview:
+                preview = build_preview(
+                    text,
+                    start=hit.start(),
+                    length=max(1, hit.end() - hit.start()),
+                    width=preview_chars,
+                )
+            yield Match(row.file, row.row, preview)
+        return
+
+    literal_plan = plan.literal_plan or _build_literal_query_plan(plan.query_text)
+    query_text = plan.query_text
+    build_preview = _build_preview
+    matches_literal = _matches_literal
+    match_index = _match_literal_index
+
+    if case_sensitive:
+        if not include_preview:
+            for row in rows:
+                text = raw_get(row) or ""
+                if not matches_literal(text, query_text, plan=literal_plan):
+                    continue
+                yield Match(row.file, row.row)
+            return
+        for row in rows:
+            text = raw_get(row) or ""
+            start, length = match_index(text, query_text, plan=literal_plan)
+            if start < 0:
+                continue
+            preview = build_preview(
+                text,
+                start=start,
+                length=length,
+                width=preview_chars,
+            )
+            yield Match(row.file, row.row, preview)
+        return
+
+    if not include_preview:
+        for row in rows:
+            target = norm_get(row)
+            if not matches_literal(target, query_text, plan=literal_plan):
+                continue
+            yield Match(row.file, row.row)
+        return
+
+    for row in rows:
+        raw_text = raw_get(row) or ""
+        target = norm_get(row)
+        start, length = match_index(target, query_text, plan=literal_plan)
+        if start < 0:
+            continue
+        preview = build_preview(
+            raw_text,
+            start=start,
+            length=length,
+            width=preview_chars,
+        )
+        yield Match(row.file, row.row, preview)
+
+
 def iter_matches(
     rows: Iterable[SearchRow],
     query: str,
@@ -110,58 +298,26 @@ def iter_matches(
     case_sensitive: bool = False,
     include_preview: bool = False,
     preview_chars: int = 96,
+    prepared_plan: SearchQueryPlan | None = None,
 ) -> Iterable[Match]:
     """Yield matches for a query across rows with literal or regex mode."""
-    if not query:
+    plan = prepared_plan
+    if plan is None:
+        plan = prepare_search_plan(
+            query,
+            is_regex=is_regex,
+            case_sensitive=case_sensitive,
+        )
+    if plan is None:
         return
-    if is_regex:
-        try:
-            flags = re.MULTILINE
-            if not case_sensitive:
-                flags |= re.IGNORECASE
-            matcher = re.compile(query, flags)
-        except re.error:
-            return
-        query_text = query
-    else:
-        matcher = None
-        query_text = query
-        if not case_sensitive:
-            query_text = query.lower()
-
-    for row in rows:
-        if field is SearchField.KEY:
-            text = row.key
-        elif field is SearchField.SOURCE:
-            text = row.source
-        else:
-            text = row.value
-        text = text or ""
-        if matcher:
-            hit = matcher.search(text)
-            if hit:
-                preview = ""
-                if include_preview:
-                    preview = _build_preview(
-                        text,
-                        start=hit.start(),
-                        length=max(1, hit.end() - hit.start()),
-                        width=preview_chars,
-                    )
-                yield Match(row.file, row.row, preview)
-        else:
-            target = text if case_sensitive else text.lower()
-            if _matches_literal(target, query_text):
-                preview = ""
-                if include_preview:
-                    start, length = _find_literal_span(target, query_text)
-                    preview = _build_preview(
-                        text,
-                        start=start,
-                        length=length,
-                        width=preview_chars,
-                    )
-                yield Match(row.file, row.row, preview)
+    yield from _iter_matches_with_plan(
+        rows,
+        plan=plan,
+        field=field,
+        case_sensitive=case_sensitive,
+        include_preview=include_preview,
+        preview_chars=preview_chars,
+    )
 
 
 def search(
@@ -173,14 +329,23 @@ def search(
     case_sensitive: bool = False,
     include_preview: bool = False,
     preview_chars: int = 96,
+    prepared_plan: SearchQueryPlan | None = None,
 ) -> list[Match]:
     """Collect and return all matches from :func:`iter_matches`."""
-    return list(
-        iter_matches(
-            rows,
+    plan = prepared_plan
+    if plan is None:
+        plan = prepare_search_plan(
             query,
-            field,
-            is_regex,
+            is_regex=is_regex,
+            case_sensitive=case_sensitive,
+        )
+    if plan is None:
+        return []
+    return list(
+        _iter_matches_with_plan(
+            rows,
+            plan=plan,
+            field=field,
             case_sensitive=case_sensitive,
             include_preview=include_preview,
             preview_chars=preview_chars,
