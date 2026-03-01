@@ -14,6 +14,24 @@ Goals:
   `run` -> `running`).
 - Avoid substring-only noise for short one-token queries.
 
+## 1.1) Implementation Module Map (A15-TM-RF1)
+
+Current implementation ownership:
+1. `translationzed_py/core/tm_store.py`
+   1. database lifecycle, query cache, and top-level `TMStore.query(...)` orchestration.
+2. `translationzed_py/core/tm_query_engine.py`
+   1. exact+fuzzy query composition and candidate retrieval flow.
+3. `translationzed_py/core/tm_query_policy.py`
+   1. normalization policy, adaptive length-band policy, and oversized-candidate guard.
+4. `translationzed_py/core/tm_query_scoring.py`
+   1. scoring gates, score construction, and deterministic tie-break ordering.
+5. `translationzed_py/core/tm_query_contracts.py`
+   1. internal dataclass contracts for runtime policy/config/metrics.
+6. `translationzed_py/core/tm_query_text.py`
+   1. token and composed-phrase text-matching primitives.
+7. `translationzed_py/core/tm_store_support.py`
+   1. locale/origin/status normalization and sqlite conflict helper predicates.
+
 ## 2) Query Inputs
 
 - `source_text`: current EN source text from selected row.

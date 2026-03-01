@@ -250,19 +250,28 @@ sequenceDiagram
 
 ## 8) TM Orchestration + Ranking Pipeline
 
+- Module review status: `translationzed_py/core/tm_store.py` closed in A15-TM-RF1
+  (`docs/reference/review_queue.json`, `status=CLOSED`, `closed_at=2026-03-01`).
+
 ```mermaid
 flowchart LR
   UI[TM panel in main_window_panel_helpers]
   WF[core.tm_workflow_service.TMWorkflowService]
-  STORE[core.tm_store]
-  QUERY[core.tm_query]
+  STORE[core.tm_store.TMStore]
+  ENGINE[core.tm_query_engine]
+  POLICY[core.tm_query_policy]
+  SCORING[core.tm_query_scoring]
+  CONTRACTS[core.tm_query_contracts]
   VIEW[TMSuggestionsView]
 
   UI --> WF
   WF --> STORE
-  WF --> QUERY
+  STORE --> ENGINE
+  ENGINE --> POLICY
+  ENGINE --> SCORING
+  ENGINE --> CONTRACTS
+  ENGINE --> STORE
   STORE --> WF
-  QUERY --> WF
   WF --> VIEW
   VIEW --> UI
 ```
@@ -273,22 +282,25 @@ flowchart LR
 flowchart TB
   UI_REQ[TM panel refresh] --> WF_REQ[TMWorkflowService.build_query_request]
   WF_REQ --> STORE_Q[TMStore.query]
-  STORE_Q --> NORMALIZE[_normalize + partial wrapper cleanup]
-  NORMALIZE --> TOKENS[_query_tokens_cached]
-  TOKENS --> FUZZY[TMStore._fuzzy_candidates]
+  STORE_Q --> QUERY_CONN[TMStore._query_conn]
+  QUERY_CONN --> ENGINE[tm_query_engine.query_conn]
+  ENGINE --> NORMALIZE[tm_query_policy.normalize_for_match]
+  ENGINE --> FUZZY[tm_query_engine.fuzzy_candidates]
+  FUZZY --> TOKENS[_query_tokens_cached]
 
-  FUZZY --> BAND[Adaptive candidate band\nLmin/Lmax by k and Lq]
+  FUZZY --> BAND[tm_query_policy.compute_candidate_length_band]
   BAND --> BASE_BAND[Lmax_base checkpoint]
-  BASE_BAND --> OVER_GUARD[Oversized guard when Lc > Lmax_base]
+  BASE_BAND --> OVER_GUARD[tm_query_policy.allow_oversized_candidate]
   OVER_GUARD --> OVERLAP[_soft_token_overlap]
   OVER_GUARD --> PHRASE[_contains_composed_phrase_cached]
   OVER_GUARD --> RATIO[SequenceMatcher ratio]
 
-  OVERLAP --> SCORE[Score + tie-break]
+  OVERLAP --> SCORE[tm_query_scoring.score_candidate]
   PHRASE --> SCORE
   RATIO --> SCORE
+  SCORE --> SORT[tm_query_scoring.sort_scored_candidates]
 
-  SCORE --> WF_VIEW[TMWorkflowService.accept_query_result]
+  SORT --> WF_VIEW[TMWorkflowService.accept_query_result]
   WF_VIEW --> UI_ROWS[TMSuggestionsView rows]
 ```
 

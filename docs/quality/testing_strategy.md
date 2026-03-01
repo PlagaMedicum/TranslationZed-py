@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-02-25_
+_Last updated: 2026-03-01_
 
 ---
 
@@ -31,6 +31,10 @@ _Last updated: 2026-02-25_
 - EN hash cache index read/write (implemented).
 - Core search behavior (once `core.search` is introduced).
 - Cache header `last_opened_unix` read/write correctness.
+- TM store maintainability thresholds:
+    - module line budget `<1200`,
+    - longest function budget `<180` lines
+    (`tests/test_tm_store_structure.py`).
 - QA rule primitives:
     - trailing-fragment detection,
     - newline mismatch detection,
@@ -82,6 +86,8 @@ _Last updated: 2026-02-25_
   cached source rows so Source-column search results cannot reuse stale mode data.
 - Architecture guards enforce allowed GUI->core imports and
   `main_window.py <= 5400` line-budget threshold.
+- TM architecture guard enforces refactor closure thresholds for
+  `tm_store.py` (`tests/test_tm_store_structure.py`).
 - Sidebar progress integration checks:
     - permanent Project-tab progress strip renders locale/current-file rows correctly,
     - translated/proofread percent semantics (`Translated` excludes `Proofread`),
@@ -168,6 +174,9 @@ _Last updated: 2026-02-25_
     `tests/test_tm_store_cache_caps.py`,
     - TM legacy-vs-optimized bit-stability + 20k median speedup contracts:
     `tests/test_tm_query_perf_contract.py`.
+    - TM perf contracts use a broader deterministic perf query pack
+      (`build_tm_perf_query_pack`) to reduce jitter and better represent repeated-token
+      workloads.
     - search speed target (default
       `TZP_PERF_SEARCH_SPEEDUP_20K_PERCENT=30`),
     - warm-cache target (default `TZP_PERF_TM_SPEEDUP_20K_PERCENT=35`),

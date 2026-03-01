@@ -56,7 +56,7 @@
       "status": "REVIEW_REQUIRED"
     },
     {
-      "closed_at": null,
+      "closed_at": "2026-03-01",
       "closure_criteria": [
         "Reduce translationzed_py/core/tm_store.py to <1200 lines",
         "Keep longest function in translationzed_py/core/tm_store.py <180 lines",
@@ -66,7 +66,10 @@
       ],
       "evidence": [
         "Long fuzzy-query path combines retrieval bands, gating, and scoring in one module",
-        "Document-or-Flag triage marked module REVIEW_REQUIRED during A12-TM-R2 updates"
+        "Document-or-Flag triage marked module REVIEW_REQUIRED during A12-TM-R2 updates",
+        "A15-TM-RF1 extracted tm_query_contracts/policy/scoring/engine/text/support modules",
+        "Structural threshold now enforced by tests/test_tm_store_structure.py",
+        "TM equivalence/perf contracts and make verify passed on 2026-03-01"
       ],
       "module_path": "translationzed_py/core/tm_store.py",
       "opened_at": "2026-03-01",
@@ -80,11 +83,12 @@
       "required_tests": [
         "tests/test_tm_store.py",
         "tests/test_tm_store_edge_paths.py",
+        "tests/test_tm_store_structure.py",
         "tests/test_tm_ranking_corpus.py",
         "tests/test_tm_query_perf_contract.py"
       ],
       "risk_level": "P1",
-      "status": "IN_REFACTOR"
+      "status": "CLOSED"
     }
   ],
   "version": 1

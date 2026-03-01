@@ -32,11 +32,17 @@ Execution evidence log:
    1. `tm_store.py` `<1200` lines
    2. longest function `<180` lines
    3. TM equivalence + long-variant detection + perf contracts green
-4. [ ] Internal extraction in progress:
-   1. query contracts
-   2. query policy (normalization + adaptive band + oversized guard)
-   3. scoring/tie-break helpers
-5. [ ] Queue closure to `CLOSED` will happen only after all closure criteria are green.
+4. [✓] Internal extraction landed:
+   1. `core.tm_query_contracts` (runtime + metrics dataclasses)
+   2. `core.tm_query_policy` (normalization + adaptive band + oversized guard)
+   3. `core.tm_query_scoring` (gates + score + deterministic tie-break)
+   4. `core.tm_query_engine` (exact/fuzzy orchestration flow)
+   5. `core.tm_query_text` and `core.tm_store_support` support helpers
+   6. `TMStore._query_conn` and `TMStore._fuzzy_candidates` reduced to thin orchestrators
+5. [✓] Queue closure complete:
+   1. `docs/reference/review_queue.json` entry for `translationzed_py/core/tm_store.py` moved to `CLOSED` (`closed_at=2026-03-01`)
+   2. validated gates: `make docs-check`, `make test-perf-scale`, `make verify`
+   3. deferred debt remains explicit: synthetic search benchmark correction lane is unchanged and tracked separately
 
 ## 0) Non‑negotiable invariants
 

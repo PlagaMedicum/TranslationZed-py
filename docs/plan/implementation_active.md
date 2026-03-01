@@ -1,22 +1,22 @@
 # TranslationZed-Py — Active Implementation Plan
 _Last updated: 2026-03-01_
 
-## 1) Active Milestone
+## 1) Current State
 
-### A15-TM-RF1 [in progress] — TM deep refactor (docs-first)
+### A15-TM-RF1 [completed] — TM deep refactor (docs-first)
 
 1. Scope is TM-only in this cycle: `translationzed_py/core/tm_store.py`.
 2. Search synthetic benchmark correction remains deferred and tracked debt.
 3. Public contract remains stable: `TMStore.query(...)` signature and GUI behavior do not change.
 4. `Document-or-Flag` policy remains mandatory for all touched modules.
 
-Active acceptance targets:
-1. `tm_store.py` line count is `<1200`.
-2. Longest function in `tm_store.py` is `<180` lines.
-3. TM equivalence/ordering contracts remain green.
-4. TM long-variant detection at default `min_score=50` remains green.
-5. TM warm/cold perf contracts remain green in `make test-perf-scale`.
-6. End-of-cycle validation passes: `make docs-check`, `make test-perf-scale`, `make verify`.
+Completed acceptance targets:
+1. `tm_store.py` line count is `<1200` (current: 1199).
+2. Longest function in `tm_store.py` is `<180` lines (current max: 88).
+3. TM equivalence/ordering contracts are green.
+4. TM long-variant detection at default `min_score=50` is green.
+5. TM warm/cold perf contracts are green in `make test-perf-scale`.
+6. End-of-cycle validation passed: `make docs-check`, `make test-perf-scale`, `make verify`.
 
 Tracking docs:
 1. `docs/domain/tm_ranking.md`
