@@ -1,0 +1,91 @@
+{
+  "entries": [
+    {
+      "closed_at": null,
+      "closure_criteria": [
+        "Split _parse_env into smaller typed parsers",
+        "Reduce max function branch count below 45",
+        "Keep preferences roundtrip tests green"
+      ],
+      "evidence": [
+        "High branch density in _parse_env",
+        "Single module owns parsing, normalization, and migration paths"
+      ],
+      "module_path": "translationzed_py/core/preferences.py",
+      "opened_at": "2026-02-26",
+      "owner": "core-maintainers",
+      "reason_codes": [
+        "COMPLEXITY",
+        "STATE_INCOHERENCE"
+      ],
+      "refactor_scope": "extract parsing/normalization helpers and isolate legacy migration handling",
+      "required_tests": [
+        "tests/test_preferences.py",
+        "tests/test_preferences_edge_paths.py",
+        "tests/test_preferences_service.py"
+      ],
+      "risk_level": "P1",
+      "status": "REVIEW_REQUIRED"
+    },
+    {
+      "closed_at": null,
+      "closure_criteria": [
+        "Reduce fuzzy-candidate branch complexity",
+        "Split query planning and candidate retrieval internals",
+        "Preserve search/replace equivalence + perf contract tests"
+      ],
+      "evidence": [
+        "Large module and heavy branching in search/replace orchestration",
+        "Multiple policy paths concentrated in one service module"
+      ],
+      "module_path": "translationzed_py/core/search_replace_service.py",
+      "opened_at": "2026-02-26",
+      "owner": "core-maintainers",
+      "reason_codes": [
+        "COMPLEXITY",
+        "STATE_INCOHERENCE",
+        "PERF_SMELL"
+      ],
+      "refactor_scope": "separate search planning, row-cache policy, and replace orchestration helpers",
+      "required_tests": [
+        "tests/test_search_replace_service.py",
+        "tests/test_search_wave2_equivalence.py",
+        "tests/test_search_perf_contract.py"
+      ],
+      "risk_level": "P1",
+      "status": "REVIEW_REQUIRED"
+    },
+    {
+      "closed_at": null,
+      "closure_criteria": [
+        "Reduce translationzed_py/core/tm_store.py to <1200 lines",
+        "Keep longest function in translationzed_py/core/tm_store.py <180 lines",
+        "Keep TM equivalence ordering and score contracts green",
+        "Keep TM long-variant detection at min_score=50 green",
+        "Keep TM warm/cold perf contracts green in make test-perf-scale"
+      ],
+      "evidence": [
+        "Long fuzzy-query path combines retrieval bands, gating, and scoring in one module",
+        "Document-or-Flag triage marked module REVIEW_REQUIRED during A12-TM-R2 updates"
+      ],
+      "module_path": "translationzed_py/core/tm_store.py",
+      "opened_at": "2026-03-01",
+      "owner": "core-maintainers",
+      "reason_codes": [
+        "COMPLEXITY",
+        "PERF_SMELL",
+        "STATE_INCOHERENCE"
+      ],
+      "refactor_scope": "extract fuzzy retrieval planning, candidate gating, and scoring flow while preserving deterministic ranking contracts",
+      "required_tests": [
+        "tests/test_tm_store.py",
+        "tests/test_tm_store_edge_paths.py",
+        "tests/test_tm_ranking_corpus.py",
+        "tests/test_tm_query_perf_contract.py"
+      ],
+      "risk_level": "P1",
+      "status": "IN_REFACTOR"
+    }
+  ],
+  "version": 1
+}

@@ -17,6 +17,27 @@ Legend:
 
 ---
 
+## A15-TM-RF1 [→] TM Deep Refactor (docs-first; TM-only)
+
+Execution lock for this cycle:
+1. TM-only refactor scope: `translationzed_py/core/tm_store.py`.
+2. Search synthetic benchmark correction remains deferred debt in this cycle.
+3. Public API remains stable: no signature drift for `TMStore.query(...)`.
+4. `Document-or-Flag` gate is active for all touched modules.
+
+Execution evidence log:
+1. [✓] Active-plan scope moved to A15-TM-RF1 in `docs/plan/implementation_active.md`.
+2. [✓] Review queue moved `translationzed_py/core/tm_store.py` from `REVIEW_REQUIRED` to `IN_REFACTOR`.
+3. [✓] Closure criteria locked:
+   1. `tm_store.py` `<1200` lines
+   2. longest function `<180` lines
+   3. TM equivalence + long-variant detection + perf contracts green
+4. [ ] Internal extraction in progress:
+   1. query contracts
+   2. query policy (normalization + adaptive band + oversized guard)
+   3. scoring/tie-break helpers
+5. [ ] Queue closure to `CLOSED` will happen only after all closure criteria are green.
+
 ## 0) Non‑negotiable invariants
 
 These are **always-on** constraints; any new feature must preserve them.

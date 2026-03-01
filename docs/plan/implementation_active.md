@@ -1,73 +1,55 @@
 # TranslationZed-Py — Active Implementation Plan
 _Last updated: 2026-03-01_
 
-## 1) Active Milestones
+## 1) Active Milestone
 
-### A12 [in progress] — Mathematical performance program
+### A15-TM-RF1 [in progress] — TM deep refactor (docs-first)
 
-Scope (locked): parser + TM first, strict semantic compatibility, no user-visible behavior drift.
+1. Scope is TM-only in this cycle: `translationzed_py/core/tm_store.py`.
+2. Search synthetic benchmark correction remains deferred and tracked debt.
+3. Public contract remains stable: `TMStore.query(...)` signature and GUI behavior do not change.
+4. `Document-or-Flag` policy remains mandatory for all touched modules.
 
-Current active acceptance targets:
-
-- Parser 20k-scale median speedup gate: `>=45%` versus legacy path (same-run A/B contract).
-- TM 20k-scale median warm-cache speedup gate: `>=35%` with bit-stable output order/scores.
-- TM cold-cache speedup gate enforced separately.
-- Cache caps remain deterministic and bounded.
+Active acceptance targets:
+1. `tm_store.py` line count is `<1200`.
+2. Longest function in `tm_store.py` is `<180` lines.
+3. TM equivalence/ordering contracts remain green.
+4. TM long-variant detection at default `min_score=50` remains green.
+5. TM warm/cold perf contracts remain green in `make test-perf-scale`.
+6. End-of-cycle validation passes: `make docs-check`, `make test-perf-scale`, `make verify`.
 
 Tracking docs:
+1. `docs/domain/tm_ranking.md`
+2. `docs/architecture/code_architecture.md`
+3. `docs/quality/testing_strategy.md`
+4. `docs/reference/review_queue.json`
+5. `docs/plan/implementation_history.md`
 
-- `docs/spec/technical.md`
-- `docs/quality/testing_strategy.md`
-- `docs/performance/math_appendix.md`
-- `docs/plan/implementation_history.md` (decision ledger)
+## 2) Explicit Deferred Lane
 
-## 2) Recently Completed
+1. Search synthetic benchmark correction (`test_bench_search_translation_synthetic_20k`) is deferred in A15-TM-RF1.
+2. No baseline inflation is allowed in this cycle.
+3. No refactor scope this cycle for:
+   1. `translationzed_py/core/search_replace_service.py`
+   2. `translationzed_py/core/preferences.py`
+
+## 3) Recently Completed
 
 ### A14-R1 [completed] — High-assurance docs with Document-or-Flag
 
-Completed scope:
-1. `Document-or-Flag` triage gate added to docs quality workflow.
-2. Review queue contract introduced (`docs/reference/review_queue.json`) and validated.
-3. Strict default docs build policy enforced (`make docs-build` full stack).
-4. mkdocstrings/griffe API docs (core-first) and contract index artifact added.
-5. `docs-check` now runs triage + queue + contract-index checks.
+1. Added docs triage gate and queue checks.
+2. Added mkdocstrings/griffe API docs stack and contract index.
+3. Locked strict docs-check integration into verification flows.
 
 ### A13 [completed] — Documentation coherency overhaul (browser-first)
 
-Completed scope:
-1. Domain-folder docs structure + short canonical names.
-2. Current UI truth alignment (`General` menu, `Project` tab).
-3. MathJax + Mermaid browser rendering and local `file://` navigation fix.
-4. Single primary diagram rendering in canonical pages (no fallback duplication).
-5. Docs anti-drift automation in `scripts/docs_contract_check.py` + `make docs-check`.
-
-## 3) Current Execution Sequence
-
-1. [✓] Complete A12 Wave-2 search optimization with strict semantic equivalence.
-2. [✓] Land strict 20k search perf contract (`>=30%` median speedup).
-3. [✓] Wire Wave-2 perf/equivalence tests into perf-scale lanes and CI strict gates.
-4. [→] Finalize A12 docs sync (math model, testing strategy, history evidence).
-5. [ ] Run final validation pass (`make docs-check`, `make test-perf-scale`, `make verify`).
-
-Current local blocker:
-- strict docs build dependencies are not installed in this environment
-  (`material`, `pymdownx`, `mkdocstrings`, `mkdocstrings_handlers.python`),
-  so `make docs-check` cannot complete locally until dev docs deps are present.
+1. Reorganized docs into canonical domain folders.
+2. Aligned docs to current UI labels and removed stale terms.
+3. Enabled browser-first rendering stack (MathJax + Mermaid + strict docs checks).
 
 ## 4) Non-Negotiable Constraints
 
-1. Canonical behavior is defined by `technical` + `ux` docs only.
-2. Historical notes must not conflict with canonical behavior.
-3. Docs updates are required whenever behavior/contracts/commands change.
-4. Keep verification command semantics stable unless explicitly updated in
-   `testing_strategy` and `checklists` together.
-
-## 5) Open Questions Backlog
-
-No blocking product questions are currently tracked in this file.
-
-Any new open question must include:
-
-- impacted contract,
-- candidate options,
-- selected default or explicit owner.
+1. Canonical behavior is defined by `docs/spec/technical.md` and `docs/ux/use_cases.md`.
+2. Historical docs must not conflict with canonical docs.
+3. Docs must be updated with every behavior/contract/tooling change.
+4. Verification command semantics can change only with synchronized docs updates.
