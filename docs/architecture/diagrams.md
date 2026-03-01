@@ -1,0 +1,204 @@
+# TranslationZed-Py — Architecture Diagrams
+_Last updated: 2026-03-01_
+
+This page is the high-level diagram index.
+For concrete class/interface/controller diagrams, see
+`docs/architecture/code_architecture.md`.
+
+Notation policy:
+- Mermaid is default for browser-native rendering.
+- PlantUML source is used for dense architecture/controller-domain maps.
+- Canonical docs render one primary diagram only (no inline fallback duplication).
+
+## 1) System Context
+
+```mermaid
+flowchart LR
+  U[Translator / Proofreader] --> GUI[Qt GUI]
+  GUI --> CORE[Core Services]
+  CORE --> FS[(Locale Files)]
+  CORE --> CACHE[(.tzp/cache)]
+  CORE --> TM[(TM SQLite Store)]
+```
+
+## 2) Layered Architecture
+
+```mermaid
+flowchart TB
+  GUI[GUI Layer\nmain_window + models/delegates] --> APP[Workflow Services\nQt-free orchestration]
+  APP --> CORE[Domain/Core\nparser/saver/search/qa/tm]
+  CORE --> INFRA[Infrastructure IO\nfilesystem/cache/sqlite]
+```
+
+Dense source reference:
+- `docs/diagrams/src/layered_architecture.puml`
+
+## 3) Core Services Interaction Graph
+
+```mermaid
+graph LR
+  PS[project_session] --> FW[file_workflow]
+  FW --> SX[save_exit_flow]
+  FW --> CS[conflict_service]
+  FW --> SC[status_cache]
+  SR[search_replace_service] --> QA[qa_service]
+  TMW[tm_workflow_service] --> TMS[tm_store]
+  TMW --> TMI[tm_import_sync]
+```
+
+## 4) GUI Adapters/Controllers Interaction Graph
+
+```mermaid
+graph LR
+  MW[main_window] --> PM[panel_helpers]
+  MW --> ED[entry_model]
+  MW --> SH[status_header]
+  MW --> LT[languagetool_adapter]
+  MW --> PR[preferences_dialog]
+```
+
+Dense source reference:
+- `docs/diagrams/src/gui_controller_domain_map.puml`
+
+## 5) Save Flow Sequence
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant GUI as main_window
+  participant C as status_cache
+  participant S as saver
+  U->>GUI: Edit translation
+  GUI->>C: persist draft cache
+  U->>GUI: Save
+  GUI->>S: write selected files
+  S-->>GUI: success/failure
+  GUI->>C: rewrite status-only cache
+```
+
+## 6) Open / Parse / Conflict Sequence
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant GUI as main_window
+  participant F as file_workflow
+  participant P as parser
+  participant X as conflict_service
+  U->>GUI: Open file
+  GUI->>F: build open plan
+  F->>P: parse locale file
+  F->>X: evaluate cache/original mismatch
+  X-->>GUI: prompt plan or clean load
+```
+
+## 7) EN Diff + NEW Insertion Sequence
+
+```mermaid
+sequenceDiagram
+  participant GUI as main_window
+  participant D as en_diff_service
+  participant I as en_insert_plan
+  GUI->>D: classify NEW/REMOVED/MODIFIED
+  D-->>GUI: row marker payload
+  GUI->>I: build insertion preview for edited NEW rows
+  I-->>GUI: Apply/Skip/Edit/Cancel preview
+```
+
+## 8) Status Triage State Machine
+
+```mermaid
+stateDiagram-v2
+  [*] --> Untouched
+  Untouched --> ForReview: QA / manual mark
+  ForReview --> Translated: mark translated
+  Translated --> Proofread: mark proofread
+  Proofread --> ForReview: re-open for review
+```
+
+## 9) QA + LanguageTool Pipeline
+
+```mermaid
+flowchart LR
+  A[Run QA] --> Q[qa_service checks]
+  Q --> R[QA findings list]
+  T[Inline LT check] --> L[languagetool adapter]
+  L --> R
+```
+
+## 10) TM Ranking Query Activity
+
+```mermaid
+flowchart TB
+  Q[Source text query] --> N[Normalize + partial wrapper cleanup]
+  N --> E[Exact retrieval]
+  E --> F[Fuzzy candidate pools]
+  F --> B[Adaptive band by Lq,k]
+  B --> OG[Oversized guard when Lc > Lmax_base]
+  OG --> G[Relevance gates]
+  G --> S[Score + tie-break]
+  S --> O[Ordered suggestions]
+```
+
+### 10.1 TM Long-Variant Detection Activity
+
+```mermaid
+flowchart LR
+  LQ[Compute Lq and k] --> BASE[Compute Lmin_base/Lmax_base]
+  BASE --> TRIG{is_long_multi}
+  TRIG -- no --> BAND0[Use base band]
+  TRIG -- yes --> BAND1[Use adaptive band\nLmin=max(1,floor(0.5*Lq))\nLmax=max(Lmax_base,floor(1.85*Lq))]
+  BAND0 --> PICK[Candidate selected]
+  BAND1 --> PICK
+  PICK --> OVER{Lc > Lmax_base}
+  OVER -- no --> KEEP[Proceed to scoring]
+  OVER -- yes --> RULE{overlap>=0.55 OR\n(composed && ratio>=0.70)}
+  RULE -- no --> DROP[Reject candidate]
+  RULE -- yes --> KEEP
+```
+
+## 11) Verification Pipeline
+
+```mermaid
+flowchart LR
+  V[make verify] --> VC[verify-core]
+  VC --> P[perf advisory]
+  VC --> D[docstyle + docs-build]
+  C[make verify-ci] --> CC[verify-ci-core]
+  CC --> B[bench-check strict]
+  H[make verify-heavy] --> HE[verify-heavy-extra]
+```
+
+## 12) Module Dependency Map
+
+```mermaid
+flowchart LR
+  subgraph GUI
+    MW[main_window]
+    EM[entry_model]
+    DG[delegates]
+  end
+  subgraph CORE
+    PS[project_session]
+    FW[file_workflow]
+    SR[search_replace_service]
+    TMW[tm_workflow_service]
+    QA[qa_service]
+  end
+  subgraph DATA
+    PARSER[parser/saver]
+    CACHE[status_cache]
+    TMDB[tm_store]
+  end
+  MW --> PS
+  MW --> FW
+  MW --> SR
+  MW --> TMW
+  MW --> QA
+  FW --> PARSER
+  FW --> CACHE
+  TMW --> TMDB
+```
+
+Dense source reference:
+- `docs/diagrams/src/module_dependency_dense.puml`
