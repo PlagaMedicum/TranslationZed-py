@@ -11,6 +11,7 @@ from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from .app_config import LEGACY_CONFIG_DIR
 from .app_config import load as _load_app_config
@@ -24,8 +25,10 @@ from .tm_query_contracts import (
 from .tm_query_engine import fuzzy_candidates as _fuzzy_candidates_engine
 from .tm_query_engine import query_conn as _query_conn_engine
 from .tm_query_policy import normalize_for_match as _normalize
-from .tm_query_policy import strip_tm_wrappers as _strip_tm_wrappers
-from .tm_query_text import contains_composed_phrase_uncached as _contains_phrase_uncached
+from .tm_query_policy import strip_tm_wrappers as _strip_tm_wrappers_impl
+from .tm_query_text import (
+    contains_composed_phrase_uncached as _contains_phrase_uncached,
+)
 from .tm_query_text import token_matches_uncached as _token_matches_uncached_impl
 from .tm_store_support import (
     is_project_upsert_conflict_mismatch as _is_project_upsert_conflict_mismatch,
@@ -33,11 +36,11 @@ from .tm_store_support import (
 from .tm_store_support import normalize_locale as _normalize_locale
 from .tm_store_support import normalize_origins as _normalize_origins
 from .tm_store_support import normalize_row_status as _normalize_row_status
+from .tm_store_support import prefix as _prefix
 from .tmx_io import iter_tm_pairs, write_tmx
 
 _PROJECT_ORIGIN = "project"
 _IMPORT_ORIGIN = "import"
-# Store query accepts 5..100 when explicitly requested; GUI default is 50.
 _MIN_FUZZY_SCORE = 5
 _MAX_FUZZY_CANDIDATES = 1200
 _FUZZY_RESERVED_SLOTS = 3
@@ -129,9 +132,8 @@ class TMImportFile:
     note: str
     updated_at: int
 
-def _prefix(text: str, length: int = 8) -> str:
-    """Execute prefix."""
-    return text[:length] if text else ""
+
+_strip_tm_wrappers = _strip_tm_wrappers_impl
 
 
 def _query_tokens(text: str) -> tuple[str, ...]:
@@ -1143,23 +1145,26 @@ class TMStore:
         normalized_source: str | None = None,
     ) -> list[TMMatch]:
         """Execute query conn."""
-        return _query_conn_engine(
-            conn,
-            source_text,
-            source_locale=source_locale,
-            target_locale=target_locale,
-            limit=limit,
-            min_score=min_score,
-            origins=origins,
-            normalized_source=normalized_source,
-            runtime=_QUERY_RUNTIME,
-            callbacks=TMQueryCallbacks(
-                normalize_locale=_normalize_locale,
-                normalize_origins=_normalize_origins,
-                normalize_text=_normalize,
+        return cast(
+            list[TMMatch],
+            _query_conn_engine(
+                conn,
+                source_text,
+                source_locale=source_locale,
+                target_locale=target_locale,
+                limit=limit,
+                min_score=min_score,
+                origins=origins,
+                normalized_source=normalized_source,
+                runtime=_QUERY_RUNTIME,
+                callbacks=TMQueryCallbacks(
+                    normalize_locale=_normalize_locale,
+                    normalize_origins=_normalize_origins,
+                    normalize_text=_normalize,
+                ),
+                fuzzy_candidates_fn=cls._fuzzy_candidates,
+                match_cls=TMMatch,
             ),
-            fuzzy_candidates_fn=cls._fuzzy_candidates,
-            match_cls=TMMatch,
         )
 
     @staticmethod

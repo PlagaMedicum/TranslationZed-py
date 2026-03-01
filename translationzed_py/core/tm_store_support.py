@@ -17,6 +17,11 @@ def normalize_locale(locale: str) -> str:
     return locale.strip().upper()
 
 
+def prefix(text: str, length: int = 8) -> str:
+    """Return indexed prefix value used by TM lookup SQL."""
+    return text[:length] if text else ""
+
+
 def normalize_row_status(value: object) -> int | None:
     """Normalize persisted row status value into canonical int enum value."""
     if value is None:
