@@ -15,6 +15,24 @@ from pathlib import Path
 from .app_config import LEGACY_CONFIG_DIR
 from .app_config import load as _load_app_config
 from .model import Status
+from .tm_query_contracts import (
+    TMFuzzyCallbacks,
+    TMFuzzyRuntime,
+    TMQueryCallbacks,
+    TMQueryRuntime,
+)
+from .tm_query_engine import fuzzy_candidates as _fuzzy_candidates_engine
+from .tm_query_engine import query_conn as _query_conn_engine
+from .tm_query_policy import normalize_for_match as _normalize
+from .tm_query_policy import strip_tm_wrappers as _strip_tm_wrappers
+from .tm_query_text import contains_composed_phrase_uncached as _contains_phrase_uncached
+from .tm_query_text import token_matches_uncached as _token_matches_uncached_impl
+from .tm_store_support import (
+    is_project_upsert_conflict_mismatch as _is_project_upsert_conflict_mismatch,
+)
+from .tm_store_support import normalize_locale as _normalize_locale
+from .tm_store_support import normalize_origins as _normalize_origins
+from .tm_store_support import normalize_row_status as _normalize_row_status
 from .tmx_io import iter_tm_pairs, write_tmx
 
 _PROJECT_ORIGIN = "project"
@@ -51,6 +69,25 @@ OR COALESCE(
     1
 ) = 1
 """
+_QUERY_RUNTIME = TMQueryRuntime(
+    min_fuzzy_score=_MIN_FUZZY_SCORE,
+    short_query_len=_SHORT_QUERY_LEN,
+    fuzzy_reserved_slots=_FUZZY_RESERVED_SLOTS,
+    short_query_reserved_slots=_SHORT_QUERY_RESERVED_SLOTS,
+    max_fuzzy_source_len=_MAX_FUZZY_SOURCE_LEN,
+    project_origin=_PROJECT_ORIGIN,
+    import_visible_sql=_IMPORT_VISIBLE_SQL,
+)
+_FUZZY_RUNTIME = TMFuzzyRuntime(
+    max_fuzzy_candidates=_MAX_FUZZY_CANDIDATES,
+    fuzzy_bucket_candidates=_FUZZY_BUCKET_CANDIDATES,
+    short_query_len=_SHORT_QUERY_LEN,
+    short_query_max_candidates=_SHORT_QUERY_MAX_CANDIDATES,
+    short_query_bucket_candidates=_SHORT_QUERY_BUCKET_CANDIDATES,
+    multi_token_len_padding=_MULTI_TOKEN_LEN_PADDING,
+    project_origin=_PROJECT_ORIGIN,
+    import_visible_sql=_IMPORT_VISIBLE_SQL,
+)
 
 ProjectEntryRow = (
     tuple[str, str, str] | tuple[str, str, str, int] | tuple[str, str, str, Status]
@@ -91,12 +128,6 @@ class TMImportFile:
     status: str
     note: str
     updated_at: int
-
-
-def _normalize(text: str) -> str:
-    """Execute normalize."""
-    return " ".join(text.lower().split())
-
 
 def _prefix(text: str, length: int = 8) -> str:
     """Execute prefix."""
@@ -163,39 +194,12 @@ def _token_matches_uncached(
     use_en_stemming: bool,
 ) -> bool:
     """Execute token matches."""
-    if query_token == candidate_token:
-        return True
-    if use_en_stemming:
-        query_stem = _stem_token_cached(query_token)
-        candidate_stem = _stem_token_cached(candidate_token)
-        if len(query_stem) >= 3 and query_stem == candidate_stem:
-            return True
-    if len(query_token) == len(candidate_token) and len(query_token) >= 4:
-        if query_token[:2] != candidate_token[:2]:
-            return False
-        if query_token[-1] != candidate_token[-1]:
-            return False
-        mismatches = 0
-        for q_char, c_char in zip(query_token, candidate_token, strict=False):
-            if q_char != c_char:
-                mismatches += 1
-                if mismatches > 1:
-                    break
-        if mismatches == 1:
-            return True
-    shorter, longer = (
-        (query_token, candidate_token)
-        if len(query_token) <= len(candidate_token)
-        else (candidate_token, query_token)
+    return _token_matches_uncached_impl(
+        query_token,
+        candidate_token,
+        use_en_stemming=use_en_stemming,
+        stem_token_cached=_stem_token_cached,
     )
-    if len(shorter) < 4:
-        return False
-    ratio = len(shorter) / len(longer)
-    if (longer.startswith(shorter) or longer.endswith(shorter)) and ratio >= 0.50:
-        return True
-    if shorter in longer:
-        return ratio >= 0.67
-    return False
 
 
 @functools.lru_cache(maxsize=_TOKEN_MATCH_CACHE_CAP)
@@ -222,34 +226,17 @@ def _contains_composed_phrase_uncached(
     query: str,
     use_en_stemming: bool,
 ) -> bool:
-    parts = _query_tokens_cached(query)
-    if not parts:
-        return False
-    text_tokens = _query_tokens_cached(text)
-    if not text_tokens:
-        return False
-    if len(parts) == 1:
-        token = parts[0]
-        return any(
-            _token_matches(token, cand, use_en_stemming=use_en_stemming)
-            for cand in text_tokens
-        )
-    pos = 0
-    for part in parts:
-        found = False
-        while pos < len(text_tokens):
-            if _token_matches(
-                part,
-                text_tokens[pos],
-                use_en_stemming=use_en_stemming,
-            ):
-                found = True
-                pos += 1
-                break
-            pos += 1
-        if not found:
-            return False
-    return True
+    return _contains_phrase_uncached(
+        text,
+        query,
+        use_en_stemming=use_en_stemming,
+        query_tokens_cached=_query_tokens_cached,
+        token_matches=lambda query_token, candidate_token: _token_matches(
+            query_token,
+            candidate_token,
+            use_en_stemming=use_en_stemming,
+        ),
+    )
 
 
 @functools.lru_cache(maxsize=_PHRASE_MATCH_CACHE_CAP)
@@ -295,49 +282,6 @@ def _exact_token_overlap(
     return matched / max(1, len(query_tokens))
 
 
-def _normalize_locale(locale: str) -> str:
-    """Normalize locale."""
-    return locale.strip().upper()
-
-
-def _normalize_row_status(value: object) -> int | None:
-    """Normalize row status."""
-    if value is None:
-        return None
-    if isinstance(value, Status):
-        return int(value)
-    if isinstance(value, int):
-        raw = value
-    elif isinstance(value, str):
-        with contextlib.suppress(ValueError):
-            raw = int(value.strip())
-            with contextlib.suppress(ValueError):
-                return int(Status(raw))
-        return None
-    else:
-        return None
-    with contextlib.suppress(ValueError):
-        return int(Status(raw))
-    return None
-
-
-def _normalize_origins(origins: Iterable[str] | None) -> tuple[str, ...]:
-    """Normalize origins."""
-    if origins is None:
-        return (_PROJECT_ORIGIN, _IMPORT_ORIGIN)
-    normalized: list[str] = []
-    allowed = {_PROJECT_ORIGIN, _IMPORT_ORIGIN}
-    for origin in origins:
-        if origin in allowed and origin not in normalized:
-            normalized.append(origin)
-    ordered: list[str] = []
-    if _PROJECT_ORIGIN in normalized:
-        ordered.append(_PROJECT_ORIGIN)
-    if _IMPORT_ORIGIN in normalized:
-        ordered.append(_IMPORT_ORIGIN)
-    return tuple(ordered)
-
-
 def clear_query_caches() -> None:
     """Clear TM fuzzy-query helper caches."""
     _query_tokens_cached.cache_clear()
@@ -354,14 +298,6 @@ def query_cache_stats() -> dict[str, object]:
         "token_match": _token_matches_cached.cache_info(),
         "phrase": _contains_composed_phrase_cached.cache_info(),
     }
-
-
-def _is_project_upsert_conflict_mismatch(exc: sqlite3.OperationalError) -> bool:
-    """Return whether sqlite error indicates missing ON CONFLICT target support."""
-    return (
-        "ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint"
-        in str(exc)
-    )
 
 
 class TMStore:
@@ -1139,9 +1075,10 @@ class TMStore:
         source_locale_norm = _normalize_locale(source_locale)
         target_locale_norm = _normalize_locale(target_locale)
         origin_list = _normalize_origins(origins)
+        normalized_source = _normalize(source_text)
         cache_key = (
             self._query_revision,
-            _normalize(source_text),
+            normalized_source,
             source_locale_norm,
             target_locale_norm,
             int(limit),
@@ -1159,6 +1096,7 @@ class TMStore:
             limit=limit,
             min_score=min_score,
             origins=origin_list,
+            normalized_source=normalized_source,
         )
         self._query_cache_put(cache_key, matches)
         return matches
@@ -1202,122 +1140,27 @@ class TMStore:
         limit: int,
         min_score: int | None,
         origins: Iterable[str] | None,
+        normalized_source: str | None = None,
     ) -> list[TMMatch]:
         """Execute query conn."""
-        source_locale = _normalize_locale(source_locale)
-        target_locale = _normalize_locale(target_locale)
-        origin_list = _normalize_origins(origins)
-        if not origin_list:
-            return []
-        if min_score is None:
-            min_score = _MIN_FUZZY_SCORE
-        min_score = max(_MIN_FUZZY_SCORE, min(100, int(min_score)))
-        norm = _normalize(source_text)
-        if not norm:
-            return []
-        origin_params: tuple[str, ...]
-        if len(origin_list) == 1:
-            origin_clause = "origin = ?"
-            origin_params = (origin_list[0],)
-        else:
-            origin_clause = "origin IN (?, ?)"
-            origin_params = (origin_list[0], origin_list[1])
-        exact_rows = conn.execute(
-            f"""
-            SELECT
-                source_text,
-                target_text,
-                origin,
-                tm_name,
-                tm_path,
-                file_path,
-                key,
-                row_status,
-                updated_at
-            FROM tm_entries
-            WHERE source_locale = ? AND target_locale = ? AND source_norm = ?
-              AND ({_IMPORT_VISIBLE_SQL})
-              AND {origin_clause}
-            ORDER BY CASE origin WHEN 'project' THEN 0 ELSE 1 END, updated_at DESC
-            """,
-            (source_locale, target_locale, norm, *origin_params),
-        ).fetchall()
-        matches: list[TMMatch] = []
-        seen: set[tuple[str, str, str, str | None]] = set()
-        fuzzy_reserved = (
-            _SHORT_QUERY_RESERVED_SLOTS
-            if len(norm) <= _SHORT_QUERY_LEN
-            else _FUZZY_RESERVED_SLOTS
-        )
-        max_exact = max(1, limit - fuzzy_reserved)
-        for row in exact_rows:
-            key = (
-                row["source_text"],
-                row["target_text"],
-                row["origin"],
-                row["tm_name"],
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            matches.append(
-                TMMatch(
-                    source_text=row["source_text"],
-                    target_text=row["target_text"],
-                    score=100,
-                    origin=row["origin"],
-                    tm_name=row["tm_name"],
-                    tm_path=row["tm_path"],
-                    file_path=row["file_path"],
-                    key=row["key"],
-                    updated_at=row["updated_at"],
-                    raw_score=100,
-                    row_status=row["row_status"],
-                )
-            )
-            if len(matches) >= max_exact:
-                break
-        if len(norm) > _MAX_FUZZY_SOURCE_LEN:
-            return matches
-        candidates = cls._fuzzy_candidates(
+        return _query_conn_engine(
             conn,
-            norm,
-            source_locale,
-            target_locale,
-            origin_list,
+            source_text,
+            source_locale=source_locale,
+            target_locale=target_locale,
+            limit=limit,
+            min_score=min_score,
+            origins=origins,
+            normalized_source=normalized_source,
+            runtime=_QUERY_RUNTIME,
+            callbacks=TMQueryCallbacks(
+                normalize_locale=_normalize_locale,
+                normalize_origins=_normalize_origins,
+                normalize_text=_normalize,
+            ),
+            fuzzy_candidates_fn=cls._fuzzy_candidates,
+            match_cls=TMMatch,
         )
-        for cand, score, raw_score in candidates:
-            if cand["source_norm"] == norm:
-                continue
-            key = (
-                cand["source_text"],
-                cand["target_text"],
-                cand["origin"],
-                cand["tm_name"],
-            )
-            if key in seen:
-                continue
-            if score < min_score:
-                continue
-            seen.add(key)
-            matches.append(
-                TMMatch(
-                    source_text=cand["source_text"],
-                    target_text=cand["target_text"],
-                    score=score,
-                    origin=cand["origin"],
-                    tm_name=cand["tm_name"],
-                    tm_path=cand["tm_path"],
-                    file_path=cand["file_path"],
-                    key=cand["key"],
-                    updated_at=cand["updated_at"],
-                    raw_score=raw_score,
-                    row_status=cand["row_status"],
-                )
-            )
-            if len(matches) >= limit:
-                break
-        return matches
 
     @staticmethod
     def _fuzzy_candidates(
@@ -1328,206 +1171,24 @@ class TMStore:
         origins: Iterable[str],
     ) -> list[tuple[sqlite3.Row, int, int]]:
         """Execute fuzzy candidates."""
-        from difflib import SequenceMatcher
-
-        query_token_seq = _query_tokens_cached(norm)
-        query_tokens = set(query_token_seq)
-        query_token_count = len(query_tokens)
-        use_en_stemming = source_locale == "EN"
-        origin_list = _normalize_origins(origins)
-        if not origin_list:
-            return []
-        origin_params: tuple[str, ...]
-        if len(origin_list) == 1:
-            origin_clause = "origin = ?"
-            origin_params = (origin_list[0],)
-        else:
-            origin_clause = "origin IN (?, ?)"
-            origin_params = (origin_list[0], origin_list[1])
-        # Keep lookup prefix length aligned with stored/indexed source_prefix.
-        prefix = _prefix(norm)
-        length = len(norm)
-        min_len = max(1, int(length * 0.6))
-        max_len = int(length * 1.4) if length > 5 else length + 10
-        if query_token_count > 1:
-            # Allow phrase-expansion neighbors (e.g. "make item" -> "make new item").
-            max_len = max(
-                max_len,
-                length + max(_MULTI_TOKEN_LEN_PADDING, query_token_count * 2),
-            )
-        max_candidates = _MAX_FUZZY_CANDIDATES
-        bucket_candidates = _FUZZY_BUCKET_CANDIDATES
-        if length <= _SHORT_QUERY_LEN:
-            min_len = 1
-            max_len = max(max_len, 40)
-            max_candidates = _SHORT_QUERY_MAX_CANDIDATES
-            bucket_candidates = _SHORT_QUERY_BUCKET_CANDIDATES
-        rows: list[sqlite3.Row] = []
-        seen_rows: set[tuple[object, ...]] = set()
-
-        def _select_rows(
-            where_sql: str,
-            order_sql: str,
-            where_params: tuple[object, ...],
-            *,
-            order_params: tuple[object, ...] = (),
-            limit: int,
-        ) -> list[sqlite3.Row]:
-            """Execute select rows."""
-            return conn.execute(
-                f"""
-                SELECT
-                    source_text, source_norm, target_text, origin, file_path, key
-                    , row_status, updated_at, tm_name, tm_path
-                FROM tm_entries
-                WHERE source_locale = ? AND target_locale = ?
-                  AND {where_sql}
-                  AND ({_IMPORT_VISIBLE_SQL})
-                  AND {origin_clause}
-                ORDER BY {order_sql}
-                LIMIT ?
-                """,
-                (
-                    source_locale,
-                    target_locale,
-                    *where_params,
-                    *origin_params,
-                    *order_params,
-                    limit,
-                ),
-            ).fetchall()
-
-        def _append_unique(candidates: list[sqlite3.Row]) -> None:
-            """Execute append unique."""
-            for row in candidates:
-                row_key = (
-                    row["source_text"],
-                    row["target_text"],
-                    row["origin"],
-                    row["tm_name"],
-                    row["tm_path"],
-                    row["file_path"],
-                    row["key"],
-                )
-                if row_key in seen_rows:
-                    continue
-                seen_rows.add(row_key)
-                rows.append(row)
-                if len(rows) >= max_candidates:
-                    return
-
-        prefix_rows = _select_rows(
-            "source_prefix = ? AND source_len BETWEEN ? AND ?",
-            "ABS(source_len - ?) ASC, updated_at DESC",
-            (prefix, min_len, max_len),
-            order_params=(length,),
-            limit=bucket_candidates,
-        )
-        fallback_rows = _select_rows(
-            "source_len BETWEEN ? AND ?",
-            "ABS(source_len - ?) ASC, updated_at DESC",
-            (min_len, max_len),
-            order_params=(length,),
-            limit=bucket_candidates,
-        )
-        token_rows: list[sqlite3.Row] = []
-        if query_tokens:
-            # Query by longest token first to keep phrase neighbors visible even
-            # when source_prefix diverges ("drop one" -> "drop-all").
-            token = max(query_tokens, key=len)
-            if len(token) >= 3:
-                token_rows = _select_rows(
-                    "instr(source_norm, ?) > 0 AND source_len BETWEEN ? AND ?",
-                    (
-                        "CASE WHEN source_norm = ? THEN 0 "
-                        "WHEN source_norm LIKE ? THEN 1 "
-                        "WHEN source_norm LIKE ? THEN 2 "
-                        "WHEN source_norm LIKE ? THEN 3 "
-                        "ELSE 4 END, ABS(source_len - ?) ASC, updated_at DESC"
-                    ),
-                    (
-                        token,
-                        min_len,
-                        max_len,
-                    ),
-                    order_params=(
-                        token,
-                        f"{token} %",
-                        f"% {token} %",
-                        f"% {token}",
-                        length,
-                    ),
-                    limit=bucket_candidates,
-                )
-        if length <= _SHORT_QUERY_LEN:
-            # For tiny queries, prefix-only retrieval is too strict
-            # (e.g. "all" vs "apply all").
-            # Seed token-containing rows first to keep close phrase neighbors visible.
-            if token_rows:
-                _append_unique(token_rows)
-            if len(rows) < max_candidates:
-                _append_unique(prefix_rows)
-            if len(rows) < max_candidates:
-                _append_unique(fallback_rows)
-        else:
-            _append_unique(prefix_rows)
-            if len(rows) < max_candidates and token_rows:
-                _append_unique(token_rows)
-            if len(rows) < max_candidates:
-                _append_unique(fallback_rows)
-        scored: list[tuple[sqlite3.Row, int, int, int]] = []
-        for row in rows:
-            cand_norm = row["source_norm"]
-            ratio = SequenceMatcher(None, norm, cand_norm, autojunk=False).ratio()
-            composed = _contains_composed_phrase_cached(
-                cand_norm, norm, use_en_stemming
-            )
-            overlap = 0.0
-            exact_overlap = 0.0
-            token_count_delta = 999
-            if query_tokens:
-                cand_tokens = set(_query_tokens_cached(cand_norm))
-                token_count_delta = abs(len(cand_tokens) - query_token_count)
-                if cand_tokens:
-                    overlap = _soft_token_overlap(
+        return _fuzzy_candidates_engine(
+            conn,
+            norm,
+            source_locale,
+            target_locale,
+            origins,
+            runtime=_FUZZY_RUNTIME,
+            callbacks=TMFuzzyCallbacks(
+                normalize_origins=_normalize_origins,
+                query_tokens_cached=_query_tokens_cached,
+                contains_composed_phrase_cached=_contains_composed_phrase_cached,
+                soft_token_overlap=lambda query_tokens, candidate_tokens, use_en: (
+                    _soft_token_overlap(
                         query_tokens,
-                        cand_tokens,
-                        use_en_stemming=use_en_stemming,
+                        candidate_tokens,
+                        use_en_stemming=use_en,
                     )
-                    exact_overlap = _exact_token_overlap(query_tokens, cand_tokens)
-                    if query_token_count == 1:
-                        if overlap < 0.5 and not composed:
-                            continue
-                    elif overlap < 0.34 and ratio < 0.75 and not composed:
-                        continue
-                elif not composed:
-                    continue
-            raw_score = int(round(ratio * 100))
-            score = raw_score
-            token_bonus = int(round((overlap * 6.0) + (exact_overlap * 4.0)))
-            score = min(100, score + token_bonus)
-            if composed:
-                score = max(score, 90 if query_token_count > 1 else 85)
-            if score >= 100 and cand_norm != norm:
-                score = 99
-            scored.append((row, score, raw_score, token_count_delta))
-        if query_token_count > 1:
-            scored.sort(
-                key=lambda item: (
-                    item[3],
-                    -item[1],
-                    abs(len(item[0]["source_norm"]) - length),
-                    0 if item[0]["origin"] == _PROJECT_ORIGIN else 1,
-                    -item[0]["updated_at"],
-                )
-            )
-        else:
-            scored.sort(
-                key=lambda item: (
-                    -item[1],
-                    abs(len(item[0]["source_norm"]) - length),
-                    0 if item[0]["origin"] == _PROJECT_ORIGIN else 1,
-                    -item[0]["updated_at"],
-                )
-            )
-        return [(row, score, raw_score) for row, score, raw_score, _delta in scored]
+                ),
+                exact_token_overlap=_exact_token_overlap,
+            ),
+        )
