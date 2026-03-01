@@ -26,9 +26,7 @@ TRIAGE_DEEP_DOC_PATHS = {
     "docs/spec/technical.md",
     "docs/reference/module_map.md",
 }
-TRIAGE_DEEP_DOC_PREFIXES = (
-    "docs/reference/api/",
-)
+TRIAGE_DEEP_DOC_PREFIXES = ("docs/reference/api/",)
 MODULE_DIRECTIVE_PATTERN = ":::"
 FLAGGED_MODULE_PATTERN = "FLAGGED_MODULE:"
 TRIAGE_MODULE_PATTERN = "TRIAGE_MODULE:"
@@ -88,9 +86,11 @@ def _extract_modules_from_doc(path: Path) -> set[str]:
             return None
         if token.startswith("translationzed_py/") and token.endswith(".py"):
             return token.removesuffix(".py").replace("/", ".")
-        if token.startswith("translationzed_py."):
-            if token.replace(".", "").replace("_", "").isalnum():
-                return token
+        if (
+            token.startswith("translationzed_py.")
+            and token.replace(".", "").replace("_", "").isalnum()
+        ):
+            return token
         return None
 
     for raw_line in text.splitlines():
@@ -295,7 +295,9 @@ def _collect_target_modules(
         if doc_path.is_file():
             docs_modules.update(_extract_modules_from_doc(doc_path))
     modules.update(
-        module for module in docs_modules if module.startswith("translationzed_py.core.")
+        module
+        for module in docs_modules
+        if module.startswith("translationzed_py.core.")
     )
     return modules, deep_doc_files
 
@@ -344,7 +346,9 @@ def main() -> int:
     out_json = (repo_root / args.out_json).resolve()
     pass_log = (repo_root / args.pass_log).resolve()
     changed_files = _git_changed_files(repo_root)
-    modules, deep_doc_files = _collect_target_modules(repo_root, changed_files, args.module)
+    modules, deep_doc_files = _collect_target_modules(
+        repo_root, changed_files, args.module
+    )
     test_files, test_blob = _load_test_inventory(repo_root)
     doc_blob = _load_doc_reference_blob(repo_root)
 
