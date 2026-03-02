@@ -21,7 +21,7 @@ Legend:
 
 Execution lock for this cycle:
 1. TM-only refactor scope: `translationzed_py/core/tm_store.py`.
-2. Search synthetic benchmark correction remains deferred debt in this cycle.
+2. Search synthetic benchmark correction was initially deferred, then resolved during v0.8.0 blocker closure.
 3. Public API remains stable: no signature drift for `TMStore.query(...)`.
 4. `Document-or-Flag` gate is active for all touched modules.
 
@@ -42,7 +42,7 @@ Execution evidence log:
 5. [✓] Queue closure complete:
    1. `docs/reference/review_queue.json` entry for `translationzed_py/core/tm_store.py` moved to `CLOSED` (`closed_at=2026-03-01`)
    2. validated gates: `make docs-check`, `make test-perf-scale`, `make verify`
-   3. deferred debt remains explicit: synthetic search benchmark correction lane is unchanged and tracked separately
+   3. synthetic search benchmark debt later closed in v0.8.0 blocker lane (see next section)
 
 ## v0.8.0 Blocker Closure Snapshot (2026-03-02)
 
@@ -56,9 +56,17 @@ Execution evidence log:
 4. [✓] P1 review queue closures:
    1. `translationzed_py/core/preferences.py` moved to `CLOSED`.
    2. `translationzed_py/core/search_replace_service.py` moved to `CLOSED`.
-5. [→] Pending before tag:
-   1. final single-commit gate chain (`docs-check`, `test-perf-scale`, `bench-check`, `verify`, `verify-ci`, `release-check`).
-   2. RC dry-run tag + final tag promotion from same validated commit.
+5. [✓] Full validation chain completed on 2026-03-02:
+   1. `make docs-check`
+   2. `make test-perf-scale`
+   3. `make bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20`
+   4. `make verify`
+   5. `make verify-ci TAG=v0.8.0`
+   6. `make release-check TAG=v0.8.0`
+   7. `make release-dry-run TAG=v0.8.0-rc1`
+6. [→] Pending before final tag:
+   1. push `v0.8.0-rc1` from validated commit and confirm CI matrix.
+   2. push final `v0.8.0` tag from the same commit.
 
 ## 0) Non‑negotiable invariants
 
