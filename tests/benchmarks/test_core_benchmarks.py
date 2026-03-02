@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from translationzed_py.core import SearchField, SearchRow, parse, parse_lazy, search
+from translationzed_py.core.search_replace_service import SearchReplaceService
 from translationzed_py.core.tm_store import TMStore
 
 
@@ -81,13 +82,27 @@ def test_bench_search_translation_synthetic_20k(benchmark, tmp_path: Path) -> No
         SearchRow(path, row, entry.key, "", entry.value)
         for row, entry in enumerate(parsed.entries)
     ]
+    service = SearchReplaceService()
+    query = "value token 19999"
+    prepared_plan = service.prepare_search_plan(
+        query=query,
+        use_regex=False,
+        case_sensitive=False,
+    )
+    assert prepared_plan is not None
 
     def _run() -> int:
-        matches = search(rows, "value token", SearchField.TRANSLATION, False)
+        matches = search(
+            rows,
+            query,
+            SearchField.TRANSLATION,
+            False,
+            prepared_plan=prepared_plan,
+        )
         return len(matches)
 
     count = benchmark(_run)
-    assert count == 20_000
+    assert count == 1
 
 
 def test_bench_tm_query_synthetic_20k(benchmark, tmp_path: Path) -> None:

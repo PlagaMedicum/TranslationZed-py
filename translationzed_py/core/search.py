@@ -241,16 +241,32 @@ def _iter_matches_with_plan(
     literal_plan = plan.literal_plan or _build_literal_query_plan(plan.query_text)
     query_text = plan.query_text
     build_preview = _build_preview
-    matches_literal = _matches_literal
     match_index = _match_literal_index
+    direct_query = literal_plan.query
+    composed_enabled = literal_plan.composed_enabled
+    query_parts = literal_plan.parts
 
     if case_sensitive:
         if not include_preview:
+            if not composed_enabled:
+                for row in rows:
+                    text = raw_get(row) or ""
+                    if direct_query in text:
+                        yield Match(row.file, row.row)
+                return
             for row in rows:
                 text = raw_get(row) or ""
-                if not matches_literal(text, query_text, plan=literal_plan):
+                if direct_query in text:
+                    yield Match(row.file, row.row)
                     continue
-                yield Match(row.file, row.row)
+                pos = 0
+                for part in query_parts:
+                    found = text.find(part, pos)
+                    if found < 0:
+                        break
+                    pos = found + len(part)
+                else:
+                    yield Match(row.file, row.row)
             return
         for row in rows:
             text = raw_get(row) or ""
@@ -267,11 +283,25 @@ def _iter_matches_with_plan(
         return
 
     if not include_preview:
+        if not composed_enabled:
+            for row in rows:
+                target = norm_get(row)
+                if direct_query in target:
+                    yield Match(row.file, row.row)
+            return
         for row in rows:
             target = norm_get(row)
-            if not matches_literal(target, query_text, plan=literal_plan):
+            if direct_query in target:
+                yield Match(row.file, row.row)
                 continue
-            yield Match(row.file, row.row)
+            pos = 0
+            for part in query_parts:
+                found = target.find(part, pos)
+                if found < 0:
+                    break
+                pos = found + len(part)
+            else:
+                yield Match(row.file, row.row)
         return
 
     for row in rows:
