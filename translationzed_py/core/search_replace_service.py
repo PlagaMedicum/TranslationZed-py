@@ -10,7 +10,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from .model import Entry, Status
-from .search import Match, SearchField, SearchRow, iter_matches
+from .search import (
+    Match,
+    SearchField,
+    SearchQueryPlan,
+    SearchRow,
+    iter_matches,
+)
+from .search import (
+    prepare_search_plan as _prepare_search_plan_core,
+)
 from .status_cache import CacheEntry
 
 if TYPE_CHECKING:
@@ -233,445 +242,57 @@ class SearchMatchApplyPlan:
     target_column: int
 
 
-@dataclass(frozen=True, slots=True)
 class SearchReplaceService:
-    """Represent SearchReplaceService."""
+    """Thin facade exposing module-level search/replace helpers as methods."""
 
-    def scope_files(
-        self,
-        *,
-        scope: str,
-        current_file: Path | None,
-        current_locale: str | None,
-        selected_locales: Iterable[str],
-        files_for_locale: Callable[[str], list[Path]],
-    ) -> list[Path]:
-        """Execute scope files."""
-        return scope_files(
-            scope=scope,
-            current_file=current_file,
-            current_locale=current_locale,
-            selected_locales=selected_locales,
-            files_for_locale=files_for_locale,
-        )
+    _METHODS = frozenset(
+        {
+            "scope_files",
+            "search_spec_for_column",
+            "find_match_in_rows",
+            "prepare_search_plan",
+            "search_across_files",
+            "build_replace_all_plan",
+            "build_replace_request",
+            "build_replace_all_run_plan",
+            "apply_replace_all",
+            "apply_replace_in_row",
+            "count_replace_all_in_file",
+            "apply_replace_all_in_file",
+            "count_replace_all_in_rows",
+            "apply_replace_all_in_rows",
+            "search_result_label",
+            "build_search_panel_plan",
+            "build_search_run_plan",
+            "build_rows_cache_lookup_plan",
+            "collect_rows_cache_stamp",
+            "build_rows_cache_store_plan",
+            "build_rows_source_plan",
+            "load_search_rows_from_file",
+            "build_search_rows",
+            "build_match_open_plan",
+            "build_match_apply_plan",
+        }
+    )
 
-    def search_spec_for_column(self, column: int) -> tuple[SearchField, bool, bool]:
-        """Execute search spec for column."""
-        return search_spec_for_column(column)
+    def __getattr__(self, name: str) -> Callable[..., object]:
+        if name in self._METHODS:
+            return globals()[name]
+        raise AttributeError(f"{type(self).__name__!s} has no attribute {name!r}")
 
-    def find_match_in_rows(
-        self,
-        rows: Iterable[SearchRow],
-        query: str,
-        field: SearchField,
-        use_regex: bool,
-        *,
-        start_row: int,
-        direction: int,
-        case_sensitive: bool,
-    ) -> Match | None:
-        """Find match in rows."""
-        return find_match_in_rows(
-            rows,
-            query,
-            field,
-            use_regex,
-            start_row=start_row,
-            direction=direction,
-            case_sensitive=case_sensitive,
-        )
 
-    def search_across_files(
-        self,
-        *,
-        files: list[Path],
-        anchor_path: Path | None,
-        anchor_row: int,
-        direction: int,
-        wrap: bool,
-        find_in_file: Callable[[Path, int], Match | None],
-    ) -> Match | None:
-        """Execute search across files."""
-        return search_across_files(
-            files=files,
-            anchor_path=anchor_path,
-            anchor_row=anchor_row,
-            direction=direction,
-            wrap=wrap,
-            find_in_file=find_in_file,
-        )
-
-    def build_replace_all_plan(
-        self,
-        *,
-        files: list[Path],
-        current_file: Path | None,
-        display_name: Callable[[Path], str],
-        count_in_current: Callable[[], int | None],
-        count_in_file: Callable[[Path], int | None],
-    ) -> ReplaceAllPlan | None:
-        """Build replace all plan."""
-        return build_replace_all_plan(
-            files=files,
-            current_file=current_file,
-            display_name=display_name,
-            count_in_current=count_in_current,
-            count_in_file=count_in_file,
-        )
-
-    def build_replace_request(
-        self,
-        *,
-        query: str,
-        replacement: str,
-        use_regex: bool,
-        case_sensitive: bool,
-    ) -> ReplaceRequest | None:
-        """Build replace request."""
-        return build_replace_request(
-            query=query,
-            replacement=replacement,
-            use_regex=use_regex,
-            case_sensitive=case_sensitive,
-        )
-
-    def build_replace_all_run_plan(
-        self,
-        *,
-        scope: str,
-        current_locale: str | None,
-        selected_locale_count: int,
-        files: list[Path],
-        current_file: Path | None,
-        display_name: Callable[[Path], str],
-        count_in_current: Callable[[], int | None],
-        count_in_file: Callable[[Path], int | None],
-    ) -> ReplaceAllRunPlan | None:
-        """Build replace all run plan."""
-        return build_replace_all_run_plan(
-            scope=scope,
-            current_locale=current_locale,
-            selected_locale_count=selected_locale_count,
-            files=files,
-            current_file=current_file,
-            display_name=display_name,
-            count_in_current=count_in_current,
-            count_in_file=count_in_file,
-        )
-
-    def apply_replace_all(
-        self,
-        *,
-        files: list[Path],
-        current_file: Path | None,
-        apply_in_current: Callable[[], bool],
-        apply_in_file: Callable[[Path], bool],
-    ) -> bool:
-        """Apply replace all."""
-        return apply_replace_all(
-            files=files,
-            current_file=current_file,
-            apply_in_current=apply_in_current,
-            apply_in_file=apply_in_file,
-        )
-
-    def apply_replace_in_row(
-        self,
-        *,
-        row: int,
-        request: ReplaceRequest,
-        callbacks: ReplaceCurrentRowCallbacks,
-    ) -> bool:
-        """Apply replace in row."""
-        return apply_replace_in_row(
-            row=row,
-            request=request,
-            callbacks=callbacks,
-        )
-
-    def count_replace_all_in_file(
-        self,
-        path: Path,
-        *,
-        pattern: re.Pattern[str],
-        replacement: str,
-        use_regex: bool,
-        matches_empty: bool,
-        has_group_ref: bool,
-        callbacks: ReplaceAllFileCountCallbacks,
-        hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
-    ) -> int:
-        """Count replace all in file."""
-        return count_replace_all_in_file(
-            path,
-            pattern=pattern,
-            replacement=replacement,
-            use_regex=use_regex,
-            matches_empty=matches_empty,
-            has_group_ref=has_group_ref,
-            callbacks=callbacks,
-            hash_for_entry=hash_for_entry,
-        )
-
-    def apply_replace_all_in_file(
-        self,
-        path: Path,
-        *,
-        pattern: re.Pattern[str],
-        replacement: str,
-        use_regex: bool,
-        matches_empty: bool,
-        has_group_ref: bool,
-        callbacks: ReplaceAllFileApplyCallbacks,
-        hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
-    ) -> ReplaceAllFileApplyResult:
-        """Apply replace all in file."""
-        return apply_replace_all_in_file(
-            path,
-            pattern=pattern,
-            replacement=replacement,
-            use_regex=use_regex,
-            matches_empty=matches_empty,
-            has_group_ref=has_group_ref,
-            callbacks=callbacks,
-            hash_for_entry=hash_for_entry,
-        )
-
-    def count_replace_all_in_rows(
-        self,
-        *,
-        pattern: re.Pattern[str],
-        replacement: str,
-        use_regex: bool,
-        matches_empty: bool,
-        has_group_ref: bool,
-        callbacks: ReplaceAllRowsCallbacks,
-    ) -> int:
-        """Count replace all in rows."""
-        return count_replace_all_in_rows(
-            pattern=pattern,
-            replacement=replacement,
-            use_regex=use_regex,
-            matches_empty=matches_empty,
-            has_group_ref=has_group_ref,
-            callbacks=callbacks,
-        )
-
-    def apply_replace_all_in_rows(
-        self,
-        *,
-        pattern: re.Pattern[str],
-        replacement: str,
-        use_regex: bool,
-        matches_empty: bool,
-        has_group_ref: bool,
-        callbacks: ReplaceAllRowsCallbacks,
-    ) -> ReplaceAllRowsApplyResult:
-        """Apply replace all in rows."""
-        return apply_replace_all_in_rows(
-            pattern=pattern,
-            replacement=replacement,
-            use_regex=use_regex,
-            matches_empty=matches_empty,
-            has_group_ref=has_group_ref,
-            callbacks=callbacks,
-        )
-
-    def search_result_label(self, *, match: Match, root: Path) -> str:
-        """Execute search result label."""
-        return search_result_label(match=match, root=root)
-
-    def build_search_panel_plan(
-        self,
-        *,
-        files: list[Path],
-        root: Path,
-        result_limit: int,
-        iter_matches_for_file: Callable[[Path], Iterable[Match]],
-    ) -> SearchPanelPlan:
-        """Build search panel plan."""
-        return build_search_panel_plan(
-            files=files,
-            root=root,
-            result_limit=result_limit,
-            iter_matches_for_file=iter_matches_for_file,
-        )
-
-    def build_search_run_plan(
-        self,
-        *,
-        query_text: str,
-        column: int,
-        use_regex: bool,
-        files: list[Path],
-        current_file: Path | None,
-        current_row: int | None,
-        direction: int,
-    ) -> SearchRunPlan:
-        """Build search run plan."""
-        return build_search_run_plan(
-            query_text=query_text,
-            column=column,
-            use_regex=use_regex,
-            files=files,
-            current_file=current_file,
-            current_row=current_row,
-            direction=direction,
-        )
-
-    def build_rows_cache_lookup_plan(
-        self,
-        *,
-        path: Path,
-        include_source: bool,
-        include_value: bool,
-        file_mtime_ns: int,
-        cache_mtime_ns: int,
-        source_mtime_ns: int,
-        cached_stamp: SearchRowsCacheStamp | None,
-    ) -> SearchRowsCacheLookupPlan:
-        """Build rows cache lookup plan."""
-        return build_rows_cache_lookup_plan(
-            path=path,
-            include_source=include_source,
-            include_value=include_value,
-            file_mtime_ns=file_mtime_ns,
-            cache_mtime_ns=cache_mtime_ns,
-            source_mtime_ns=source_mtime_ns,
-            cached_stamp=cached_stamp,
-        )
-
-    def collect_rows_cache_stamp(
-        self,
-        *,
-        path: Path,
-        include_source: bool,
-        include_value: bool,
-        callbacks: SearchRowsCacheStampCallbacks,
-    ) -> SearchRowsCacheStamp | None:
-        """Collect rows cache stamp."""
-        return collect_rows_cache_stamp(
-            path=path,
-            include_source=include_source,
-            include_value=include_value,
-            callbacks=callbacks,
-        )
-
-    def build_rows_cache_store_plan(
-        self,
-        *,
-        rows_materialized: bool,
-        entry_count: int,
-        cache_row_limit: int,
-    ) -> SearchRowsCacheStorePlan:
-        """Build rows cache store plan."""
-        return build_rows_cache_store_plan(
-            rows_materialized=rows_materialized,
-            entry_count=entry_count,
-            cache_row_limit=cache_row_limit,
-        )
-
-    def build_rows_source_plan(
-        self,
-        *,
-        locale_known: bool,
-        is_current_file: bool,
-        has_current_model: bool,
-    ) -> SearchRowsSourcePlan:
-        """Build rows source plan."""
-        return build_rows_source_plan(
-            locale_known=locale_known,
-            is_current_file=is_current_file,
-            has_current_model=has_current_model,
-        )
-
-    def load_search_rows_from_file(
-        self,
-        *,
-        path: Path,
-        encoding: str,
-        use_lazy_parser: bool,
-        include_source: bool,
-        include_value: bool,
-        cache_row_limit: int,
-        callbacks: SearchRowsFileCallbacks,
-        hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
-    ) -> SearchRowsBuildResult | None:
-        """Load search rows from file."""
-        return load_search_rows_from_file(
-            path=path,
-            encoding=encoding,
-            use_lazy_parser=use_lazy_parser,
-            include_source=include_source,
-            include_value=include_value,
-            cache_row_limit=cache_row_limit,
-            callbacks=callbacks,
-            hash_for_entry=hash_for_entry,
-        )
-
-    def build_search_rows(
-        self,
-        *,
-        path: Path,
-        entries: Iterable[Entry],
-        entry_count: int,
-        include_source: bool,
-        include_value: bool,
-        source_by_row: Sequence[str] | None,
-        source_for_key: Callable[[str], str],
-        cache_map: Mapping[int, CacheEntry],
-        cache_row_limit: int,
-        hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
-    ) -> SearchRowsBuildResult:
-        """Build search rows."""
-        return build_search_rows(
-            path=path,
-            entries=entries,
-            entry_count=entry_count,
-            include_source=include_source,
-            include_value=include_value,
-            source_by_row=source_by_row,
-            source_for_key=source_for_key,
-            cache_map=cache_map,
-            cache_row_limit=cache_row_limit,
-            hash_for_entry=hash_for_entry,
-        )
-
-    def build_match_open_plan(
-        self,
-        *,
-        has_match: bool,
-        match_file: Path | None,
-        current_file: Path | None,
-    ) -> SearchMatchOpenPlan:
-        """Build match open plan."""
-        return build_match_open_plan(
-            has_match=has_match,
-            match_file=match_file,
-            current_file=current_file,
-        )
-
-    def build_match_apply_plan(
-        self,
-        *,
-        has_match: bool,
-        match_file: Path | None,
-        current_file: Path | None,
-        has_current_model: bool,
-        match_row: int,
-        row_count: int,
-        column: int,
-    ) -> SearchMatchApplyPlan:
-        """Build match apply plan."""
-        return build_match_apply_plan(
-            has_match=has_match,
-            match_file=match_file,
-            current_file=current_file,
-            has_current_model=has_current_model,
-            match_row=match_row,
-            row_count=row_count,
-            column=column,
-        )
+def prepare_search_plan(
+    *,
+    query: str,
+    use_regex: bool,
+    case_sensitive: bool,
+) -> SearchQueryPlan | None:
+    """Prepare reusable search plan for repeated row scans."""
+    return _prepare_search_plan_core(
+        query,
+        is_regex=use_regex,
+        case_sensitive=case_sensitive,
+    )
 
 
 def scope_files(
@@ -1182,6 +803,7 @@ def find_match_in_rows(
     start_row: int,
     direction: int,
     case_sensitive: bool = False,
+    prepared_plan: SearchQueryPlan | None = None,
 ) -> Match | None:
     """Find match in rows."""
     if direction >= 0:
@@ -1191,6 +813,7 @@ def find_match_in_rows(
             field,
             use_regex,
             case_sensitive=case_sensitive,
+            prepared_plan=prepared_plan,
         ):
             if match.row > start_row:
                 return match
@@ -1202,6 +825,7 @@ def find_match_in_rows(
         field,
         use_regex,
         case_sensitive=case_sensitive,
+        prepared_plan=prepared_plan,
     ):
         if match.row >= start_row:
             break
