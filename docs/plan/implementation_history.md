@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation History
-_Last updated: 2026-03-01_
+_Last updated: 2026-03-02_
 
 > Historical execution log (non-normative).  
 > Current canonical planning scope lives in `docs/plan/implementation_active.md`.
@@ -43,6 +43,22 @@ Execution evidence log:
    1. `docs/reference/review_queue.json` entry for `translationzed_py/core/tm_store.py` moved to `CLOSED` (`closed_at=2026-03-01`)
    2. validated gates: `make docs-check`, `make test-perf-scale`, `make verify`
    3. deferred debt remains explicit: synthetic search benchmark correction lane is unchanged and tracked separately
+
+## v0.8.0 Blocker Closure Snapshot (2026-03-02)
+
+1. [✓] Lint blocker fixed:
+   `scripts/docs_contract_check.py` `SIM103` remediation landed.
+2. [✓] Release metadata synchronized to `0.8.0`:
+   `pyproject.toml`, `translationzed_py/version.py`, `CHANGELOG.md`.
+3. [✓] Search synthetic benchmark blocker recovered:
+   1. hot-path overhead reduced in `core.search` literal no-preview path.
+   2. strict check green with `make bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20`.
+4. [✓] P1 review queue closures:
+   1. `translationzed_py/core/preferences.py` moved to `CLOSED`.
+   2. `translationzed_py/core/search_replace_service.py` moved to `CLOSED`.
+5. [→] Pending before tag:
+   1. final single-commit gate chain (`docs-check`, `test-perf-scale`, `bench-check`, `verify`, `verify-ci`, `release-check`).
+   2. RC dry-run tag + final tag promotion from same validated commit.
 
 ## 0) Non‑negotiable invariants
 

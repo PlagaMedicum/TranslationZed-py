@@ -30,7 +30,7 @@
       "status": "CLOSED"
     },
     {
-      "closed_at": null,
+      "closed_at": "2026-03-02",
       "closure_criteria": [
         "Reduce fuzzy-candidate branch complexity",
         "Split query planning and candidate retrieval internals",
@@ -38,7 +38,11 @@
       ],
       "evidence": [
         "Large module and heavy branching in search/replace orchestration",
-        "Multiple policy paths concentrated in one service module"
+        "Multiple policy paths concentrated in one service module",
+        "v0.8.0 cycle: SearchReplaceService wrapper boilerplate collapsed into facade-style dispatch with compatibility adapter for prepare_search_plan",
+        "v0.8.0 cycle: core.search literal no-preview hot path optimized to reduce repeated helper-call overhead while preserving match semantics",
+        "Closure validation: tests/test_search_replace_service.py, tests/test_search_wave2_equivalence.py, tests/test_search_perf_contract.py green on 2026-03-02",
+        "Strict benchmark recovery confirmed: make bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20 green on 2026-03-02"
       ],
       "module_path": "translationzed_py/core/search_replace_service.py",
       "opened_at": "2026-02-26",
@@ -55,7 +59,7 @@
         "tests/test_search_perf_contract.py"
       ],
       "risk_level": "P1",
-      "status": "REVIEW_REQUIRED"
+      "status": "CLOSED"
     },
     {
       "closed_at": "2026-03-01",

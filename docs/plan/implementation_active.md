@@ -12,14 +12,22 @@ Release policy locked for this cycle:
 4. Docs scope in this slice is critical breakage closure only.
 
 Current blockers (must be resolved before RC/final tag):
-1. Version triad drift:
-   1. `pyproject.toml` still `0.7.0`
-   2. `translationzed_py/version.py` still `0.7.0`
-   3. `CHANGELOG.md` missing `[0.8.0]` heading
-2. `make verify` lint failure (`SIM103`) in `scripts/docs_contract_check.py`.
-3. Strict benchmark gate failure:
-   `test_bench_search_translation_synthetic_20k` exceeds +20% threshold in fail mode.
-4. Review queue entries for `preferences.py` and `search_replace_service.py` still active.
+1. Final pre-tag validation chain has not been executed yet on a single commit:
+   1. `make docs-check`
+   2. `make test-perf-scale`
+   3. `make bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20`
+   4. `make verify`
+   5. `make verify-ci TAG=v0.8.0`
+   6. `make release-check TAG=v0.8.0`
+2. RC tag dry-run and final tag promotion are pending on validated commit.
+
+Resolved blockers in this slice:
+1. Version triad synchronized to `0.8.0` in `pyproject.toml`, `translationzed_py/version.py`, and `CHANGELOG.md`.
+2. Lint blocker (`SIM103`) fixed in `scripts/docs_contract_check.py`.
+3. Search synthetic benchmark gate recovered under strict fail mode.
+4. P1 review queue entries closed:
+   1. `translationzed_py/core/preferences.py`
+   2. `translationzed_py/core/search_replace_service.py`
 
 ## 1) Current State
 
