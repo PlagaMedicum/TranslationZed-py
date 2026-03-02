@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name            = "translationzed_py"
-version         = "0.7.0"
+version         = "0.8.0"
 description     = "Python + Qt CAT tool for Project Zomboid localisation files."
 requires-python = ">=3.10"
 authors         = [ { name = "TranslationZed‑Py team" } ]
@@ -33,6 +33,10 @@ dev = [
     "bandit>=1.7.8",
     "pydocstyle>=6.3.0",
     "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.26.1",
+    "griffe>=1.6.0",
+    "pymdown-extensions>=10.8",
     "mutmut>=2.4.4",
     "pre-commit>=3.6",
     "build>=1.2",

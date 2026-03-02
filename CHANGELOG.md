@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-03-02
+
+### Added
+- Browser-first documentation stack with canonical docs restructure, strict docs contract checks, and generated contract index.
+- `Document-or-Flag` workflow (`code-triage` + review queue validation) integrated into docs quality gates.
+- TM long-variant detection contracts and tests for edited long instruction-like strings at default threshold.
+- Progress HUD in the `Project` tab (locale/current-file segmented progress rows) and status triage controls in the status header.
+
+### Changed
+- Verification pipeline aligned around strict/non-mutating CI gates and advisory local perf/benchmark lanes.
+- TM query internals refactored into focused modules while preserving deterministic ranking and score behavior.
+- API reference pages now include orchestration intent/boundary sections and workflow call-chain diagrams.
+
+### Fixed
+- Docs browser navigation uses `.html` targets directly for local static browsing.
+- Math/list rendering regressions are guarded by stricter docs contract checks on rendered HTML.
+- Search Wave-2 performance contracts stabilized with strict equivalence tests.
+
 ## [0.7.0] - 2026-02-16
 
 ### Added
