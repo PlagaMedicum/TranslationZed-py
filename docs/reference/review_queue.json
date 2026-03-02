@@ -1,7 +1,7 @@
 {
   "entries": [
     {
-      "closed_at": null,
+      "closed_at": "2026-03-02",
       "closure_criteria": [
         "Split _parse_env into smaller typed parsers",
         "Reduce max function branch count below 45",
@@ -10,7 +10,8 @@
       "evidence": [
         "High branch density in _parse_env",
         "Single module owns parsing, normalization, and migration paths",
-        "v0.8.0 cycle: env-key parser handlers extracted; _parse_env branch complexity reduced below closure threshold"
+        "v0.8.0 cycle: env-key parser handlers extracted; _parse_env branch complexity reduced below closure threshold",
+        "Closure validation: tests/test_preferences.py, tests/test_preferences_edge_paths.py, tests/test_preferences_service.py green on 2026-03-02"
       ],
       "module_path": "translationzed_py/core/preferences.py",
       "opened_at": "2026-02-26",
@@ -26,7 +27,7 @@
         "tests/test_preferences_service.py"
       ],
       "risk_level": "P1",
-      "status": "IN_REFACTOR"
+      "status": "CLOSED"
     },
     {
       "closed_at": null,
