@@ -9,7 +9,8 @@
       ],
       "evidence": [
         "High branch density in _parse_env",
-        "Single module owns parsing, normalization, and migration paths"
+        "Single module owns parsing, normalization, and migration paths",
+        "v0.8.0 cycle: env-key parser handlers extracted; _parse_env branch complexity reduced below closure threshold"
       ],
       "module_path": "translationzed_py/core/preferences.py",
       "opened_at": "2026-02-26",
@@ -25,7 +26,7 @@
         "tests/test_preferences_service.py"
       ],
       "risk_level": "P1",
-      "status": "REVIEW_REQUIRED"
+      "status": "IN_REFACTOR"
     },
     {
       "closed_at": null,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from translationzed_py.core.app_config import (
     LEGACY_CONFIG_DIR,
@@ -207,6 +207,94 @@ def _migrate_legacy_tm_import_dirs(root: Path | None = None) -> bool:
     return changed
 
 
+def _parse_bool_token(value: str) -> bool | None:
+    token = value.lower()
+    if token in _BOOL_TRUE:
+        return True
+    if token in _BOOL_FALSE:
+        return False
+    return None
+
+
+def _set_bool_pref(pref_key: str) -> Callable[[dict[str, Any], str], None]:
+    def _apply(out: dict[str, Any], value: str) -> None:
+        parsed = _parse_bool_token(value)
+        if parsed is not None:
+            out[pref_key] = parsed
+
+    return _apply
+
+
+def _set_literal_pref(pref_key: str) -> Callable[[dict[str, Any], str], None]:
+    def _apply(out: dict[str, Any], value: str) -> None:
+        out[pref_key] = value
+
+    return _apply
+
+
+def _set_scope_pref(pref_key: str) -> Callable[[dict[str, Any], str], None]:
+    def _apply(out: dict[str, Any], value: str) -> None:
+        scope = value.upper()
+        if scope in {"FILE", "LOCALE", "POOL"}:
+            out[pref_key] = scope
+
+    return _apply
+
+
+def _set_last_locales_pref(out: dict[str, Any], value: str) -> None:
+    out["last_locales"] = [v.strip() for v in value.split(",") if v.strip()]
+
+
+def _set_lt_editor_mode_pref(out: dict[str, Any], value: str) -> None:
+    out["lt_editor_mode"] = _normalize_lt_editor_mode(value)
+
+
+def _set_lt_timeout_ms_pref(out: dict[str, Any], value: str) -> None:
+    out["lt_timeout_ms"] = _normalize_lt_timeout_ms(value)
+
+
+def _set_lt_locale_map_pref(out: dict[str, Any], value: str) -> None:
+    out["lt_locale_map"] = _normalize_lt_locale_map(value)
+
+
+def _set_qa_lt_max_rows_pref(out: dict[str, Any], value: str) -> None:
+    out["qa_languagetool_max_rows"] = _normalize_qa_languagetool_max_rows(value)
+
+
+_ENV_PARSERS: dict[str, Callable[[dict[str, Any], str], None]] = {
+    "PROMPT_WRITE_ON_EXIT": _set_bool_pref("prompt_write_on_exit"),
+    "WRAP_TEXT": _set_bool_pref("wrap_text"),
+    "LARGE_TEXT_OPTIMIZATIONS": _set_bool_pref("large_text_optimizations"),
+    "QA_CHECK_TRAILING": _set_bool_pref("qa_check_trailing"),
+    "QA_CHECK_NEWLINES": _set_bool_pref("qa_check_newlines"),
+    "QA_CHECK_ESCAPES": _set_bool_pref("qa_check_escapes"),
+    "QA_CHECK_SAME_AS_SOURCE": _set_bool_pref("qa_check_same_as_source"),
+    "QA_AUTO_REFRESH": _set_bool_pref("qa_auto_refresh"),
+    "QA_AUTO_MARK_FOR_REVIEW": _set_bool_pref("qa_auto_mark_for_review"),
+    "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW": _set_bool_pref(
+        "qa_auto_mark_translated_for_review"
+    ),
+    "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW": _set_bool_pref(
+        "qa_auto_mark_proofread_for_review"
+    ),
+    "LAST_ROOT": _set_literal_pref("last_root"),
+    "LAST_LOCALES": _set_last_locales_pref,
+    "WINDOW_GEOMETRY": _set_literal_pref("window_geometry"),
+    "DEFAULT_ROOT": _set_literal_pref("default_root"),
+    "SEARCH_SCOPE": _set_scope_pref("search_scope"),
+    "REPLACE_SCOPE": _set_scope_pref("replace_scope"),
+    "TM_IMPORT_DIR": _set_literal_pref("tm_import_dir"),
+    "LT_EDITOR_MODE": _set_lt_editor_mode_pref,
+    "LT_SERVER_URL": _set_literal_pref("lt_server_url"),
+    "LT_TIMEOUT_MS": _set_lt_timeout_ms_pref,
+    "LT_PICKY_MODE": _set_bool_pref("lt_picky_mode"),
+    "LT_LOCALE_MAP": _set_lt_locale_map_pref,
+    "QA_CHECK_LANGUAGETOOL": _set_bool_pref("qa_check_languagetool"),
+    "QA_LANGUAGETOOL_MAX_ROWS": _set_qa_lt_max_rows_pref,
+    "QA_LANGUAGETOOL_AUTOMARK": _set_bool_pref("qa_languagetool_automark"),
+}
+
+
 def _parse_env(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
@@ -224,122 +312,11 @@ def _parse_env(path: Path) -> dict[str, Any]:
             if key in _DEPRECATED_ENV_KEYS:
                 deprecated_keys_present = True
                 continue
-            if key == "PROMPT_WRITE_ON_EXIT":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["prompt_write_on_exit"] = True
-                elif val in _BOOL_FALSE:
-                    out["prompt_write_on_exit"] = False
-            elif key == "WRAP_TEXT":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["wrap_text"] = True
-                elif val in _BOOL_FALSE:
-                    out["wrap_text"] = False
-            elif key == "LARGE_TEXT_OPTIMIZATIONS":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["large_text_optimizations"] = True
-                elif val in _BOOL_FALSE:
-                    out["large_text_optimizations"] = False
-            elif key == "QA_CHECK_TRAILING":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_check_trailing"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_check_trailing"] = False
-            elif key == "QA_CHECK_NEWLINES":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_check_newlines"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_check_newlines"] = False
-            elif key == "QA_CHECK_ESCAPES":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_check_escapes"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_check_escapes"] = False
-            elif key == "QA_CHECK_SAME_AS_SOURCE":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_check_same_as_source"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_check_same_as_source"] = False
-            elif key == "QA_AUTO_REFRESH":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_auto_refresh"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_auto_refresh"] = False
-            elif key == "QA_AUTO_MARK_FOR_REVIEW":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_auto_mark_for_review"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_auto_mark_for_review"] = False
-            elif key == "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_auto_mark_translated_for_review"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_auto_mark_translated_for_review"] = False
-            elif key == "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_auto_mark_proofread_for_review"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_auto_mark_proofread_for_review"] = False
-            elif key == "LAST_ROOT":
-                out["last_root"] = value
-            elif key == "LAST_LOCALES":
-                out["last_locales"] = [v.strip() for v in value.split(",") if v.strip()]
-            elif key == "WINDOW_GEOMETRY":
-                out["window_geometry"] = value
-            elif key == "DEFAULT_ROOT":
-                out["default_root"] = value
-            elif key == "SEARCH_SCOPE":
-                value = value.upper()
-                if value in {"FILE", "LOCALE", "POOL"}:
-                    out["search_scope"] = value
-            elif key == "REPLACE_SCOPE":
-                value = value.upper()
-                if value in {"FILE", "LOCALE", "POOL"}:
-                    out["replace_scope"] = value
-            elif key == "TM_IMPORT_DIR":
-                out["tm_import_dir"] = value
-            elif key == "LT_EDITOR_MODE":
-                out["lt_editor_mode"] = _normalize_lt_editor_mode(value)
-            elif key == "LT_SERVER_URL":
-                out["lt_server_url"] = value
-            elif key == "LT_TIMEOUT_MS":
-                out["lt_timeout_ms"] = _normalize_lt_timeout_ms(value)
-            elif key == "LT_PICKY_MODE":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["lt_picky_mode"] = True
-                elif val in _BOOL_FALSE:
-                    out["lt_picky_mode"] = False
-            elif key == "LT_LOCALE_MAP":
-                out["lt_locale_map"] = _normalize_lt_locale_map(value)
-            elif key == "QA_CHECK_LANGUAGETOOL":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_check_languagetool"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_check_languagetool"] = False
-            elif key == "QA_LANGUAGETOOL_MAX_ROWS":
-                out["qa_languagetool_max_rows"] = _normalize_qa_languagetool_max_rows(
-                    value
-                )
-            elif key == "QA_LANGUAGETOOL_AUTOMARK":
-                val = value.lower()
-                if val in _BOOL_TRUE:
-                    out["qa_languagetool_automark"] = True
-                elif val in _BOOL_FALSE:
-                    out["qa_languagetool_automark"] = False
-            else:
+            parser = _ENV_PARSERS.get(key)
+            if parser is None:
                 extras[key] = value
+                continue
+            parser(out, value)
     except OSError:
         return {}
     if deprecated_keys_present:
