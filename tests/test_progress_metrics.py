@@ -30,4 +30,3 @@ def test_status_progress_roundtrip_tuple_normalization() -> None:
     progress = StatusProgress.from_tuple((-1, 2, 3, 4))
     assert progress.as_tuple() == (0, 2, 3, 4)
     assert progress.total == 9
-

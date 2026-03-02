@@ -418,7 +418,9 @@ def test_sync_import_folder_records_language_detect_failures(tmp_path: Path) -> 
     store.close()
 
 
-def test_sync_import_folder_skips_repeated_unchanged_error_files(tmp_path: Path) -> None:
+def test_sync_import_folder_skips_repeated_unchanged_error_files(
+    tmp_path: Path,
+) -> None:
     """Unchanged parse-error imports should not re-fail every passive sync."""
     root = tmp_path / "root"
     root.mkdir()
@@ -448,7 +450,9 @@ def test_sync_import_folder_skips_repeated_unchanged_error_files(tmp_path: Path)
     store.close()
 
 
-def test_sync_import_folder_retries_error_file_after_content_change(tmp_path: Path) -> None:
+def test_sync_import_folder_retries_error_file_after_content_change(
+    tmp_path: Path,
+) -> None:
     """Errored file is retried and imported once its on-disk content changes."""
     root = tmp_path / "root"
     root.mkdir()

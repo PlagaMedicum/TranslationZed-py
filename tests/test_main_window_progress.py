@@ -23,20 +23,12 @@ def _make_project(root: Path) -> None:
             encoding="utf-8",
         )
     (root / "EN" / "a.txt").write_text('A1 = "One"\nA2 = "Two"\n', encoding="utf-8")
-    (root / "EN" / "b.txt").write_text(
-        'B1 = "Three"\nB2 = "Four"\n', encoding="utf-8"
-    )
-    (root / "BE" / "a.txt").write_text(
-        'A1 = "Adzin"\nA2 = "Dva"\n', encoding="utf-8"
-    )
-    (root / "BE" / "b.txt").write_text(
-        'B1 = "Try"\nB2 = "Chatyry"\n', encoding="utf-8"
-    )
+    (root / "EN" / "b.txt").write_text('B1 = "Three"\nB2 = "Four"\n', encoding="utf-8")
+    (root / "BE" / "a.txt").write_text('A1 = "Adzin"\nA2 = "Dva"\n', encoding="utf-8")
+    (root / "BE" / "b.txt").write_text('B1 = "Try"\nB2 = "Chatyry"\n', encoding="utf-8")
 
 
-def test_progress_strip_updates_for_file_and_locale(
-    qtbot, tmp_path: Path
-) -> None:
+def test_progress_strip_updates_for_file_and_locale(qtbot, tmp_path: Path) -> None:
     """Verify progress strip reflects file + locale status distribution."""
     root = tmp_path / "proj"
     root.mkdir()
@@ -104,7 +96,9 @@ def test_locale_progress_reuses_session_cache_and_updates_incrementally(
         scheduled.append(str(locale))
         return None
 
-    monkeypatch.setattr(panel_helpers, "_schedule_locale_progress_refresh", _track_schedule)
+    monkeypatch.setattr(
+        panel_helpers, "_schedule_locale_progress_refresh", _track_schedule
+    )
 
     ix_b = win.fs_model.index_for_path(root / "BE" / "b.txt")
     win._file_chosen(ix_b)

@@ -19,7 +19,9 @@ _TRACK_COLOR = QColor("#2a2a2a")
 class TreeProgressDelegate(QStyledItemDelegate):
     """Draw thin status-distribution bars for selected tree rows."""
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:  # noqa: N802
+    def paint(
+        self, painter: QPainter, option: QStyleOptionViewItem, index
+    ) -> None:  # noqa: N802
         """Paint base item and append thin progress bar if payload is available."""
         super().paint(painter, option, index)
         payload = index.data(TREE_PROGRESS_COUNTS_ROLE)
@@ -45,9 +47,10 @@ class TreeProgressDelegate(QStyledItemDelegate):
                 segment_width = int(round((count / total) * width))
             if segment_width <= 0:
                 continue
-            painter.fillRect(x, rect.y(), segment_width, rect.height(), _STATUS_COLORS[idx])
+            painter.fillRect(
+                x, rect.y(), segment_width, rect.height(), _STATUS_COLORS[idx]
+            )
             x += segment_width
             if x > rect.right():
                 break
         painter.restore()
-

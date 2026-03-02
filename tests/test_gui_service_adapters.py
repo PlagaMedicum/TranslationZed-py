@@ -2759,7 +2759,9 @@ def test_refresh_search_panel_results_covers_guard_empty_query_and_empty_files(
     monkeypatch.setattr(win, "_search_files_for_scope", lambda: [])
     win._refresh_search_panel_results()
     assert win._search_results_list.count() == 1
-    assert win._search_results_list.item(0).text() == "No files in current search scope."
+    assert (
+        win._search_results_list.item(0).text() == "No files in current search scope."
+    )
 
 
 def test_schedule_qa_refresh_covers_disabled_busy_immediate_and_timer_paths(

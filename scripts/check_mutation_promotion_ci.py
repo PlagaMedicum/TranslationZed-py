@@ -118,11 +118,15 @@ def _github_request_json(*, url: str, token: str) -> dict[str, Any]:
         with urllib.request.urlopen(request, timeout=30) as response:  # nosec B310
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        raise ValueError(f"GitHub API request failed ({exc.code}) for '{url}'.") from exc
+        raise ValueError(
+            f"GitHub API request failed ({exc.code}) for '{url}'."
+        ) from exc
     except urllib.error.URLError as exc:
         raise ValueError(f"GitHub API request failed for '{url}': {exc}") from exc
     except json.JSONDecodeError as exc:
-        raise ValueError(f"GitHub API returned invalid JSON for '{url}': {exc}") from exc
+        raise ValueError(
+            f"GitHub API returned invalid JSON for '{url}': {exc}"
+        ) from exc
     if not isinstance(payload, dict):
         raise ValueError(f"Invalid GitHub API payload for '{url}': expected object.")
     return payload
@@ -149,9 +153,7 @@ def _github_download_bytes(*, url: str, token: str) -> bytes:
         with urllib.request.urlopen(request, timeout=60) as response:  # nosec B310
             return response.read()
     except urllib.error.HTTPError as exc:
-        raise ValueError(
-            f"Artifact download failed ({exc.code}) for '{url}'."
-        ) from exc
+        raise ValueError(f"Artifact download failed ({exc.code}) for '{url}'.") from exc
     except urllib.error.URLError as exc:
         raise ValueError(f"Artifact download failed for '{url}': {exc}") from exc
 
@@ -180,11 +182,15 @@ def _fetch_completed_runs(
     payload = _github_request_json(url=url, token=token)
     runs = payload.get("workflow_runs")
     if not isinstance(runs, list):
-        raise ValueError("Invalid workflow-runs payload: 'workflow_runs' must be a list.")
+        raise ValueError(
+            "Invalid workflow-runs payload: 'workflow_runs' must be a list."
+        )
     validated: list[dict[str, Any]] = []
     for index, value in enumerate(runs):
         if not isinstance(value, dict):
-            raise ValueError(f"Invalid workflow-runs payload at index {index}: expected object.")
+            raise ValueError(
+                f"Invalid workflow-runs payload at index {index}: expected object."
+            )
         validated.append(value)
     return validated
 
@@ -215,7 +221,9 @@ def _fetch_named_artifact(
             candidates.append(value)
     if not candidates:
         return None
-    candidates.sort(key=lambda artifact: _require_int(artifact.get("id"), field="artifact.id"))
+    candidates.sort(
+        key=lambda artifact: _require_int(artifact.get("id"), field="artifact.id")
+    )
     return candidates[-1]
 
 
@@ -223,7 +231,9 @@ def _extract_summary_payload(*, zip_bytes: bytes, run_id: int) -> dict[str, Any]
     """Extract and parse summary JSON payload from an artifact ZIP archive."""
     buffer = io.BytesIO(zip_bytes)
     if not zipfile.is_zipfile(buffer):
-        raise ValueError(f"Unreadable artifact archive for run {run_id}: not a ZIP file.")
+        raise ValueError(
+            f"Unreadable artifact archive for run {run_id}: not a ZIP file."
+        )
 
     buffer.seek(0)
     try:
@@ -237,9 +247,13 @@ def _extract_summary_payload(*, zip_bytes: bytes, run_id: int) -> dict[str, Any]
             target_name = summary_names[0]
             raw = archive.read(target_name)
     except zipfile.BadZipFile as exc:
-        raise ValueError(f"Unreadable artifact archive for run {run_id}: {exc}") from exc
+        raise ValueError(
+            f"Unreadable artifact archive for run {run_id}: {exc}"
+        ) from exc
     except OSError as exc:
-        raise ValueError(f"Unable to read artifact archive for run {run_id}: {exc}") from exc
+        raise ValueError(
+            f"Unable to read artifact archive for run {run_id}: {exc}"
+        ) from exc
 
     try:
         payload = json.loads(raw.decode("utf-8"))
@@ -605,7 +619,9 @@ def main() -> int:
                 work_dir=work_dir,
             )
         else:
-            with tempfile.TemporaryDirectory(prefix="mutation-promotion-ci-") as temp_dir:
+            with tempfile.TemporaryDirectory(
+                prefix="mutation-promotion-ci-"
+            ) as temp_dir:
                 evaluation = evaluate_promotion_readiness(
                     repo=args.repo,
                     workflow=args.workflow,

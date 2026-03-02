@@ -30,8 +30,7 @@ def test_load_reads_diff_overrides_from_toml(tmp_path: Path) -> None:
 [diff]
 insertion_enabled_globs = ["*.txt", "*.lua"]
 preview_context_lines = 5
-""".strip()
-        + "\n",
+""".strip() + "\n",
     )
     cfg = app_config.load(tmp_path)
     assert cfg.insertion_enabled_globs == ("*.txt", "*.lua")
@@ -47,8 +46,7 @@ def test_load_normalizes_diff_values(tmp_path: Path) -> None:
 [diff]
 insertion_enabled_globs = ["*.txt", "", "*.txt", " *.cfg "]
 preview_context_lines = 99
-""".strip()
-        + "\n",
+""".strip() + "\n",
     )
     cfg = app_config.load(tmp_path)
     assert cfg.insertion_enabled_globs == ("*.txt", "*.cfg")
@@ -64,8 +62,7 @@ def test_load_keeps_default_diff_values_for_invalid_payload(tmp_path: Path) -> N
 [diff]
 insertion_enabled_globs = 1
 preview_context_lines = "bad"
-""".strip()
-        + "\n",
+""".strip() + "\n",
     )
     cfg = app_config.load(tmp_path)
     assert cfg.insertion_enabled_globs == ("*.txt",)

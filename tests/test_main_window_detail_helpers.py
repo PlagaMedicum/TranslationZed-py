@@ -402,7 +402,8 @@ def test_languagetool_hint_popup_click_is_deferred(
     monkeypatch.setattr(
         win,
         "_show_languagetool_hint_for_position",
-        lambda position, *, global_pos=None: opened.append((position, global_pos)) or True,
+        lambda position, *, global_pos=None: opened.append((position, global_pos))
+        or True,
     )
 
     win._on_detail_translation_clicked(local_pos, global_pos)

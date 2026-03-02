@@ -15,9 +15,7 @@ _SUMMARY_PATTERNS = {
     "killed": re.compile(r"\bkilled\s*[:=]\s*(\d+)\b", flags=re.IGNORECASE),
     "survived": re.compile(r"\bsurvived\s*[:=]\s*(\d+)\b", flags=re.IGNORECASE),
     "timeout": re.compile(r"\btimeout(?:s)?\s*[:=]\s*(\d+)\b", flags=re.IGNORECASE),
-    "suspicious": re.compile(
-        r"\bsuspicious\s*[:=]\s*(\d+)\b", flags=re.IGNORECASE
-    ),
+    "suspicious": re.compile(r"\bsuspicious\s*[:=]\s*(\d+)\b", flags=re.IGNORECASE),
     "skipped": re.compile(r"\bskipped\s*[:=]\s*(\d+)\b", flags=re.IGNORECASE),
 }
 

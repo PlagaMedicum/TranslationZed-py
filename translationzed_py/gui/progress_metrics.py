@@ -20,9 +20,12 @@ class StatusProgress:
     @property
     def total(self) -> int:
         """Return total number of entries in the distribution."""
-        return max(0, self.untouched) + max(0, self.for_review) + max(
-            0, self.translated
-        ) + max(0, self.proofread)
+        return (
+            max(0, self.untouched)
+            + max(0, self.for_review)
+            + max(0, self.translated)
+            + max(0, self.proofread)
+        )
 
     def as_tuple(self) -> tuple[int, int, int, int]:
         """Return normalized tuple payload for Qt item roles."""
@@ -88,4 +91,3 @@ def translated_percent(progress: StatusProgress) -> int:
 def proofread_percent(progress: StatusProgress) -> int:
     """Return proofread percent."""
     return percent(progress.proofread, progress.total)
-

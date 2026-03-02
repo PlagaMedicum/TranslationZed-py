@@ -76,7 +76,9 @@ def write_snapshot(root: Path, snapshot: Mapping[str, Mapping[str, str]]) -> Non
     path = snapshot_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     normalized = normalize_snapshot(snapshot)
-    payload = json.dumps(normalized, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(
+        normalized, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    )
     path.write_text(payload + "\n", encoding="utf-8")
 
 

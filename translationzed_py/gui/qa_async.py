@@ -134,17 +134,15 @@ def _run_scan_job(
     check_tokens: bool,
     check_same_as_source: bool,
 ) -> tuple[Path, list[QAFinding], str]:
-    result_limit = _normalize_result_limit(
-        getattr(win, "_qa_panel_result_limit", 500)
-    )
+    result_limit = _normalize_result_limit(getattr(win, "_qa_panel_result_limit", 500))
     findings = list(
         win._qa_service.scan_rows(
-        file=path,
-        rows=rows,
-        check_trailing=check_trailing,
-        check_newlines=check_newlines,
-        check_tokens=check_tokens,
-        check_same_as_source=check_same_as_source,
+            file=path,
+            rows=rows,
+            check_trailing=check_trailing,
+            check_newlines=check_newlines,
+            check_tokens=check_tokens,
+            check_same_as_source=check_same_as_source,
         )
     )
     remaining_slots = max(0, result_limit - len(findings))

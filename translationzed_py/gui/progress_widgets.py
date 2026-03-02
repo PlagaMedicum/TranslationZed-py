@@ -62,7 +62,9 @@ class SegmentedProgressBar(QWidget):
                 segment_width = int(round((count / total) * width))
             if segment_width <= 0:
                 continue
-            painter.fillRect(x, rect.y(), segment_width, rect.height(), _STATUS_COLORS[idx])
+            painter.fillRect(
+                x, rect.y(), segment_width, rect.height(), _STATUS_COLORS[idx]
+            )
             x += segment_width
             if x > rect.right():
                 break
@@ -103,7 +105,9 @@ class ProgressStripRow(QWidget):
         """Force a fixed percent-column width for cross-row alignment."""
         self.percent_label.setFixedWidth(max(0, int(width)))
 
-    def set_progress(self, progress: StatusProgress | None, *, loading: bool = False) -> None:
+    def set_progress(
+        self, progress: StatusProgress | None, *, loading: bool = False
+    ) -> None:
         """Update row progress display."""
         payload = progress or StatusProgress()
         self.bar.set_progress(payload, loading=loading)

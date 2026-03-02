@@ -7,7 +7,7 @@ import sys
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 from .model import Entry, Status
 from .search import (
@@ -276,8 +276,10 @@ class SearchReplaceService:
     )
 
     def __getattr__(self, name: str) -> Callable[..., object]:
-        if name in self._METHODS:
-            return globals()[name]
+        """Expose registered helper functions as bound-like service methods."""
+        func = globals().get(name)
+        if name in self._METHODS and callable(func):
+            return cast(Callable[..., object], func)
         raise AttributeError(f"{type(self).__name__!s} has no attribute {name!r}")
 
 

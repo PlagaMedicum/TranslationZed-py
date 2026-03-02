@@ -52,7 +52,9 @@ def _zip_summary(payload: dict[str, object]) -> bytes:
     return buffer.getvalue()
 
 
-def _mock_two_runs(module, monkeypatch: pytest.MonkeyPatch, run_data: dict[int, bytes]) -> None:
+def _mock_two_runs(
+    module, monkeypatch: pytest.MonkeyPatch, run_data: dict[int, bytes]
+) -> None:
     """Install mocks for two latest scheduled runs and per-run artifacts."""
     newest_to_oldest = [
         {
@@ -171,8 +173,12 @@ def test_evaluate_reports_not_ready_when_mode_is_warn(
         module,
         monkeypatch,
         {
-            100: _zip_summary(_summary_payload(mode="warn", warned=True, killed_percent=40.0)),
-            200: _zip_summary(_summary_payload(mode="warn", warned=True, killed_percent=42.0)),
+            100: _zip_summary(
+                _summary_payload(mode="warn", warned=True, killed_percent=40.0)
+            ),
+            200: _zip_summary(
+                _summary_payload(mode="warn", warned=True, killed_percent=42.0)
+            ),
         },
     )
 
@@ -204,9 +210,7 @@ def test_evaluate_reports_not_ready_when_actionable_mutants_are_zero(
         monkeypatch,
         {
             100: _zip_summary(_summary_payload(killed_percent=35.0)),
-            200: _zip_summary(
-                _summary_payload(actionable_total=0, killed_percent=0.0)
-            ),
+            200: _zip_summary(_summary_payload(actionable_total=0, killed_percent=0.0)),
         },
     )
 
@@ -256,7 +260,9 @@ def test_evaluate_reports_not_ready_when_artifact_is_missing(
 
     assert evaluation.ready is False
     assert evaluation.results[-1].artifact_state == "missing"
-    assert "artifact 'heavy-mutation-summary' not found" in evaluation.results[-1].reasons
+    assert (
+        "artifact 'heavy-mutation-summary' not found" in evaluation.results[-1].reasons
+    )
 
 
 def test_evaluate_raises_value_error_for_unreadable_zip_artifact(

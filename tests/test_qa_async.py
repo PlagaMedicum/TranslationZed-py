@@ -465,12 +465,16 @@ def test_poll_scan_filters_languagetool_auto_mark_by_toggle() -> None:
         excerpt="base",
     )
     win._qa_languagetool_automark = False
-    win._qa_scan_future = _Future(done=True, payload=(path, [lt_finding, base_finding], ""))
+    win._qa_scan_future = _Future(
+        done=True, payload=(path, [lt_finding, base_finding], "")
+    )
     qa_async.poll_scan(win)
     assert win.auto_mark_history[-1] == (base_finding,)
 
     win._qa_languagetool_automark = True
-    win._qa_scan_future = _Future(done=True, payload=(path, [lt_finding, base_finding], ""))
+    win._qa_scan_future = _Future(
+        done=True, payload=(path, [lt_finding, base_finding], "")
+    )
     qa_async.poll_scan(win)
     assert win.auto_mark_history[-1] == (lt_finding, base_finding)
 

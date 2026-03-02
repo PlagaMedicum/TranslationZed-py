@@ -5,7 +5,9 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-_TM_STORE_PATH = Path(__file__).resolve().parents[1] / "translationzed_py" / "core" / "tm_store.py"
+_TM_STORE_PATH = (
+    Path(__file__).resolve().parents[1] / "translationzed_py" / "core" / "tm_store.py"
+)
 _MAX_TM_STORE_LINES = 1199
 _MAX_TM_STORE_FUNCTION_LINES = 179
 

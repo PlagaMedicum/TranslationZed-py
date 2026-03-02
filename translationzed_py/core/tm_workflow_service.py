@@ -618,6 +618,7 @@ class TMWorkflowService:
         )
         return TMSuggestionsView(message="TM suggestions", items=items)
 
+
 def query_terms(source_text: str) -> list[str]:
     """Execute query terms."""
     out: list[str] = []

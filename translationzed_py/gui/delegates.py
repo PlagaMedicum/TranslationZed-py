@@ -108,7 +108,9 @@ class KeyDelegate(QStyledItemDelegate):
         marker_icon = _DIFF_MARKER_ICON_MAP.get(marker)
         if marker_icon is None:
             return
-        style = option.widget.style() if option.widget is not None else QApplication.style()
+        style = (
+            option.widget.style() if option.widget is not None else QApplication.style()
+        )
         option.icon = style.standardIcon(marker_icon)
 
 
