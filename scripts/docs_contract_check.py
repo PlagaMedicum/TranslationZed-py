@@ -29,6 +29,10 @@ CANONICAL_DOCS = [
     "reference/review_queue.md",
     "spec/technical.md",
     "ux/use_cases.md",
+    "ux/use_cases_project_lifecycle.md",
+    "ux/use_cases_editing_status.md",
+    "ux/use_cases_search_qa.md",
+    "ux/use_cases_tm.md",
     "architecture/overview.md",
     "architecture/code_architecture.md",
     "architecture/flows.md",
@@ -55,6 +59,10 @@ CANONICAL_SCAN_SCOPE = [
     "reference/review_queue.md",
     "spec/technical.md",
     "ux/use_cases.md",
+    "ux/use_cases_project_lifecycle.md",
+    "ux/use_cases_editing_status.md",
+    "ux/use_cases_search_qa.md",
+    "ux/use_cases_tm.md",
     "architecture/overview.md",
     "architecture/code_architecture.md",
     "architecture/flows.md",
@@ -77,6 +85,11 @@ RENDERED_HTML_SCAN_SCOPE = [
     "operations/checklists.md",
     "plan/implementation_active.md",
     "plan/implementation_history.md",
+    "ux/use_cases.md",
+    "ux/use_cases_project_lifecycle.md",
+    "ux/use_cases_editing_status.md",
+    "ux/use_cases_search_qa.md",
+    "ux/use_cases_tm.md",
 ]
 
 BANNED_RULES = [
@@ -154,8 +167,8 @@ PROHIBITED_NORMALIZATION_PATTERNS = [
 
 TM_LONG_VARIANT_FORMULA_SNIPPETS = (
     "TM Long-Variant Detection Contract",
-    r"L_{\text{min\_base}} = \max(1,\lfloor 0.6 \cdot L_q \rfloor)",
-    r"\text{is\_long\_multi} := (k \ge 8) \land (L_q \ge 80)",
+    r"L_{\min b} = \max(1,\lfloor 0.6 \cdot L_q \rfloor)",
+    r"I_{\mathrm{long}} := (k \ge 8) \land (L_q \ge 80)",
     r"\lfloor 1.85 \cdot L_q \rfloor",
     r"\text{overlap} \ge 0.55",
     r"\text{ratio} \ge 0.70",
@@ -459,7 +472,17 @@ def _looks_like_pseudo_list_paragraph(text: str) -> bool:
         return True
     if re.search(r"(?:^|\s)-\s\[[^\]]+\]", text):
         return True
-    return bool(": - " in text and text.count(" - ") >= 2)
+    if ": - " in text and text.count(" - ") >= 2:
+        return True
+    # Detect markdown-table rows that were rendered as plain paragraph text.
+    return bool(
+        text.count("|") >= 3
+        and re.search(
+            r"\|\s*(Field|Value|Trigger|Flow|Goal|Post-condition)\s*\|",
+            text,
+            flags=re.IGNORECASE,
+        )
+    )
 
 
 def _validate_rendered_html_shape(site_root: Path) -> list[str]:
