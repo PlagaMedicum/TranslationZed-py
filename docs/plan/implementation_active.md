@@ -1,5 +1,25 @@
 # TranslationZed-Py — Active Implementation Plan
-_Last updated: 2026-03-01_
+_Last updated: 2026-03-02_
+
+## 0) v0.8.0 Release Readiness [in progress]
+
+Release policy locked for this cycle:
+1. Target tag is `v0.8.0`.
+2. Search synthetic benchmark regression must be fixed (no baseline inflation for release).
+3. Open P1 review-queue entries must be closed before tag:
+   1. `translationzed_py/core/preferences.py`
+   2. `translationzed_py/core/search_replace_service.py`
+4. Docs scope in this slice is critical breakage closure only.
+
+Current blockers (must be resolved before RC/final tag):
+1. Version triad drift:
+   1. `pyproject.toml` still `0.7.0`
+   2. `translationzed_py/version.py` still `0.7.0`
+   3. `CHANGELOG.md` missing `[0.8.0]` heading
+2. `make verify` lint failure (`SIM103`) in `scripts/docs_contract_check.py`.
+3. Strict benchmark gate failure:
+   `test_bench_search_translation_synthetic_20k` exceeds +20% threshold in fail mode.
+4. Review queue entries for `preferences.py` and `search_replace_service.py` still active.
 
 ## 1) Current State
 
