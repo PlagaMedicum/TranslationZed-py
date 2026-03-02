@@ -118,6 +118,9 @@ Fuzzy candidates are built as a **union** of bounded pools (de-duplicated):
 Length band:
 - default: `source_len` in `[0.6 * query_len, 1.4 * query_len]` (or `+10` for short text),
 - short query (`<=4`): widened to `[1, max(previous, 40)]`.
+- short/mid multi-token query (`2+` tokens and `12<=query_len<=64`):
+  upper band is additionally widened to `max(previous, floor(2.0 * query_len))`
+  to keep duplicated-segment UI artifacts visible.
 
 Pool order:
 - short query: token -> prefix -> fallback,
@@ -137,15 +140,15 @@ Define:
 - `Lq = |q|`
 - `Lc = |c|`
 - `k = token_count(q)`
+- `I_{\mathrm{dup}} := (k \ge 2) \land (12 \le L_q \le 64)`
+- base-band subscript `b` means "base policy before long-query widening".
 
 Base candidate-length band:
 
-$$
-L_{\text{min\_base}} = \max(1,\lfloor 0.6 \cdot L_q \rfloor)
-$$
+$$ L_{\min b} = \max(1,\lfloor 0.6 \cdot L_q \rfloor) $$
 
 $$
-L_{\text{max\_base}} =
+L_{\max b} =
 \begin{cases}
 \lfloor 1.4 \cdot L_q \rfloor, & L_q > 5 \\
 L_q + 10, & \text{otherwise}
@@ -154,33 +157,32 @@ $$
 
 Adaptive long multi-token trigger:
 
-$$
-\text{is\_long\_multi} := (k \ge 8) \land (L_q \ge 80)
-$$
+$$ I_{\mathrm{long}} := (k \ge 8) \land (L_q \ge 80) $$
 
-If `is_long_multi`:
+If `I_long` is true:
 
-$$
-L_{\text{min}} = \max(1,\lfloor 0.5 \cdot L_q \rfloor)
-$$
+$$ L_{\min} = \max(1,\lfloor 0.5 \cdot L_q \rfloor) $$
 
-$$
-L_{\text{max}} = \max\left(L_{\text{max\_base}}, \lfloor 1.85 \cdot L_q \rfloor\right)
-$$
+$$ L_{\max} = \max\left(L_{\max b}, \lfloor 1.85 \cdot L_q \rfloor\right) $$
 
 Else:
 
-$$
-L_{\text{min}} = L_{\text{min\_base}}, \quad L_{\text{max}} = L_{\text{max\_base}}
-$$
+$$ L_{\min} = L_{\min b}, \quad L_{\max} = L_{\max b} $$
 
-Oversized precision guard (only for candidates where `Lc > Lmax_base`):
+Duplicate-segment widening (applied after the branch above):
 
 $$
-\text{keep}(c) \iff
+I_{\mathrm{dup}} \Rightarrow
+L_{\max} = \max\left(L_{\max}, \lfloor 2.0 \cdot L_q \rfloor\right)
+$$
+
+Oversized precision guard (only for candidates where `Lc > Lmax_b`):
+
+$$
+\mathrm{keep}(c) \iff
 \left(\text{overlap} \ge 0.55\right)
 \lor
-\left(\text{composed\_phrase} = \text{true} \land \text{ratio} \ge 0.70\right)
+\left(\text{composed phrase} = \text{true} \land \text{ratio} \ge 0.70\right)
 $$
 
 Invariants:

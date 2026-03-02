@@ -41,6 +41,7 @@ def compute_candidate_length_band(
     multi_token_len_padding: int,
 ) -> TMLengthBand:
     """Compute retrieval length band with adaptive long-query widening."""
+    repeated_phrase_candidate = query_token_count >= 2 and 12 <= query_len <= 64
     query_is_long_multi = query_token_count >= 8 and query_len >= 80
     min_len_base = max(1, int(query_len * 0.6))
     max_len_base = int(query_len * 1.4) if query_len > 5 else query_len + 10
@@ -55,6 +56,10 @@ def compute_candidate_length_band(
             max_len,
             query_len + max(multi_token_len_padding, query_token_count * 2),
         )
+    if repeated_phrase_candidate:
+        # Keep duplicated-segment artifacts visible
+        # ("collection suggestionsCOLLECTION SUGGESTIONS").
+        max_len = max(max_len, int(query_len * 2.0))
     max_candidates = max_fuzzy_candidates
     bucket_candidates = fuzzy_bucket_candidates
     if query_len <= short_query_len:

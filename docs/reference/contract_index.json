@@ -9513,7 +9513,7 @@
           },
           "full_context": "Return whether oversized candidate should remain in fuzzy pool.",
           "kind": "function",
-          "lineno": 76,
+          "lineno": 81,
           "medium_context": "Return whether oversized candidate should remain in fuzzy pool.",
           "name": "allow_oversized_candidate",
           "short_context": "Return whether oversized candidate should remain in fuzzy pool.",

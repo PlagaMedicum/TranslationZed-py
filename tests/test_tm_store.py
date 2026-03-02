@@ -229,6 +229,141 @@ def test_tm_store_tagged_query_matches_phrase_candidate(tmp_path: Path) -> None:
     store.close()
 
 
+def test_tm_store_long_instruction_variant_is_visible_at_default_min_score(
+    tmp_path: Path,
+) -> None:
+    """Verify long edited instruction variants remain visible at min_score=50."""
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    query = (
+        "Add detailed instructions to customize how Codex can help, "
+        "like what tone to use or how to format responses"
+    )
+    long_variant = (
+        "1) Add detailed instructions to customize how **Codex** helps with this "
+        "project can help, like what tone it should to use or how it should format "
+        "its response to format responses"
+    )
+    store.upsert_project_entries(
+        [
+            ("k_exact", query, "Дайце падрабязныя інструкцыі."),
+            ("k_long", long_variant, "Даўжэйшы варыянт."),
+            (
+                "k_para",
+                (
+                    "Give Codex detailed instructions for this project, "
+                    "including tone and response format preferences."
+                ),
+                "Перафразаваны варыянт.",
+            ),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    matches = store.query(
+        query,
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=50,
+    )
+
+    sources = {match.source_text for match in matches}
+    assert query in sources
+    assert long_variant in sources
+    store.close()
+
+
+def test_tm_store_long_instruction_variant_filters_unrelated_long_noise(
+    tmp_path: Path,
+) -> None:
+    """Verify unrelated long noisy candidates are rejected under long-variant rules."""
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    query = (
+        "Add detailed instructions to customize how Codex can help, "
+        "like what tone to use or how to format responses"
+    )
+    long_variant = (
+        "2) Add detailed instructions to customize how Codex helps with this "
+        "project can help, like what tone it should to use or how it should format "
+        "its response to format responses"
+    )
+    unrelated_noise = (
+        "1) Configure deployment pipeline and release checklist for nightly "
+        "binary packaging, signing keys, rollback procedures, and QA handoff notes."
+    )
+    store.upsert_project_entries(
+        [
+            ("k_exact", query, "Exact."),
+            ("k_long", long_variant, "Long near-duplicate."),
+            ("k_noise", unrelated_noise, "Noise."),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    matches = store.query(
+        query,
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=50,
+    )
+
+    sources = {match.source_text for match in matches}
+    assert long_variant in sources
+    assert unrelated_noise not in sources
+    store.close()
+
+
+def test_tm_store_duplicate_phrase_artifact_keeps_tm_near_match_score(
+    tmp_path: Path,
+) -> None:
+    """Verify duplicate-phrase UI artifacts stay visible with high fuzzy score."""
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    query = "Collection suggestions"
+    duplicated_phrase = "Collection suggestionsCOLLECTION SUGGESTIONS"
+    store.upsert_project_entries(
+        [
+            ("k_exact", query, "Прапановы для калекцыі"),
+            ("k_dup", duplicated_phrase, "Прапановы для калекцыі"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    matches = store.query(
+        query,
+        source_locale="EN",
+        target_locale="BE",
+        limit=10,
+        min_score=50,
+    )
+
+    duplicate_match = next(
+        (item for item in matches if item.source_text == duplicated_phrase),
+        None,
+    )
+    assert duplicate_match is not None
+    assert duplicate_match.score >= 90
+    store.close()
+
+
 def test_tm_store_fuzzy_prefix_lookup_finds_neighboring_strings(tmp_path: Path) -> None:
     """Verify tm store fuzzy prefix lookup finds neighboring strings."""
     root = tmp_path / "root"
