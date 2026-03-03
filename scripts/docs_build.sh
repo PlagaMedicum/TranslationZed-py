@@ -16,7 +16,7 @@ if [ "$MODE" = "lite" ]; then
 else
   MISSING_DOC_MODULES=$("$VENV_PY" - <<'PY'
 import importlib
-mods = ("material", "pymdownx", "mkdocstrings", "mkdocstrings_handlers.python")
+mods = ("zensical", "pymdownx", "mkdocstrings", "mkdocstrings_handlers.python")
 missing = []
 for mod in mods:
     try:
@@ -28,10 +28,10 @@ PY
 )
   if [ -n "$MISSING_DOC_MODULES" ]; then
     echo "docs-build: strict mode missing modules: $MISSING_DOC_MODULES"
-    echo "docs-build: strict mode requires mkdocs-material, pymdownx, mkdocstrings, and mkdocstrings python handler"
+    echo "docs-build: strict mode requires zensical, pymdownx, mkdocstrings, and mkdocstrings python handler"
     echo "docs-build: install dev dependencies (for example: make venv)"
     exit 2
   fi
 fi
 
-"$VENV_PY" -m mkdocs build --strict --site-dir "$SITE_DIR" --config-file "$CONFIG_FILE"
+"$VENV_PY" -m zensical build --clean --config-file "$CONFIG_FILE"

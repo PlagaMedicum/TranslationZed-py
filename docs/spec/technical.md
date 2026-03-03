@@ -985,7 +985,7 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
     plus medium/high severity+confidence gate on shipped code (`translationzed_py` + `scripts`)
     with `B608` suppressed for known parameterized SQLite query patterns,
   - `make docstyle`: repo-wide pydocstyle with strict PEP257 checks (no local ignore overrides).
-- **Documentation build**: `make docs-build` runs MkDocs strict build (warnings fail).
+- **Documentation build**: `make docs-build` runs the Zensical builder against `mkdocs.yml` in strict docs-check lanes.
 - **Gate contract**:
   - local umbrella gate: `make verify` (auto-fix allowed; warns on tracked-file changes),
   - CI/release strict gate: `make verify-ci` (non-mutating, fail-on-drift),

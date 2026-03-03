@@ -446,6 +446,19 @@ def _validate_mkdocs_contract(repo_root: Path) -> list[str]:
                     f"{main_mkdocs_path}: missing required docs-rendering "
                     f"contract snippet: {snippet!r}"
                 )
+    docs_build_script = repo_root / "scripts" / "docs_build.sh"
+    if not docs_build_script.is_file():
+        errors.append(f"missing docs build script: {docs_build_script}")
+    else:
+        script_text = _read_text(docs_build_script)
+        if "-m zensical build" not in script_text:
+            errors.append(
+                f"{docs_build_script}: docs builder must use zensical build command"
+            )
+        if "-m mkdocs build" in script_text:
+            errors.append(
+                f"{docs_build_script}: direct mkdocs build command is no longer allowed"
+            )
     return errors
 
 
