@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation History
-_Last updated: 2026-03-02_
+_Last updated: 2026-03-03_
 
 > Historical execution log (non-normative).  
 > Current canonical planning scope lives in `docs/plan/implementation_active.md`.
@@ -44,7 +44,7 @@ Execution evidence log:
    2. validated gates: `make docs-check`, `make test-perf-scale`, `make verify`
    3. synthetic search benchmark debt later closed in v0.8.0 blocker lane (see next section)
 
-## v0.8.0 Blocker Closure Snapshot (2026-03-02)
+## v0.8.0 Blocker Closure Snapshot (2026-03-03)
 
 1. [✓] Lint blocker fixed:
    `scripts/docs_contract_check.py` `SIM103` remediation landed.
@@ -56,7 +56,7 @@ Execution evidence log:
 4. [✓] P1 review queue closures:
    1. `translationzed_py/core/preferences.py` moved to `CLOSED`.
    2. `translationzed_py/core/search_replace_service.py` moved to `CLOSED`.
-5. [✓] Full validation chain completed on 2026-03-02:
+5. [✓] Full validation chain completed on 2026-03-03:
    1. `make docs-check`
    2. `make test-perf-scale`
    3. `make bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20`

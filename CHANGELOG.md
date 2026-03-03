@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.8.0] - 2026-03-02
+## [0.8.0] - 2026-03-03
 
 ### Added
 - Browser-first documentation stack with canonical docs restructure, strict docs contract checks, and generated contract index.
