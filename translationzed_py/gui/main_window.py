@@ -3548,11 +3548,7 @@ class MainWindow(QMainWindow):
         assert self._current_pf is not None
         assert self._current_model is not None
         changed_values_reader = getattr(self._current_model, "changed_values", None)
-        changed = (
-            changed_values_reader()
-            if callable(changed_values_reader)
-            else {}
-        )
+        changed = changed_values_reader() if callable(changed_values_reader) else {}
         insertion_action = "skip"
         insertion_edits: dict[str, str] | None = None
         edited_new_values: dict[str, str] = {}
