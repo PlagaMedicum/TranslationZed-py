@@ -46,6 +46,7 @@ jobs:
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
       - name: Verify (strict, non-mutating)
+        shell: bash
         run: make verify-ci VERIFY_SKIP_BENCH=1
       - name: Upload verification artifacts
         if: always()
