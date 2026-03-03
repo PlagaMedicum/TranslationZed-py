@@ -2,27 +2,21 @@
 
 from __future__ import annotations
 
-import importlib
-import sys
 from pathlib import Path
 
-import pytest
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    import tomli as tomllib
 
 
-def test_mutmut_paths_to_mutate_target_critical_core_modules(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_mutmut_paths_to_mutate_target_critical_core_modules() -> None:
     """Ensure mutation scope remains pinned to the critical-core module set."""
-    try:
-        mutmain = importlib.import_module("mutmut.__main__")
-    except ModuleNotFoundError:
-        pytest.skip("mutmut is unavailable in this environment.")
-    except PermissionError as exc:
-        pytest.skip(f"mutmut import is unavailable in this environment: {exc}")
-    monkeypatch.chdir(Path(__file__).resolve().parent.parent)
-    monkeypatch.setattr(sys, "argv", ["mutmut", "run"])
-    config = mutmain.load_config()
-    actual = sorted(str(path.as_posix()) for path in config.paths_to_mutate)
+    repo_root = Path(__file__).resolve().parent.parent
+    pyproject = repo_root / "pyproject.toml"
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    config = data.get("tool", {}).get("mutmut", {})
+    actual = sorted(str(path) for path in config.get("paths_to_mutate", []))
     expected = sorted(
         [
             "translationzed_py/core/parser.py",
@@ -35,4 +29,4 @@ def test_mutmut_paths_to_mutate_target_critical_core_modules(
         ]
     )
     assert actual == expected
-    assert config.tests_dir == ["tests"]
+    assert config.get("tests_dir") == ["tests"]
