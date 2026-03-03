@@ -37,11 +37,12 @@ def test_property_parser_saver_roundtrip_identity(
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "property.txt"
         content = "".join(f'{key} = "{value}"\n' for key, value in pairs)
-        path.write_text(content, encoding="utf-8")
+        content_bytes = content.encode("utf-8")
+        path.write_bytes(content_bytes)
 
         parsed = parse(path, encoding="utf-8")
         values = {entry.key: entry.value for entry in parsed.entries}
 
         save(parsed, values, encoding="utf-8")
 
-        assert path.read_bytes() == content.encode("utf-8")
+        assert path.read_bytes() == content_bytes
