@@ -113,6 +113,31 @@ def test_search_replace_service_delegates_scope_and_search_spec_helpers() -> Non
     assert include_value is True
 
 
+def test_search_replace_service_prepare_search_plan() -> None:
+    """Verify search replace service exposes reusable search-plan preparation."""
+    service = SearchReplaceService()
+    literal = service.prepare_search_plan(
+        query="Needle token",
+        use_regex=False,
+        case_sensitive=False,
+    )
+    regex = service.prepare_search_plan(
+        query=r"Needle\s+token",
+        use_regex=True,
+        case_sensitive=True,
+    )
+    invalid = service.prepare_search_plan(
+        query="(",
+        use_regex=True,
+        case_sensitive=False,
+    )
+    assert literal is not None
+    assert literal.matcher is None
+    assert literal.query_text == "needle token"
+    assert regex is not None and regex.matcher is not None
+    assert invalid is None
+
+
 def test_prioritize_current_file_moves_current_to_front() -> None:
     """Verify prioritize current file moves current to front."""
     files = [Path("a"), Path("b"), Path("c")]
@@ -267,6 +292,13 @@ def test_find_match_in_rows_forward_and_backward() -> None:
         SearchRow(Path("x"), 1, "B", "s1", "needle"),
         SearchRow(Path("x"), 2, "C", "s2", "needle"),
     ]
+    service = SearchReplaceService()
+    prepared = service.prepare_search_plan(
+        query="needle",
+        use_regex=False,
+        case_sensitive=False,
+    )
+
     fwd = find_match_in_rows(
         rows,
         "needle",
@@ -274,6 +306,7 @@ def test_find_match_in_rows_forward_and_backward() -> None:
         False,
         start_row=0,
         direction=1,
+        prepared_plan=prepared,
     )
     back = find_match_in_rows(
         rows,
@@ -282,6 +315,7 @@ def test_find_match_in_rows_forward_and_backward() -> None:
         False,
         start_row=2,
         direction=-1,
+        prepared_plan=prepared,
     )
     assert fwd is not None and fwd.row == 1
     assert back is not None and back.row == 1

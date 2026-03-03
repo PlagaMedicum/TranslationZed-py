@@ -11,13 +11,24 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import translationzed_py.core.tm_store as tm_store_module
-from tests.fixtures.perf_generated.builders import build_tm_query_pack, build_tm_rows
+from tests.fixtures.perf_generated.builders import (
+    build_tm_perf_query_pack,
+    build_tm_query_pack,
+    build_tm_rows,
+)
 from translationzed_py.core.tm_store import TMStore
 
 
-def _median_ms(repeats: int, fn: Callable[[], object]) -> float:
+def _median_ms(
+    repeats: int,
+    fn: Callable[[], object],
+    *,
+    setup: Callable[[], object] | None = None,
+) -> float:
     values: list[float] = []
     for _ in range(max(1, repeats)):
+        if setup is not None:
+            setup()
         gc.collect()
         start = time.perf_counter()
         fn()
@@ -112,11 +123,6 @@ def _run_optimized_pack(store: TMStore, queries: tuple[str, ...]) -> int:
     return total
 
 
-def _run_optimized_pack_cold(store: TMStore, queries: tuple[str, ...]) -> int:
-    store.clear_runtime_caches()
-    return _run_optimized_pack(store, queries)
-
-
 def test_tm_query_optimized_path_is_bit_stable_vs_legacy(tmp_path: Path) -> None:
     """Verify optimized TM query path preserves ordered score/result output."""
     entries = 20_000
@@ -149,7 +155,7 @@ def test_tm_query_speedup_contract_20k(tmp_path: Path, perf_recorder) -> None:
     entries = 20_000
     repeats = int(os.getenv("TZP_PERF_TM_REPEATS", "7"))
     target_speedup_percent = float(os.getenv("TZP_PERF_TM_SPEEDUP_20K_PERCENT", "35"))
-    queries = build_tm_query_pack()
+    queries = build_tm_perf_query_pack()
 
     store = _build_store(tmp_path / "tm_perf", entries)
     try:
@@ -184,14 +190,15 @@ def test_tm_query_cold_cache_speedup_contract_20k(
     target_speedup_percent = float(
         os.getenv("TZP_PERF_TM_COLD_SPEEDUP_20K_PERCENT", "3")
     )
-    queries = build_tm_query_pack()
+    queries = build_tm_perf_query_pack()
 
     store = _build_store(tmp_path / "tm_perf_cold", entries)
     try:
         legacy_ms = _median_ms(repeats, lambda: _run_legacy_pack(store, queries))
         optimized_ms = _median_ms(
             repeats,
-            lambda: _run_optimized_pack_cold(store, queries),
+            lambda: _run_optimized_pack(store, queries),
+            setup=store.clear_runtime_caches,
         )
         speedup_percent = (
             ((legacy_ms - optimized_ms) / legacy_ms) * 100.0 if legacy_ms > 0.0 else 0.0

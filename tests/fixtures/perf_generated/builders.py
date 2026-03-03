@@ -62,3 +62,19 @@ def build_tm_query_pack() -> tuple[str, ...]:
         "Drop-all",
         "Noise token 00010",
     )
+
+
+def build_tm_perf_query_pack() -> tuple[str, ...]:
+    """Return broader deterministic TM query pack for stable perf contracts."""
+    base = build_tm_query_pack()
+    noise_queries = tuple(f"Noise token {idx:05d}" for idx in range(10, 210, 10))
+    overlap_queries = (
+        "Drop one now",
+        "Drop all now",
+        "drop all",
+        "Drop-all",
+        "Noise token 00150",
+    )
+    pack = base + noise_queries + overlap_queries
+    # Repeat once to model short in-session query bursts and reduce timing jitter.
+    return pack + pack

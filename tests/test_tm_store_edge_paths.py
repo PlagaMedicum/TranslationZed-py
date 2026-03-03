@@ -14,10 +14,12 @@ from translationzed_py.core.tm_store import (
     TMStore,
     _contains_composed_phrase,
     _exact_token_overlap,
+    _normalize,
     _normalize_row_status,
     _query_tokens,
     _soft_token_overlap,
     _stem_token,
+    _strip_tm_wrappers,
     _token_matches,
 )
 
@@ -34,6 +36,8 @@ def test_tm_store_text_helper_edges_cover_guard_branches() -> None:
     assert _contains_composed_phrase("!!!", "alpha", use_en_stemming=False) is False
     assert _soft_token_overlap(set(), {"alpha"}, use_en_stemming=False) == 0.0
     assert _exact_token_overlap(set(), {"alpha"}) == 0.0
+    assert _strip_tm_wrappers("1) **Hello** `world`") == "Hello world"
+    assert _normalize("- ~~Tagged~~ _line_ @user <LINE>") == "tagged line @user <line>"
 
     assert _normalize_row_status(None) is None
     assert _normalize_row_status(Status.TRANSLATED) == int(Status.TRANSLATED)

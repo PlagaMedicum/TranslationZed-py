@@ -180,6 +180,86 @@
       ]
     },
     {
+      "id": "long_instruction_variant_min50_visible",
+      "profile": "synthetic_core",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "Add detailed instructions to customize how Codex can help, like what tone to use or how to format responses",
+      "min_score": 50,
+      "limit": 12,
+      "entries": [
+        {
+          "origin": "project",
+          "key": "k_exact",
+          "source": "Add detailed instructions to customize how Codex can help, like what tone to use or how to format responses",
+          "target": "exact tr",
+          "updated_at": 1
+        },
+        {
+          "origin": "project",
+          "key": "k_long",
+          "source": "1) Add detailed instructions to customize how **Codex** helps with this project can help, like what tone it should to use or how it should format its response to format responses",
+          "target": "long variant tr",
+          "updated_at": 2
+        },
+        {
+          "origin": "project",
+          "key": "k_para",
+          "source": "Give Codex detailed instructions for this project, including tone and response format preferences.",
+          "target": "paraphrase tr",
+          "updated_at": 3
+        }
+      ],
+      "expect_top": "Add detailed instructions to customize how Codex can help, like what tone to use or how to format responses",
+      "expect_present": [
+        {
+          "source": "1) Add detailed instructions to customize how **Codex** helps with this project can help, like what tone it should to use or how it should format its response to format responses",
+          "min_score": 50
+        }
+      ]
+    },
+    {
+      "id": "long_instruction_variant_noise_rejected",
+      "profile": "synthetic_core",
+      "source_locale": "EN",
+      "target_locale": "BE",
+      "query": "Add detailed instructions to customize how Codex can help, like what tone to use or how to format responses",
+      "min_score": 50,
+      "limit": 12,
+      "entries": [
+        {
+          "origin": "project",
+          "key": "k_exact",
+          "source": "Add detailed instructions to customize how Codex can help, like what tone to use or how to format responses",
+          "target": "exact tr",
+          "updated_at": 1
+        },
+        {
+          "origin": "project",
+          "key": "k_long",
+          "source": "2) Add detailed instructions to customize how Codex helps with this project can help, like what tone it should to use or how it should format its response to format responses",
+          "target": "long variant tr",
+          "updated_at": 2
+        },
+        {
+          "origin": "project",
+          "key": "k_noise",
+          "source": "1) Configure deployment pipeline and release checklist for nightly binary packaging, signing keys, rollback procedures, and QA handoff notes.",
+          "target": "noise tr",
+          "updated_at": 3
+        }
+      ],
+      "expect_present": [
+        {
+          "source": "2) Add detailed instructions to customize how Codex helps with this project can help, like what tone it should to use or how it should format its response to format responses",
+          "min_score": 50
+        }
+      ],
+      "expect_absent": [
+        "1) Configure deployment pipeline and release checklist for nightly binary packaging, signing keys, rollback procedures, and QA handoff notes."
+      ]
+    },
+    {
       "id": "pz_drop_neighbors_dense_pool",
       "profile": "pz_fixture_like",
       "source_locale": "EN",

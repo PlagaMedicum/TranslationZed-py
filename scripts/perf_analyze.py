@@ -50,6 +50,7 @@ class ProfileDump:
     top: list[str]
     total_time_s: float
     offset_time_s: float
+    search_focus_time_s: dict[str, float]
 
 
 def _build_argument_parser() -> argparse.ArgumentParser:
@@ -144,7 +145,7 @@ def _measure_distribution(
 
 def _profile_summary(
     fn: Callable[[], object], top_n: int
-) -> tuple[list[str], float, float]:
+) -> tuple[list[str], float, float, dict[str, float]]:
     pr = cProfile.Profile()
     pr.enable()
     fn()
@@ -156,11 +157,25 @@ def _profile_summary(
 
     total_time_s = float(stats.total_tt)
     offset_time_s = 0.0
+    search_focus_time_s: dict[str, float] = {
+        "iter_matches": 0.0,
+        "match_literal": 0.0,
+        "find_literal_span": 0.0,
+    }
     for (_filename, _lineno, func_name), sample in stats.stats.items():
         if func_name.startswith("_build_offset_map"):
             _cc, _nc, _tt, ct, _callers = sample
             offset_time_s += float(ct)
-    return lines[-max(1, top_n) :], total_time_s, offset_time_s
+        if func_name in {"iter_matches", "_iter_matches_with_plan"}:
+            _cc, _nc, _tt, ct, _callers = sample
+            search_focus_time_s["iter_matches"] += float(ct)
+        if func_name in {"_matches_literal", "_match_literal_index"}:
+            _cc, _nc, _tt, ct, _callers = sample
+            search_focus_time_s["match_literal"] += float(ct)
+        if func_name == "_find_literal_span":
+            _cc, _nc, _tt, ct, _callers = sample
+            search_focus_time_s["find_literal_span"] += float(ct)
+    return lines[-max(1, top_n) :], total_time_s, offset_time_s, search_focus_time_s
 
 
 def _required_component_speedup(p: float, target_factor: float = 0.55) -> float:
@@ -321,7 +336,9 @@ def main() -> int:
                 samples.append(
                     PerfSample(name=name, scale=scale, repeats=repeats, stats=stats)
                 )
-                top, total_time_s, offset_time_s = _profile_summary(fn, top_n)
+                top, total_time_s, offset_time_s, search_focus_time_s = (
+                    _profile_summary(fn, top_n)
+                )
                 profiles.append(
                     ProfileDump(
                         name=name,
@@ -329,6 +346,7 @@ def main() -> int:
                         top=top,
                         total_time_s=total_time_s,
                         offset_time_s=offset_time_s,
+                        search_focus_time_s=search_focus_time_s,
                     )
                 )
                 if name.startswith("parse") and total_time_s > 0.0:
@@ -357,6 +375,27 @@ def main() -> int:
                 "required-offset-speedup="
                 f"{float(item['required_component_speedup_for_45pct_total']):.4f}"
             )
+    search_profiles = [
+        dump
+        for dump in profiles
+        if dump.name == "search_translation" and dump.scale == "synthetic20k"
+    ]
+    if search_profiles:
+        print("\nSearch synthetic20k hotspot shares:")
+        for dump in search_profiles:
+            if dump.total_time_s <= 0.0:
+                continue
+            iter_share = (
+                dump.search_focus_time_s["iter_matches"] / dump.total_time_s
+            ) * 100.0
+            literal_share = (
+                dump.search_focus_time_s["match_literal"] / dump.total_time_s
+            ) * 100.0
+            print(
+                "  - "
+                f"iter_matches={iter_share:.2f}% "
+                f"literal_match={literal_share:.2f}%"
+            )
 
     payload = {
         "samples": [
@@ -381,6 +420,7 @@ def main() -> int:
                 "top": dump.top,
                 "total_time_s": dump.total_time_s,
                 "offset_time_s": dump.offset_time_s,
+                "search_focus_time_s": dump.search_focus_time_s,
             }
             for dump in profiles
         ],
