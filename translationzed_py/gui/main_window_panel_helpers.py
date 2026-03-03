@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import html
 import time
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
@@ -27,6 +27,9 @@ from translationzed_py.core import parse_lazy
 from translationzed_py.core.model import STATUS_ORDER, Entry, Status
 from translationzed_py.core.qa_service import QAFinding as _QAFinding
 from translationzed_py.core.search import Match as _SearchMatch
+from translationzed_py.core.search import SearchField as _SearchField
+from translationzed_py.core.search import SearchQueryPlan as _SearchQueryPlan
+from translationzed_py.core.search import SearchRow as _SearchRow
 from translationzed_py.core.status_cache import read as _read_status_cache
 from translationzed_py.core.tm_query import TMQueryKey, TMQueryPolicy
 from translationzed_py.core.tm_store import TMMatch, TMStore
@@ -67,7 +70,11 @@ def _hash_for_cache_key(key: str | Entry, cache_map: dict[int, object]) -> int:
 def _progress_from_model(win) -> StatusProgress | None:
     model = getattr(win, "_current_model", None)
     current = getattr(win, "_current_pf", None)
-    if model is None or current is None or not hasattr(model, "canonical_status_counts"):
+    if (
+        model is None
+        or current is None
+        or not hasattr(model, "canonical_status_counts")
+    ):
         return None
     cached = getattr(win, "_progress_current_model_cache", None)
     if (
@@ -164,12 +171,14 @@ def _compute_locale_progress_task(
     values: list[StatusProgress] = []
     current_progress = StatusProgress.from_tuple(current_counts)
     for path in files:
-        if current_path is not None and current_counts is not None and path == current_path:
+        if (
+            current_path is not None
+            and current_counts is not None
+            and path == current_path
+        ):
             values.append(current_progress)
             continue
-        values.append(
-            _progress_from_disk(path, root=root, encoding=locale_encoding)
-        )
+        values.append(_progress_from_disk(path, root=root, encoding=locale_encoding))
     return locale, _sum_progress(values).as_tuple()
 
 
@@ -653,6 +662,104 @@ def _go_to_next_priority_status(win) -> None:
         QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
     )
     win.table.scrollTo(target, QAbstractItemView.PositionAtCenter)
+
+
+def _search_files_for_scope(win) -> list[Path]:
+    return list(win._files_for_scope(win._search_scope))
+
+
+def _find_match_in_rows(
+    win,
+    rows: Iterable[_SearchRow],
+    query: str,
+    field: _SearchField,
+    use_regex: bool,
+    *,
+    start_row: int,
+    direction: int,
+    case_sensitive: bool,
+    prepared_plan: _SearchQueryPlan | None = None,
+) -> _SearchMatch | None:
+    if prepared_plan is None:
+        return win._search_replace_service.find_match_in_rows(
+            rows,
+            query,
+            field,
+            use_regex,
+            start_row=start_row,
+            direction=direction,
+            case_sensitive=case_sensitive,
+        )
+    return win._search_replace_service.find_match_in_rows(
+        rows,
+        query,
+        field,
+        use_regex,
+        start_row=start_row,
+        direction=direction,
+        case_sensitive=case_sensitive,
+        prepared_plan=prepared_plan,
+    )
+
+
+def _search_rows_for_file(
+    win,
+    path: Path,
+    *,
+    include_source: bool,
+    include_value: bool,
+) -> Iterable[_SearchRow]:
+    locale = win._locale_for_path(path)
+    is_current = bool(win._current_pf and path == win._current_pf.path)
+    plan = win._search_replace_service.build_rows_source_plan(
+        locale_known=bool(locale),
+        is_current_file=is_current,
+        has_current_model=bool(win._current_model),
+    )
+    if not plan.has_rows:
+        return ()
+    if plan.use_active_model_rows:
+        return win._rows_from_model(
+            include_source=include_source,
+            include_value=include_value,
+        )
+    assert locale is not None
+    return win._cached_rows_from_file(
+        path,
+        locale,
+        include_source=include_source,
+        include_value=include_value,
+    )
+
+
+def _find_match_in_file(
+    win,
+    path: Path,
+    *,
+    query: str,
+    field: _SearchField,
+    use_regex: bool,
+    include_source: bool,
+    include_value: bool,
+    start_row: int,
+    direction: int,
+    prepared_plan: _SearchQueryPlan | None = None,
+) -> _SearchMatch | None:
+    rows = win._search_rows_for_file(
+        path,
+        include_source=include_source,
+        include_value=include_value,
+    )
+    return win._find_match_in_rows(
+        rows,
+        query,
+        field,
+        use_regex,
+        start_row=start_row,
+        direction=direction,
+        case_sensitive=win._search_case_sensitive,
+        prepared_plan=prepared_plan,
+    )
 
 
 def _run_search(win) -> None:

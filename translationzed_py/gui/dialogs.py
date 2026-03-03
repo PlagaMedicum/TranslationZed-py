@@ -112,6 +112,13 @@ class SaveFilesDialog(QDialog):
         main_layout.addWidget(
             QLabel("Choose files to write to originals (checked = will be written):")
         )
+        cache_notice = QLabel(
+            "Draft edits are auto-saved to cache by default while you work.\n"
+            "Choose Write only when you want to update original files now."
+        )
+        cache_notice.setObjectName("saveCacheNoticeLabel")
+        cache_notice.setWordWrap(True)
+        main_layout.addWidget(cache_notice)
 
         self._list.setSelectionMode(QAbstractItemView.NoSelection)
         for item in files:

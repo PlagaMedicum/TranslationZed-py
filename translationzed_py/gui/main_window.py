@@ -161,6 +161,9 @@ from translationzed_py.core.search import (
     SearchField as _SearchField,
 )
 from translationzed_py.core.search import (
+    SearchQueryPlan as _SearchQueryPlan,
+)
+from translationzed_py.core.search import (
     SearchRow as _SearchRow,
 )
 from translationzed_py.core.search import (
@@ -2390,7 +2393,10 @@ class MainWindow(QMainWindow):
         msg.setIcon(QMessageBox.Question)
         msg.setWindowTitle("Write to original file")
         msg.setText("Write draft translations to the original file?")
-        msg.setInformativeText("No keeps changes in cache only.")
+        msg.setInformativeText(
+            "No keeps changes in cache only. "
+            "Draft edits are auto-saved to cache by default."
+        )
         msg.setStandardButtons(
             QMessageBox.StandardButton.Yes
             | QMessageBox.StandardButton.No
@@ -4921,86 +4927,6 @@ class MainWindow(QMainWindow):
             return source_path.stat().st_mtime_ns
         return 0
 
-    def _search_files_for_scope(self) -> list[Path]:
-        return list(self._files_for_scope(self._search_scope))
-
-    def _find_match_in_rows(
-        self,
-        rows: Iterable[_SearchRow],
-        query: str,
-        field: _SearchField,
-        use_regex: bool,
-        *,
-        start_row: int,
-        direction: int,
-        case_sensitive: bool,
-    ) -> _SearchMatch | None:
-        return self._search_replace_service.find_match_in_rows(
-            rows,
-            query,
-            field,
-            use_regex,
-            start_row=start_row,
-            direction=direction,
-            case_sensitive=case_sensitive,
-        )
-
-    def _find_match_in_file(
-        self,
-        path: Path,
-        *,
-        query: str,
-        field: _SearchField,
-        use_regex: bool,
-        include_source: bool,
-        include_value: bool,
-        start_row: int,
-        direction: int,
-    ) -> _SearchMatch | None:
-        rows = self._search_rows_for_file(
-            path,
-            include_source=include_source,
-            include_value=include_value,
-        )
-        return self._find_match_in_rows(
-            rows,
-            query,
-            field,
-            use_regex,
-            start_row=start_row,
-            direction=direction,
-            case_sensitive=self._search_case_sensitive,
-        )
-
-    def _search_rows_for_file(
-        self,
-        path: Path,
-        *,
-        include_source: bool,
-        include_value: bool,
-    ) -> Iterable[_SearchRow]:
-        locale = self._locale_for_path(path)
-        is_current = bool(self._current_pf and path == self._current_pf.path)
-        plan = self._search_replace_service.build_rows_source_plan(
-            locale_known=bool(locale),
-            is_current_file=is_current,
-            has_current_model=bool(self._current_model),
-        )
-        if not plan.has_rows:
-            return ()
-        if plan.use_active_model_rows:
-            return self._rows_from_model(
-                include_source=include_source,
-                include_value=include_value,
-            )
-        assert locale is not None
-        return self._cached_rows_from_file(
-            path,
-            locale,
-            include_source=include_source,
-            include_value=include_value,
-        )
-
     def _select_match(self, match: _SearchMatch) -> bool:
         open_plan = self._search_replace_service.build_match_open_plan(
             has_match=bool(match),
@@ -5076,6 +5002,14 @@ class MainWindow(QMainWindow):
                 self._set_search_panel_message(plan.status_message)
             return False
         assert plan.field is not None
+        prepared_plan: _SearchQueryPlan | None = None
+        prepare_fn = getattr(self._search_replace_service, "prepare_search_plan", None)
+        if callable(prepare_fn):
+            prepared_plan = prepare_fn(
+                query=plan.query,
+                use_regex=plan.use_regex,
+                case_sensitive=self._search_case_sensitive,
+            )
         self._refresh_search_panel_results(
             query=plan.query,
             use_regex=plan.use_regex,
@@ -5083,6 +5017,7 @@ class MainWindow(QMainWindow):
             include_source=plan.include_source,
             include_value=plan.include_value,
             files=list(plan.files),
+            prepared_plan=prepared_plan,
         )
 
         def _find_in_file(path: Path, start_row: int) -> _SearchMatch | None:
@@ -5095,6 +5030,7 @@ class MainWindow(QMainWindow):
                 include_value=plan.include_value,
                 start_row=start_row,
                 direction=direction,
+                prepared_plan=prepared_plan,
             )
 
         match = self._search_replace_service.search_across_files(
@@ -5119,6 +5055,7 @@ class MainWindow(QMainWindow):
         include_source: bool | None = None,
         include_value: bool | None = None,
         files: list[Path] | None = None,
+        prepared_plan: _SearchQueryPlan | None = None,
     ) -> None:
         if (
             not hasattr(self, "_search_results_list")
@@ -5143,6 +5080,16 @@ class MainWindow(QMainWindow):
         if not files:
             self._set_search_panel_message("No files in current search scope.")
             return
+        if prepared_plan is None:
+            prepare_fn = getattr(
+                self._search_replace_service, "prepare_search_plan", None
+            )
+            if callable(prepare_fn):
+                prepared_plan = prepare_fn(
+                    query=query_text,
+                    use_regex=use_regex,
+                    case_sensitive=self._search_case_sensitive,
+                )
 
         def _iter_matches_for_file(path: Path) -> Iterable[_SearchMatch]:
             rows = self._search_rows_for_file(
@@ -5158,6 +5105,7 @@ class MainWindow(QMainWindow):
                 case_sensitive=self._search_case_sensitive,
                 include_preview=True,
                 preview_chars=96,
+                prepared_plan=prepared_plan,
             )
 
         plan = self._search_replace_service.build_search_panel_plan(
@@ -5208,6 +5156,7 @@ class MainWindow(QMainWindow):
             self._start_qa_scan_for_current_file()
             return
         self._qa_refresh_timer.start(self._qa_refresh_delay_ms)
+
     _refresh_qa_for_current_file = _qa_refresh_sync_for_test
     _start_qa_scan_for_current_file = _qa_start_scan
     _poll_qa_scan = _qa_poll_scan
@@ -5223,6 +5172,10 @@ class MainWindow(QMainWindow):
     _qa_prev_finding = _panel_helpers._qa_prev_finding
     _next_priority_status_row = _panel_helpers._next_priority_status_row
     _go_to_next_priority_status = _panel_helpers._go_to_next_priority_status
+    _search_files_for_scope = _panel_helpers._search_files_for_scope
+    _find_match_in_rows = _panel_helpers._find_match_in_rows
+    _search_rows_for_file = _panel_helpers._search_rows_for_file
+    _find_match_in_file = _panel_helpers._find_match_in_file
     _run_search = _panel_helpers._run_search
     _search_next = _panel_helpers._search_next
     _search_prev = _panel_helpers._search_prev
@@ -5264,7 +5217,10 @@ class MainWindow(QMainWindow):
     _init_progress_strip = _panel_helpers._init_progress_strip
     _init_empty_table_placeholder = _panel_helpers._init_empty_table_placeholder
     _set_table_empty_state = _panel_helpers._set_table_empty_state
-    _clear_table_model_for_empty_state = _panel_helpers._clear_table_model_for_empty_state
+    _clear_table_model_for_empty_state = (
+        _panel_helpers._clear_table_model_for_empty_state
+    )
+
     def showEvent(self, event) -> None:  # noqa: N802
         """Re-apply detail panel state when the window becomes visible."""
         super().showEvent(event)
@@ -5280,7 +5236,9 @@ class MainWindow(QMainWindow):
         if self.replace_toolbar.isVisible():
             self._align_replace_bar()
 
-    _update_status_combo_from_selection = _panel_helpers._update_status_combo_from_selection
+    _update_status_combo_from_selection = (
+        _panel_helpers._update_status_combo_from_selection
+    )
     _set_status_combo = _panel_helpers._set_status_combo
     _status_combo_changed = _panel_helpers._status_combo_changed
     _set_saved_status = _panel_helpers._set_saved_status

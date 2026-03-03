@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import contextlib
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from translationzed_py.core.app_config import (
     LEGACY_CONFIG_DIR,

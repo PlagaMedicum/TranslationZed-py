@@ -66,6 +66,17 @@ def test_save_files_dialog_toggle_selection_and_choice(qtbot) -> None:
     dialog._set_choice("cache")
     assert dialog.choice() == "cache"
 
+    notice = dialog.findChild(QCheckBox, "saveCacheNoticeLabel")
+    assert notice is None
+
+    from PySide6.QtWidgets import QLabel
+
+    cache_notice = dialog.findChild(QLabel, "saveCacheNoticeLabel")
+    assert cache_notice is not None
+    text = cache_notice.text().lower()
+    assert "auto-saved" in text
+    assert "cache" in text
+
 
 def test_tm_language_dialog_defaults_and_skip_all_flow(qtbot) -> None:
     """Verify TM language dialog applies defaults and skip-all behavior."""
