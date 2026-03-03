@@ -7,10 +7,16 @@ ensure_venv
 FMT_SCOPE="${FMT_SCOPE:-all}"
 case "$FMT_SCOPE" in
   all)
-    mapfile -t PY_FILES < <(python_source_files)
+    PY_FILES=()
+    while IFS= read -r path; do
+      PY_FILES+=("$path")
+    done < <(python_source_files)
     ;;
   changed)
-    mapfile -t PY_FILES < <(changed_python_source_files)
+    PY_FILES=()
+    while IFS= read -r path; do
+      PY_FILES+=("$path")
+    done < <(changed_python_source_files)
     ;;
   *)
     echo "fmt: invalid FMT_SCOPE='$FMT_SCOPE' (expected: all | changed)." >&2

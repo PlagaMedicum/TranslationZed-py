@@ -4,7 +4,10 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/_common.sh"
 ensure_venv
 
-mapfile -t PY_FILES < <(python_source_files)
+PY_FILES=()
+while IFS= read -r path; do
+  PY_FILES+=("$path")
+done < <(python_source_files)
 if [ "${#PY_FILES[@]}" -eq 0 ]; then
   echo "fmt-check: no Python sources discovered under translationzed_py/tests/scripts."
   exit 0
