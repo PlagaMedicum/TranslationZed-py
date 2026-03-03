@@ -1,0 +1,59 @@
+# TranslationZed-Py — Module Responsibility Map
+_Last updated: 2026-02-25_
+
+## 1) Core Domain And Services
+
+| Module | Responsibility |
+|---|---|
+| `core.model` | Core entry/status/value models and invariants. |
+| `core.parser` / `core.parse_utils` / `core.lazy_entries` | Locale file parsing, span tracking, lazy text handling. |
+| `core.saver` / `core.atomic_io` | Byte-preserving save + atomic replace/write safety. |
+| `core.status_cache` / `core.en_hash_cache` | Draft/status cache and EN baseline hash tracking. |
+| `core.en_diff_snapshot` / `core.en_diff_service` / `core.en_insert_plan` | EN diff markers (`NEW/REMOVED/MODIFIED`) and insertion planning. |
+| `core.project_scanner` | Locale/project discovery and metadata extraction. |
+| `core.project_session` | Locale/session/tree planning and startup/switch orchestration policies. |
+| `core.file_workflow` | Open/save persistence sequencing plans and callbacks. |
+| `core.save_exit_flow` | Save/exit prompt and multi-file write orchestration policies. |
+| `core.conflict_service` | Conflict detection/resolution planning and persist decisions. |
+| `core.search` / `core.search_replace_service` | Search/replace matching and orchestration plans. |
+| `core.qa_rules` / `core.qa_service` | QA primitives, findings generation, panel/navigation planning. |
+| `core.languagetool` | LT endpoint policy, level semantics, picky fallback behavior. |
+| `core.source_reference_service` | Source-locale switching and fallback logic. |
+| `core.preferences` / `core.preferences_service` | Settings IO normalization, defaults, and persist payloads. |
+| `core.app_config` | Static app config parsing (`config/app.toml`). |
+| `core.tm_store` / `core.tm_query` / `core.tmx_io` | TM storage, query/ranking, TMX import/export mechanics. |
+| `core.tm_import_sync` / `core.tm_preferences` / `core.tm_rebuild` / `core.tm_workflow_service` | TM import lifecycle, preference actions, rebuild and GUI-facing plans. |
+| `core.render_workflow_service` | Render-heavy policy decisions for GUI performance paths. |
+| `core.encoding_diagnostics` | Read-only encoding diagnostics and reporting utilities. |
+| `core.architecture_guard` | Architecture constraints (imports/line budgets). |
+
+## 2) GUI Layer
+
+| Module | Responsibility |
+|---|---|
+| `gui.main_window` | Qt adapter/orchestrator for menus, widgets, and service delegation. |
+| `gui.main_window_panel_helpers` | Sidebar/TM/QA/search/progress helper orchestration. |
+| `gui.main_window_en_diff_helpers` | GUI wiring for EN-diff badges and insertion prompts. |
+| `gui.entry_model` / `gui.commands` | Table model, undo/redo command integration, row mapping. |
+| `gui.delegates` | Cell rendering/edit delegates (status, key, multiline, visual text). |
+| `gui.fs_model` | Project tree model with locale/file nodes. |
+| `gui.status_header` / `gui.table_header` | Header interactions (status sort/filter, source header tools). |
+| `gui.source_reference_header` / `gui.source_reference_ui` / `gui.source_reference_state` / `gui.source_lookup` | Source-reference UI and local runtime state. |
+| `gui.preferences_dialog` | Preferences UI for General/Search/QA/LanguageTool/TM/View. |
+| `gui.dialogs` | Shared dialogs (locale chooser, save selection, conflict/about, etc.). |
+| `gui.languagetool_adapter` | Editor underline spans/hints integration layer. |
+| `gui.qa_async` | Async QA run management and callback wiring. |
+| `gui.tm_preview` | TM preview helper rendering/parsing. |
+| `gui.progress_metrics` / `gui.progress_widgets` | Progress distribution math and strip widgets. |
+| `gui.search_scope_ui` | Search/replace scope indicator widgets. |
+| `gui.theme` | Theme detection/apply helpers. |
+| `gui.perf_trace` | GUI performance instrumentation helpers. |
+| `gui.app` | GUI app bootstrap entrypoint wrapper. |
+
+## 3) Ownership Boundary Rules
+
+1. GUI modules must not implement domain policy that belongs in core services.
+2. Core modules must remain Qt-free.
+3. Workflow decisions should be exposed through DTO/callback contracts, with GUI
+   responsible only for rendering and user interaction.
+4. Any new module must be added to this map and referenced by canonical spec docs.
