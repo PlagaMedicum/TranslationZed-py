@@ -1,0 +1,30 @@
+:root {
+  --md-text-font: "Noto Sans", "DejaVu Sans", sans-serif;
+  --md-code-font: "JetBrains Mono", "DejaVu Sans Mono", monospace;
+}
+
+.md-typeset {
+  line-height: 1.7;
+  font-size: 0.9rem;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  letter-spacing: 0.01em;
+}
+
+.md-typeset p,
+.md-typeset li {
+  max-width: 82ch;
+}
+
+.md-typeset .arithmatex {
+  overflow-x: auto;
+}
+
+.md-typeset img.diagram {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 4px;
+  background: var(--md-default-bg-color);
+}

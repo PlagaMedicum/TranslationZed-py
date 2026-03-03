@@ -134,7 +134,7 @@ flowchart TB
   N --> E[Exact retrieval]
   E --> F[Fuzzy candidate pools]
   F --> B[Adaptive band by Lq,k]
-  B --> OG[Oversized guard when Lc > Lmax_base]
+  B --> OG[Oversized candidate guard stage]
   OG --> G[Relevance gates]
   G --> S[Score + tie-break]
   S --> O[Ordered suggestions]
@@ -144,15 +144,15 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  LQ[Compute Lq and k] --> BASE[Compute Lmin_base/Lmax_base]
-  BASE --> TRIG{is_long_multi}
+  LQ[Compute query length and token count] --> BASE[Compute base length band]
+  BASE --> TRIG{Long multi-token query}
   TRIG -- no --> BAND0[Use base band]
-  TRIG -- yes --> BAND1[Use adaptive band\nLmin=max(1,floor(0.5*Lq))\nLmax=max(Lmax_base,floor(1.85*Lq))]
+  TRIG -- yes --> BAND1[Use adaptive band]
   BAND0 --> PICK[Candidate selected]
   BAND1 --> PICK
-  PICK --> OVER{Lc > Lmax_base}
+  PICK --> OVER{Candidate above base upper band}
   OVER -- no --> KEEP[Proceed to scoring]
-  OVER -- yes --> RULE{overlap>=0.55 OR\n(composed && ratio>=0.70)}
+  OVER -- yes --> RULE{Oversized guard satisfied}
   RULE -- no --> DROP[Reject candidate]
   RULE -- yes --> KEEP
 ```

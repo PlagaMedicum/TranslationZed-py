@@ -1,0 +1,22 @@
+@startuml
+skinparam linetype ortho
+rectangle "GUI Controller" as GUI {
+  [main_window]
+  [panel_helpers]
+  [status_header]
+  [languagetool_adapter]
+}
+rectangle "Core Domain" as CORE {
+  [project_session]
+  [file_workflow]
+  [qa_service]
+  [tm_workflow_service]
+}
+[main_window] --> [panel_helpers]
+[main_window] --> [status_header]
+[main_window] --> [languagetool_adapter]
+[main_window] --> [project_session]
+[main_window] --> [file_workflow]
+[main_window] --> [qa_service]
+[main_window] --> [tm_workflow_service]
+@enduml

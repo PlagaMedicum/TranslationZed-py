@@ -154,6 +154,196 @@ classDiagram
 Dense source reference:
 - `docs/diagrams/src/core_service_contracts_dense.puml`
 
+### 3.3 Workflow Internals (Code-Level UML)
+
+#### 3.3.1 `project_session` internals
+
+```mermaid
+classDiagram
+  class ProjectSessionService {
+    +collect_draft_files(...)
+    +find_last_opened_file(...)
+    +collect_orphan_cache_paths(...)
+    +build_locale_selection_plan(...)
+    +build_locale_switch_plan(...)
+    +build_locale_reset_plan()
+    +apply_locale_reset_plan(...)
+    +build_post_locale_startup_plan(...)
+    +run_post_locale_startup_tasks(...)
+    +build_tree_rebuild_plan(...)
+    +execute_cache_migration_schedule(...)
+    +execute_cache_migration_batch(...)
+  }
+
+  class LocaleSelectionPlan
+  class LocaleSwitchPlan
+  class LocaleResetPlan
+  class PostLocaleStartupPlan
+  class TreeRebuildPlan
+  class CacheMigrationSchedulePlan
+  class CacheMigrationBatchPlan
+  class CacheMigrationScheduleCallbacks
+  class CacheMigrationBatchCallbacks
+  class CacheMigrationScheduleExecution
+  class CacheMigrationBatchExecution
+
+  ProjectSessionService --> LocaleSelectionPlan
+  ProjectSessionService --> LocaleSwitchPlan
+  ProjectSessionService --> LocaleResetPlan
+  ProjectSessionService --> PostLocaleStartupPlan
+  ProjectSessionService --> TreeRebuildPlan
+  ProjectSessionService --> CacheMigrationSchedulePlan
+  ProjectSessionService --> CacheMigrationBatchPlan
+  ProjectSessionService --> CacheMigrationScheduleCallbacks
+  ProjectSessionService --> CacheMigrationBatchCallbacks
+  ProjectSessionService --> CacheMigrationScheduleExecution
+  ProjectSessionService --> CacheMigrationBatchExecution
+```
+
+```mermaid
+sequenceDiagram
+  participant GUI as main_window
+  participant PS as project_session
+  GUI->>PS: resolve_requested_locales(...)
+  GUI->>PS: build_locale_switch_plan(...)
+  GUI->>PS: build_locale_reset_plan()
+  GUI->>PS: apply_locale_reset_plan(...callbacks...)
+  GUI->>PS: build_post_locale_startup_plan(...)
+  GUI->>PS: run_post_locale_startup_tasks(...)
+  GUI->>PS: build_tree_rebuild_plan(...)
+```
+
+#### 3.3.2 `file_workflow` internals
+
+```mermaid
+classDiagram
+  class FileWorkflowService {
+    +prepare_open_file(...)
+    +apply_cache_overlay(...)
+    +apply_cache_for_write(...)
+    +build_save_current_run_plan(...)
+    +persist_current_save(...)
+    +write_from_cache(...)
+  }
+
+  class OpenFileCallbacks
+  class OpenFileResult
+  class CacheOverlayResult
+  class CacheWriteOverlay
+  class SaveCurrentRunPlan
+  class SaveCurrentCallbacks
+  class SaveCurrentResult
+  class SaveFromCacheCallbacks
+  class SaveFromCacheResult
+  class SaveFromCacheParseError
+
+  FileWorkflowService --> OpenFileCallbacks
+  FileWorkflowService --> OpenFileResult
+  FileWorkflowService --> CacheOverlayResult
+  FileWorkflowService --> CacheWriteOverlay
+  FileWorkflowService --> SaveCurrentRunPlan
+  FileWorkflowService --> SaveCurrentCallbacks
+  FileWorkflowService --> SaveCurrentResult
+  FileWorkflowService --> SaveFromCacheCallbacks
+  FileWorkflowService --> SaveFromCacheResult
+  FileWorkflowService --> SaveFromCacheParseError
+```
+
+```mermaid
+sequenceDiagram
+  participant GUI as main_window
+  participant FW as file_workflow
+  participant PARSE as parser
+  participant CACHE as status_cache
+  participant SAVE as saver
+
+  GUI->>FW: prepare_open_file(path, encoding, callbacks, hash_for_entry)
+  FW->>PARSE: parse_eager/parse_lazy
+  FW->>CACHE: read_cache + overlay
+  GUI->>FW: build_save_current_run_plan(...)
+  GUI->>FW: persist_current_save(..., callbacks)
+  FW->>SAVE: save_file(...)
+  FW->>CACHE: write_cache(...)
+```
+
+#### 3.3.3 `search_replace_service` internals
+
+```mermaid
+classDiagram
+  class SearchReplaceService {
+    +scope_files(...)
+    +build_search_run_plan(...)
+    +find_match_in_rows(...)
+    +search_across_files(...)
+    +build_replace_request(...)
+    +build_replace_all_run_plan(...)
+    +apply_replace_all(...)
+  }
+
+  class SearchRunPlan
+  class SearchPanelPlan
+  class SearchPanelItem
+  class SearchRowsCacheKey
+  class SearchRowsCacheStamp
+  class SearchRowsCacheLookupPlan
+  class SearchRowsCacheStorePlan
+  class SearchRowsSourcePlan
+  class SearchRowsBuildResult
+  class SearchMatchOpenPlan
+  class SearchMatchApplyPlan
+  class ReplaceRequest
+  class ReplaceAllPlan
+  class ReplaceAllRunPlan
+  class ReplaceAllFileCountCallbacks
+  class ReplaceAllFileApplyCallbacks
+  class ReplaceAllRowsCallbacks
+  class ReplaceCurrentRowCallbacks
+  class ReplaceAllFileApplyResult
+  class ReplaceAllRowsApplyResult
+  class ReplaceRequestError
+  class ReplaceAllFileParseError
+
+  SearchReplaceService --> SearchRunPlan
+  SearchReplaceService --> SearchPanelPlan
+  SearchReplaceService --> SearchPanelItem
+  SearchReplaceService --> SearchRowsCacheKey
+  SearchReplaceService --> SearchRowsCacheStamp
+  SearchReplaceService --> SearchRowsCacheLookupPlan
+  SearchReplaceService --> SearchRowsCacheStorePlan
+  SearchReplaceService --> SearchRowsSourcePlan
+  SearchReplaceService --> SearchRowsBuildResult
+  SearchReplaceService --> SearchMatchOpenPlan
+  SearchReplaceService --> SearchMatchApplyPlan
+  SearchReplaceService --> ReplaceRequest
+  SearchReplaceService --> ReplaceAllPlan
+  SearchReplaceService --> ReplaceAllRunPlan
+  SearchReplaceService --> ReplaceAllFileCountCallbacks
+  SearchReplaceService --> ReplaceAllFileApplyCallbacks
+  SearchReplaceService --> ReplaceAllRowsCallbacks
+  SearchReplaceService --> ReplaceCurrentRowCallbacks
+  SearchReplaceService --> ReplaceAllFileApplyResult
+  SearchReplaceService --> ReplaceAllRowsApplyResult
+  SearchReplaceService --> ReplaceRequestError
+  SearchReplaceService --> ReplaceAllFileParseError
+```
+
+```mermaid
+sequenceDiagram
+  participant GUI as main_window
+  participant SR as search_replace_service
+  participant SEARCH as core.search
+
+  GUI->>SR: scope_files(...)
+  GUI->>SR: build_search_run_plan(...)
+  GUI->>SEARCH: prepare_search_plan(...)
+  GUI->>SR: build_search_rows(...)
+  GUI->>SR: find_match_in_rows(..., prepared_plan)
+  GUI->>SR: search_across_files(...)
+  GUI->>SR: build_replace_request(...)
+  GUI->>SR: build_replace_all_run_plan(...)
+  GUI->>SR: apply_replace_all(...)
+```
+
 ## 4) GUI Controllers And Adapters
 
 ```mermaid

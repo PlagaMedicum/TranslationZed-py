@@ -1,0 +1,43 @@
+@startuml
+skinparam linetype ortho
+hide empty members
+
+package "Core workflow services" {
+  class ProjectSessionService
+  class FileWorkflowService
+  class ConflictWorkflowService
+  class SearchReplaceService
+  class TMWorkflowService
+  class QAService
+}
+
+package "Plan/DTO contracts" {
+  class LocaleSelectionPlan
+  class OpenFileResult
+  class SaveCurrentRunPlan
+  class ConflictResolutionRunPlan
+  class SearchRunPlan
+  class TMQueryPlan
+  class QAPanelPlan
+}
+
+package "Callback/Protocol boundaries" {
+  interface OpenFileCallbacks
+  interface SaveCurrentCallbacks
+  interface CacheMigrationScheduleCallbacks
+  interface TMDiagnosticsStore
+}
+
+ProjectSessionService --> LocaleSelectionPlan
+ProjectSessionService --> CacheMigrationScheduleCallbacks
+FileWorkflowService --> OpenFileResult
+FileWorkflowService --> SaveCurrentRunPlan
+FileWorkflowService --> OpenFileCallbacks
+FileWorkflowService --> SaveCurrentCallbacks
+ConflictWorkflowService --> ConflictResolutionRunPlan
+SearchReplaceService --> SearchRunPlan
+TMWorkflowService --> TMQueryPlan
+TMWorkflowService --> TMDiagnosticsStore
+QAService --> QAPanelPlan
+
+@enduml
