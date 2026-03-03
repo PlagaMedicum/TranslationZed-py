@@ -8,6 +8,8 @@ import stat
 import subprocess
 from pathlib import Path
 
+from tests._bash_exec import resolve_bash_executable
+
 
 def _repo_root() -> Path:
     """Return repository root for subprocess script execution."""
@@ -59,6 +61,7 @@ def _run_mutation_script(
 ) -> subprocess.CompletedProcess[str]:
     """Run `scripts/mutation.sh` with fake mutmut statuses and captured output."""
     repo_root = _repo_root()
+    bash_executable = resolve_bash_executable()
     fake_python = tmp_path / "fake-python.sh"
     _write_fake_python(fake_python)
 
@@ -66,6 +69,7 @@ def _run_mutation_script(
     env = dict(os.environ)
     env.update(
         {
+            "BASH": bash_executable,
             "VENV_PY_OVERRIDE": str(fake_python),
             "MUTATION_SCORE_MODE": mode,
             "MUTATION_MIN_KILLED_PERCENT": "25",
@@ -78,7 +82,7 @@ def _run_mutation_script(
 
     try:
         return subprocess.run(
-            ["bash", "scripts/mutation.sh"],
+            [bash_executable, "scripts/mutation.sh"],
             cwd=repo_root,
             env=env,
             capture_output=True,

@@ -6,6 +6,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from tests._bash_exec import resolve_bash_executable
+
 
 def _repo_root() -> Path:
     """Return repository root path for shell script execution."""
@@ -14,10 +16,12 @@ def _repo_root() -> Path:
 
 def _run_script(script_name: str, *, root_override: Path) -> None:
     """Run a repository shell script against an overridden root path."""
+    bash_executable = resolve_bash_executable()
     env = dict(os.environ)
+    env["BASH"] = bash_executable
     env["ROOT_DIR_OVERRIDE"] = str(root_override)
     subprocess.run(
-        ["bash", f"scripts/{script_name}"],
+        [bash_executable, f"scripts/{script_name}"],
         cwd=_repo_root(),
         env=env,
         check=True,

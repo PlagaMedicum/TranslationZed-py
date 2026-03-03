@@ -7,6 +7,8 @@ import stat
 import subprocess
 from pathlib import Path
 
+from tests._bash_exec import resolve_bash_executable
+
 
 def _repo_root() -> Path:
     """Return repository root path for subprocess script execution."""
@@ -49,6 +51,7 @@ def _read_calls(log_path: Path) -> list[list[str]]:
 def test_fmt_changed_scope_formats_only_changed_python_sources(tmp_path: Path) -> None:
     """Changed-scope fmt should invoke black with changed Python files only."""
     repo = _repo_root()
+    bash_executable = resolve_bash_executable()
     fake_python = tmp_path / "fake-python.sh"
     args_log = tmp_path / "fmt-args.log"
     _write_fake_python(fake_python, args_log=args_log)
@@ -59,13 +62,14 @@ def test_fmt_changed_scope_formats_only_changed_python_sources(tmp_path: Path) -
         env = dict(os.environ)
         env.update(
             {
+                "BASH": bash_executable,
                 "VENV_PY_OVERRIDE": str(fake_python),
                 "FMT_SCOPE": "changed",
                 "FAKE_FMT_ARGS_LOG": str(args_log),
             }
         )
         proc = subprocess.run(
-            ["bash", "scripts/fmt.sh"],
+            [bash_executable, "scripts/fmt.sh"],
             cwd=repo,
             env=env,
             capture_output=True,
@@ -97,6 +101,7 @@ def test_fmt_changed_scope_formats_only_changed_python_sources(tmp_path: Path) -
 def test_fmt_script_rejects_invalid_scope(tmp_path: Path) -> None:
     """Invalid fmt scope should fail with explicit usage guidance."""
     repo = _repo_root()
+    bash_executable = resolve_bash_executable()
     fake_python = tmp_path / "fake-python.sh"
     args_log = tmp_path / "fmt-args.log"
     _write_fake_python(fake_python, args_log=args_log)
@@ -104,13 +109,14 @@ def test_fmt_script_rejects_invalid_scope(tmp_path: Path) -> None:
     env = dict(os.environ)
     env.update(
         {
+            "BASH": bash_executable,
             "VENV_PY_OVERRIDE": str(fake_python),
             "FMT_SCOPE": "invalid",
             "FAKE_FMT_ARGS_LOG": str(args_log),
         }
     )
     proc = subprocess.run(
-        ["bash", "scripts/fmt.sh"],
+        [bash_executable, "scripts/fmt.sh"],
         cwd=repo,
         env=env,
         capture_output=True,
@@ -126,6 +132,7 @@ def test_fmt_script_rejects_invalid_scope(tmp_path: Path) -> None:
 def test_fmt_check_uses_file_list_and_not_directory_targets(tmp_path: Path) -> None:
     """fmt-check should pass explicit Python file paths to black check mode."""
     repo = _repo_root()
+    bash_executable = resolve_bash_executable()
     fake_python = tmp_path / "fake-python.sh"
     args_log = tmp_path / "fmt-check-args.log"
     _write_fake_python(fake_python, args_log=args_log)
@@ -133,12 +140,13 @@ def test_fmt_check_uses_file_list_and_not_directory_targets(tmp_path: Path) -> N
     env = dict(os.environ)
     env.update(
         {
+            "BASH": bash_executable,
             "VENV_PY_OVERRIDE": str(fake_python),
             "FAKE_FMT_ARGS_LOG": str(args_log),
         }
     )
     proc = subprocess.run(
-        ["bash", "scripts/fmt_check.sh"],
+        [bash_executable, "scripts/fmt_check.sh"],
         cwd=repo,
         env=env,
         capture_output=True,
