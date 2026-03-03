@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,7 @@ def test_mutmut_paths_to_mutate_target_critical_core_modules(
     except PermissionError as exc:
         pytest.skip(f"mutmut import is unavailable in this environment: {exc}")
     monkeypatch.chdir(Path(__file__).resolve().parent.parent)
+    monkeypatch.setattr(sys, "argv", ["mutmut", "run"])
     config = mutmain.load_config()
     actual = sorted(str(path.as_posix()) for path in config.paths_to_mutate)
     expected = sorted(
