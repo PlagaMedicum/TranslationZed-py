@@ -3521,17 +3521,25 @@ class MainWindow(QMainWindow):
             and self._current_model
             and self._ensure_conflicts_resolved(self._current_pf.path)
         )
-        has_virtual_new = bool(
-            self._current_model and self._current_model.has_pending_virtual_new_values()
+        has_pending_virtual_new_values = getattr(
+            self._current_model,
+            "has_pending_virtual_new_values",
+            None,
         )
+        has_virtual_new = bool(
+            self._current_model
+            and callable(has_pending_virtual_new_values)
+            and has_pending_virtual_new_values()
+        )
+        changed_keys = set()
+        changed_keys_reader = getattr(self._current_model, "changed_keys", None)
+        if self._current_model is not None and callable(changed_keys_reader):
+            changed_keys = set(changed_keys_reader())
         plan = self._file_workflow_service.build_save_current_run_plan(
             has_current_file=self._current_pf is not None,
             has_current_model=self._current_model is not None,
             conflicts_resolved=conflicts_resolved,
-            has_changed_keys=bool(
-                self._current_model and self._current_model.changed_keys()
-            )
-            or has_virtual_new,
+            has_changed_keys=bool(changed_keys) or has_virtual_new,
         )
         if plan.immediate_result is not None:
             return plan.immediate_result
@@ -3539,12 +3547,23 @@ class MainWindow(QMainWindow):
             return False
         assert self._current_pf is not None
         assert self._current_model is not None
-        changed = self._current_model.changed_values()
+        changed_values_reader = getattr(self._current_model, "changed_values", None)
+        changed = (
+            changed_values_reader()
+            if callable(changed_values_reader)
+            else {}
+        )
         insertion_action = "skip"
         insertion_edits: dict[str, str] | None = None
         edited_new_values: dict[str, str] = {}
         if has_virtual_new and self._insertion_enabled_for_path(self._current_pf.path):
-            edited_new_values = self._current_model.edited_virtual_new_values()
+            edited_virtual_reader = getattr(
+                self._current_model,
+                "edited_virtual_new_values",
+                None,
+            )
+            if callable(edited_virtual_reader):
+                edited_new_values = edited_virtual_reader()
             if edited_new_values:
                 en_path = self._current_en_reference_path
                 if en_path is not None:
