@@ -611,7 +611,7 @@ class PreferencesDialog(QDialog):
             ),
         )
         for raw_path in paths:
-            tm_path = str(Path(raw_path))
+            tm_path = Path(raw_path).as_posix()
             if tm_path in self._tm_import_paths:
                 continue
             self._tm_import_paths.append(tm_path)

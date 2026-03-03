@@ -1410,9 +1410,9 @@ def _update_status_bar(win) -> None:
     if win._current_pf:
         try:
             rel = win._current_pf.path.relative_to(win._root)
-            parts.append(str(rel))
+            parts.append(rel.as_posix())
         except ValueError:
-            parts.append(str(win._current_pf.path))
+            parts.append(win._current_pf.path.as_posix())
     if not parts:
         parts.append("Ready to edit")
     win.statusBar().showMessage(" | ".join(parts))
