@@ -23,7 +23,8 @@ MUTATION_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/mutation/promotion-readiness.json
 .PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check \
 	test test-cov test-perf test-perf-scale test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
-	security docstyle docs-build bench bench-check bench-advisory test-mutation \
+	security docstyle docs-build docs-build-lite docs-index docs-api docs-contract docs-check code-triage review-queue-check \
+	bench bench-check bench-advisory test-mutation \
 	test-mutation-stage mutation-promotion-check mutation-promotion-readiness \
 	test-warnings run clean clean-cache clean-config perf-scenarios perf-dependency-eval ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
@@ -86,6 +87,31 @@ docstyle:
 
 docs-build:
 	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/docs_build.sh
+
+docs-build-lite:
+	DOCS_BUILD_MODE=lite VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/docs_build.sh
+
+docs-index:
+	VENV=$(VENV) $(VENV)/bin/python scripts/generate_contract_index.py --check \
+		--out docs/reference/contract_index.json
+
+docs-api: docs-index
+	@echo "docs-api: mkdocstrings API pages validated through docs-index + docs-build"
+
+review-queue-check:
+	VENV=$(VENV) $(VENV)/bin/python scripts/review_queue_check.py \
+		--queue docs/reference/review_queue.json
+
+code-triage:
+	VENV=$(VENV) $(VENV)/bin/python scripts/code_quality_triage.py \
+		--review-queue docs/reference/review_queue.json \
+		--out-json $(ARTIFACTS)/docs/code_triage_report.json \
+		--pass-log $(ARTIFACTS)/docs/triage_pass_log.json $(ARGS)
+
+docs-contract: review-queue-check code-triage
+	VENV=$(VENV) $(VENV)/bin/python scripts/docs_contract_check.py --site-root $(ARTIFACTS)/docs/site
+
+docs-check: docstyle docs-build docs-index docs-api docs-contract
 
 bench:
 	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) BENCH_CURRENT=$(BENCH_CURRENT) \
@@ -162,7 +188,7 @@ check-local: fmt lint typecheck arch-check test
 # ─── Verification umbrella gates ───────────────────────────────────────────────
 ## full local verification core (auto-fix + warning policy)
 verify-core: clean-cache clean-config fmt-changed lint typecheck arch-check perf-advisory \
-	bench-advisory test-cov test-readonly-clean security docstyle docs-build
+	bench-advisory test-cov test-readonly-clean security docs-check
 
 ## local perf gates are advisory; strict blocking lives in verify-ci
 perf-advisory:
@@ -199,7 +225,7 @@ verify:
 
 ## strict CI verification core (non-mutating)
 verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-check test-cov test-perf test-perf-scale \
-	test-readonly-clean security docstyle docs-build perf-scenarios release-check-if-tag
+	test-readonly-clean security docs-check perf-scenarios release-check-if-tag
 
 ## CI benchmark gate helper; can be skipped when a dedicated benchmark job is used.
 verify-ci-bench:

@@ -24,6 +24,9 @@ def test_pseudo_list_paragraph_detection() -> None:
     module = _load_docs_contract_module()
     assert module._looks_like_pseudo_list_paragraph("- [✓] done item")
     assert module._looks_like_pseudo_list_paragraph("Covered: - parser - tm - qa")
+    assert module._looks_like_pseudo_list_paragraph(
+        "| Trigger | General ▸ Save | | Flow | 1. write |"
+    )
     assert not module._looks_like_pseudo_list_paragraph(
         "Covered checks are listed in proper bullet items."
     )
