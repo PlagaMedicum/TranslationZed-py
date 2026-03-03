@@ -4,11 +4,19 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${VENV:-.venv}"
 PY="${PY:-python}"
-VENV_PY="${VENV_PY_OVERRIDE:-$ROOT_DIR/$VENV/bin/python}"
+VENV_PY="${VENV_PY_OVERRIDE:-}"
 PYTEST_RESOURCE_WARNING_FILTER="${PYTEST_RESOURCE_WARNING_FILTER:-error::ResourceWarning}"
 
 ensure_venv() {
-  if [ ! -x "$VENV_PY" ]; then
+  local unix_py="$ROOT_DIR/$VENV/bin/python"
+  local win_py="$ROOT_DIR/$VENV/Scripts/python.exe"
+  if [ -n "${VENV_PY_OVERRIDE:-}" ]; then
+    VENV_PY="$VENV_PY_OVERRIDE"
+  elif [ -x "$unix_py" ]; then
+    VENV_PY="$unix_py"
+  elif [ -x "$win_py" ]; then
+    VENV_PY="$win_py"
+  else
     if [ "${GITHUB_ACTIONS:-}" = "true" ] || [ "${CI:-}" = "true" ]; then
       VENV_PY="$PY"
       return 0

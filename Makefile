@@ -92,24 +92,24 @@ docs-build-lite:
 	DOCS_BUILD_MODE=lite VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/docs_build.sh
 
 docs-index:
-	VENV=$(VENV) $(VENV)/bin/python scripts/generate_contract_index.py --check \
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/generate_contract_index.py --check \
 		--out docs/reference/contract_index.json
 
 docs-api: docs-index
 	@echo "docs-api: mkdocstrings API pages validated through docs-index + docs-build"
 
 review-queue-check:
-	VENV=$(VENV) $(VENV)/bin/python scripts/review_queue_check.py \
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/review_queue_check.py \
 		--queue docs/reference/review_queue.json
 
 code-triage:
-	VENV=$(VENV) $(VENV)/bin/python scripts/code_quality_triage.py \
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/code_quality_triage.py \
 		--review-queue docs/reference/review_queue.json \
 		--out-json $(ARTIFACTS)/docs/code_triage_report.json \
 		--pass-log $(ARTIFACTS)/docs/triage_pass_log.json $(ARGS)
 
 docs-contract: review-queue-check code-triage
-	VENV=$(VENV) $(VENV)/bin/python scripts/docs_contract_check.py --site-root $(ARTIFACTS)/docs/site
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/docs_contract_check.py --site-root $(ARTIFACTS)/docs/site
 
 docs-check: docstyle docs-build docs-index docs-api docs-contract
 
@@ -130,7 +130,7 @@ test-mutation-stage:
 	@set -e; \
 	stage_env="$$(mktemp)"; \
 	trap 'rm -f "$$stage_env"' EXIT; \
-	$(VENV)/bin/python scripts/mutation_stage.py \
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/mutation_stage.py \
 		--stage "$(MUTATION_STAGE)" \
 		--min-killed-percent "$(MUTATION_STAGE_MIN_KILLED_PERCENT)" \
 		--out-env "$$stage_env" >/dev/null; \
@@ -140,20 +140,14 @@ test-mutation-stage:
 		MUTATION_MIN_KILLED_PERCENT="$$MUTATION_EFFECTIVE_MIN_KILLED_PERCENT"
 
 mutation-promotion-check:
-	$(VENV)/bin/python scripts/check_mutation_promotion.py $(ARGS)
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/check_mutation_promotion.py $(ARGS)
 
 mutation-promotion-readiness:
 	@if [ -z "$(MUTATION_PROMOTION_REPO)" ]; then \
 		echo "MUTATION_PROMOTION_REPO is required (example: owner/repo)."; \
 		exit 2; \
 	fi
-	@set -e; \
-	if [ -x "$(VENV)/bin/python" ]; then \
-		py_bin="$(VENV)/bin/python"; \
-	else \
-		py_bin="$(PY)"; \
-	fi; \
-	"$$py_bin" scripts/check_mutation_promotion_ci.py \
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/check_mutation_promotion_ci.py \
 		--repo "$(MUTATION_PROMOTION_REPO)" \
 		--workflow "$(MUTATION_PROMOTION_WORKFLOW)" \
 		--branch "$(MUTATION_PROMOTION_BRANCH)" \
@@ -289,7 +283,7 @@ perf-scenarios:
 	VENV=$(VENV) bash scripts/perf_scenarios.sh $(ARGS)
 
 perf-dependency-eval:
-	$(VENV)/bin/python scripts/perf_dependency_eval.py $(ARGS)
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/perf_dependency_eval.py $(ARGS)
 
 ## convenience runner: make run ARGS="--help"
 run:
