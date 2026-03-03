@@ -1,13 +1,32 @@
 # TranslationZed-Py Documentation
 
-Use this documentation set as a single source of truth for implementation,
-verification, architecture boundaries, and release readiness.
+This documentation set is optimized for factual implementation guidance and
+browser-first reading.
 
-- Start with `docs/docs_structure.md` to understand ownership and update rules.
-- Use `docs/translation_zed_py_technical_specification.md` and
-  `docs/translation_zed_py_use_case_ux_specification.md` for normative behavior.
-- Use `docs/implementation_plan.md` for execution sequencing and status.
-- Use `docs/testing_strategy.md` and `docs/checklists.md` for verification policy
-  and operational gates.
-- Use `docs/performance_math_appendix.md` for optimization formulas,
-  equivalence obligations, and perf-proof guidance on hard code paths.
+## Start Here
+
+- `docs/meta/docs_structure.md` — ownership model, anti-duplication rules, and update protocol.
+- `docs/reference/quick_context.md` — fastest onboarding context for developers and LLMs.
+- `docs/reference/module_map.md` — module-level responsibilities and boundaries.
+- `docs/quality/assurance_standard.md` — Document-or-Flag workflow and assurance gates.
+
+## Canonical Specs
+
+- `docs/spec/technical.md` — technical contracts and architecture constraints.
+- `docs/ux/use_cases.md` — user-facing behavior and interaction contracts.
+
+## Delivery And Quality
+
+- `docs/plan/implementation_active.md` — active milestone scope and acceptance criteria.
+- `docs/plan/implementation_history.md` — historical execution log.
+- `docs/quality/testing_strategy.md` — test policy and verification model.
+- `docs/reference/contract_index.md` — machine-readable symbol contract index.
+- `docs/reference/review_queue.md` — deep-review/refactor queue.
+- `docs/operations/checklists.md` — operational command matrix and release gates.
+
+## Deep References
+
+- `docs/architecture/code_architecture.md` — concrete classes/interfaces/types/controllers and boundaries.
+- `docs/architecture/diagrams.md` — high-level architecture and flow diagrams.
+- `docs/domain/tm_ranking.md` — TM retrieval/ranking contract.
+- `docs/performance/math_appendix.md` — formal performance models and proof obligations.

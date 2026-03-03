@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.7.0 · 2026-02-24**\
+**Version 0.8.0 · 2026-03-01**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -23,7 +23,7 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 
 ---
 
-## 2  Functional Scope (Current v0.7.0)
+## 2  Functional Scope (Current v0.8.0)
 
 - Open an existing `ProjectZomboidTranslations` folder.
 - Detect locale sub‑folders in the repo root, ignoring `_TVRADIO_TRANSLATIONS`.
@@ -148,13 +148,34 @@ Interfaces should be **explicit but minimal**, justified by future replaceabilit
 and format choices are **config‑driven** (see `config/app.toml`) to allow
 library/format swaps with minimal code churn.
 
+### 4.1 Programming Paradigm and Architectural Style
+
+The implemented style is a pragmatic hybrid:
+
+1. **Adapter-shell GUI (Qt Model/View/Delegate)**:
+   - `gui.main_window.MainWindow` is the top-level controller.
+   - Qt widgets/models/delegates remain in `translationzed_py/gui/*`.
+2. **Service-oriented application core (Qt-free)**:
+   - Workflow services in `translationzed_py/core/*` expose plan/result DTOs and callback contracts.
+   - GUI invokes services and applies results; service modules hold non-UI policy.
+3. **Dataclass-first domain and DTO boundaries**:
+   - Core data/state contracts are strongly typed dataclasses/enums/protocols.
+   - This keeps state transitions explicit and testable.
+4. **Deterministic IO and algorithms**:
+   - Parser/saver/status-cache/TM/search behavior is contract-tested for stable outputs.
+   - Optimizations are allowed only when semantic equivalence is preserved.
+
+Concrete module/class/type wiring is documented in:
+- `docs/architecture/code_architecture.md`
+- `docs/reference/module_map.md`
+
 ---
 
 ## 5  Detailed Module Specifications
 
 ### 5.0  Use-Case Traceability (UX spec §3)
 
-All UX behavior is normative in `docs/translation_zed_py_use_case_ux_specification.md`.
+All UX behavior is normative in `docs/ux/use_cases.md`.
 This table binds technical sections to canonical UC IDs.
 
 | Technical area | Primary UC references |
@@ -271,7 +292,9 @@ Algorithm:
 `search(query: str, mode: SearchField, is_regex: bool) -> list[Match]`
 
 - If `is_regex`: `re_flags = re.IGNORECASE | re.MULTILINE`.
-- Otherwise lower‑case substring on indexed `.lower()` caches.
+- Otherwise lower‑case substring on per-row folded field caches.
+- Query decomposition is compiled once per search run (`prepare_search_plan`)
+  and reused across row/file scans to avoid repeated split/lower/regex planning.
 - Returns `(file_path, row_index)` list for selection (multi‑file capable).
 - Future: optional `match_span`/`snippet` payload for preview; not in current scope.
 - GUI must delegate search logic to this module (no GUI-level search).
@@ -762,7 +785,7 @@ UNTOUCHED).
   - TM suggestion fetch depth scales with min-score to support high-recall review:
     very low thresholds return deeper candidate lists.
   - Imported rows are query-visible only when the import record is **enabled** and in **ready** state.
-  - Detailed algorithm contract is defined in `docs/tm_ranking_algorithm.md`.
+  - Detailed algorithm contract is defined in `docs/domain/tm_ranking.md`.
 - TM import/export:
   - `core.tmx_io.iter_tm_pairs` dispatches import parsing by extension:
     `.tmx` (TMX 1.4), `.xliff`/`.xlf` (XLIFF), `.po`/`.pot` (GNU gettext PO/POT),
@@ -862,10 +885,31 @@ UNTOUCHED).
 
 ---
 
+### 5.13 Supporting Module Contracts
+
+The following modules are normative parts of the current architecture and are
+tracked in the responsibility map `docs/reference/module_map.md`:
+
+- Core support: `core.architecture_guard`, `core.atomic_io`,
+  `core.en_diff_snapshot`, `core.en_diff_service`, `core.en_insert_plan`,
+  `core.encoding_diagnostics`, `core.languagetool`, `core.qa_service`,
+  `core.source_reference_service`.
+- GUI support: `gui.app`, `gui.dialogs`, `gui.fs_model`,
+  `gui.languagetool_adapter`, `gui.preferences_dialog`, `gui.progress_metrics`,
+  `gui.progress_widgets`, `gui.qa_async`, `gui.source_reference_header`,
+  `gui.source_reference_state`, `gui.source_reference_ui`,
+  `gui.status_header`, `gui.table_header`, `gui.theme`, `gui.tm_preview`.
+
+Boundary rule:
+- supporting GUI modules remain adapter/view concerns;
+- supporting core modules remain Qt-free and service-owned for policy logic.
+
+---
+
 ## 6  Implementation Plan (LLM‑Friendly)
 
 Detailed, step‑by‑step plan (with current status, acceptance checks, diagrams) lives in:
-`docs/implementation_plan.md`. The list below is a high‑level phase summary.
+`docs/plan/implementation_active.md`. The list below is a high‑level phase summary.
 
 Instead of sprint dates, the project is broken into **six sequential phases**.  Each phase can be executed once the previous one is functionally complete; timeboxing is left to the integrator.
 
@@ -1067,18 +1111,14 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 ---
 
-## 16  Spec Gaps To Resolve
+## 16  Current Spec Maintenance Items
 
-- v0.7 baseline keeps A0 extraction complete: primary workflow decisions are delegated
-  to Qt-free services and `gui.main_window` acts as adapter/orchestrator for Qt concerns.
-- Clean-architecture boundary ownership needs stricter package-level enforcement; add a dependency
-  matrix and keep adapter-delegation tests mandatory for new workflow slices
-  (deferred enforcement-gate automation in post-v0.7 work).
-- Module-level structure map is still shallow for some areas: add explicit responsibility + boundary
-  notes for `core.lazy_entries`, `core.en_hash_cache`, `core.parse_utils`, and `gui.perf_trace`.
-- Derived docs (`flows`, `checklists`, `technical_notes_current_state`) must be kept synced to
-  this document; stale statements should be treated as documentation defects and fixed quickly.
+- Keep module responsibility coverage synchronized with
+  `docs/reference/module_map.md` when adding/moving modules.
+- Keep derived docs (`architecture/flows`, `operations/checklists`) synchronized
+  with canonical technical + UX contracts.
+- Treat any stale or contradictory statement in canonical docs as a defect.
 
 ---
 
-*Last updated: 2026-02-24 (v0.7.0)*
+*Last updated: 2026-03-01 (v0.8.0 + A13/A15 docs alignment)*

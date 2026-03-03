@@ -1,4 +1,4 @@
-_Last updated: 2026-02-24_
+_Last updated: 2026-02-25_
 
 # Checklists
 
@@ -15,7 +15,7 @@ avoid missing mandatory tasks.
     formatter/linter (auto-fix), typecheck, architecture guard, coverage gate,
     strict `ResourceWarning` enforcement in default pytest-based test commands,
     perf tests (advisory warnings), benchmark regression compare (advisory warn mode),
-    security/docstyle/docs-build checks, encoding-integrity
+    security/docstyle/docs checks, encoding-integrity
     gates, read-only repo-clean gate, perf scenarios, and LanguageTool
     integration checks (core endpoint/level semantics + GUI/QA adapters)
   - Preference bootstrap hygiene:
@@ -26,8 +26,20 @@ avoid missing mandatory tasks.
     strict full-repo formatting remains enforced by CI `fmt-check` gates
   - Avoid duplicate reruns by default: `make verify` already executes the strict
     coverage pytest lane (`make test-cov`) once
+- **Run** `make code-triage` when touching architecture/API docs
+  - Mandatory `Document-or-Flag` gate for touched module internals
+  - Emits trace artifacts:
+    - `artifacts/docs/code_triage_report.json`
+    - `artifacts/docs/triage_pass_log.json`
+  - `REVIEW_REQUIRED` modules must already exist in `docs/reference/review_queue.json`
+- **Run** `make review-queue-check`
+  - Validates `docs/reference/review_queue.json` schema and lifecycle fields
+- **Run** `make docs-index`
+  - Enforces deterministic machine-readable symbol contracts in
+    `docs/reference/contract_index.json`
 - **Run** `make test-perf-scale` when touching parser/TM/search hot paths
   - Enforces dual-scale perf contracts (fixture-scale + synthetic 20k-scale)
+  - Includes strict search Wave-2 contract (`>=30%` median speedup at 20k by default)
   - Includes TM warm-cache and cold-cache first-pass speedup gates
   - Use for same-run legacy-vs-optimized comparisons before tightening CI thresholds
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
@@ -68,8 +80,8 @@ avoid missing mandatory tasks.
     no-file-open quick-start placeholder visibility, and default equal
     Source/Translation columns before any manual resize.
   - Include A12 perf-doc paths when touched:
-    update canonical contracts (`technical_spec`, `testing_strategy`,
-    `implementation_plan`) and `performance_math_appendix.md`.
+    update canonical contracts (`technical`, `testing_strategy`,
+    `implementation_active`) and `docs/performance/math_appendix.md`.
 
 ## Dependency trust-gate checklist
 
@@ -84,7 +96,7 @@ avoid missing mandatory tasks.
   - Preferred command:
     `make perf-dependency-eval ARGS="--candidate <name> --out-json artifacts/perf/dependency_<name>.json"`
 - **Reject adoption** if any gate fails; document rejection rationale in
-  `docs/implementation_plan.md` decisions ledger.
+  `docs/plan/implementation_history.md` decisions ledger.
 
 ## Before pushing tags / releases
 
@@ -110,11 +122,11 @@ avoid missing mandatory tasks.
   - `CHANGELOG.md` release heading must match tag (for example `## [X.Y.Z] - YYYY-MM-DD`)
 - **Push** tags only when CI is green
 - **Ensure** docs are synchronized for release scope
-  - `docs/translation_zed_py_technical_specification.md`
-  - `docs/translation_zed_py_use_case_ux_specification.md`
-  - `docs/implementation_plan.md`
-  - `docs/testing_strategy.md`
-  - `docs/tm_ranking_algorithm.md` (if TM ranking changed)
+  - `docs/spec/technical.md`
+  - `docs/ux/use_cases.md`
+  - `docs/plan/implementation_active.md`
+  - `docs/quality/testing_strategy.md`
+  - `docs/domain/tm_ranking.md` (if TM ranking changed)
 
 ## v0.7.0 release gate (completed baseline)
 
@@ -146,7 +158,7 @@ avoid missing mandatory tasks.
   - green RC dry-run workflow (`v0.8.0-rcN`) for the same commit;
   - local `make verify` + `make release-check TAG=v0.8.0`.
 - Update this section only after scope and acceptance criteria are frozen in
-  `docs/implementation_plan.md`.
+  `docs/plan/implementation_active.md`.
 
 ## CI troubleshooting
 
@@ -156,3 +168,10 @@ avoid missing mandatory tasks.
   `VERIFY_SKIP_BENCH=1`; strict benchmark enforcement is done by the dedicated
   `benchmark-regression` job (`make bench-check ...`), and schedule-heavy runs
   still execute strict `bench-check` once in the heavy lane.
+- **Run** `make docs-check` when changing docs structure, canonical contracts,
+  or diagram/math rendering setup
+  - Executes docstyle + strict full-stack docs build + contract-index drift check +
+    review-queue validation + code-triage + docs contract drift checks
+  - If the local environment lacks full docs dependencies, use
+    `make docs-build-lite` for ad-hoc browsing only; it is non-canonical and not
+    part of verification gates
