@@ -56,6 +56,13 @@ nav:
       - Review Queue: reference/review_queue.md
   - Specifications:
       - Technical Specification: spec/technical.md
+      - v0.9 Target Specification:
+          - Overview: spec/v0_9/overview.md
+          - QA Live Checklist: spec/v0_9/qa_live_checklist.md
+          - TM Quality and Explainability: spec/v0_9/tm_quality_explainability.md
+          - TM Workflow UX: spec/v0_9/tm_workflow_ux.md
+          - Crash Recovery UC-12: spec/v0_9/crash_recovery_uc12.md
+          - Implementation Subtasks: spec/v0_9/implementation_subtasks.md
       - Use Cases and UX:
           - UX Overview: ux/use_cases.md
           - Project Lifecycle and Save: ux/use_cases_project_lifecycle.md

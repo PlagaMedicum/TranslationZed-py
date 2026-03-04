@@ -14,6 +14,7 @@ browser-first reading.
 
 - `docs/spec/technical.md` — technical contracts and architecture constraints.
 - `docs/ux/use_cases.md` — user-facing behavior and interaction contracts.
+- `docs/spec/v0_9/overview.md` — target implementation specification for `v0.9.0`.
 
 ## Delivery And Quality
 
@@ -30,3 +31,11 @@ browser-first reading.
 - `docs/architecture/diagrams.md` — high-level architecture and flow diagrams.
 - `docs/domain/tm_ranking.md` — TM retrieval/ranking contract.
 - `docs/performance/math_appendix.md` — formal performance models and proof obligations.
+
+## v0.9 Spec Pack
+
+- `docs/spec/v0_9/qa_live_checklist.md`
+- `docs/spec/v0_9/tm_quality_explainability.md`
+- `docs/spec/v0_9/tm_workflow_ux.md`
+- `docs/spec/v0_9/crash_recovery_uc12.md`
+- `docs/spec/v0_9/implementation_subtasks.md`

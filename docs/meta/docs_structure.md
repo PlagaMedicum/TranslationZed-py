@@ -1,5 +1,5 @@
 # TranslationZed-Py — Documentation Structure
-_Last updated: 2026-03-01_
+_Last updated: 2026-03-04_
 
 ## 1) Purpose
 
@@ -14,6 +14,30 @@ The goal is zero normative drift across specs, execution docs, and operations do
   - Normative technical specification.
   - Owns architecture boundaries, module/service contracts, persistence contracts,
     and security/compliance constraints.
+
+- `docs/spec/v0_9/overview.md`
+  - Normative target-spec entrypoint for v0.9.0 implementation.
+  - Owns release goals, feature lock, and traceability map for v0.9 scope.
+
+- `docs/spec/v0_9/qa_live_checklist.md`
+  - Normative v0.9 QA live-checklist behavior contract.
+  - Owns rule-order/state machine/progress schema and acceptance scenarios.
+
+- `docs/spec/v0_9/tm_quality_explainability.md`
+  - Normative v0.9 TM quality/explainability contract.
+  - Owns scoring explanation payload schema and determinism constraints.
+
+- `docs/spec/v0_9/tm_workflow_ux.md`
+  - Normative v0.9 TM workflow UX contract.
+  - Owns panel interaction and triage/apply behavior targets.
+
+- `docs/spec/v0_9/crash_recovery_uc12.md`
+  - Normative v0.9 crash recovery contract.
+  - Owns startup recovery decision flow (`Restore/Discard/Cancel`) and safety invariants.
+
+- `docs/spec/v0_9/implementation_subtasks.md`
+  - Normative v0.9 implementation packet catalog.
+  - Owns decision-complete subtask sequence and dependency mapping.
 
 - `docs/ux/use_cases.md`
   - Normative UX index and UC catalog.
@@ -119,6 +143,12 @@ For every behavior change:
 
 1. Update canonical technical and/or UX spec first:
    - `docs/spec/technical.md`
+   - `docs/spec/v0_9/overview.md`
+   - `docs/spec/v0_9/qa_live_checklist.md`
+   - `docs/spec/v0_9/tm_quality_explainability.md`
+   - `docs/spec/v0_9/tm_workflow_ux.md`
+   - `docs/spec/v0_9/crash_recovery_uc12.md`
+   - `docs/spec/v0_9/implementation_subtasks.md`
    - `docs/ux/use_cases.md`
    - `docs/ux/use_cases_project_lifecycle.md`
    - `docs/ux/use_cases_editing_status.md`
@@ -141,7 +171,7 @@ For every behavior change:
    - `docs/reference/review_queue.md`
 
 If docs disagree, canonical order is:
-`technical` + `ux` > `testing/checklists` > `flows/overview/reference` > `history`.
+`technical` + `v0_9 target specs` + `ux` > `testing/checklists` > `flows/overview/reference` > `history`.
 
 ## 5) Diagram And Math Conventions
 
