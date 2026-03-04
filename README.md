@@ -95,6 +95,10 @@ Releases:
 This codebase is largely written by AI (you are welcomed to help verify and improve it!). If you want to contribute, please read the `/docs`
 and try to follow the architecture and standards described there. It was made for LLM to store context and my vision of the project.
 For document ownership and anti-duplication rules, follow `docs/meta/docs_structure.md`.
+For fast orientation, start with:
+- `docs/reference/quick_context.md`
+- `docs/reference/automation_surface.md`
+- `docs/reference/test_surface.md`
 
 ## License
 This project is Open-source, licensed under GPLv3. Distributions must include source code and the license text.

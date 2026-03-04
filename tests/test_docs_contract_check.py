@@ -260,3 +260,128 @@ def test_active_plan_drift_detects_stale_v08_pending_language(tmp_path: Path) ->
     errors = module._validate_active_plan_drift(docs_root)
     assert errors
     assert any("stale release-state wording" in err for err in errors)
+
+
+def test_module_map_coverage_detects_missing_entries(tmp_path: Path) -> None:
+    """Module map coverage should fail when repo modules are not listed."""
+    module = _load_docs_contract_module()
+    repo_root = tmp_path / "repo"
+    docs_root = repo_root / "docs"
+    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
+    (repo_root / "translationzed_py" / "core").mkdir(parents=True, exist_ok=True)
+    (repo_root / "translationzed_py" / "gui").mkdir(parents=True, exist_ok=True)
+    (repo_root / "translationzed_py" / "core" / "__init__.py").write_text(
+        "", encoding="utf-8"
+    )
+    (repo_root / "translationzed_py" / "gui" / "__init__.py").write_text(
+        "", encoding="utf-8"
+    )
+    (repo_root / "translationzed_py" / "core" / "alpha.py").write_text(
+        "x = 1\n", encoding="utf-8"
+    )
+    (repo_root / "translationzed_py" / "gui" / "beta.py").write_text(
+        "x = 1\n", encoding="utf-8"
+    )
+    (docs_root / "reference" / "module_map.md").write_text(
+        "| Module | Responsibility |\n|---|---|\n| `core.model` | sample |\n",
+        encoding="utf-8",
+    )
+    errors = module._validate_module_map_coverage(docs_root, repo_root)
+    assert errors
+    assert any("core.alpha" in err for err in errors)
+    assert any("gui.beta" in err for err in errors)
+
+
+def test_module_map_coverage_passes_when_entries_exist(tmp_path: Path) -> None:
+    """Module map coverage should pass when all modules are represented."""
+    module = _load_docs_contract_module()
+    repo_root = tmp_path / "repo"
+    docs_root = repo_root / "docs"
+    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
+    (repo_root / "translationzed_py" / "core").mkdir(parents=True, exist_ok=True)
+    (repo_root / "translationzed_py" / "gui").mkdir(parents=True, exist_ok=True)
+    (repo_root / "translationzed_py" / "core" / "__init__.py").write_text(
+        "", encoding="utf-8"
+    )
+    (repo_root / "translationzed_py" / "gui" / "__init__.py").write_text(
+        "", encoding="utf-8"
+    )
+    (repo_root / "translationzed_py" / "core" / "alpha.py").write_text(
+        "x = 1\n", encoding="utf-8"
+    )
+    (repo_root / "translationzed_py" / "gui" / "beta.py").write_text(
+        "x = 1\n", encoding="utf-8"
+    )
+    (docs_root / "reference" / "module_map.md").write_text(
+        "| Module | Responsibility |\n"
+        "|---|---|\n"
+        "| `core.alpha` | sample |\n"
+        "| `gui.beta` | sample |\n",
+        encoding="utf-8",
+    )
+    errors = module._validate_module_map_coverage(docs_root, repo_root)
+    assert errors == []
+
+
+def test_workflow_api_surface_detects_missing_coverage(tmp_path: Path) -> None:
+    """Workflow API surface should fail when critical modules are missing."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    (docs_root / "reference" / "api").mkdir(parents=True, exist_ok=True)
+    (docs_root / "reference" / "api" / "core_workflows.md").write_text(
+        "# Core Workflows API\n::: translationzed_py.core.project_session\n",
+        encoding="utf-8",
+    )
+    errors = module._validate_workflow_api_surface(docs_root)
+    assert errors
+    assert any("missing workflow module coverage" in err for err in errors)
+    assert any("missing mkdocstrings API block" in err for err in errors)
+
+
+def test_workflow_api_surface_passes_for_required_modules(tmp_path: Path) -> None:
+    """Workflow API surface should pass when all critical modules are present."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    (docs_root / "reference" / "api").mkdir(parents=True, exist_ok=True)
+    lines = ["# Core Workflows API"]
+    for name in module.WORKFLOW_CRITICAL_MODULES:
+        lines.append(f"`{name}`")
+        lines.append(f"::: translationzed_py.core.{name}")
+    (docs_root / "reference" / "api" / "core_workflows.md").write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
+    errors = module._validate_workflow_api_surface(docs_root)
+    assert errors == []
+
+
+def test_quick_context_orientation_links_detect_missing_paths(tmp_path: Path) -> None:
+    """Quick context should include orientation surface links."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
+    (docs_root / "reference" / "quick_context.md").write_text(
+        "# Quick Context\n",
+        encoding="utf-8",
+    )
+    errors = module._validate_quick_context_orientation_links(docs_root)
+    assert errors
+    assert any("missing orientation surface link" in err for err in errors)
+
+
+def test_quick_context_orientation_links_pass_with_paths(tmp_path: Path) -> None:
+    """Quick context should pass when orientation links are present."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
+    content = (
+        "# Quick Context\n"
+        "docs/reference/automation_surface.md\n"
+        "docs/reference/test_surface.md\n"
+    )
+    (docs_root / "reference" / "quick_context.md").write_text(
+        content,
+        encoding="utf-8",
+    )
+    errors = module._validate_quick_context_orientation_links(docs_root)
+    assert errors == []

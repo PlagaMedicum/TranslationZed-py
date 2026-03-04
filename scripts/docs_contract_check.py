@@ -24,6 +24,8 @@ CANONICAL_DOCS = [
     "index.md",
     "meta/docs_structure.md",
     "reference/quick_context.md",
+    "reference/automation_surface.md",
+    "reference/test_surface.md",
     "reference/module_map.md",
     "reference/contract_index.md",
     "reference/review_queue.md",
@@ -60,6 +62,8 @@ CANONICAL_SCAN_SCOPE = [
     "index.md",
     "meta/docs_structure.md",
     "reference/quick_context.md",
+    "reference/automation_surface.md",
+    "reference/test_surface.md",
     "reference/module_map.md",
     "reference/contract_index.md",
     "reference/review_queue.md",
@@ -92,6 +96,9 @@ CANONICAL_SCAN_SCOPE = [
 ]
 
 RENDERED_HTML_SCAN_SCOPE = [
+    "reference/quick_context.md",
+    "reference/automation_surface.md",
+    "reference/test_surface.md",
     "quality/testing_strategy.md",
     "quality/assurance_standard.md",
     "operations/checklists.md",
@@ -244,6 +251,22 @@ API_STRUCTURE_PAGES: dict[str, tuple[str, ...]] = {
         "Failure Modes",
     ),
 }
+
+WORKFLOW_CRITICAL_MODULES = (
+    "project_session",
+    "file_workflow",
+    "search_replace_service",
+    "qa_service",
+    "tm_workflow_service",
+    "save_exit_flow",
+    "conflict_service",
+    "source_reference_service",
+)
+
+ORIENTATION_SURFACE_DOCS = (
+    "docs/reference/automation_surface.md",
+    "docs/reference/test_surface.md",
+)
 
 
 def _read_text(path: Path) -> str:
@@ -485,6 +508,55 @@ def _validate_api_structure_contract(docs_root: Path) -> list[str]:
     return errors
 
 
+def _validate_module_map_coverage(docs_root: Path, repo_root: Path) -> list[str]:
+    errors: list[str] = []
+    path = docs_root / "reference/module_map.md"
+    if not path.is_file():
+        return [f"missing module map doc: {path}"]
+    text = _read_text(path)
+    for layer in ("core", "gui"):
+        scope = repo_root / "translationzed_py" / layer
+        if not scope.is_dir():
+            errors.append(f"missing module scope for coverage check: {scope}")
+            continue
+        for module_path in sorted(scope.glob("*.py")):
+            if module_path.name == "__init__.py":
+                continue
+            token = f"{layer}.{module_path.stem}"
+            if token not in text:
+                errors.append(f"{path}: missing module coverage entry for {token}")
+    return errors
+
+
+def _validate_workflow_api_surface(docs_root: Path) -> list[str]:
+    errors: list[str] = []
+    path = docs_root / "reference/api/core_workflows.md"
+    if not path.is_file():
+        return [f"missing workflow API surface doc: {path}"]
+    text = _read_text(path)
+    for module in WORKFLOW_CRITICAL_MODULES:
+        if f"`{module}`" not in text and f"translationzed_py.core.{module}" not in text:
+            errors.append(f"{path}: missing workflow module coverage for `{module}`")
+        block = f"::: translationzed_py.core.{module}"
+        if block not in text:
+            errors.append(
+                f"{path}: missing mkdocstrings API block for workflow module `{module}`"
+            )
+    return errors
+
+
+def _validate_quick_context_orientation_links(docs_root: Path) -> list[str]:
+    errors: list[str] = []
+    path = docs_root / "reference/quick_context.md"
+    if not path.is_file():
+        return [f"missing quick context doc: {path}"]
+    text = _read_text(path)
+    for doc_path in ORIENTATION_SURFACE_DOCS:
+        if doc_path not in text:
+            errors.append(f"{path}: missing orientation surface link: {doc_path}")
+    return errors
+
+
 def _validate_active_plan_drift(docs_root: Path) -> list[str]:
     errors: list[str] = []
     active_path = docs_root / "plan/implementation_active.md"
@@ -498,9 +570,7 @@ def _validate_active_plan_drift(docs_root: Path) -> list[str]:
             text,
             flags=re.IGNORECASE,
         ):
-            errors.append(
-                f"{active_path}: active plan must explicitly target v0.9.0"
-            )
+            errors.append(f"{active_path}: active plan must explicitly target v0.9.0")
         stale_patterns = (
             r"v0\.8\.0\s+in\s+progress",
             r"pending\s+tag",
@@ -565,6 +635,8 @@ def _validate_mkdocs_contract(repo_root: Path) -> list[str]:
         text = _read_text(mkdocs_path)
         required_snippets = [
             "use_directory_urls: false",
+            "Automation Surface: reference/automation_surface.md",
+            "Test Surface: reference/test_surface.md",
             "Code Architecture: architecture/code_architecture.md",
             "Assurance Standard: quality/assurance_standard.md",
             "API Overview: reference/api/index.md",
@@ -696,6 +768,9 @@ def main() -> int:
     errors.extend(_validate_required_headings(docs_root))
     errors.extend(_validate_v09_spec_contract(docs_root))
     errors.extend(_validate_api_structure_contract(docs_root))
+    errors.extend(_validate_module_map_coverage(docs_root, Path.cwd()))
+    errors.extend(_validate_workflow_api_surface(docs_root))
+    errors.extend(_validate_quick_context_orientation_links(docs_root))
     errors.extend(_validate_active_plan_drift(docs_root))
     errors.extend(_validate_tm_long_variant_contract(docs_root))
     errors.extend(_validate_mkdocs_contract(Path.cwd()))

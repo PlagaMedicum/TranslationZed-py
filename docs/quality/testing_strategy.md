@@ -21,6 +21,9 @@ _Last updated: 2026-03-04_
 This section is normative for upcoming `v0.9.0` implementation work and maps
 directly to `docs/spec/v0_9/*`.
 
+Quick lookup companion:
+- `docs/reference/test_surface.md`
+
 | Target area | Planned verification focus | Primary test modules (planned/extended) |
 |---|---|---|
 | QA live checklist | rule-order invariants, state transitions, completion-ratio monotonicity, LT note semantics | `tests/test_qa_async.py`, `tests/test_gui_qa_panel.py`, new QA progress DTO tests |

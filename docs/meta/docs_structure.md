@@ -113,6 +113,14 @@ The goal is zero normative drift across specs, execution docs, and operations do
   - Fast orientation reference for engineers/LLMs.
   - Owns concise project model, command surface, and boundary summary.
 
+- `docs/reference/automation_surface.md`
+  - Derived automation/runbook orientation reference.
+  - Owns make-target profiles, script mapping, and command-lane selection hints.
+
+- `docs/reference/test_surface.md`
+  - Derived test-discovery orientation reference.
+  - Owns workflow-to-test lookup paths for rapid contributor/LLM navigation.
+
 - `docs/reference/module_map.md`
   - Module ownership map.
   - Owns module-level responsibilities and ownership boundaries.
@@ -166,6 +174,8 @@ For every behavior change:
    - `docs/architecture/code_architecture.md`
    - `docs/architecture/diagrams.md`
    - `docs/reference/quick_context.md`
+   - `docs/reference/automation_surface.md`
+   - `docs/reference/test_surface.md`
    - `docs/reference/module_map.md`
    - `docs/reference/contract_index.md`
    - `docs/reference/review_queue.md`

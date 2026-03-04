@@ -51,6 +51,8 @@ nav:
   - Meta:
       - Documentation Structure: meta/docs_structure.md
       - Quick Context: reference/quick_context.md
+      - Automation Surface: reference/automation_surface.md
+      - Test Surface: reference/test_surface.md
       - Module Map: reference/module_map.md
       - Contract Index: reference/contract_index.md
       - Review Queue: reference/review_queue.md

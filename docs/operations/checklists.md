@@ -5,6 +5,9 @@ _Last updated: 2026-03-04_
 This project favors repeatable, automated steps. Use the make targets below to
 avoid missing mandatory tasks.
 
+Quick command-profile orientation:
+- `docs/reference/automation_surface.md`
+
 ## Before committing
 
 - **Run** `make verify`

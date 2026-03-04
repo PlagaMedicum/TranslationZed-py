@@ -36,6 +36,10 @@ flowchart LR
 | `file_workflow` | open/save/merge/cache write plans | `build_open_*`, `build_save_*`, `apply_*` |
 | `search_replace_service` | multi-scope search/replace orchestration | `build_search_plan`, `run_replace_*` |
 | `qa_service` | QA finding generation and list planning | `scan_*`, `build_panel_*` |
+| `tm_workflow_service` | TM query/apply/refresh orchestration and adapter-safe DTO shaping | `build_*query*`, `build_*filter*`, `accept_*result`, `build_*plan` |
+| `save_exit_flow` | save/exit prompt policy and deterministic multi-file write intent shaping | `build_*prompt*`, `build_*plan`, `apply_*decision` |
+| `conflict_service` | cache-vs-original conflict decision orchestration and persist planning | `build_*plan`, `execute_*resolution`, `execute_*persist` |
+| `source_reference_service` | source-locale mode normalization, fallback, and file-path resolution policy | `resolve_*`, `normalize_*`, `build_*policy` |
 
 ## 4) Module Contracts: Why and When Not To Use
 
@@ -74,6 +78,54 @@ When not to use:
 1. avoid extending module with unrelated UI concerns,
 2. avoid embedding heavy parser/cache IO logic outside provided callback contracts,
 3. avoid using internal helpers directly from GUI if service methods already wrap them.
+
+### 4.4 `tm_workflow_service`
+
+Why use:
+1. centralize TM request normalization, refresh/debounce policy, and stale-result guards,
+2. keep TM panel row formatting and diagnostics/report shaping Qt-free,
+3. keep async query/apply callbacks deterministic across origin/min-score filters.
+
+When not to use:
+1. do not call `tm_store` directly from GUI for routine panel behavior,
+2. do not implement panel-level ranking/explainability policy in widget handlers,
+3. do not duplicate TM request cache key logic outside this service.
+
+### 4.5 `save_exit_flow`
+
+Why use:
+1. one place for save/exit decision policy (`Write` / `Cache only` / `Cancel`),
+2. deterministic per-file write selection and prompt text contracts,
+3. shared policy for menu exit, window-close exit, and save-path confirmation.
+
+When not to use:
+1. do not reimplement save prompt branching in `main_window` slots,
+2. do not couple save/exit orchestration to Qt dialog classes inside core,
+3. do not mutate write-intent semantics ad hoc in adapter code.
+
+### 4.6 `conflict_service`
+
+Why use:
+1. centralize cache/original conflict detection and merge-choice execution policy,
+2. keep resolution status semantics deterministic (`Original` -> `For review`),
+3. keep persist-cleanup behavior explicit and callback-driven.
+
+When not to use:
+1. do not build merge/persist decisions directly in GUI event handlers,
+2. do not bypass conflict run-precondition helpers before prompting users,
+3. do not mutate cache cleanup behavior without service-level plans.
+
+### 4.7 `source_reference_service`
+
+Why use:
+1. normalize source-reference mode and fallback policy in one Qt-free boundary,
+2. keep file-path resolution deterministic for target/reference locale pairing,
+3. prevent stale source-search behavior through explicit mode-aware lookup rules.
+
+When not to use:
+1. do not perform path rewrite logic in GUI widgets,
+2. do not parse fallback policy strings directly in adapters,
+3. do not add mode-specific search/TM hacks outside this service.
 
 ## 5) DTO Boundaries
 
@@ -127,6 +179,50 @@ sequenceDiagram
   GUI->>SR: apply_replace_all(...)
 ```
 
+### 6.4 TM query and apply chain
+
+```mermaid
+sequenceDiagram
+  participant GUI as TM panel helpers
+  participant TMW as TMWorkflowService
+  participant TMS as TMStore
+
+  GUI->>TMW: build_query_request_for_lookup(...)
+  GUI->>TMW: build_filter_plan(...)
+  TMW->>TMS: query(...)
+  TMS-->>TMW: ranked rows + diagnostics
+  GUI->>TMW: accept_query_result(...)
+  GUI->>TMW: build_apply_plan(...)
+```
+
+### 6.5 Save/exit prompt chain
+
+```mermaid
+sequenceDiagram
+  participant GUI as main_window
+  participant SE as SaveExitFlow
+  participant FW as FileWorkflowService
+
+  GUI->>SE: build_exit_prompt_plan(...)
+  SE-->>GUI: Write/Cache only/Cancel decision DTO
+  GUI->>FW: persist selected writes when decision=Write
+  GUI->>SE: apply_exit_decision(...)
+```
+
+### 6.6 Conflict-resolution chain
+
+```mermaid
+sequenceDiagram
+  participant GUI as main_window
+  participant CF as ConflictService
+
+  GUI->>CF: build_resolution_run_plan(...)
+  GUI->>CF: build_prompt_plan(...)
+  CF-->>GUI: prompt rows + allowed actions
+  GUI->>CF: execute_choice(...)
+  GUI->>CF: execute_persist_resolution(...)
+```
+
 ## 7) Scenario Map (What Calls What)
 
 1. Open/switch locale:
@@ -141,6 +237,15 @@ sequenceDiagram
 4. QA:
    1. `qa_service` scans and returns finding DTOs,
    2. GUI renders findings and navigation actions.
+5. TM:
+   1. `tm_workflow_service` builds query/filter/apply plans,
+   2. `tm_store` executes deterministic retrieval/ranking.
+6. Save/exit:
+   1. `save_exit_flow` builds decision prompts and exit-intent policy,
+   2. `file_workflow` executes selected write/cache actions.
+7. Conflict/source reference:
+   1. `conflict_service` owns merge/persist decisions,
+   2. `source_reference_service` resolves source-locale mode/fallback paths.
 
 ## 8) Failure Modes
 
@@ -148,6 +253,9 @@ sequenceDiagram
 2. File parse/write callback errors are surfaced by workflow result types and handled in GUI dialog layer.
 3. Replace-all failure in one file must keep deterministic per-file result reporting and must not corrupt remaining plan traversal.
 4. QA scan failures are isolated by rule where possible; panel still renders completed findings and failure notes.
+5. TM async stale responses must be dropped by workflow service guards and never overwrite newer selection context.
+6. Save/exit decision failures must preserve cache-first safety (no partial write-intent mutation).
+7. Conflict resolution failures must surface explicit retry/abort paths; no silent merge fallback is allowed.
 
 ## 9) v0.9 Target Notes
 
@@ -200,6 +308,54 @@ Current status:
 ## 13) QA Workflow API
 
 ::: translationzed_py.core.qa_service
+    options:
+      show_root_heading: true
+      show_root_toc_entry: true
+      members: true
+      filters:
+        - "!^__"
+      show_source: false
+      members_order: source
+
+## 14) TM Workflow API
+
+::: translationzed_py.core.tm_workflow_service
+    options:
+      show_root_heading: true
+      show_root_toc_entry: true
+      members: true
+      filters:
+        - "!^__"
+      show_source: false
+      members_order: source
+
+## 15) Save/Exit Workflow API
+
+::: translationzed_py.core.save_exit_flow
+    options:
+      show_root_heading: true
+      show_root_toc_entry: true
+      members: true
+      filters:
+        - "!^__"
+      show_source: false
+      members_order: source
+
+## 16) Conflict Workflow API
+
+::: translationzed_py.core.conflict_service
+    options:
+      show_root_heading: true
+      show_root_toc_entry: true
+      members: true
+      filters:
+        - "!^__"
+      show_source: false
+      members_order: source
+
+## 17) Source Reference Workflow API
+
+::: translationzed_py.core.source_reference_service
     options:
       show_root_heading: true
       show_root_toc_entry: true

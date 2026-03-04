@@ -21,7 +21,7 @@ _Last updated: 2026-03-04_
 | `core.source_reference_service` | Source-locale switching and fallback logic. |
 | `core.preferences` / `core.preferences_service` | Settings IO normalization, defaults, and persist payloads. |
 | `core.app_config` | Static app config parsing (`config/app.toml`). |
-| `core.tm_store` / `core.tm_query` / `core.tmx_io` | TM storage, query/ranking, TMX import/export mechanics. |
+| `core.tm_store` / `core.tm_query` / `core.tm_query_engine` / `core.tm_query_policy` / `core.tm_query_scoring` / `core.tm_query_contracts` / `core.tm_query_text` / `core.tm_store_support` / `core.tmx_io` | TM storage, query/ranking internals, deterministic tie-break helpers, and TMX import/export mechanics. |
 | `core.tm_import_sync` / `core.tm_preferences` / `core.tm_rebuild` / `core.tm_workflow_service` | TM import lifecycle, preference actions, rebuild and GUI-facing plans. |
 | `core.render_workflow_service` | Render-heavy policy decisions for GUI performance paths. |
 | `core.encoding_diagnostics` | Read-only encoding diagnostics and reporting utilities. |

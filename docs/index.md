@@ -7,6 +7,8 @@ browser-first reading.
 
 - `docs/meta/docs_structure.md` — ownership model, anti-duplication rules, and update protocol.
 - `docs/reference/quick_context.md` — fastest onboarding context for developers and LLMs.
+- `docs/reference/automation_surface.md` — command profiles and make-target/script mapping.
+- `docs/reference/test_surface.md` — workflow-to-test navigation map.
 - `docs/reference/module_map.md` — module-level responsibilities and boundaries.
 - `docs/quality/assurance_standard.md` — Document-or-Flag workflow and assurance gates.
 

@@ -5,12 +5,14 @@ _Last updated: 2026-03-04_
 
 TranslationZed-Py is a Qt-based CAT tool for Project Zomboid locale files.
 Primary constraints:
+
 - byte-preserving edits (only translation literals change),
 - cache-first draft safety,
 - locale-specific encoding fidelity,
 - EN as immutable source reference.
 
 Current/target framing:
+
 - **Current released baseline:** `v0.8.0`
 - **Current planning target:** `v0.9.0` (docs-first specification phase)
 
@@ -31,6 +33,12 @@ Current/target framing:
 6. `docs/operations/checklists.md`
 7. `docs/plan/implementation_active.md`
 
+## 3.1) Orientation Companions (Fast Navigation)
+
+1. `docs/reference/automation_surface.md` — make-target profiles and script mapping.
+2. `docs/reference/test_surface.md` — workflow-to-test lookup map.
+3. `docs/reference/module_map.md` — module responsibility and ownership boundaries.
+
 ## 4) Core User-Facing Surfaces
 
 - Top menu: **General / Edit / View / Help**
@@ -49,6 +57,12 @@ Current/target framing:
 - Review queue schema gate: `make review-queue-check`
 - Contract index drift gate: `make docs-index`
 - Perf contract lane: `make test-perf-scale`
+
+Command profile hint:
+
+1. Use `make verify` for normal local work.
+2. Use `make verify-ci` for strict CI parity.
+3. Use `make verify-heavy` only when heavy mutation/perf evidence is needed.
 
 ## 6) Known High-Risk Areas
 
