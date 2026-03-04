@@ -201,3 +201,62 @@ is\\_long\\_multi := (k \\ge 8) \\land (L_q \\ge 80)
     errors = module._validate_tm_long_variant_contract(docs_root)
     assert errors
     assert any("missing TM long-variant diagram anchor" in err for err in errors)
+
+
+def test_v09_spec_contract_requires_required_snippets(tmp_path: Path) -> None:
+    """v0.9 spec pages must include required headings/snippets."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    (docs_root / "spec" / "v0_9").mkdir(parents=True, exist_ok=True)
+    (docs_root / "spec" / "v0_9" / "qa_live_checklist.md").write_text(
+        "# QA\n", encoding="utf-8"
+    )
+    (docs_root / "spec" / "v0_9" / "tm_quality_explainability.md").write_text(
+        "# TM\n", encoding="utf-8"
+    )
+    (docs_root / "spec" / "v0_9" / "crash_recovery_uc12.md").write_text(
+        "# CR\n", encoding="utf-8"
+    )
+    (docs_root / "spec" / "v0_9" / "implementation_subtasks.md").write_text(
+        "# Subtasks\n", encoding="utf-8"
+    )
+    errors = module._validate_v09_spec_contract(docs_root)
+    assert errors
+    assert any("missing required v0.9 spec contract snippet" in err for err in errors)
+
+
+def test_api_structure_contract_requires_standard_sections(tmp_path: Path) -> None:
+    """API pages must provide why/when-not/call-chain/dto/failure sections."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    (docs_root / "reference" / "api").mkdir(parents=True, exist_ok=True)
+    for rel in module.API_STRUCTURE_PAGES:
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# API\n", encoding="utf-8")
+    errors = module._validate_api_structure_contract(docs_root)
+    assert errors
+    assert any("missing required API structure section" in err for err in errors)
+
+
+def test_active_plan_drift_detects_stale_v08_pending_language(tmp_path: Path) -> None:
+    """Active docs must not present v0.8 as pending/in-progress release state."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    (docs_root / "plan").mkdir(parents=True, exist_ok=True)
+    (docs_root / "operations").mkdir(parents=True, exist_ok=True)
+    (docs_root / "plan" / "implementation_active.md").write_text(
+        "v0.8.0 in progress\n",
+        encoding="utf-8",
+    )
+    (docs_root / "operations" / "checklists.md").write_text(
+        "v0.8.0 release gate (next target)\n",
+        encoding="utf-8",
+    )
+    (docs_root / "plan" / "implementation_history.md").write_text(
+        "Pending before final tag\n",
+        encoding="utf-8",
+    )
+    errors = module._validate_active_plan_drift(docs_root)
+    assert errors
+    assert any("stale release-state wording" in err for err in errors)

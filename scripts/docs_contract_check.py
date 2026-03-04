@@ -28,6 +28,12 @@ CANONICAL_DOCS = [
     "reference/contract_index.md",
     "reference/review_queue.md",
     "spec/technical.md",
+    "spec/v0_9/overview.md",
+    "spec/v0_9/qa_live_checklist.md",
+    "spec/v0_9/tm_quality_explainability.md",
+    "spec/v0_9/tm_workflow_ux.md",
+    "spec/v0_9/crash_recovery_uc12.md",
+    "spec/v0_9/implementation_subtasks.md",
     "ux/use_cases.md",
     "ux/use_cases_project_lifecycle.md",
     "ux/use_cases_editing_status.md",
@@ -58,6 +64,12 @@ CANONICAL_SCAN_SCOPE = [
     "reference/contract_index.md",
     "reference/review_queue.md",
     "spec/technical.md",
+    "spec/v0_9/overview.md",
+    "spec/v0_9/qa_live_checklist.md",
+    "spec/v0_9/tm_quality_explainability.md",
+    "spec/v0_9/tm_workflow_ux.md",
+    "spec/v0_9/crash_recovery_uc12.md",
+    "spec/v0_9/implementation_subtasks.md",
     "ux/use_cases.md",
     "ux/use_cases_project_lifecycle.md",
     "ux/use_cases_editing_status.md",
@@ -90,6 +102,10 @@ RENDERED_HTML_SCAN_SCOPE = [
     "ux/use_cases_editing_status.md",
     "ux/use_cases_search_qa.md",
     "ux/use_cases_tm.md",
+    "spec/v0_9/qa_live_checklist.md",
+    "spec/v0_9/tm_quality_explainability.md",
+    "spec/v0_9/crash_recovery_uc12.md",
+    "spec/v0_9/implementation_subtasks.md",
 ]
 
 BANNED_RULES = [
@@ -178,6 +194,56 @@ TM_LONG_VARIANT_DIAGRAM_ANCHORS = (
     ("architecture/code_architecture.md", "TM Long-Variant Detection Pipeline"),
     ("architecture/diagrams.md", "TM Long-Variant Detection Activity"),
 )
+
+V09_REQUIRED_SNIPPETS: dict[str, tuple[str, ...]] = {
+    "spec/v0_9/qa_live_checklist.md": (
+        "Rule State Machine",
+        "Formal Progress Model",
+        "C(t) =",
+    ),
+    "spec/v0_9/tm_quality_explainability.md": (
+        "Preserved Scoring Core (Normative)",
+        "Explainability Payload Schema",
+        "raw = \\operatorname{round}(100 \\cdot ratio)",
+    ),
+    "spec/v0_9/crash_recovery_uc12.md": (
+        "Dialog Contract (Required Actions)",
+        "`Restore`",
+        "`Discard`",
+        "`Cancel`",
+    ),
+    "spec/v0_9/implementation_subtasks.md": (
+        "Packet Template (Mandatory)",
+        "Packet Catalog",
+        "Goal",
+        "Required tests",
+        "Acceptance criteria",
+    ),
+}
+
+API_STRUCTURE_PAGES: dict[str, tuple[str, ...]] = {
+    "reference/api/core_workflows.md": (
+        "Why This Layer Exists",
+        "When Not To Use",
+        "Call-Chain Examples",
+        "DTO Boundaries",
+        "Failure Modes",
+    ),
+    "reference/api/core_data_io.md": (
+        "Why This Layer Exists",
+        "When Not To Use",
+        "Call-Chain Examples",
+        "DTO Boundaries",
+        "Failure Modes",
+    ),
+    "reference/api/core_preferences.md": (
+        "Why This Layer Exists",
+        "When Not To Use",
+        "Call-Chain Examples",
+        "DTO Boundaries",
+        "Failure Modes",
+    ),
+}
 
 
 def _read_text(path: Path) -> str:
@@ -387,6 +453,85 @@ def _validate_required_headings(docs_root: Path) -> list[str]:
     return errors
 
 
+def _validate_v09_spec_contract(docs_root: Path) -> list[str]:
+    errors: list[str] = []
+    for rel, snippets in V09_REQUIRED_SNIPPETS.items():
+        path = docs_root / rel
+        if not path.is_file():
+            errors.append(f"missing v0.9 spec contract page: {path}")
+            continue
+        text = _read_text(path)
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(
+                    f"{path}: missing required v0.9 spec contract snippet: {snippet!r}"
+                )
+    return errors
+
+
+def _validate_api_structure_contract(docs_root: Path) -> list[str]:
+    errors: list[str] = []
+    for rel, snippets in API_STRUCTURE_PAGES.items():
+        path = docs_root / rel
+        if not path.is_file():
+            errors.append(f"missing API structure page: {path}")
+            continue
+        text = _read_text(path)
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(
+                    f"{path}: missing required API structure section: {snippet!r}"
+                )
+    return errors
+
+
+def _validate_active_plan_drift(docs_root: Path) -> list[str]:
+    errors: list[str] = []
+    active_path = docs_root / "plan/implementation_active.md"
+    checklists_path = docs_root / "operations/checklists.md"
+    history_path = docs_root / "plan/implementation_history.md"
+
+    if active_path.is_file():
+        text = _read_text(active_path)
+        if not re.search(
+            r"target\s+milestone.*`v0\.9\.0`",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            errors.append(
+                f"{active_path}: active plan must explicitly target v0.9.0"
+            )
+        stale_patterns = (
+            r"v0\.8\.0\s+in\s+progress",
+            r"pending\s+tag",
+            r"next\s+target:\s*v0\.8\.0",
+        )
+        for pattern in stale_patterns:
+            if re.search(pattern, text, flags=re.IGNORECASE):
+                errors.append(
+                    f"{active_path}: stale release-state wording detected ({pattern})"
+                )
+
+    if checklists_path.is_file():
+        text = _read_text(checklists_path)
+        if re.search(
+            r"v0\.8\.0\s+release\s+gate\s+\(next\s+target\)",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            errors.append(
+                f"{checklists_path}: v0.8.0 must be historical; v0.9.0 is next target"
+            )
+
+    if history_path.is_file():
+        text = _read_text(history_path)
+        if re.search(r"pending\s+before\s+final\s+tag", text, flags=re.IGNORECASE):
+            errors.append(
+                f"{history_path}: stale pending-tag phrasing detected in history log"
+            )
+    return errors
+
+
 def _validate_tm_long_variant_contract(docs_root: Path) -> list[str]:
     errors: list[str] = []
     tm_doc = docs_root / "domain/tm_ranking.md"
@@ -423,6 +568,8 @@ def _validate_mkdocs_contract(repo_root: Path) -> list[str]:
             "Code Architecture: architecture/code_architecture.md",
             "Assurance Standard: quality/assurance_standard.md",
             "API Overview: reference/api/index.md",
+            "v0.9 Target Specification",
+            "Crash Recovery UC-12: spec/v0_9/crash_recovery_uc12.md",
             "mermaid.min.js",
             "tex-mml-chtml.js",
         ]
@@ -547,6 +694,9 @@ def main() -> int:
     errors.extend(_validate_review_queue_refs(docs_root))
     errors.extend(_validate_contract_index_artifacts(docs_root))
     errors.extend(_validate_required_headings(docs_root))
+    errors.extend(_validate_v09_spec_contract(docs_root))
+    errors.extend(_validate_api_structure_contract(docs_root))
+    errors.extend(_validate_active_plan_drift(docs_root))
     errors.extend(_validate_tm_long_variant_contract(docs_root))
     errors.extend(_validate_mkdocs_contract(Path.cwd()))
     errors.extend(_validate_rendered_html_shape(site_root))
