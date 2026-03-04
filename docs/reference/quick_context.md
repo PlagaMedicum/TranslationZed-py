@@ -1,5 +1,5 @@
 # TranslationZed-Py — Quick Context
-_Last updated: 2026-02-25_
+_Last updated: 2026-03-04_
 
 ## 1) What This Project Is
 
@@ -9,6 +9,10 @@ Primary constraints:
 - cache-first draft safety,
 - locale-specific encoding fidelity,
 - EN as immutable source reference.
+
+Current/target framing:
+- **Current released baseline:** `v0.8.0`
+- **Current planning target:** `v0.9.0` (docs-first specification phase)
 
 ## 2) Fast Mental Model
 
@@ -53,3 +57,14 @@ Primary constraints:
 3. TM ranking quality and deterministic output guarantees.
 4. Documentation drift between canonical and derived docs.
 5. Low-confidence modules must be flagged, queued, and refactored before deep docs.
+
+## 7) Next-Scope (v0.9.0)
+
+1. QA panel live rule-checklist status (multi-line, rule-by-rule states).
+2. TM upgrades:
+   - explainability payload and UI visibility of score decisions,
+   - workflow UX upgrades for faster triage/apply/navigation.
+3. Crash recovery UC-12 activation:
+   - startup recovery dialog with `Restore` / `Discard` / `Cancel`,
+   - plaintext details review in the same window.
+4. Full docs/API/architecture coherence for implementation-ready handoff.

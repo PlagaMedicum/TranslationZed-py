@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation History
-_Last updated: 2026-03-03_
+_Last updated: 2026-03-04_
 
 > Historical execution log (non-normative).  
 > Current canonical planning scope lives in `docs/plan/implementation_active.md`.
@@ -17,7 +17,7 @@ Legend:
 
 ---
 
-## A15-TM-RF1 [→] TM Deep Refactor (docs-first; TM-only)
+## A15-TM-RF1 [✓] TM Deep Refactor (docs-first; TM-only)
 
 Execution lock for this cycle:
 1. TM-only refactor scope: `translationzed_py/core/tm_store.py`.
@@ -64,9 +64,16 @@ Execution evidence log:
    5. `make verify-ci TAG=v0.8.0`
    6. `make release-check TAG=v0.8.0`
    7. `make release-dry-run TAG=v0.8.0-rc1`
-6. [→] Pending before final tag:
-   1. push `v0.8.0-rc1` from validated commit and confirm CI matrix.
-   2. push final `v0.8.0` tag from the same commit.
+6. [✓] Final tag completion:
+   1. `v0.8.0` final tag was pushed from validated commit lineage.
+   2. release notes/changelog completion retag was applied on 2026-03-04.
+   3. release baseline for future work is now stable on `v0.8.0`.
+
+## v0.9.0 Transition Note (2026-03-04)
+
+1. `v0.8.0` is fully closed and released.
+2. Active planning moved to `A16` in `docs/plan/implementation_active.md` (docs-only v0.9 spec pack).
+3. Historical sections below remain as execution evidence and design lineage for future refactors.
 
 ## 0) Non‑negotiable invariants
 

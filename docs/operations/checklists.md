@@ -1,4 +1,4 @@
-_Last updated: 2026-02-25_
+_Last updated: 2026-03-04_
 
 # Checklists
 
@@ -151,13 +151,25 @@ avoid missing mandatory tasks.
 - **Packaging**
   - `make pack` produces runnable artifact for release OS.
 
-## v0.8.0 release gate (next target)
+## v0.8.0 release gate (historical baseline)
 
-- Start from the same gates used for v0.7.0:
+- Final status:
+  - release cycle completed and tag published;
+  - changelog-complete retag applied on 2026-03-04.
+- Keep this block as historical evidence only.
+
+## v0.9.0 release gate (next target)
+
+- Required pre-release baseline before RC tag:
   - green CI matrix (`linux`, `windows`, `macos`) on release commit;
-  - green RC dry-run workflow (`v0.8.0-rcN`) for the same commit;
-  - local `make verify` + `make release-check TAG=v0.8.0`.
-- Update this section only after scope and acceptance criteria are frozen in
+  - green RC dry-run workflow (`v0.9.0-rcN`) for the same commit;
+  - local `make verify` + `make release-check TAG=v0.9.0`;
+  - docs-only milestone A16 complete and `make docs-check` green with v0.9 spec pack contracts.
+- Scope lock for this target:
+  - QA live rule-checklist UX contract,
+  - TM quality/explainability plus TM workflow UX upgrades,
+  - crash recovery UC-12 (`restore/discard/cancel` + plaintext details review).
+- Update this section after each v0.9 gate-chain run in lockstep with
   `docs/plan/implementation_active.md`.
 
 ## CI troubleshooting
