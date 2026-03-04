@@ -2,23 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.8.0] - 2026-03-03
+## [0.8.0] - 2026-03-04
 
 ### Added
-- Browser-first documentation stack with canonical docs restructure, strict docs contract checks, and generated contract index.
-- `Document-or-Flag` workflow (`code-triage` + review queue validation) integrated into docs quality gates.
-- TM long-variant detection contracts and tests for edited long instruction-like strings at default threshold.
-- Progress HUD in the `Project` tab (locale/current-file segmented progress rows) and status triage controls in the status header.
+- Built-in LanguageTool writing assistance in the editor, including inline issue highlighting and quick-fix suggestions.
+- Optional LanguageTool checks in manual QA runs, with row limits to keep QA responsive on large files.
+- New EN-diff awareness in the editor with `NEW`, `MODIFIED`, and `REMOVED` markers.
+- Save-time insertion flow for edited `NEW` rows, with preview and confirmation before applying changes.
+- Status triage tools: status sorting/filtering and priority navigation (`Untouched -> For review -> Translated -> Proofread`).
+- Progress HUD in the `Project` panel showing locale and current-file translation/proofread progress.
+- Browser-first documentation portal with architecture diagrams, API pages, and stricter docs quality checks.
 
 ### Changed
-- Verification pipeline aligned around strict/non-mutating CI gates and advisory local perf/benchmark lanes.
-- TM query internals refactored into focused modules while preserving deterministic ranking and score behavior.
-- API reference pages now include orchestration intent/boundary sections and workflow call-chain diagrams.
+- LanguageTool behavior now matches browser-style picky mode semantics and falls back safely when picky mode is unavailable.
+- Translation Memory matching improved for long edited variants and duplicated-segment artifacts, with stronger default recall at standard thresholds.
+- Verification flow tightened across local and CI lanes with clearer strict vs advisory behavior.
+- Search and QA panel UX streamlined for clearer navigation, lower clutter, and better empty-state guidance.
+- Main window responsibilities reduced via helper extractions and architecture guard enforcement.
 
 ### Fixed
-- Docs browser navigation uses `.html` targets directly for local static browsing.
-- Math/list rendering regressions are guarded by stricter docs contract checks on rendered HTML.
-- Search Wave-2 performance contracts stabilized with strict equivalence tests.
+- Fixed false `REMOVED` floods in EN-diff labeling caused by locale-suffixed EN path resolution.
+- Fixed multiple sidebar/table resize and relayout regressions affecting main grid width behavior.
+- Fixed cross-platform verification issues (Windows/macOS/Linux shell and path consistency).
+- Fixed docs rendering/navigation regressions (local `.html` navigation, math/list rendering checks).
+- Fixed LanguageTool edge cases including delayed hint popup for double-click word selection and HTTP resource handling.
 
 ## [0.7.0] - 2026-02-16
 
