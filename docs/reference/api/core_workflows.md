@@ -1,5 +1,5 @@
 # Core Workflows API
-_Last updated: 2026-03-01_
+_Last updated: 2026-03-04_
 
 ## 1) Why This Layer Exists
 
@@ -63,7 +63,7 @@ When not to use:
 2. do not use for replace-all/search traversal policy (`search_replace_service`),
 3. do not bypass this layer with ad-hoc parser/cache/saver chains in GUI code.
 
-### 4.3 `search_replace_service` (flagged)
+### 4.3 `search_replace_service`
 
 Why use:
 1. one place for scope-file selection and search-run plans,
@@ -71,11 +71,11 @@ Why use:
 3. deterministic cross-file traversal and anchor/wrap behavior.
 
 When not to use:
-1. avoid extending module with unrelated UI concerns while deep-review is active,
+1. avoid extending module with unrelated UI concerns,
 2. avoid embedding heavy parser/cache IO logic outside provided callback contracts,
 3. avoid using internal helpers directly from GUI if service methods already wrap them.
 
-## 5) Request/Result Contract Style
+## 5) DTO Boundaries
 
 1. Inputs are plain Python values or dataclasses (no Qt types).
 2. Outputs are DTOs/plans that adapters can execute/present.
@@ -142,7 +142,21 @@ sequenceDiagram
    1. `qa_service` scans and returns finding DTOs,
    2. GUI renders findings and navigation actions.
 
-## 8) Project Session API
+## 8) Failure Modes
+
+1. Plan build failures (invalid scope/input/state) return explicit errors; caller must avoid partial UI mutation.
+2. File parse/write callback errors are surfaced by workflow result types and handled in GUI dialog layer.
+3. Replace-all failure in one file must keep deterministic per-file result reporting and must not corrupt remaining plan traversal.
+4. QA scan failures are isolated by rule where possible; panel still renders completed findings and failure notes.
+
+## 9) v0.9 Target Notes
+
+1. QA workflow orchestration will gain rule-progress snapshots and checklist state transitions.
+2. TM workflow orchestration will gain explainability payload delivery to UI adapters.
+3. Startup/open orchestration will gain crash-recovery decision routing (`Restore`/`Discard`/`Cancel`).
+4. These additions must preserve current `v0.8` deterministic ordering, no-write-on-open, and explicit error-surface contracts.
+
+## 10) Project Session API
 
 ::: translationzed_py.core.project_session
     options:
@@ -154,7 +168,7 @@ sequenceDiagram
       show_source: false
       members_order: source
 
-## 9) File Workflow API
+## 11) File Workflow API
 
 ::: translationzed_py.core.file_workflow
     options:
@@ -166,13 +180,12 @@ sequenceDiagram
       show_source: false
       members_order: source
 
-## 10) Search/Replace Workflow API
+## 12) Search/Replace Workflow API
 
-> flagged for deep review: `translationzed_py/core/search_replace_service.py`
-
-Why flagged now:
-1. high branch density and coupled policy/perf paths,
-2. deferred search synthetic benchmark correction lane remains open.
+Current status:
+1. review-queue entry for `translationzed_py/core/search_replace_service.py` is closed in v0.8 lane.
+2. strict benchmark and equivalence contracts are green in current baseline.
+3. v0.9 target work may expand workflow UX, but this module is not currently flagged.
 
 ::: translationzed_py.core.search_replace_service
     options:
@@ -184,7 +197,7 @@ Why flagged now:
       show_source: false
       members_order: source
 
-## 11) QA Workflow API
+## 13) QA Workflow API
 
 ::: translationzed_py.core.qa_service
     options:

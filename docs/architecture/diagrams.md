@@ -1,5 +1,5 @@
 # TranslationZed-Py — Architecture Diagrams
-_Last updated: 2026-03-01_
+_Last updated: 2026-03-04_
 
 This page is the high-level diagram index.
 For concrete class/interface/controller diagrams, see
@@ -144,13 +144,13 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  LQ[Compute query length and token count] --> BASE[Compute base length band]
-  BASE --> TRIG{Long multi-token query}
+  LQ[Query length and token count] --> BASE[Base length band]
+  BASE --> TRIG{Long multi-token}
   TRIG -- no --> BAND0[Use base band]
   TRIG -- yes --> BAND1[Use adaptive band]
   BAND0 --> PICK[Candidate selected]
   BAND1 --> PICK
-  PICK --> OVER{Candidate above base upper band}
+  PICK --> OVER{Above base upper band}
   OVER -- no --> KEEP[Proceed to scoring]
   OVER -- yes --> RULE{Oversized guard satisfied}
   RULE -- no --> DROP[Reject candidate]
@@ -202,3 +202,37 @@ flowchart LR
 
 Dense source reference:
 - `docs/diagrams/src/module_dependency_dense.puml`
+
+## 13) v0.9 Target — QA Live Checklist Pipeline
+
+```mermaid
+flowchart LR
+  RUN[Run QA] --> PLAN[Create ordered rule plan]
+  PLAN --> TRACE[Emit queued states]
+  TRACE --> EXEC[Run rules one by one]
+  EXEC --> LT[Optional LT stage]
+  LT --> SNAP[Build final progress snapshot]
+  SNAP --> UI[Render checklist and summary]
+```
+
+## 14) v0.9 Target — TM Explainability Delivery
+
+```mermaid
+flowchart LR
+  QUERY[TM query request] --> MATCH[Retrieve and score matches]
+  MATCH --> EXPL[Build explainability payload]
+  EXPL --> ORDER[Deterministic ordering]
+  ORDER --> PANEL[TM list and explanation panel]
+```
+
+## 15) v0.9 Target — Crash Recovery Startup Decision
+
+```mermaid
+flowchart LR
+  START[Startup open request] --> DETECT[Detect recovery candidates]
+  DETECT --> ASK{Recovery report exists}
+  ASK -- no --> CONTINUE[Continue normal open flow]
+  ASK -- yes --> DIALOG[Show Restore Discard Cancel dialog]
+  DIALOG --> APPLY[Apply selected action]
+  APPLY --> RESULT[Continue open or abort safely]
+```

@@ -1,5 +1,5 @@
 # API Reference (Core)
-_Last updated: 2026-03-01_
+_Last updated: 2026-03-04_
 
 This section is generated from source docstrings using `mkdocstrings + griffe`, with
 curated architecture context added for human and LLM readability.
@@ -23,4 +23,4 @@ curated architecture context added for human and LLM readability.
 
 1. Public runtime behavior contracts are normative in `docs/spec/technical.md`.
 2. API docs describe implementation shape, not product requirements.
-3. Deep-review modules are explicitly marked and must not be treated as finalized architecture.
+3. If a module re-enters `Document-or-Flag` review, API pages must include explicit warning notes tied to `docs/reference/review_queue.json`.

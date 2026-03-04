@@ -1,5 +1,5 @@
 # TranslationZed-Py — Module Responsibility Map
-_Last updated: 2026-02-25_
+_Last updated: 2026-03-04_
 
 ## 1) Core Domain And Services
 
@@ -57,3 +57,11 @@ _Last updated: 2026-02-25_
 3. Workflow decisions should be exposed through DTO/callback contracts, with GUI
    responsible only for rendering and user interaction.
 4. Any new module must be added to this map and referenced by canonical spec docs.
+
+## 4) v0.9 Target Mapping
+
+Planned `v0.9.0` feature specs map to modules as follows:
+1. QA live checklist: `gui.qa_async`, `gui.main_window_panel_helpers`, `core.qa_service`.
+2. TM explainability: `core.tm_query_engine`, `core.tm_query_scoring`, `core.tm_workflow_service`, TM panel adapters.
+3. TM workflow UX: `gui.main_window_panel_helpers`, `gui.tm_preview`, `core.tm_workflow_service`.
+4. Crash recovery UC-12: `core.project_session`, startup/open adapters in `gui.main_window`, recovery dialog surfaces in `gui.dialogs`.

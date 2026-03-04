@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-03-01_
+_Last updated: 2026-03-04_
 
 ---
 
@@ -15,6 +15,18 @@ _Last updated: 2026-03-01_
    (Linux/macOS/Windows behave identically on fixtures).
 5. **GUI smoke + integration** second (Qt event wiring).
 6. Keep tests deterministic and runnable headless.
+
+## 1.1) v0.9 Target Verification Matrix (Planned)
+
+This section is normative for upcoming `v0.9.0` implementation work and maps
+directly to `docs/spec/v0_9/*`.
+
+| Target area | Planned verification focus | Primary test modules (planned/extended) |
+|---|---|---|
+| QA live checklist | rule-order invariants, state transitions, completion-ratio monotonicity, LT note semantics | `tests/test_qa_async.py`, `tests/test_gui_qa_panel.py`, new QA progress DTO tests |
+| TM explainability | payload correctness (`raw`, `ratio`, `bonus`, cap reasons), deterministic ordering unchanged | `tests/test_tm_store.py`, `tests/test_tm_ranking_corpus.py`, explainability payload contract tests |
+| TM workflow UX | grouping/sorting view invariants, quick-apply parity (keyboard/mouse), non-blocking empty/error states | TM panel GUI tests, `tests/test_gui_tm_preferences.py` extensions |
+| Crash recovery (UC-12) | startup candidate detection, restore/discard/cancel semantics, plaintext details, no-write-on-open invariant | project-session/startup tests, new crash-recovery integration tests |
 
 ---
 

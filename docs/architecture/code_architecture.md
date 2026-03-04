@@ -1,5 +1,5 @@
 # TranslationZed-Py — Code Architecture
-_Last updated: 2026-03-01_
+_Last updated: 2026-03-04_
 
 This document is the concrete code-level architecture reference.
 It complements:
@@ -417,7 +417,7 @@ sequenceDiagram
   UI->>SNAP: persist new snapshot after successful save
 ```
 
-## 7) QA + LanguageTool Integration Sequence
+## 7) QA + LanguageTool Integration Sequence (Current v0.8.0)
 
 ```mermaid
 sequenceDiagram
@@ -436,6 +436,26 @@ sequenceDiagram
   LTAD->>LT: check_text(level=default|picky)
   LT-->>LTAD: LanguageToolCheckResult
   LTAD-->>UI: underline spans + hint window actions
+```
+
+### 7.1 v0.9 target: QA live checklist call chain
+
+```mermaid
+sequenceDiagram
+  participant UI as MainWindow QA panel
+  participant ASYNC as gui.qa_async
+  participant QA as core.qa_service
+  participant LT as core.languagetool
+
+  UI->>ASYNC: run_qa_scan(file, rules_plan)
+  ASYNC-->>UI: QARuleProgressRecord(state=queued) x N
+  ASYNC-->>UI: QARuleProgressRecord(state=running, rule=trailing)
+  ASYNC->>QA: run trailing/newline/token/same-source rules
+  QA-->>ASYNC: findings + per-rule completion
+  ASYNC-->>UI: per-rule state updates (done/skipped/failed)
+  ASYNC->>LT: optional LT stage (non-blocking)
+  LT-->>ASYNC: LT findings / warning note
+  ASYNC-->>UI: final snapshot + completion ratio
 ```
 
 ## 8) TM Orchestration + Ranking Pipeline
@@ -494,7 +514,45 @@ flowchart TB
   WF_VIEW --> UI_ROWS[TMSuggestionsView rows]
 ```
 
-## 9) Dependency Direction Contract
+### 8.2 v0.9 target: TM explainability call chain
+
+```mermaid
+sequenceDiagram
+  participant UI as TM panel
+  participant WF as TMWorkflowService
+  participant STORE as TMStore
+  participant ENG as tm_query_engine
+  participant SCORE as tm_query_scoring
+
+  UI->>WF: request suggestions(query, min_score)
+  WF->>STORE: query(...)
+  STORE->>ENG: query_conn(...)
+  ENG->>SCORE: score_candidate(...)
+  SCORE-->>ENG: score + tie-break + explanation factors
+  ENG-->>STORE: ordered matches + explainability payload
+  STORE-->>WF: query result
+  WF-->>UI: rows + why-matched metadata
+```
+
+## 9) v0.9 target: Startup crash recovery call chain
+
+```mermaid
+sequenceDiagram
+  participant APP as app startup
+  participant MW as MainWindow
+  participant PS as project_session
+  participant CR as crash-recovery service
+  participant DLG as recovery dialog
+
+  APP->>PS: build startup/open plan
+  PS->>CR: detect recovery candidates
+  CR-->>MW: CrashRecoveryReport | none
+  MW->>DLG: show Restore/Discard/Cancel + plaintext details
+  DLG-->>MW: decision
+  MW->>CR: apply decision
+  MW->>PS: continue open flow or abort safely
+```
+## 10) Dependency Direction Contract
 
 ```mermaid
 flowchart TB
@@ -525,7 +583,7 @@ flowchart TB
   classDef forbidden fill:#7a1f1f,stroke:#ff8080,color:#ffffff;
 ```
 
-## 10) Programming Model Notes For Contributors
+## 11) Programming Model Notes For Contributors
 
 1. Keep business decisions in core service modules, not Qt slots/widgets.
 2. Add DTO-first APIs (dataclasses/protocols) for cross-layer boundaries.
@@ -533,28 +591,15 @@ flowchart TB
 4. If adding GUI behavior, wire through helper adapters before growing `main_window.py`.
 5. Update this document and `docs/reference/module_map.md` when adding or moving ownership.
 
-## 11) Flagged Modules (Document-or-Flag)
+## 12) Document-or-Flag Status
 
-Active deep-review entries (see `docs/reference/review_queue.json`):
+Current queue state:
+1. `docs/reference/review_queue.json` currently has no active
+   `REVIEW_REQUIRED` or `IN_REFACTOR` entries.
+2. Previous P1 entries (`preferences.py`, `search_replace_service.py`,
+   `tm_store.py`) are closed and retained as historical evidence.
 
-- FLAGGED_MODULE: translationzed_py/core/preferences.py
-  - current behavior: env parsing + normalization + migration orchestration in one module.
-  - known limits: high branch density in `_parse_env` reduces readability/change safety.
-  - risk notes: intertwined legacy + current key paths can hide regressions.
-  - refactor target: split parser/normalizer/migration helpers.
-  - tests needed: `tests/test_preferences.py`, `tests/test_preferences_edge_paths.py`,
-    `tests/test_preferences_service.py`.
-
-- FLAGGED_MODULE: translationzed_py/core/search_replace_service.py
-  - current behavior: search planning, caching policy, replace orchestration in one module.
-  - known limits: high branching and wide responsibility surface.
-  - risk notes: policy and performance changes are tightly coupled.
-  - refactor target: isolate planning/caching/apply helpers.
-  - tests needed: `tests/test_search_replace_service.py`,
-    `tests/test_search_wave2_equivalence.py`, `tests/test_search_perf_contract.py`.
-
-When a module is flagged in `docs/reference/review_queue.json`, add an explicit marker:
-
-`FLAGGED_MODULE: translationzed_py/<path>.py`
-
-and keep the section factual (current behavior, limits, risk, refactor target, tests).
+Rule when new risk is detected:
+1. Add `FLAGGED_MODULE: translationzed_py/<path>.py` in this document.
+2. Add queue entry in `docs/reference/review_queue.json` with closure criteria.
+3. Keep only factual internals for flagged modules until closure.
