@@ -67,3 +67,51 @@ preview_context_lines = "bad"
     cfg = app_config.load(tmp_path)
     assert cfg.insertion_enabled_globs == ("*.txt",)
     assert cfg.preview_context_lines == 3
+
+
+def test_candidate_roots_none_and_dedup(tmp_path: Path, monkeypatch) -> None:
+    """Candidate roots should include cwd and deduplicate duplicates."""
+    monkeypatch.chdir(tmp_path)
+    roots_none = app_config._candidate_roots(None)
+    assert roots_none == [tmp_path.resolve()]
+
+    roots_dup = app_config._candidate_roots(tmp_path)
+    assert roots_dup == [tmp_path.resolve()]
+
+
+def test_load_toml_handles_oserror(tmp_path: Path, monkeypatch) -> None:
+    """TOML loader should safely return empty payload when read fails."""
+    cfg_file = tmp_path / "config" / "app.toml"
+    cfg_file.parent.mkdir(parents=True, exist_ok=True)
+    cfg_file.write_text("[diff]\npreview_context_lines = 3\n", encoding="utf-8")
+
+    def _raise_oserror(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise OSError("blocked")
+
+    monkeypatch.setattr(Path, "read_text", _raise_oserror)
+    assert app_config._load_toml(cfg_file) == {}
+
+
+def test_normalize_globs_string_input() -> None:
+    """String glob payload should normalize to one-item tuple."""
+    assert app_config._normalize_globs(" *.cfg ", default=("*.txt",)) == ("*.cfg",)
+
+
+def test_load_ignores_non_dict_sections(tmp_path: Path) -> None:
+    """Non-dict top-level config sections should be ignored safely."""
+    app_config.load.cache_clear()
+    _write_config(
+        tmp_path,
+        """
+paths = "bad"
+cache = "bad"
+adapters = "bad"
+formats = "bad"
+diff = "bad"
+""".strip() + "\n",
+    )
+    cfg = app_config.load(tmp_path)
+    assert cfg.cache_dir == ".tzp/cache"
+    assert cfg.config_dir == ".tzp/config"
+    assert cfg.cache_ext == ".bin"
+    assert cfg.translation_ext == ".txt"

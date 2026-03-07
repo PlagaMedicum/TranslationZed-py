@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from translationzed_py.core.en_insert_plan import (
+    ENInsertItem,
     ENInsertPlan,
     apply_insert_plan,
     build_insert_plan,
@@ -62,3 +63,109 @@ def test_apply_insert_plan_merges_lines_and_supports_manual_edits() -> None:
         edited_snippets={"K2": '# custom\nK2 = "manual"\n'},
     )
     assert '# custom\nK2 = "manual"' in edited
+
+
+def test_build_insert_plan_returns_empty_for_missing_contexts_or_no_new_keys() -> None:
+    """Verify planner exits early when EN has no keys or no missing edited keys."""
+    no_contexts = build_insert_plan(
+        en_text="# comments only\n-- still no keys\n",
+        locale_text='A = "a"\n',
+        edited_new_values={"A": "aa"},
+    )
+    assert no_contexts.items == ()
+
+    no_missing_keys = build_insert_plan(
+        en_text='A = "a"\nB = "b"\n',
+        locale_text='A = "a"\nB = "b"\n# comment line\n',
+        edited_new_values={"A": "aa"},
+    )
+    assert no_missing_keys.items == ()
+
+
+def test_build_insert_plan_comment_boundaries_and_anchor_scan() -> None:
+    """Verify comment block boundaries and anchor scan fallback behavior."""
+    en_text = (
+        'A = "a"\n'
+        "# lead for B\n"
+        "\n"
+        'B = "b"\n'
+        "\n"
+        'C = "c"\n'
+        "not a comment line\n"
+        "# not trailing for C\n"
+        'D = "d"\n'
+    )
+    locale_text = 'A = "a"\n'
+    plan = build_insert_plan(
+        en_text=en_text,
+        locale_text=locale_text,
+        edited_new_values={"C": "cc"},
+    )
+    assert [item.key for item in plan.items] == ["C"]
+    assert plan.items[0].anchor_key == "A"
+    assert plan.items[0].snippet_lines == ('C = "cc"',)
+
+
+def test_build_insert_plan_allows_none_anchor_when_no_previous_key_exists() -> None:
+    """Verify planner can emit missing keys without anchor fallback."""
+    plan = build_insert_plan(
+        en_text='A = "a"\nB = "b"\nC = "c"\n',
+        locale_text="",
+        edited_new_values={"C": "cc"},
+    )
+    assert len(plan.items) == 1
+    assert plan.items[0].anchor_key is None
+
+
+def test_apply_insert_plan_handles_empty_and_missing_anchor_paths() -> None:
+    """Verify apply handles empty locale text, empty snippets, and missing anchors."""
+    empty_item_plan = ENInsertPlan(items=())
+    assert (
+        apply_insert_plan(locale_text='A = "a"\n', plan=empty_item_plan) == 'A = "a"\n'
+    )
+
+    locale = ""
+    plan = ENInsertPlan(
+        items=(
+            build_insert_plan(
+                en_text='A = "a"\nK1 = "v"\n',
+                locale_text='A = "a"\n',
+                edited_new_values={"K1": "v-local"},
+            ).items[0],
+        )
+    )
+    merged = apply_insert_plan(
+        locale_text=locale,
+        plan=plan,
+        edited_snippets={"K1": ""},
+    )
+    assert merged == "\n"
+
+    no_anchor_plan = ENInsertPlan(
+        items=(
+            ENInsertItem(
+                key="K2",
+                value="two",
+                anchor_key=None,
+                snippet_lines=('K2 = "two"',),
+            ),
+        )
+    )
+    appended_without_anchor = apply_insert_plan(
+        locale_text='A = "a"\n',
+        plan=no_anchor_plan,
+    )
+    assert appended_without_anchor == 'A = "a"\nK2 = "two"\n'
+
+    missing_anchor_plan = ENInsertPlan(
+        items=(
+            ENInsertItem(
+                key="K1",
+                value="v-local",
+                anchor_key="MISSING_KEY",
+                snippet_lines=('K1 = "v-local"',),
+            ),
+        )
+    )
+    appended = apply_insert_plan(locale_text='A = "a"\n', plan=missing_anchor_plan)
+    assert appended == 'A = "a"\nK1 = "v-local"\n'
