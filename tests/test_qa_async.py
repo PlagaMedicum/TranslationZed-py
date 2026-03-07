@@ -5,7 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from translationzed_py.core.qa_service import QA_CODE_LANGUAGETOOL, QAFinding
+from translationzed_py.core.qa_service import (
+    QA_CODE_LANGUAGETOOL,
+    QA_CODE_NEWLINES,
+    QA_CODE_TOKENS,
+    QA_CODE_TRAILING,
+    QAFinding,
+    QARuleState,
+    QAService,
+)
 from translationzed_py.gui import qa_async
 
 
@@ -70,17 +78,43 @@ class _Pool:
         return self.future
 
 
-class _QaService:
-    """QA service stub that records scan requests."""
+def _scan_rule_from_kwargs(kwargs: dict[str, object]) -> str:
+    """Return rule id from scan_rows kwargs flags."""
+    if bool(kwargs.get("check_trailing")):
+        return "trailing"
+    if bool(kwargs.get("check_newlines")):
+        return "newlines"
+    if bool(kwargs.get("check_tokens")):
+        return "tokens"
+    if bool(kwargs.get("check_same_as_source")):
+        return "same_source"
+    return "unknown"
 
-    def __init__(self, *, findings: tuple[QAFinding, ...] = ()) -> None:
+
+class _QaService:
+    """QA service stub that records scan requests and delegates progress helpers."""
+
+    def __init__(
+        self, *, findings_by_rule: dict[str, tuple[QAFinding, ...]] | None = None
+    ):
         self.calls: list[dict[str, object]] = []
-        self.findings = findings
+        self.findings_by_rule = findings_by_rule or {}
+        self._delegate = QAService()
 
     def scan_rows(self, **kwargs):  # type: ignore[no-untyped-def]
         """Capture call and return configured findings list."""
         self.calls.append(kwargs)
-        return list(self.findings)
+        rule = _scan_rule_from_kwargs(kwargs)
+        return list(self.findings_by_rule.get(rule, ()))
+
+    def build_progress_records(self, **kwargs):  # type: ignore[no-untyped-def]
+        return self._delegate.build_progress_records(**kwargs)
+
+    def transition_rule_state(self, **kwargs):  # type: ignore[no-untyped-def]
+        return self._delegate.transition_rule_state(**kwargs)
+
+    def build_progress_snapshot(self, **kwargs):  # type: ignore[no-untyped-def]
+        return self._delegate.build_progress_snapshot(**kwargs)
 
 
 class _Model:
@@ -95,7 +129,7 @@ class _Model:
 
 
 class _Win:
-    """Window-like object exposing the attributes used by qa_async."""
+    """Window-like object exposing attributes used by qa_async."""
 
     def __init__(self) -> None:
         self._current_pf = SimpleNamespace(path=Path("/tmp/project/BE/ui.txt"))
@@ -109,6 +143,7 @@ class _Win:
         self._qa_scan_future = None
         self._qa_scan_pool = None
         self._qa_scan_path = None
+        self._qa_scan_run_id = ""
         self._qa_scan_timer = _Timer()
         self._qa_check_trailing = True
         self._qa_check_newlines = False
@@ -129,6 +164,7 @@ class _Win:
         self.findings_history: list[tuple[object, ...]] = []
         self.progress_history: list[bool] = []
         self.auto_mark_history: list[tuple[object, ...]] = []
+        self.snapshot_history: list[tuple[object, ...]] = []
 
     def _set_qa_findings(self, findings) -> None:  # type: ignore[no-untyped-def]
         """Capture applied findings."""
@@ -146,6 +182,10 @@ class _Win:
         """Capture progress visibility updates."""
         self.progress_history.append(visible)
 
+    def _set_qa_progress_snapshots(self, snapshots) -> None:  # type: ignore[no-untyped-def]
+        """Capture progress snapshots updates."""
+        self.snapshot_history.append(tuple(snapshots))
+
     def _apply_qa_auto_mark(self, findings) -> None:  # type: ignore[no-untyped-def]
         """Capture auto-mark finding set."""
         self.auto_mark_history.append(tuple(findings))
@@ -155,6 +195,46 @@ class _Win:
         return "en-US"
 
 
+def _job_result_for(
+    path: Path, *, run_id: str, findings: tuple[QAFinding, ...], note: str
+):
+    """Build QA scan job result with one final snapshot."""
+    service = QAService()
+    records = service.build_progress_records(
+        run_id=run_id,
+        enabled_rules=("trailing",),
+        skip_disabled_rules=True,
+    )
+    records = service.transition_rule_state(
+        records=records,
+        run_id=run_id,
+        rule_id="trailing",
+        new_state=QARuleState.RUNNING,
+        timestamp_ms=1,
+    )
+    records = service.transition_rule_state(
+        records=records,
+        run_id=run_id,
+        rule_id="trailing",
+        new_state=QARuleState.DONE,
+        timestamp_ms=2,
+        findings_count=len(findings),
+    )
+    snapshot = service.build_progress_snapshot(
+        run_id=run_id,
+        file_path=path,
+        ordered_rules=records,
+        final_summary="summary",
+    )
+    return qa_async.QAScanJobResult(
+        run_id=run_id,
+        path=path,
+        findings=findings,
+        note=note,
+        snapshots=(snapshot,),
+    )
+
+
 def test_collect_input_rows_returns_empty_without_model() -> None:
     """Verify row collector returns empty tuple when model is missing."""
     win = _Win()
@@ -162,29 +242,38 @@ def test_collect_input_rows_returns_empty_without_model() -> None:
     assert qa_async._collect_input_rows(win) == ()
 
 
-def test_run_scan_job_delegates_to_qa_service() -> None:
-    """Verify scan job forwards all QA options and returns path/findings."""
+def test_run_scan_job_returns_progress_snapshots_and_rule_findings() -> None:
+    """Verify run-scan payload includes snapshots and per-rule findings."""
     file_path = Path("/tmp/project/BE/ui.txt")
-    finding = QAFinding(file=file_path, row=1, code="qa.tokens", excerpt="x")
+    trailing = QAFinding(file=file_path, row=1, code=QA_CODE_TRAILING, excerpt="t")
+    tokens = QAFinding(file=file_path, row=2, code=QA_CODE_TOKENS, excerpt="k")
     win = _Win()
-    win._qa_service = _QaService(findings=(finding,))
+    win._qa_service = _QaService(
+        findings_by_rule={
+            "trailing": (trailing,),
+            "tokens": (tokens,),
+        }
+    )
     rows = qa_async._collect_input_rows(win)
-
-    path, findings, note = qa_async._run_scan_job(
+    result = qa_async._run_scan_job(
         win,
         file_path,
         rows,
+        "run-1",
         True,
         False,
         True,
         False,
     )
-
-    assert path == file_path
-    assert findings == [finding]
-    assert note == ""
-    assert win._qa_service.calls
-    assert win._qa_service.calls[0]["rows"] == rows
+    assert result.path == file_path
+    assert result.run_id == "run-1"
+    assert result.findings == (trailing, tokens)
+    assert result.note == ""
+    assert result.snapshots
+    assert result.snapshots[-1].run_id == "run-1"
+    assert len(win._qa_service.calls) == 2
+    assert _scan_rule_from_kwargs(win._qa_service.calls[0]) == "trailing"
+    assert _scan_rule_from_kwargs(win._qa_service.calls[1]) == "tokens"
 
 
 def test_start_scan_sets_no_file_message_without_path_or_model() -> None:
@@ -195,6 +284,7 @@ def test_start_scan_sets_no_file_message_without_path_or_model() -> None:
     assert win.findings_history == [()]
     assert win.notes[-1] == ""
     assert win.messages[-1] == "No file selected."
+    assert win.snapshot_history[-1] == ()
 
     win = _Win()
     win._current_model = None
@@ -202,6 +292,7 @@ def test_start_scan_sets_no_file_message_without_path_or_model() -> None:
     assert win.findings_history == [()]
     assert win.notes[-1] == ""
     assert win.messages[-1] == "No file selected."
+    assert win.snapshot_history[-1] == ()
 
 
 def test_start_scan_reports_already_running_when_future_pending() -> None:
@@ -230,11 +321,17 @@ def test_start_scan_submits_job_and_respects_timer_activity(monkeypatch) -> None
     assert win._qa_scan_pool is created_pools[0]
     assert win._qa_scan_future is created_pools[0].future
     assert win._qa_scan_path == win._current_pf.path
+    assert win._qa_scan_run_id.startswith("qa-")
     assert win.notes[-1] == ""
     assert win._qa_scan_languagetool_language == "en-US"
     assert win.progress_history == [True]
     assert win.messages[-1] == "Running QA checks..."
     assert win._qa_scan_timer.start_calls == 1
+    assert win.snapshot_history
+
+    fn, args = created_pools[0].submit_calls[0]
+    assert fn is qa_async._run_scan_job
+    assert args[3] == win._qa_scan_run_id
 
     win._qa_scan_future = None
     win._qa_scan_timer = _Timer(active=True)
@@ -265,13 +362,24 @@ def test_poll_scan_handles_future_none_pending_and_exception() -> None:
 
 
 def test_poll_scan_ignores_stale_result_and_applies_current_result() -> None:
-    """Verify poll ignores stale path results and applies current-file findings."""
+    """Verify poll ignores stale path/run_id and applies current-file matching result."""
     stale_win = _Win()
+    stale_win._qa_scan_run_id = "run-live"
     stale_path = Path("/tmp/project/RU/ui.txt")
-    stale_finding = QAFinding(file=stale_path, row=3, code="qa.newlines", excerpt="bad")
+    stale_finding = QAFinding(
+        file=stale_path,
+        row=3,
+        code=QA_CODE_NEWLINES,
+        excerpt="bad",
+    )
     stale_win._qa_scan_future = _Future(
         done=True,
-        payload=(stale_path, [stale_finding], "stale note"),
+        payload=_job_result_for(
+            stale_path,
+            run_id="run-old",
+            findings=(stale_finding,),
+            note="stale note",
+        ),
     )
     qa_async.poll_scan(stale_win)
     assert stale_win.findings_history == []
@@ -279,16 +387,23 @@ def test_poll_scan_ignores_stale_result_and_applies_current_result() -> None:
 
     win = _Win()
     win._qa_auto_mark_for_review = True
+    win._qa_scan_run_id = "run-live"
     path = win._current_pf.path
-    finding = QAFinding(file=path, row=4, code="qa.trailing", excerpt="trim")
+    finding = QAFinding(file=path, row=4, code=QA_CODE_TRAILING, excerpt="trim")
     win._qa_scan_future = _Future(
         done=True,
-        payload=(path, [finding], "LanguageTool scanned first 10 row(s) due to cap."),
+        payload=_job_result_for(
+            path,
+            run_id="run-live",
+            findings=(finding,),
+            note="LanguageTool scanned first 10 row(s) due to cap.",
+        ),
     )
     qa_async.poll_scan(win)
     assert win.notes[-1].startswith("LanguageTool scanned first")
     assert win.findings_history == [(finding,)]
     assert win.auto_mark_history == [(finding,)]
+    assert win.snapshot_history[-1]
 
 
 def test_run_scan_job_skips_languagetool_when_disabled(monkeypatch) -> None:
@@ -299,18 +414,26 @@ def test_run_scan_job_skips_languagetool_when_disabled(monkeypatch) -> None:
         raise AssertionError("LanguageTool should not be called")
 
     monkeypatch.setattr(qa_async, "_lt_check_text", _unexpected_lt_call)
-    path, findings, note = qa_async._run_scan_job(
+    result = qa_async._run_scan_job(
         win,
         win._current_pf.path,
         qa_async._collect_input_rows(win),
+        "run-1",
         True,
         True,
         True,
         True,
     )
-    assert path == win._current_pf.path
-    assert note == ""
-    assert all(finding.code != QA_CODE_LANGUAGETOOL for finding in findings)
+    assert result.path == win._current_pf.path
+    assert result.note == ""
+    assert all(finding.code != QA_CODE_LANGUAGETOOL for finding in result.findings)
+    lt_record = next(
+        record
+        for record in result.snapshots[-1].ordered_rules
+        if record.rule_id == "languagetool"
+    )
+    assert lt_record.state == QARuleState.SKIPPED
+    assert lt_record.note == "Rule disabled in settings."
 
 
 def test_run_scan_job_includes_languagetool_findings_when_enabled(monkeypatch) -> None:
@@ -326,17 +449,24 @@ def test_run_scan_job_includes_languagetool_findings_when_enabled(monkeypatch) -
         )
 
     monkeypatch.setattr(qa_async, "_lt_check_text", _fake_lt_check_text)
-    _path, findings, note = qa_async._run_scan_job(
+    result = qa_async._run_scan_job(
         win,
         win._current_pf.path,
         qa_async._collect_input_rows(win),
+        "run-1",
         False,
         False,
         False,
         False,
     )
-    assert note == ""
-    assert any(finding.code == QA_CODE_LANGUAGETOOL for finding in findings)
+    assert result.note == ""
+    assert any(finding.code == QA_CODE_LANGUAGETOOL for finding in result.findings)
+    lt_record = next(
+        record
+        for record in result.snapshots[-1].ordered_rules
+        if record.rule_id == "languagetool"
+    )
+    assert lt_record.state == QARuleState.DONE
 
 
 def test_run_scan_job_reports_languagetool_row_cap_note(monkeypatch) -> None:
@@ -353,52 +483,59 @@ def test_run_scan_job_reports_languagetool_row_cap_note(monkeypatch) -> None:
         )
 
     monkeypatch.setattr(qa_async, "_lt_check_text", _fake_lt_check_text)
-    _path, _findings, note = qa_async._run_scan_job(
+    result = qa_async._run_scan_job(
         win,
         win._current_pf.path,
         qa_async._collect_input_rows(win),
+        "run-1",
         False,
         False,
         False,
         False,
     )
-    assert note == "LanguageTool scanned first 1 row(s) due to cap."
+    assert result.note == "LanguageTool scanned first 1 row(s) due to cap."
 
 
 def test_run_scan_job_skips_languagetool_when_standard_limit_is_full(
     monkeypatch,
 ) -> None:
-    """Verify LT stage is skipped when standard findings already fill the panel cap."""
+    """Verify LT stage is skipped when standard findings already fill panel cap."""
     win = _Win()
     win._qa_panel_result_limit = 1
     win._qa_check_languagetool = True
     win._qa_service = _QaService(
-        findings=(
-            QAFinding(
-                file=win._current_pf.path,
-                row=1,
-                code="qa.trailing",
-                excerpt="base",
-            ),
-        )
+        findings_by_rule={
+            "trailing": (
+                QAFinding(
+                    file=win._current_pf.path,
+                    row=1,
+                    code=QA_CODE_TRAILING,
+                    excerpt="base",
+                ),
+            )
+        }
     )
 
     def _unexpected_lt_call(**_kwargs):  # type: ignore[no-untyped-def]
         raise AssertionError("LanguageTool should not run when no panel slots remain")
 
     monkeypatch.setattr(qa_async, "_lt_check_text", _unexpected_lt_call)
-    _path, findings, note = qa_async._run_scan_job(
+    result = qa_async._run_scan_job(
         win,
         win._current_pf.path,
         qa_async._collect_input_rows(win),
+        "run-1",
         True,
         False,
         False,
         False,
     )
-    assert len(findings) == 1
-    assert findings[0].code == "qa.trailing"
-    assert note == "LanguageTool skipped: QA result limit reached by standard checks."
+    assert len(result.findings) == 1
+    assert result.findings[0].code == QA_CODE_TRAILING
+    assert (
+        result.note
+        == "LanguageTool skipped: QA result limit reached by standard checks."
+    )
 
 
 def test_run_scan_job_stops_languagetool_when_result_limit_reached(monkeypatch) -> None:
@@ -407,14 +544,16 @@ def test_run_scan_job_stops_languagetool_when_result_limit_reached(monkeypatch) 
     win._qa_check_languagetool = True
     win._qa_panel_result_limit = 2
     win._qa_service = _QaService(
-        findings=(
-            QAFinding(
-                file=win._current_pf.path,
-                row=0,
-                code="qa.trailing",
-                excerpt="base",
-            ),
-        )
+        findings_by_rule={
+            "trailing": (
+                QAFinding(
+                    file=win._current_pf.path,
+                    row=0,
+                    code=QA_CODE_TRAILING,
+                    excerpt="base",
+                ),
+            )
+        }
     )
     rows = (
         qa_async.QAInputRow(row=1, source_text="src", target_text="dst"),
@@ -431,26 +570,71 @@ def test_run_scan_job_stops_languagetool_when_result_limit_reached(monkeypatch) 
         )
 
     monkeypatch.setattr(qa_async, "_lt_check_text", _fake_lt_check_text)
-    _path, findings, note = qa_async._run_scan_job(
+    result = qa_async._run_scan_job(
         win,
         win._current_pf.path,
         rows,
+        "run-1",
         True,
         False,
         False,
         False,
     )
     assert calls["count"] == 1
-    assert len(findings) == 2
-    assert [f.code for f in findings] == ["qa.trailing", QA_CODE_LANGUAGETOOL]
-    assert "LanguageTool scanned first 1 row(s) due to cap." in note
-    assert "LanguageTool stopped at 1 finding(s) due to QA result limit." in note
+    assert len(result.findings) == 2
+    assert [f.code for f in result.findings] == [QA_CODE_TRAILING, QA_CODE_LANGUAGETOOL]
+    assert "LanguageTool scanned first 1 row(s) due to cap." in result.note
+    assert "LanguageTool stopped at 1 finding(s) due to QA result limit." in result.note
+
+
+def test_run_scan_job_languagetool_exceptions_do_not_fail_whole_scan(
+    monkeypatch,
+) -> None:
+    """Verify LT exceptions are isolated to LT rule and do not abort full scan."""
+    win = _Win()
+    win._qa_check_languagetool = True
+    win._qa_service = _QaService(
+        findings_by_rule={
+            "trailing": (
+                QAFinding(
+                    file=win._current_pf.path,
+                    row=0,
+                    code=QA_CODE_TRAILING,
+                    excerpt="base",
+                ),
+            )
+        }
+    )
+
+    def _lt_raises(**_kwargs):  # type: ignore[no-untyped-def]
+        raise RuntimeError("lt unavailable")
+
+    monkeypatch.setattr(qa_async, "_lt_check_text", _lt_raises)
+    result = qa_async._run_scan_job(
+        win,
+        win._current_pf.path,
+        qa_async._collect_input_rows(win),
+        "run-1",
+        True,
+        False,
+        False,
+        False,
+    )
+    assert result.findings[0].code == QA_CODE_TRAILING
+    assert "LanguageTool rule failed for one or more rows." in result.note
+    lt_record = next(
+        record
+        for record in result.snapshots[-1].ordered_rules
+        if record.rule_id == "languagetool"
+    )
+    assert lt_record.state == QARuleState.FAILED
 
 
 def test_poll_scan_filters_languagetool_auto_mark_by_toggle() -> None:
     """Verify LT findings are auto-marked only when LT auto-mark toggle is enabled."""
     win = _Win()
     win._qa_auto_mark_for_review = True
+    win._qa_scan_run_id = "run-1"
     path = win._current_pf.path
     lt_finding = QAFinding(
         file=path,
@@ -461,19 +645,32 @@ def test_poll_scan_filters_languagetool_auto_mark_by_toggle() -> None:
     base_finding = QAFinding(
         file=path,
         row=2,
-        code="qa.trailing",
+        code=QA_CODE_TRAILING,
         excerpt="base",
     )
     win._qa_languagetool_automark = False
     win._qa_scan_future = _Future(
-        done=True, payload=(path, [lt_finding, base_finding], "")
+        done=True,
+        payload=_job_result_for(
+            path,
+            run_id="run-1",
+            findings=(lt_finding, base_finding),
+            note="",
+        ),
     )
     qa_async.poll_scan(win)
     assert win.auto_mark_history[-1] == (base_finding,)
 
     win._qa_languagetool_automark = True
+    win._qa_scan_run_id = "run-2"
     win._qa_scan_future = _Future(
-        done=True, payload=(path, [lt_finding, base_finding], "")
+        done=True,
+        payload=_job_result_for(
+            path,
+            run_id="run-2",
+            findings=(lt_finding, base_finding),
+            note="",
+        ),
     )
     qa_async.poll_scan(win)
     assert win.auto_mark_history[-1] == (lt_finding, base_finding)
