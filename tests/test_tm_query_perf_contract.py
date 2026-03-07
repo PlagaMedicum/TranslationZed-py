@@ -61,6 +61,30 @@ def _legacy_tm_query_helpers() -> Iterator[None]:
 def _matches_snapshot(matches) -> list[tuple[object, ...]]:
     return [
         (
+            item.explainability.score if item.explainability else None,
+            item.explainability.raw_score if item.explainability else None,
+            item.explainability.ratio if item.explainability else None,
+            item.explainability.cap_reason if item.explainability else None,
+            (
+                item.explainability.tie_break.token_count_delta
+                if item.explainability
+                else None
+            ),
+            (
+                item.explainability.tie_break.origin_priority
+                if item.explainability
+                else None
+            ),
+            item.explainability.tie_break.updated_at if item.explainability else None,
+            item.explainability.decision_notes if item.explainability else (),
+        )
+        for item in matches
+    ]
+
+
+def _legacy_snapshot(matches) -> list[tuple[object, ...]]:
+    return [
+        (
             item.source_text,
             item.target_text,
             item.score,
@@ -145,6 +169,7 @@ def test_tm_query_optimized_path_is_bit_stable_vs_legacy(tmp_path: Path) -> None
                 limit=20,
                 min_score=5,
             )
+            assert _legacy_snapshot(optimized) == _legacy_snapshot(legacy)
             assert _matches_snapshot(optimized) == _matches_snapshot(legacy)
     finally:
         store.close()

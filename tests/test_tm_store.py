@@ -4,6 +4,8 @@ import gc
 import warnings
 from pathlib import Path
 
+import pytest
+
 from translationzed_py.core.tm_store import TMStore
 
 
@@ -753,6 +755,180 @@ def test_tm_store_exposes_ranked_and_raw_scores_for_diagnostics(tmp_path: Path) 
     assert exact.raw_score == 100
     assert neighbor.raw_score is not None
     assert neighbor.raw_score <= neighbor.score
+    store.close()
+
+
+def test_tm_store_exact_match_exposes_explainability_payload(tmp_path: Path) -> None:
+    """Verify exact TM matches include explainability payload metadata."""
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [("k1", "Drop all", "Пакінуць усё")],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    matches = store.query(
+        "Drop all",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=5,
+    )
+
+    exact = next(match for match in matches if match.source_text == "Drop all")
+    payload = exact.explainability
+    assert payload is not None
+    assert payload.score == exact.score == 100
+    assert payload.raw_score == 100
+    assert payload.ratio == 1.0
+    assert payload.cap_reason == "none"
+    assert payload.oversized_guard_applied is False
+    assert payload.oversized_guard_passed is None
+    assert payload.tie_break.origin_priority == 0
+    assert payload.tie_break.updated_at == exact.updated_at
+    assert payload.decision_notes == ("exact_match",)
+    store.close()
+
+
+def test_tm_store_explainability_reports_fuzzy_100_to_99_cap(tmp_path: Path) -> None:
+    """Verify explainability reports fuzzy-cap path when non-exact score hits 100."""
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k1", "Drop all", "Пакінуць усё"),
+            ("k2", "Drop all!", "Пакінуць усё!"),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    matches = store.query(
+        "Drop all",
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=5,
+    )
+
+    fuzzy_neighbor = next(
+        match for match in matches if match.source_text == "Drop all!"
+    )
+    payload = fuzzy_neighbor.explainability
+    assert fuzzy_neighbor.score == 99
+    assert payload is not None
+    assert payload.score == fuzzy_neighbor.score
+    assert payload.raw_score == fuzzy_neighbor.raw_score
+    assert payload.cap_reason == "fuzzy_to_99"
+    assert payload.token_bonus > 0
+    assert payload.tie_break.updated_at == fuzzy_neighbor.updated_at
+    assert "fuzzy_capped_to_99" in payload.decision_notes
+    store.close()
+
+
+def test_tm_store_query_fails_when_explainability_order_is_corrupted(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Verify query path fails fast if explainability order diverges from ranking keys."""
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    store.upsert_project_entries(
+        [
+            ("k_exact", "Drop one", "Скінуць шт."),
+            ("k_fuzzy_1", "Drop one now", "Скінуць зараз."),
+            ("k_fuzzy_2", "Drop all now", "Пакінуць усё зараз."),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+    from translationzed_py.core import tm_query_engine
+
+    original_sort = tm_query_engine.sort_scored_candidates
+
+    def _reverse_sorted(
+        *,
+        scored,
+        query_token_count,
+        query_len,
+        project_origin,
+    ):
+        ordered = original_sort(
+            scored=scored,
+            query_token_count=query_token_count,
+            query_len=query_len,
+            project_origin=project_origin,
+        )
+        return list(reversed(ordered))
+
+    monkeypatch.setattr(tm_query_engine, "sort_scored_candidates", _reverse_sorted)
+
+    with pytest.raises(ValueError, match="non-monotonic"):
+        store.query(
+            "Drop one",
+            source_locale="EN",
+            target_locale="BE",
+            limit=12,
+            min_score=5,
+        )
+    store.close()
+
+
+def test_tm_store_explainability_marks_long_multi_band_for_long_variants(
+    tmp_path: Path,
+) -> None:
+    """Verify long-variant fuzzy matches carry long-multi explainability markers."""
+    root = tmp_path / "root"
+    root.mkdir()
+    store = TMStore(root)
+    file_path = root / "BE" / "ui.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    query = (
+        "Add detailed instructions to customize how Codex can help, "
+        "like what tone to use or how to format responses"
+    )
+    long_variant = (
+        "1) Add detailed instructions to customize how Codex helps with this "
+        "project can help, like what tone it should to use or how it should format "
+        "its response to format responses"
+    )
+    store.upsert_project_entries(
+        [
+            ("k_exact", query, "Дайце падрабязныя інструкцыі."),
+            ("k_long", long_variant, "Даўжэйшы варыянт."),
+        ],
+        source_locale="EN",
+        target_locale="BE",
+        file_path=str(file_path),
+    )
+
+    matches = store.query(
+        query,
+        source_locale="EN",
+        target_locale="BE",
+        limit=12,
+        min_score=50,
+    )
+
+    long_match = next(match for match in matches if match.source_text == long_variant)
+    payload = long_match.explainability
+    assert payload is not None
+    assert payload.long_multi_triggered is True
+    assert payload.band.max_effective >= payload.band.max_base
+    assert "long_multi_band" in payload.decision_notes
+    assert payload.tie_break.token_count_delta >= 0
     store.close()
 
 

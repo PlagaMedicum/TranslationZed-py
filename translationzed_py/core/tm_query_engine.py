@@ -8,6 +8,10 @@ from difflib import SequenceMatcher
 
 from .tm_query_contracts import (
     TMCandidateMetrics,
+    TMCapReason,
+    TMExplainability,
+    TMExplainabilityBand,
+    TMExplainabilityTieBreak,
     TMFuzzyCallbacks,
     TMFuzzyRuntime,
     TMQueryCallbacks,
@@ -15,7 +19,12 @@ from .tm_query_contracts import (
     TMScoredCandidate,
 )
 from .tm_query_policy import allow_oversized_candidate, compute_candidate_length_band
-from .tm_query_scoring import passes_token_gate, score_candidate, sort_scored_candidates
+from .tm_query_scoring import (
+    passes_token_gate,
+    score_candidate,
+    sort_scored_candidates,
+    validate_sorted_explainability_order,
+)
 
 
 def query_conn(
@@ -32,7 +41,7 @@ def query_conn(
     callbacks: TMQueryCallbacks,
     fuzzy_candidates_fn: Callable[
         [sqlite3.Connection, str, str, str, Iterable[str]],
-        list[tuple[sqlite3.Row, int, int]],
+        list[tuple[sqlite3.Row, int, int, TMExplainability]],
     ],
     match_cls: type,
 ) -> list[object]:
@@ -91,6 +100,7 @@ def query_conn(
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
+        origin_priority = 0 if row["origin"] == runtime.project_origin else 1
         matches.append(
             match_cls(
                 source_text=row["source_text"],
@@ -104,6 +114,11 @@ def query_conn(
                 updated_at=row["updated_at"],
                 raw_score=100,
                 row_status=row["row_status"],
+                explainability=_build_exact_explainability(
+                    query_norm=norm,
+                    updated_at=int(row["updated_at"]),
+                    origin_priority=origin_priority,
+                ),
             )
         )
         if len(matches) >= max_exact:
@@ -117,7 +132,7 @@ def query_conn(
         target_locale_norm,
         origin_list,
     )
-    for cand, score, raw_score in candidates:
+    for cand, score, raw_score, explainability in candidates:
         if cand["source_norm"] == norm:
             continue
         dedup_key = (
@@ -144,6 +159,7 @@ def query_conn(
                 updated_at=cand["updated_at"],
                 raw_score=raw_score,
                 row_status=cand["row_status"],
+                explainability=explainability,
             )
         )
         if len(matches) >= limit:
@@ -160,7 +176,7 @@ def fuzzy_candidates(
     *,
     runtime: TMFuzzyRuntime,
     callbacks: TMFuzzyCallbacks,
-) -> list[tuple[sqlite3.Row, int, int]]:
+) -> list[tuple[sqlite3.Row, int, int, TMExplainability]]:
     """Collect and score fuzzy TM candidates with deterministic ordering."""
     query_token_seq = callbacks.query_tokens_cached(norm)
     query_tokens = set(query_token_seq)
@@ -325,13 +341,15 @@ def fuzzy_candidates(
                     continue
             elif not composed:
                 continue
-        if not allow_oversized_candidate(
+        oversized_guard_applied = cand_len > band.max_len_base
+        oversized_guard_passed = allow_oversized_candidate(
             candidate_len=cand_len,
             max_len_base=band.max_len_base,
             overlap=overlap,
             composed=composed,
             ratio=ratio,
-        ):
+        )
+        if not oversized_guard_passed:
             continue
         metrics = TMCandidateMetrics(
             candidate_len=cand_len,
@@ -341,18 +359,63 @@ def fuzzy_candidates(
             composed=composed,
             token_count_delta=token_count_delta,
         )
-        score, raw_score = score_candidate(
+        score_decision = score_candidate(
             query_norm=norm,
             candidate_norm=cand_norm,
             query_token_count=query_token_count,
             metrics=metrics,
         )
+        cap_reason: TMCapReason = "none"
+        if score_decision.fuzzy_capped_to_99:
+            cap_reason = "fuzzy_to_99"
+        elif score_decision.composed_floor_applied:
+            cap_reason = "composed_floor"
+        origin_priority = 0 if row["origin"] == runtime.project_origin else 1
+        decision_notes: list[str] = []
+        if band.query_is_long_multi:
+            decision_notes.append("long_multi_band")
+        if composed:
+            decision_notes.append("composed_phrase_match")
+        if oversized_guard_applied and oversized_guard_passed:
+            decision_notes.append("oversized_guard_passed")
+        if score_decision.composed_floor_applied:
+            decision_notes.append("composed_floor_applied")
+        if score_decision.fuzzy_capped_to_99:
+            decision_notes.append("fuzzy_capped_to_99")
+        explainability = TMExplainability(
+            score=score_decision.score,
+            raw_score=score_decision.raw_score,
+            ratio=metrics.ratio,
+            overlap=metrics.overlap,
+            exact_overlap=metrics.exact_overlap,
+            token_bonus=score_decision.token_bonus,
+            composed_phrase=metrics.composed,
+            long_multi_triggered=band.query_is_long_multi,
+            band=TMExplainabilityBand(
+                min_base=band.min_len_base,
+                max_base=band.max_len_base,
+                min_effective=band.min_len,
+                max_effective=band.max_len,
+            ),
+            oversized_guard_applied=oversized_guard_applied,
+            oversized_guard_passed=(
+                oversized_guard_passed if oversized_guard_applied else None
+            ),
+            cap_reason=cap_reason,
+            tie_break=TMExplainabilityTieBreak(
+                token_count_delta=max(0, metrics.token_count_delta),
+                origin_priority=origin_priority,
+                updated_at=int(row["updated_at"]),
+            ),
+            decision_notes=tuple(decision_notes),
+        )
         scored.append(
             TMScoredCandidate(
                 row=row,
-                score=score,
-                raw_score=raw_score,
+                score=score_decision.score,
+                raw_score=score_decision.raw_score,
                 token_count_delta=metrics.token_count_delta,
+                explainability=explainability,
             )
         )
     sorted_scored = sort_scored_candidates(
@@ -361,7 +424,53 @@ def fuzzy_candidates(
         query_len=query_len,
         project_origin=runtime.project_origin,
     )
-    return [(item.row, item.score, item.raw_score) for item in sorted_scored]
+    validate_sorted_explainability_order(
+        scored=sorted_scored,
+        query_token_count=query_token_count,
+        query_len=query_len,
+        project_origin=runtime.project_origin,
+    )
+    return [
+        (item.row, item.score, item.raw_score, item.explainability)
+        for item in sorted_scored
+    ]
+
+
+def _build_exact_explainability(
+    *,
+    query_norm: str,
+    updated_at: int,
+    origin_priority: int,
+) -> TMExplainability:
+    """Build explainability payload for exact source-norm TM matches."""
+    query_len = len(query_norm)
+    token_count = len([token for token in query_norm.split(" ") if token])
+    overlap = 1.0 if token_count > 0 else 0.0
+    return TMExplainability(
+        score=100,
+        raw_score=100,
+        ratio=1.0,
+        overlap=overlap,
+        exact_overlap=overlap,
+        token_bonus=0,
+        composed_phrase=False,
+        long_multi_triggered=False,
+        band=TMExplainabilityBand(
+            min_base=query_len,
+            max_base=query_len,
+            min_effective=query_len,
+            max_effective=query_len,
+        ),
+        oversized_guard_applied=False,
+        oversized_guard_passed=None,
+        cap_reason="none",
+        tie_break=TMExplainabilityTieBreak(
+            token_count_delta=0,
+            origin_priority=origin_priority,
+            updated_at=updated_at,
+        ),
+        decision_notes=("exact_match",),
+    )
 
 
 def _origin_clause(origins: tuple[str, ...]) -> tuple[str, tuple[str, ...]]:

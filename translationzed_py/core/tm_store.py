@@ -13,23 +13,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from .app_config import LEGACY_CONFIG_DIR
-from .app_config import load as _load_app_config
+from . import app_config as _app_config
+from . import tm_query_engine as _tm_query_engine
+from . import tm_query_text as _tm_query_text
 from .model import Status
 from .tm_query_contracts import (
+    TMExplainability,
     TMFuzzyCallbacks,
     TMFuzzyRuntime,
     TMQueryCallbacks,
     TMQueryRuntime,
 )
-from .tm_query_engine import fuzzy_candidates as _fuzzy_candidates_engine
-from .tm_query_engine import query_conn as _query_conn_engine
 from .tm_query_policy import normalize_for_match as _normalize
 from .tm_query_policy import strip_tm_wrappers as _strip_tm_wrappers_impl
-from .tm_query_text import (
-    contains_composed_phrase_uncached as _contains_phrase_uncached,
-)
-from .tm_query_text import token_matches_uncached as _token_matches_uncached_impl
 from .tm_store_support import (
     is_project_upsert_conflict_mismatch as _is_project_upsert_conflict_mismatch,
 )
@@ -112,6 +108,7 @@ class TMMatch:
     updated_at: int
     raw_score: int | None = None
     row_status: int | None = None
+    explainability: TMExplainability | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,7 +193,7 @@ def _token_matches_uncached(
     use_en_stemming: bool,
 ) -> bool:
     """Execute token matches."""
-    return _token_matches_uncached_impl(
+    return _tm_query_text.token_matches_uncached(
         query_token,
         candidate_token,
         use_en_stemming=use_en_stemming,
@@ -228,7 +225,7 @@ def _contains_composed_phrase_uncached(
     query: str,
     use_en_stemming: bool,
 ) -> bool:
-    return _contains_phrase_uncached(
+    return _tm_query_text.contains_composed_phrase_uncached(
         text,
         query,
         use_en_stemming=use_en_stemming,
@@ -307,7 +304,7 @@ class TMStore:
 
     def __init__(self, root: Path) -> None:
         """Initialize the instance."""
-        cfg = _load_app_config(root)
+        cfg = _app_config.load(root)
         self._path = self._resolve_db_path(root, cfg.config_dir)
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self._path)
@@ -350,7 +347,7 @@ class TMStore:
     def _resolve_db_path(root: Path, config_dir: str) -> Path:
         """Resolve db path."""
         primary = root / config_dir / "tm.sqlite"
-        legacy = root / LEGACY_CONFIG_DIR / "tm.sqlite"
+        legacy = root / _app_config.LEGACY_CONFIG_DIR / "tm.sqlite"
         if primary.exists():
             return primary
         if legacy == primary or not legacy.exists():
@@ -1147,7 +1144,7 @@ class TMStore:
         """Execute query conn."""
         return cast(
             list[TMMatch],
-            _query_conn_engine(
+            _tm_query_engine.query_conn(
                 conn,
                 source_text,
                 source_locale=source_locale,
@@ -1174,9 +1171,9 @@ class TMStore:
         source_locale: str,
         target_locale: str,
         origins: Iterable[str],
-    ) -> list[tuple[sqlite3.Row, int, int]]:
+    ) -> list[tuple[sqlite3.Row, int, int, TMExplainability]]:
         """Execute fuzzy candidates."""
-        return _fuzzy_candidates_engine(
+        return _tm_query_engine.fuzzy_candidates(
             conn,
             norm,
             source_locale,

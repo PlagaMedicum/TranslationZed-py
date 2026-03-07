@@ -5,6 +5,59 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from typing import Literal
+
+TMCapReason = Literal["none", "fuzzy_to_99", "composed_floor"]
+
+
+@dataclass(frozen=True, slots=True)
+class TMExplainabilityBand:
+    """Represent effective length-band values used for one TM decision."""
+
+    min_base: int
+    max_base: int
+    min_effective: int
+    max_effective: int
+
+
+@dataclass(frozen=True, slots=True)
+class TMExplainabilityTieBreak:
+    """Represent deterministic tie-break factors for one TM decision."""
+
+    token_count_delta: int
+    origin_priority: int
+    updated_at: int
+
+
+@dataclass(frozen=True, slots=True)
+class TMExplainability:
+    """Represent explainability payload attached to one TM match."""
+
+    score: int
+    raw_score: int
+    ratio: float
+    overlap: float
+    exact_overlap: float
+    token_bonus: int
+    composed_phrase: bool
+    long_multi_triggered: bool
+    band: TMExplainabilityBand
+    oversized_guard_applied: bool
+    oversized_guard_passed: bool | None
+    cap_reason: TMCapReason
+    tie_break: TMExplainabilityTieBreak
+    decision_notes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class TMScoreDecision:
+    """Represent score-path diagnostics while preserving existing formulas."""
+
+    score: int
+    raw_score: int
+    token_bonus: int
+    composed_floor_applied: bool
+    fuzzy_capped_to_99: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +93,7 @@ class TMScoredCandidate:
     score: int
     raw_score: int
     token_count_delta: int
+    explainability: TMExplainability
 
 
 @dataclass(frozen=True, slots=True)
