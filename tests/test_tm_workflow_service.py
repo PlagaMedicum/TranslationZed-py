@@ -5,8 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from translationzed_py.core.tm_query import TMQueryPolicy
+from translationzed_py.core.tm_query_contracts import (
+    TMExplainability,
+    TMExplainabilityBand,
+    TMExplainabilityTieBreak,
+)
 from translationzed_py.core.tm_store import TMImportFile, TMMatch
-from translationzed_py.core.tm_workflow_service import TMWorkflowService
+from translationzed_py.core.tm_workflow_service import (
+    TMWorkflowService,
+    format_explainability_preview,
+    normalize_suggestion_grouping,
+)
 
 
 def _path_text(value: object) -> str:
@@ -344,6 +353,50 @@ def test_tm_workflow_build_suggestions_view_imported_label_has_no_status_tag() -
     assert "import [" not in view.items[0].label
 
 
+def test_tm_workflow_build_suggestions_view_origin_grouping_marks_transitions() -> None:
+    """Verify origin grouping emits headers while preserving base match order."""
+    service = TMWorkflowService()
+    view = service.build_suggestions_view(
+        matches=[
+            _match(source="A", target="TA", score=95, origin="project"),
+            _match(source="B", target="TB", score=91, origin="import"),
+            _match(source="C", target="TC", score=89, origin="project"),
+        ],
+        policy=TMQueryPolicy(min_score=5, origin_project=True, origin_import=True),
+        grouping="origin",
+    )
+    assert [item.match.source_text for item in view.items] == ["A", "B", "C"]
+    assert [item.group_label for item in view.items] == [
+        "Origin: Project",
+        "Origin: Import",
+        "Origin: Project",
+    ]
+
+
+def test_tm_workflow_build_suggestions_view_score_band_grouping_marks_transitions() -> (
+    None
+):
+    """Verify score-band grouping emits deterministic bucket headers."""
+    service = TMWorkflowService()
+    view = service.build_suggestions_view(
+        matches=[
+            _match(source="A", target="TA", score=100, origin="project"),
+            _match(source="B", target="TB", score=94, origin="project"),
+            _match(source="C", target="TC", score=88, origin="project"),
+            _match(source="D", target="TD", score=91, origin="project"),
+        ],
+        policy=TMQueryPolicy(min_score=5, origin_project=True, origin_import=False),
+        grouping="score_band",
+    )
+    assert [item.match.source_text for item in view.items] == ["A", "B", "C", "D"]
+    assert [item.group_label for item in view.items] == [
+        "Score band: 100",
+        "Score band: 90-99",
+        "Score band: <90",
+        "Score band: 90-99",
+    ]
+
+
 def test_tm_workflow_build_suggestions_view_empty_and_filtered_messages() -> None:
     """Verify tm workflow build suggestions view empty and filtered messages."""
     service = TMWorkflowService()
@@ -397,6 +450,7 @@ def test_tm_workflow_build_selection_plan() -> None:
     assert no_match.apply_enabled is False
     assert no_match.source_preview == ""
     assert no_match.target_preview == ""
+    assert no_match.explanation_preview == "Select a TM suggestion to see explanation."
     assert "drop" in no_match.query_terms
 
     with_match = service.build_selection_plan(
@@ -406,7 +460,58 @@ def test_tm_workflow_build_selection_plan() -> None:
     assert with_match.apply_enabled is True
     assert with_match.source_preview == "Drop one"
     assert with_match.target_preview == "Скінуць шт."
+    assert (
+        with_match.explanation_preview
+        == "No explainability details for this suggestion."
+    )
     assert "drop" in with_match.query_terms
+
+
+def test_format_explainability_preview_renders_stable_summary() -> None:
+    """Verify explainability preview renders deterministic score/tie-break details."""
+    match = TMMatch(
+        source_text="Drop all",
+        target_text="Скінуць усё",
+        score=99,
+        origin="import",
+        tm_name="pack",
+        tm_path="/tmp/pack.tmx",
+        file_path=None,
+        key=None,
+        updated_at=1234,
+        raw_score=100,
+        row_status=None,
+        explainability=TMExplainability(
+            score=99,
+            raw_score=100,
+            ratio=0.932,
+            overlap=0.667,
+            exact_overlap=0.5,
+            token_bonus=7,
+            composed_phrase=False,
+            long_multi_triggered=False,
+            band=TMExplainabilityBand(
+                min_base=5,
+                max_base=25,
+                min_effective=5,
+                max_effective=25,
+            ),
+            oversized_guard_applied=True,
+            oversized_guard_passed=True,
+            cap_reason="fuzzy_to_99",
+            tie_break=TMExplainabilityTieBreak(
+                token_count_delta=1,
+                origin_priority=1,
+                updated_at=1234,
+            ),
+            decision_notes=("fuzzy_capped_to_99", "oversized_guard_passed"),
+        ),
+    )
+    preview = format_explainability_preview(match)
+    assert "Score path: final=99% raw=100% bonus=7 cap=fuzzy_to_99" in preview
+    assert "Similarity: ratio=0.932 overlap=0.667 exact_overlap=0.500" in preview
+    assert "Tie-break: token_delta=1 origin_priority=1 updated_at=1234" in preview
+    assert "Decision notes: fuzzy_capped_to_99, oversized_guard_passed" in preview
 
 
 def test_tm_workflow_build_lookup_validates_source_and_locale() -> None:
@@ -513,11 +618,36 @@ def test_tm_workflow_build_filter_plan_normalizes_min_score_and_extras() -> None
     assert plan.policy.limit >= 120
     assert plan.policy.origin_project is False
     assert plan.policy.origin_import is True
+    assert plan.grouping == "none"
     assert plan.prefs_extras == {
         "TM_MIN_SCORE": "5",
         "TM_ORIGIN_PROJECT": "false",
         "TM_ORIGIN_IMPORT": "true",
+        "TM_GROUPING": "none",
     }
+
+
+def test_tm_workflow_build_filter_plan_normalizes_grouping_mode() -> None:
+    """Verify grouping mode is normalized and persisted in filter extras."""
+    service = TMWorkflowService()
+    plan = service.build_filter_plan(
+        source_locale="EN",
+        min_score=50,
+        origin_project=True,
+        origin_import=True,
+        grouping="score_band",
+    )
+    assert plan.grouping == "score_band"
+    assert plan.prefs_extras["TM_GROUPING"] == "score_band"
+
+
+def test_normalize_suggestion_grouping_falls_back_to_none() -> None:
+    """Verify unsupported or empty grouping values normalize to stable default."""
+    assert normalize_suggestion_grouping("origin") == "origin"
+    assert normalize_suggestion_grouping("score_band") == "score_band"
+    assert normalize_suggestion_grouping("invalid") == "none"
+    assert normalize_suggestion_grouping("") == "none"
+    assert normalize_suggestion_grouping(None) == "none"
 
 
 def test_tm_workflow_build_query_request_for_lookup() -> None:

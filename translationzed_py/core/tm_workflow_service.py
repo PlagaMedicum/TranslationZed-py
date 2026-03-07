@@ -8,7 +8,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
 from .project_scanner import LocaleMeta
 from .tm_import_sync import LocaleResolver, TMImportSyncReport, sync_import_folder
@@ -38,6 +38,10 @@ from .tm_rebuild import (
 )
 from .tm_store import TMImportFile, TMMatch, TMStore
 
+TMSuggestionGrouping = Literal["none", "origin", "score_band"]
+_TM_EXPLAIN_SELECTION_HINT = "Select a TM suggestion to see explanation."
+_TM_EXPLAIN_UNAVAILABLE = "No explainability details for this suggestion."
+
 
 @dataclass(frozen=True, slots=True)
 class TMPendingBatch:
@@ -65,6 +69,7 @@ class TMSuggestionItem:
     match: TMMatch
     label: str
     tooltip_html: str
+    group_label: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +107,7 @@ class TMSelectionPlan:
     apply_enabled: bool
     source_preview: str
     target_preview: str
+    explanation_preview: str
     query_terms: tuple[str, ...]
 
 
@@ -110,6 +116,7 @@ class TMFilterPlan:
     """Represent TMFilterPlan."""
 
     policy: TMQueryPolicy
+    grouping: TMSuggestionGrouping
     prefs_extras: dict[str, str]
 
 
@@ -420,9 +427,11 @@ class TMWorkflowService:
         min_score: int,
         origin_project: bool,
         origin_import: bool,
+        grouping: str | None = "none",
     ) -> TMFilterPlan:
         """Build filter plan."""
         normalized = normalize_min_score(min_score)
+        normalized_grouping = normalize_suggestion_grouping(grouping)
         policy = TMQueryPolicy(
             source_locale=source_locale,
             min_score=normalized,
@@ -432,10 +441,12 @@ class TMWorkflowService:
         )
         return TMFilterPlan(
             policy=policy,
+            grouping=normalized_grouping,
             prefs_extras={
                 "TM_MIN_SCORE": str(normalized),
                 "TM_ORIGIN_PROJECT": "true" if origin_project else "false",
                 "TM_ORIGIN_IMPORT": "true" if origin_import else "false",
+                "TM_GROUPING": normalized_grouping,
             },
         )
 
@@ -510,12 +521,14 @@ class TMWorkflowService:
                 apply_enabled=False,
                 source_preview="",
                 target_preview="",
+                explanation_preview=_TM_EXPLAIN_SELECTION_HINT,
                 query_terms=terms,
             )
         return TMSelectionPlan(
             apply_enabled=True,
             source_preview=match.source_text,
             target_preview=match.target_text,
+            explanation_preview=format_explainability_preview(match),
             query_terms=terms,
         )
 
@@ -591,6 +604,7 @@ class TMWorkflowService:
         policy: TMQueryPolicy,
         source_preview_limit: int = 60,
         target_preview_limit: int = 80,
+        grouping: TMSuggestionGrouping | str = "none",
     ) -> TMSuggestionsView:
         """Build suggestions view."""
         if not matches:
@@ -604,19 +618,101 @@ class TMWorkflowService:
                 message="No TM matches (filtered).",
                 items=(),
             )
-        items = tuple(
-            TMSuggestionItem(
-                match=match,
-                label=format_match_label(
-                    match,
-                    source_preview_limit=source_preview_limit,
-                    target_preview_limit=target_preview_limit,
-                ),
-                tooltip_html=match_tooltip_html(match),
+        normalized_grouping = normalize_suggestion_grouping(str(grouping))
+        items: list[TMSuggestionItem] = []
+        last_group_key: str | None = None
+        for match in filtered:
+            group_label: str | None = None
+            if normalized_grouping != "none":
+                group_key = _group_key_for_match(match, grouping=normalized_grouping)
+                if group_key != last_group_key:
+                    group_label = _group_label_for_key(
+                        group_key,
+                        grouping=normalized_grouping,
+                    )
+                last_group_key = group_key
+            items.append(
+                TMSuggestionItem(
+                    match=match,
+                    label=format_match_label(
+                        match,
+                        source_preview_limit=source_preview_limit,
+                        target_preview_limit=target_preview_limit,
+                    ),
+                    tooltip_html=match_tooltip_html(match),
+                    group_label=group_label,
+                )
             )
-            for match in filtered
+        return TMSuggestionsView(message="TM suggestions", items=tuple(items))
+
+
+def normalize_suggestion_grouping(value: str | None) -> TMSuggestionGrouping:
+    """Normalize TM grouping mode while preserving backward-compatible defaults."""
+    raw = str(value or "none").strip().lower()
+    if raw in {"origin", "score_band"}:
+        return cast(TMSuggestionGrouping, raw)
+    return "none"
+
+
+def _score_band_key(score: int) -> str:
+    """Return deterministic score-band bucket key for TM triage grouping."""
+    if score >= 100:
+        return "100"
+    if score >= 90:
+        return "90-99"
+    return "<90"
+
+
+def _group_key_for_match(match: TMMatch, *, grouping: TMSuggestionGrouping) -> str:
+    """Build grouping key for one suggestion item."""
+    if grouping == "origin":
+        return "project" if match.origin == "project" else "import"
+    if grouping == "score_band":
+        return _score_band_key(match.score)
+    return "none"
+
+
+def _group_label_for_key(key: str, *, grouping: TMSuggestionGrouping) -> str:
+    """Render compact group header label for one grouping key."""
+    if grouping == "origin":
+        return "Origin: Project" if key == "project" else "Origin: Import"
+    if grouping == "score_band":
+        return f"Score band: {key}"
+    return ""
+
+
+def format_explainability_preview(match: TMMatch) -> str:
+    """Format stable explanation text for TM detail preview panel."""
+    payload = match.explainability
+    if payload is None:
+        return _TM_EXPLAIN_UNAVAILABLE
+    guards = (
+        "oversized="
+        f"{'yes' if payload.oversized_guard_applied else 'no'}"
+        f" passed={payload.oversized_guard_passed}"
+    )
+    notes = ", ".join(payload.decision_notes) if payload.decision_notes else "none"
+    return "\n".join(
+        (
+            "Score path: "
+            f"final={payload.score}% raw={payload.raw_score}% "
+            f"bonus={payload.token_bonus} cap={payload.cap_reason}",
+            "Similarity: "
+            f"ratio={payload.ratio:.3f} "
+            f"overlap={payload.overlap:.3f} "
+            f"exact_overlap={payload.exact_overlap:.3f}",
+            "Band: "
+            f"base=[{payload.band.min_base},{payload.band.max_base}] "
+            f"effective=[{payload.band.min_effective},{payload.band.max_effective}] "
+            f"long_multi={payload.long_multi_triggered}",
+            f"Guards: {guards}",
+            "Tie-break: "
+            f"token_delta={payload.tie_break.token_count_delta} "
+            f"origin_priority={payload.tie_break.origin_priority} "
+            f"updated_at={payload.tie_break.updated_at}",
+            f"Decision notes: {notes}",
         )
-        return TMSuggestionsView(message="TM suggestions", items=items)
+    )
 
 
 def query_terms(source_text: str) -> list[str]:
