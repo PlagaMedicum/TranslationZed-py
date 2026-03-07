@@ -12,6 +12,13 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import QEvent
 from PySide6.QtGui import QFocusEvent
 
+from translationzed_py.core.project_session import (
+    CrashRecoveryAffectedFile,
+    CrashRecoveryApplyExecution,
+    CrashRecoveryApplyPlan,
+    CrashRecoveryDetectionPlan,
+    CrashRecoveryReport,
+)
 from translationzed_py.gui import main_window as mw
 
 
@@ -31,6 +38,26 @@ def _make_project(tmp_path: Path) -> Path:
     (root / "EN" / "ui.txt").write_text('UI_OK = "OK"\n', encoding="utf-8")
     (root / "BE" / "ui.txt").write_text('UI_OK = "Добра"\n', encoding="utf-8")
     return root
+
+
+def _recovery_report(root: Path) -> CrashRecoveryReport:
+    return CrashRecoveryReport(
+        project_root=str(root),
+        generated_at_ms=123,
+        affected_files=(
+            CrashRecoveryAffectedFile(
+                file_path="BE/ui.txt",
+                locale="BE",
+                draft_value_count=2,
+                status_only_count=1,
+                cache_mtime_ns=7,
+                warning="",
+            ),
+        ),
+        total_files=1,
+        total_draft_values=2,
+        total_status_only=1,
+    )
 
 
 def test_in_test_mode_and_pref_parsers_handle_common_inputs(monkeypatch) -> None:
@@ -518,6 +545,325 @@ def test_main_window_startup_aborts_when_en_hash_guard_rejects(
     """Verify startup aborts when EN hash guard blocks initialization."""
     root = _make_project(tmp_path)
     monkeypatch.setattr(mw.MainWindow, "_check_en_hash_cache", lambda _self: False)
+
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    assert win._startup_aborted is True
+
+
+def test_prompt_startup_crash_recovery_maps_buttons_and_renders_details(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify startup recovery prompt maps restore/discard/cancel and renders plaintext details."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    report = _recovery_report(root)
+
+    class _Button:
+        def __init__(self):
+            self.text = ""
+
+        def setText(self, text: str) -> None:
+            self.text = text
+
+    class _MessageBox:
+        Warning = 1
+        next_result = 0
+        details = ""
+
+        class StandardButton:
+            Save = 10
+            Discard = 20
+            Cancel = 30
+
+        def __init__(self, *_args, **_kwargs):
+            self._save = _Button()
+
+        def setIcon(self, _icon):
+            return None
+
+        def setWindowTitle(self, _title):
+            return None
+
+        def setText(self, _text):
+            return None
+
+        def setInformativeText(self, _text):
+            return None
+
+        def setDetailedText(self, text: str):
+            _MessageBox.details = text
+
+        def setStandardButtons(self, _buttons):
+            return None
+
+        def button(self, button_type):  # type: ignore[no-untyped-def]
+            if button_type == self.StandardButton.Save:
+                return self._save
+            return None
+
+        def exec(self) -> int:
+            return int(_MessageBox.next_result)
+
+    monkeypatch.setattr(mw._panel_helpers, "QMessageBox", _MessageBox)
+
+    _MessageBox.next_result = _MessageBox.StandardButton.Save
+    assert mw._panel_helpers._prompt_startup_crash_recovery(win, report) == "restore"
+    assert "Affected files:" in _MessageBox.details
+    assert "BE/ui.txt [BE] drafts=2 status_only=1" in _MessageBox.details
+
+    _MessageBox.next_result = _MessageBox.StandardButton.Discard
+    assert mw._panel_helpers._prompt_startup_crash_recovery(win, report) == "discard"
+
+    _MessageBox.next_result = _MessageBox.StandardButton.Cancel
+    assert mw._panel_helpers._prompt_startup_crash_recovery(win, report) == "cancel"
+
+
+def test_run_startup_recovery_flow_clears_pending_plan_on_cancel(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify startup recovery cancel stops pending startup timers and blocks continuation."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._pending_post_locale_plan = SimpleNamespace(should_schedule=True)
+    win._post_locale_timer.start()
+
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "build_crash_recovery_detection_plan",
+        lambda _self, **_kwargs: CrashRecoveryDetectionPlan(  # type: ignore[no-untyped-def]
+            run_recovery_flow=True,
+            report=_recovery_report(root),
+        ),
+    )
+    monkeypatch.setattr(
+        mw._panel_helpers,
+        "_prompt_startup_crash_recovery",
+        lambda _win, _report: "cancel",
+    )
+
+    allowed = mw._panel_helpers._run_startup_recovery(win)
+
+    assert allowed is False
+    assert win._pending_post_locale_plan is None
+    assert win._post_locale_timer.isActive() is False
+
+
+def test_run_startup_recovery_flow_executes_apply_plan_for_restore(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify startup recovery restore path applies plan and continues."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    report = _recovery_report(root)
+    captured_build: dict[str, object] = {}
+    captured_execute: list[CrashRecoveryApplyPlan] = []
+    apply_plan = CrashRecoveryApplyPlan(
+        decision="restore",
+        continue_startup=True,
+        discard_cache_paths=(),
+    )
+    apply_execution = CrashRecoveryApplyExecution(
+        decision="restore",
+        continue_startup=True,
+        discarded_cache_paths=(),
+        failed_cache_paths=(),
+        failure_message=None,
+    )
+
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "build_crash_recovery_detection_plan",
+        lambda _self, **_kwargs: CrashRecoveryDetectionPlan(  # type: ignore[no-untyped-def]
+            run_recovery_flow=True,
+            report=report,
+        ),
+    )
+    monkeypatch.setattr(
+        mw._panel_helpers,
+        "_prompt_startup_crash_recovery",
+        lambda _win, _report: "restore",
+    )
+
+    def _build_apply_plan(_self, **kwargs):  # type: ignore[no-untyped-def]
+        captured_build.update(kwargs)
+        return apply_plan
+
+    def _execute_apply_plan(_self, *, plan, unlink_cache_path=None):  # type: ignore[no-untyped-def]
+        _ = unlink_cache_path
+        captured_execute.append(plan)
+        return apply_execution
+
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "build_crash_recovery_apply_plan",
+        _build_apply_plan,
+    )
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "execute_crash_recovery_apply_plan",
+        _execute_apply_plan,
+    )
+
+    allowed = mw._panel_helpers._run_startup_recovery(win)
+
+    assert allowed is True
+    assert captured_build["root"] == root
+    assert captured_build["report"] == report
+    assert captured_build["decision"] == "restore"
+    assert captured_execute == [apply_plan]
+
+
+def test_run_startup_recovery_discard_failure_cancel_aborts_open(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify discard failure warning can abort startup safely."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._pending_post_locale_plan = SimpleNamespace(should_schedule=True)
+    win._post_locale_timer.start()
+    report = _recovery_report(root)
+    apply_plan = CrashRecoveryApplyPlan(
+        decision="discard",
+        continue_startup=True,
+        discard_cache_paths=(root / ".tzp" / "cache" / "BE" / "ui.bin",),
+    )
+    apply_execution = CrashRecoveryApplyExecution(
+        decision="discard",
+        continue_startup=True,
+        discarded_cache_paths=(),
+        failed_cache_paths=(root / ".tzp" / "cache" / "BE" / "ui.bin",),
+        failure_message="discard failed",
+    )
+
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "build_crash_recovery_detection_plan",
+        lambda _self, **_kwargs: CrashRecoveryDetectionPlan(  # type: ignore[no-untyped-def]
+            run_recovery_flow=True,
+            report=report,
+        ),
+    )
+    monkeypatch.setattr(
+        mw._panel_helpers,
+        "_prompt_startup_crash_recovery",
+        lambda _win, _report: "discard",
+    )
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "build_crash_recovery_apply_plan",
+        lambda _self, **_kwargs: apply_plan,
+    )
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "execute_crash_recovery_apply_plan",
+        lambda _self, *, plan, unlink_cache_path=None: apply_execution,
+    )
+    monkeypatch.setattr(
+        mw._panel_helpers,
+        "_prompt_startup_discard_failure",
+        lambda _win, _execution: False,
+    )
+
+    allowed = mw._panel_helpers._run_startup_recovery(win)
+
+    assert allowed is False
+    assert win._pending_post_locale_plan is None
+    assert win._post_locale_timer.isActive() is False
+
+
+def test_prompt_startup_discard_failure_maps_buttons_and_details(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify discard failure prompt maps continue/cancel and includes failure details."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    execution = CrashRecoveryApplyExecution(
+        decision="discard",
+        continue_startup=True,
+        discarded_cache_paths=(),
+        failed_cache_paths=(root / ".tzp" / "cache" / "BE" / "ui.bin",),
+        failure_message="failed/path.bin",
+    )
+
+    class _MessageBox:
+        Warning = 1
+        next_result = 0
+        details = ""
+
+        class StandardButton:
+            Ok = 10
+            Cancel = 20
+
+        def __init__(self, *_args, **_kwargs):
+            return None
+
+        def setIcon(self, _icon):
+            return None
+
+        def setWindowTitle(self, _title):
+            return None
+
+        def setText(self, _text):
+            return None
+
+        def setInformativeText(self, _text):
+            return None
+
+        def setDetailedText(self, text: str):
+            _MessageBox.details = text
+
+        def setStandardButtons(self, _buttons):
+            return None
+
+        def exec(self) -> int:
+            return int(_MessageBox.next_result)
+
+    monkeypatch.setattr(mw._panel_helpers, "QMessageBox", _MessageBox)
+
+    _MessageBox.next_result = _MessageBox.StandardButton.Ok
+    assert mw._panel_helpers._prompt_startup_discard_failure(win, execution) is True
+    assert _MessageBox.details == "failed/path.bin"
+
+    _MessageBox.next_result = _MessageBox.StandardButton.Cancel
+    assert mw._panel_helpers._prompt_startup_discard_failure(win, execution) is False
+
+
+def test_main_window_startup_aborts_when_crash_recovery_is_cancelled(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify startup marks abort when recovery dialog result is cancel."""
+    root = _make_project(tmp_path)
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "build_crash_recovery_detection_plan",
+        lambda _self, **_kwargs: CrashRecoveryDetectionPlan(  # type: ignore[no-untyped-def]
+            run_recovery_flow=True,
+            report=_recovery_report(root),
+        ),
+    )
+    monkeypatch.setattr(
+        mw._panel_helpers,
+        "_prompt_startup_crash_recovery",
+        lambda _win, _report: "cancel",
+    )
 
     win = mw.MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)

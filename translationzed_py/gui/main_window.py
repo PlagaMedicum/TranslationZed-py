@@ -145,6 +145,9 @@ from translationzed_py.core.qa_service import (
     QAFinding as _QAFinding,
 )
 from translationzed_py.core.qa_service import (
+    QAScanProgressSnapshot as _QAScanProgressSnapshot,
+)
+from translationzed_py.core.qa_service import (
     QAService as _QAService,
 )
 from translationzed_py.core.render_workflow_service import (
@@ -153,7 +156,7 @@ from translationzed_py.core.render_workflow_service import (
 from translationzed_py.core.save_exit_flow import (
     SaveExitFlowService as _SaveExitFlowService,
 )
-from translationzed_py.core.saver import save
+from translationzed_py.core.saver import save as save  # noqa: F401
 from translationzed_py.core.search import (
     Match as _SearchMatch,
 )
@@ -249,6 +252,9 @@ from translationzed_py.core.tm_store import TMMatch, TMStore
 from translationzed_py.core.tm_workflow_service import (
     TMWorkflowService as _TMWorkflowService,
 )
+from translationzed_py.core.tm_workflow_service import (
+    normalize_suggestion_grouping as _normalize_tm_grouping,
+)
 
 from . import languagetool_adapter as _lt_adapter
 from . import main_window_en_diff_helpers as _en_diff_helpers
@@ -288,6 +294,9 @@ from .source_reference_state import (
 )
 from .source_reference_state import (
     normalize_source_reference_fallback_policy as _normalize_source_reference_fallback_policy,
+)
+from .source_reference_state import (
+    source_reference_preferences_payload_for_window as _source_ref_preferences_payload_for_window,
 )
 from .source_reference_state import (
     sync_source_reference_mode_for_window as _sync_source_reference_mode_for_window,
@@ -643,8 +652,11 @@ class MainWindow(QMainWindow):
         self._qa_panel_result_limit = 500
         self._qa_refresh_delay_ms = 140
         self._qa_scan_pool: ThreadPoolExecutor | None = None
-        self._qa_scan_future: Future[tuple[Path, list[_QAFinding], str]] | None = None
+        self._qa_scan_future: Future[Any] | None = None
         self._qa_scan_path: Path | None = None
+        self._qa_scan_run_id = ""
+        self._qa_progress_snapshot: _QAScanProgressSnapshot | None = None
+        self._qa_progress_snapshots: tuple[_QAScanProgressSnapshot, ...] = ()
         self._qa_scan_languagetool_language = "en-US"
         self._qa_scan_busy = False
         self._qa_scan_timer = QTimer(self)
@@ -745,6 +757,9 @@ class MainWindow(QMainWindow):
         )
         self._tm_origin_import = _bool_from_pref(
             self._prefs_extras.get("TM_ORIGIN_IMPORT"), True
+        )
+        self._tm_grouping = _normalize_tm_grouping(
+            self._prefs_extras.get("TM_GROUPING")
         )
         self._tm_import_dir = normalized_prefs.tm_import_dir
         geom = normalized_prefs.window_geometry
@@ -1050,14 +1065,12 @@ class MainWindow(QMainWindow):
         self._tree_last_width = _pref_int("TREE_PANEL_WIDTH") or self._tree_last_width
         self._visual_whitespace = _pref_bool("TEXT_SHOW_WHITESPACE", False)
         self._visual_highlight = _pref_bool("TEXT_HIGHLIGHT", False)
-        # ── menu bar ───────────────────────────────────────────────────────
         menubar = self.menuBar()
         self.menu_general = menubar.addMenu("General")
         self.menu_edit = menubar.addMenu("Edit")
         self.menu_view = menubar.addMenu("View")
         self.menu_help = menubar.addMenu("Help")
 
-        # ── left pane: side panel (Project / TM / Search / QA) ───────────────
         self._left_panel = QWidget()
         left_layout = QVBoxLayout(self._left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -1093,7 +1106,9 @@ class MainWindow(QMainWindow):
         self._left_group.buttonClicked.connect(self._on_left_panel_changed)
         self._left_stack = QStackedWidget(self._left_panel)
         self.tree = QTreeView()
-        self._init_locales(selected_locales)
+        self._init_locales(
+            _panel_helpers._prepare_manual_scenario(self, selected_locales)
+        )
         if not self._selected_locales:
             self._startup_aborted = True
             return
@@ -1104,10 +1119,12 @@ class MainWindow(QMainWindow):
         )
         self._rebuild_tree_for_selected_locales(tree_plan=tree_plan)
         self.tree.expanded.connect(self._on_tree_expanded)
-        # prevent in-place renaming on double-click; we use double-click to open
         self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self._schedule_post_locale_tasks()
-        self.tree.activated.connect(self._file_chosen)  # Enter / platform activation
+        if not _panel_helpers._run_startup_recovery(self):
+            self._startup_aborted = True
+            return
+        _panel_helpers._schedule_post_startup_hooks(self)
+        self.tree.activated.connect(self._file_chosen)
         self.tree.doubleClicked.connect(self._file_chosen)
         self._files_panel = QWidget(self._left_panel)
         files_layout = QVBoxLayout(self._files_panel)
@@ -1146,6 +1163,16 @@ class MainWindow(QMainWindow):
         self._tm_origin_import_cb.setChecked(self._tm_origin_import)
         self._tm_origin_import_cb.toggled.connect(self._on_tm_filters_changed)
         tm_header.addWidget(self._tm_origin_import_cb)
+        self._tm_grouping_combo = QComboBox(self._tm_panel)
+        self._tm_grouping_combo.addItem("Flat", "none")
+        self._tm_grouping_combo.addItem("Origin", "origin")
+        self._tm_grouping_combo.addItem("Score band", "score_band")
+        self._tm_grouping_combo.setToolTip("TM grouping mode for triage list")
+        grouping_index = self._tm_grouping_combo.findData(self._tm_grouping)
+        if grouping_index >= 0:
+            self._tm_grouping_combo.setCurrentIndex(grouping_index)
+        self._tm_grouping_combo.currentIndexChanged.connect(self._on_tm_filters_changed)
+        tm_header.addWidget(self._tm_grouping_combo)
         tm_header.addStretch(1)
         self._tm_prefs_btn = QToolButton(self._tm_panel)
         self._tm_prefs_btn.setAutoRaise(True)
@@ -1260,12 +1287,17 @@ class MainWindow(QMainWindow):
         self._qa_progress.setTextVisible(False)
         self._qa_progress.setRange(0, 0)
         self._qa_progress.setVisible(False)
+        self._qa_checklist_label = QLabel(self._qa_panel)
+        self._qa_checklist_label.setWordWrap(True)
+        self._qa_checklist_label.setTextFormat(Qt.TextFormat.PlainText)
+        self._qa_checklist_label.setText("Run QA to see rule-by-rule progress.")
         self._qa_results_list = QListWidget(self._qa_panel)
         self._qa_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._qa_results_list.itemActivated.connect(self._open_qa_result_item)
         self._qa_results_list.itemClicked.connect(self._open_qa_result_item)
         self._set_qa_list_placeholder(_QA_DEFAULT_PLACEHOLDER)
         qa_layout.addLayout(qa_header)
+        qa_layout.addWidget(self._qa_checklist_label)
         qa_layout.addWidget(self._qa_progress)
         qa_layout.addWidget(self._qa_results_list)
         self._left_stack.addWidget(self._qa_panel)
@@ -1277,7 +1309,6 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self._left_stack)
         self._content_splitter.addWidget(self._left_panel)
 
-        # ── status shortcuts ────────────────────────────────────────────────
         act_proof = QAction("&Mark Proofread", self)
         act_proof.setShortcut("Ctrl+P")
         act_proof.triggered.connect(self._mark_proofread)
@@ -2632,7 +2663,6 @@ class MainWindow(QMainWindow):
             "default_root": self._default_root,
             "tm_import_dir": self._tm_import_dir,
             "theme_mode": self._theme_mode,
-            "source_reference_fallback_policy": self._source_reference_fallback_policy,
             "prompt_write_on_exit": self._prompt_write_on_exit,
             "wrap_text": self._wrap_text_user,
             "large_text_optimizations": self._large_text_optimizations,
@@ -2646,13 +2676,10 @@ class MainWindow(QMainWindow):
             "qa_check_same_as_source": self._qa_check_same_as_source,
             "qa_auto_refresh": self._qa_auto_refresh,
             "qa_auto_mark_for_review": self._qa_auto_mark_for_review,
-            "qa_auto_mark_translated_for_review": (
-                self._qa_auto_mark_translated_for_review
-            ),
-            "qa_auto_mark_proofread_for_review": (
-                self._qa_auto_mark_proofread_for_review
-            ),
+            "qa_auto_mark_translated_for_review": self._qa_auto_mark_translated_for_review,
+            "qa_auto_mark_proofread_for_review": self._qa_auto_mark_proofread_for_review,
         }
+        prefs.update(_source_ref_preferences_payload_for_window(self))
         _lt_adapter.populate_preferences_dialog_values(self, prefs)
         tm_files: list[dict[str, object]] = []
         if self._ensure_tm_store():
@@ -3607,9 +3634,7 @@ class MainWindow(QMainWindow):
                         if insertion_action == "cancel":
                             return False
         callbacks = _SaveCurrentCallbacks(
-            save_file=lambda pf, changed_values, enc: save(
-                pf, changed_values, encoding=enc
-            ),
+            save_file=self._save_parsed_file_with_writeback,
             write_cache=lambda path, entries, last_opened: _write_status_cache(
                 self._root,
                 path,
@@ -3618,6 +3643,7 @@ class MainWindow(QMainWindow):
                 last_opened=last_opened,
             ),
             now_ts=lambda: int(time.time()),
+            status_comment_writeback=self._status_comment_writeback_options(True),
         )
         save_succeeded = False
         insertion_applied = False
@@ -3958,15 +3984,14 @@ class MainWindow(QMainWindow):
         )
         callbacks = _SaveFromCacheCallbacks(
             parse_file=lambda file_path, enc: parse(file_path, encoding=enc),
-            save_file=lambda pf, changed_values, enc: save(
-                pf, changed_values, encoding=enc
-            ),
+            save_file=self._save_parsed_file_with_writeback,
             write_cache=lambda file_path, entries: _write_status_cache(
                 self._root,
                 file_path,
                 entries,
                 changed_keys=set(),
             ),
+            status_comment_writeback=self._status_comment_writeback_options(False),
         )
         try:
             result = self._file_workflow_service.write_from_cache(
@@ -5176,6 +5201,7 @@ class MainWindow(QMainWindow):
     _start_qa_scan_for_current_file = _qa_start_scan
     _poll_qa_scan = _qa_poll_scan
     _set_qa_progress_visible = _panel_helpers._set_qa_progress_visible
+    _set_qa_progress_snapshots = _panel_helpers._set_qa_progress_snapshots
     _set_qa_findings = _panel_helpers._set_qa_findings
     _set_qa_scan_note = _panel_helpers._set_qa_scan_note
     _set_qa_panel_message = _panel_helpers._set_qa_panel_message
@@ -5206,6 +5232,8 @@ class MainWindow(QMainWindow):
     _apply_text_visual_options = _panel_helpers._apply_text_visual_options
     _apply_detail_whitespace_options = _panel_helpers._apply_detail_whitespace_options
     _toggle_prompt_on_exit = _panel_helpers._toggle_prompt_on_exit
+    _save_parsed_file_with_writeback = _panel_helpers._save_parsed_file_with_writeback
+    _status_comment_writeback_options = _panel_helpers._status_comment_writeback_options
     _persist_preferences = _panel_helpers._persist_preferences
     _on_model_data_changed = _panel_helpers._on_model_data_changed
     _on_selection_changed = _panel_helpers._on_selection_changed

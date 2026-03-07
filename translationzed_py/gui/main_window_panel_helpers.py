@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import html
+import os
 import time
 from collections.abc import Iterable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -11,21 +12,36 @@ from pathlib import Path
 
 import xxhash
 from PySide6.QtCore import QItemSelectionModel, Qt, QTimer
-from PySide6.QtGui import QGuiApplication, QTextOption
+from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut, QTextOption
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHeaderView,
     QLabel,
     QListWidgetItem,
     QMessageBox,
+    QPlainTextEdit,
     QStyle,
     QVBoxLayout,
     QWidget,
 )
 
 from translationzed_py.core import parse_lazy
+from translationzed_py.core.file_workflow import (
+    StatusCommentWritebackOptions as _StatusCommentWritebackOptions,
+)
 from translationzed_py.core.model import STATUS_ORDER, Entry, Status
+from translationzed_py.core.project_session import (
+    CrashRecoveryApplyExecution as _CrashRecoveryApplyExecution,
+)
+from translationzed_py.core.project_session import (
+    CrashRecoveryReport as _CrashRecoveryReport,
+)
+from translationzed_py.core.qa_service import QA_RULE_LABELS as _QA_RULE_LABELS
+from translationzed_py.core.qa_service import QA_RULE_ORDER as _QA_RULE_ORDER
+from translationzed_py.core.qa_service import QA_RULE_STATE_TEXT as _QA_RULE_STATE_TEXT
 from translationzed_py.core.qa_service import QAFinding as _QAFinding
+from translationzed_py.core.qa_service import QARuleState as _QARuleState
+from translationzed_py.core.saver import save as _save
 from translationzed_py.core.search import Match as _SearchMatch
 from translationzed_py.core.search import SearchField as _SearchField
 from translationzed_py.core.search import SearchQueryPlan as _SearchQueryPlan
@@ -39,6 +55,14 @@ from translationzed_py.core.tm_workflow_service import (
 
 from . import languagetool_adapter as _lt_adapter
 from .delegates import MAX_VISUAL_CHARS
+from .manual_scenario_dialog import ManualScenarioChecklistDialog
+from .manual_scenario_runtime import (
+    SCENARIO_ENV_FILE,
+    SCENARIO_ENV_RESULTS_DIR,
+    ManualScenarioError,
+    ManualScenarioRuntime,
+    load_manual_runtime,
+)
 from .perf_trace import PERF_TRACE
 from .progress_metrics import (
     StatusProgress,
@@ -50,6 +74,116 @@ from .tm_preview import apply_tm_preview_highlights as _apply_tm_preview_highlig
 from .tm_preview import prepare_tm_preview_terms as _prepare_tm_preview_terms
 
 _PROGRESS_POLL_INTERVAL_MS = 70
+
+
+def _run_startup_recovery(win) -> bool:
+    plan = win._project_session_service.build_crash_recovery_detection_plan(
+        root=win._root,
+        selected_locales=win._selected_locales,
+        startup_accepted=True,
+        previous_session_unclean=False,
+        interrupted_draft_marker=False,
+    )
+    report = plan.report
+    if not plan.run_recovery_flow or report is None:
+        return True
+    decision = _prompt_startup_crash_recovery(win, report)
+    apply_plan = win._project_session_service.build_crash_recovery_apply_plan(
+        root=win._root,
+        report=report,
+        decision=decision,
+    )
+    execution = win._project_session_service.execute_crash_recovery_apply_plan(
+        plan=apply_plan
+    )
+    if not execution.continue_startup:
+        _abort_pending_post_locale_startup(win)
+        return False
+    if execution.failed_cache_paths and not _prompt_startup_discard_failure(
+        win, execution
+    ):
+        _abort_pending_post_locale_startup(win)
+        return False
+    return True
+
+
+def _abort_pending_post_locale_startup(win) -> None:
+    if win._post_locale_timer.isActive():
+        win._post_locale_timer.stop()
+    win._pending_post_locale_plan = None
+
+
+def _prompt_startup_discard_failure(
+    win,
+    execution: _CrashRecoveryApplyExecution,
+) -> bool:
+    msg = QMessageBox(win)
+    msg.setIcon(QMessageBox.Warning)
+    msg.setWindowTitle("Discard incomplete")
+    msg.setText("Could not remove some recovery cache files.")
+    msg.setInformativeText(
+        "Continue opens the project with remaining cache entries. Cancel aborts project open."
+    )
+    if execution.failure_message:
+        msg.setDetailedText(execution.failure_message)
+    msg.setStandardButtons(
+        QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+    )
+    return int(msg.exec()) != int(QMessageBox.StandardButton.Cancel)
+
+
+def _prompt_startup_crash_recovery(
+    win,
+    report: _CrashRecoveryReport,
+) -> str:
+    msg = QMessageBox(win)
+    msg.setIcon(QMessageBox.Warning)
+    msg.setWindowTitle("Recovery options")
+    msg.setText(f"Found unsaved draft cache in {report.total_files} file(s).")
+    msg.setInformativeText(
+        "Restore keeps draft cache, Discard skips recovery for now, Cancel aborts project open."
+    )
+    msg.setDetailedText(_crash_recovery_details_text(report))
+    msg.setStandardButtons(
+        QMessageBox.StandardButton.Save
+        | QMessageBox.StandardButton.Discard
+        | QMessageBox.StandardButton.Cancel
+    )
+    restore_btn = msg.button(QMessageBox.StandardButton.Save)
+    if restore_btn is not None:
+        restore_btn.setText("Restore")
+    result = int(msg.exec())
+    if result == int(QMessageBox.StandardButton.Discard):
+        return "discard"
+    if result == int(QMessageBox.StandardButton.Cancel):
+        return "cancel"
+    return "restore"
+
+
+def _crash_recovery_details_text(report: _CrashRecoveryReport) -> str:
+    lines = [
+        f"Project root: {report.project_root}",
+        f"Generated at (ms): {report.generated_at_ms}",
+        (
+            "Totals: "
+            f"files={report.total_files} "
+            f"draft_values={report.total_draft_values} "
+            f"status_only={report.total_status_only}"
+        ),
+        "",
+        "Affected files:",
+    ]
+    for item in report.affected_files:
+        line = (
+            f"{item.file_path} [{item.locale}] "
+            f"drafts={item.draft_value_count} "
+            f"status_only={item.status_only_count} "
+            f"cache_mtime_ns={item.cache_mtime_ns}"
+        )
+        if item.warning:
+            line = f"{line} warning={item.warning}"
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _hash_for_cache_key(key: str | Entry, cache_map: dict[int, object]) -> int:
@@ -514,6 +648,14 @@ def _set_qa_progress_visible(win, visible: bool) -> None:
     win._qa_refresh_btn.setEnabled(not win._qa_scan_busy)
 
 
+def _set_qa_progress_snapshots(win, snapshots: Sequence[object]) -> None:
+    win._qa_progress_snapshots = tuple(snapshots)
+    win._qa_progress_snapshot = (
+        win._qa_progress_snapshots[-1] if win._qa_progress_snapshots else None
+    )
+    _render_qa_checklist(win)
+
+
 def _set_qa_findings(win, findings: Sequence[_QAFinding]) -> None:
     win._qa_findings = tuple(findings)
     if win._left_stack.currentIndex() == 3:
@@ -529,11 +671,13 @@ def _set_qa_scan_note(win, note: str) -> None:
 def _set_qa_panel_message(win, text: str) -> None:
     win._qa_scan_note = ""
     win._set_qa_list_placeholder(text)
+    _render_qa_checklist(win)
 
 
 def _refresh_qa_panel_results(win) -> None:
     if not hasattr(win, "_qa_results_list") or win._qa_results_list is None:
         return
+    _render_qa_checklist(win)
     plan = win._qa_service.build_panel_plan(
         findings=win._qa_findings,
         root=win._root,
@@ -611,6 +755,36 @@ def _qa_next_finding(win) -> None:
 
 def _qa_prev_finding(win) -> None:
     win._navigate_qa_finding(direction=-1)
+
+
+def _render_qa_checklist(win) -> None:
+    label = getattr(win, "_qa_checklist_label", None)
+    if label is None:
+        return
+    snapshot = getattr(win, "_qa_progress_snapshot", None)
+    if snapshot is None:
+        label.setText("Run QA to see rule-by-rule progress.")
+        return
+    by_rule = {record.rule_id: record for record in snapshot.ordered_rules}
+    lines: list[str] = []
+    for rule_id in _QA_RULE_ORDER:
+        record = by_rule.get(rule_id)
+        rule_label = _QA_RULE_LABELS.get(rule_id, str(rule_id))
+        if record is None:
+            lines.append(
+                f"{rule_label}: {_QA_RULE_STATE_TEXT.get(_QARuleState.QUEUED, 'Queued')}"
+            )
+            continue
+        state_label = _QA_RULE_STATE_TEXT.get(record.state, record.state.value)
+        row = f"{rule_label}: {state_label}"
+        note = str(record.note).strip()
+        if note:
+            row = f"{row} ({note})"
+        lines.append(row)
+    summary = str(snapshot.final_summary).strip()
+    if summary:
+        lines.append(summary)
+    label.setText("\n".join(lines) if lines else "Run QA to see rule-by-rule progress.")
 
 
 def _next_priority_status_row(win) -> int | None:
@@ -945,6 +1119,113 @@ def _toggle_prompt_on_exit(win, checked: bool) -> None:
     win._persist_preferences()
 
 
+def _prepare_manual_scenario(
+    win, selected_locales: list[str] | None
+) -> list[str] | None:
+    runtime_path = str(os.environ.get(SCENARIO_ENV_FILE, "")).strip()
+    if not runtime_path:
+        return selected_locales
+    try:
+        runtime = load_manual_runtime(Path(runtime_path))
+    except ManualScenarioError as exc:
+        QMessageBox.warning(win, "Manual scenario ignored", str(exc))
+        return selected_locales
+    win._manual_scenario_runtime = runtime
+    win._manual_scenario_dialog_shown = False
+    if runtime.scenario.prefs_extras:
+        win._prefs_extras.update(runtime.scenario.prefs_extras)
+    if selected_locales is not None:
+        return selected_locales
+    if runtime.scenario.selected_locales:
+        return list(runtime.scenario.selected_locales)
+    return selected_locales
+
+
+def _manual_scenario_results_dir() -> Path:
+    raw = str(os.environ.get(SCENARIO_ENV_RESULTS_DIR, "")).strip()
+    if raw:
+        return Path(raw).resolve()
+    return (Path.cwd() / "artifacts" / "manual-ui").resolve()
+
+
+def _show_manual_scenario_dialog(win) -> None:
+    runtime = getattr(win, "_manual_scenario_runtime", None)
+    if not isinstance(runtime, ManualScenarioRuntime):
+        return
+    if bool(getattr(win, "_manual_scenario_dialog_shown", False)):
+        return
+    win._manual_scenario_dialog_shown = True
+    dialog = ManualScenarioChecklistDialog(
+        runtime,
+        results_dir=_manual_scenario_results_dir(),
+        parent=win,
+    )
+    dialog.exec()
+    result = dialog.final_result
+    if result:
+        win.statusBar().showMessage(
+            f"Manual scenario '{runtime.scenario.id}' marked {result}.",
+            8000,
+        )
+
+
+def _schedule_post_startup_hooks(win) -> None:
+    win._schedule_post_locale_tasks()
+    if isinstance(
+        getattr(win, "_manual_scenario_runtime", None), ManualScenarioRuntime
+    ):
+        QTimer.singleShot(0, lambda: _show_manual_scenario_dialog(win))
+
+
+def _save_parsed_file_with_writeback(
+    _win,
+    parsed_file,
+    changed_values,
+    encoding: str,
+    writeback: _StatusCommentWritebackOptions,
+):
+    return _save(
+        parsed_file,
+        changed_values,
+        encoding=encoding,
+        write_tzp_status_comments=writeback.enabled,
+        tzp_comment_prefix=writeback.comment_prefix,
+        status_by_key=writeback.status_by_key,
+    )
+
+
+def _status_comment_writeback_options(
+    win,
+    include_current_model_overrides: bool = False,
+) -> _StatusCommentWritebackOptions:
+    raw_enabled = str(win._prefs_extras.get("TZP_STATUS_COMMENT_WRITEBACK", "")).strip()
+    enabled = raw_enabled.lower() in {"1", "true", "yes", "on"}
+    raw_prefix = str(win._prefs_extras.get("TZP_STATUS_COMMENT_PREFIX", "")).strip()
+    comment_prefix = (
+        raw_prefix
+        or str(win._app_config.comment_prefix).strip()
+        or _StatusCommentWritebackOptions.comment_prefix
+    )
+    status_by_key: dict[str, Status] | None = None
+    if include_current_model_overrides and win._current_model is not None:
+        status_by_key = {}
+        for (
+            key,
+            _source,
+            _value,
+            status_code,
+        ) in win._current_model.changed_rows_with_source():
+            with contextlib.suppress(ValueError):
+                status_by_key[key] = Status(int(status_code))
+        if not status_by_key:
+            status_by_key = None
+    return _StatusCommentWritebackOptions(
+        enabled=enabled,
+        comment_prefix=comment_prefix,
+        status_by_key=status_by_key,
+    )
+
+
 def _persist_preferences(win) -> None:
     geometry = ""
     try:
@@ -1039,6 +1320,48 @@ def _set_tm_progress_visible(win, visible: bool) -> None:
     win._tm_progress.setVisible(bool(visible))
 
 
+def _ensure_tm_quick_actions(win) -> None:
+    if getattr(win, "_tm_quick_actions_ready", False):
+        return
+
+    def _next() -> None:
+        _tm_select_neighbor(win, step=1)
+
+    def _prev() -> None:
+        _tm_select_neighbor(win, step=-1)
+
+    def _apply() -> None:
+        if win._left_stack.currentIndex() != 1:
+            return
+        win._apply_tm_selection()
+
+    win._tm_next_shortcut = QShortcut(QKeySequence("Alt+Down"), win)
+    win._tm_next_shortcut.activated.connect(_next)
+    win._tm_prev_shortcut = QShortcut(QKeySequence("Alt+Up"), win)
+    win._tm_prev_shortcut.activated.connect(_prev)
+    win._tm_apply_shortcut = QShortcut(QKeySequence("Ctrl+Return"), win)
+    win._tm_apply_shortcut.activated.connect(_apply)
+    win._tm_apply_shortcut_numpad = QShortcut(QKeySequence("Ctrl+Enter"), win)
+    win._tm_apply_shortcut_numpad.activated.connect(_apply)
+    win._tm_quick_actions_ready = True
+
+
+def _tm_select_neighbor(win, *, step: int) -> None:
+    if win._left_stack.currentIndex() != 1:
+        return
+    total = win._tm_list.count()
+    if total <= 0:
+        return
+    current = win._tm_list.currentRow()
+    start = current if current >= 0 else (-1 if step > 0 else total)
+    for offset in range(1, total + 1):
+        row = (start + (offset * step)) % total
+        data = win._tm_list.item(row).data(Qt.UserRole)
+        if isinstance(data, TMMatch):
+            win._tm_list.setCurrentRow(row)
+            return
+
+
 def _set_tm_list_placeholder(win, text: str) -> None:
     """Show a non-selectable placeholder row inside the TM results list."""
     win._tm_list.clear()
@@ -1085,18 +1408,56 @@ def _update_tm_apply_state(win) -> None:
 
 
 def _set_tm_preview(win, plan: _TMSelectionPlan) -> None:
+    _ensure_tm_explanation_panel(win)
+    explain = getattr(win, "_tm_explain_preview", None)
     if not plan.apply_enabled:
         win._tm_source_preview.clear()
         win._tm_target_preview.clear()
         win._tm_source_preview.setExtraSelections([])
         win._tm_target_preview.setExtraSelections([])
+        if isinstance(explain, QPlainTextEdit):
+            explain.setPlainText(
+                getattr(
+                    plan,
+                    "explanation_preview",
+                    "Select a TM suggestion to see explanation.",
+                )
+            )
         return
     win._tm_source_preview.setPlainText(plan.source_preview)
     win._tm_target_preview.setPlainText(plan.target_preview)
+    if isinstance(explain, QPlainTextEdit):
+        explain.setPlainText(
+            getattr(
+                plan,
+                "explanation_preview",
+                "No explainability details for this suggestion.",
+            )
+        )
     terms = _prepare_tm_preview_terms(plan.query_terms)
     with contextlib.suppress(Exception):
         _apply_tm_preview_highlights(win._tm_source_preview, terms)
         _apply_tm_preview_highlights(win._tm_target_preview, terms)
+
+
+def _ensure_tm_explanation_panel(win) -> None:
+    if hasattr(win, "_tm_explain_preview"):
+        return
+    container = getattr(win, "_tm_preview_container", None)
+    if not isinstance(container, QWidget):
+        return
+    layout = container.layout()
+    if not isinstance(layout, QVBoxLayout):
+        return
+    label = QLabel("TM Explanation", container)
+    preview = QPlainTextEdit(container)
+    preview.setReadOnly(True)
+    preview.setPlaceholderText("Why this suggestion matched")
+    preview.setMinimumHeight(56)
+    layout.addWidget(label)
+    layout.addWidget(preview, 1)
+    win._tm_explain_label = label
+    win._tm_explain_preview = preview
 
 
 def _on_tm_item_double_clicked(win, _item: QListWidgetItem) -> None:
@@ -1117,6 +1478,7 @@ def _tm_apply_filter_plan(win, plan) -> None:
     win._tm_min_score = plan.policy.min_score
     win._tm_origin_project = plan.policy.origin_project
     win._tm_origin_import = plan.policy.origin_import
+    win._tm_grouping = plan.grouping
     win._prefs_extras.update(plan.prefs_extras)
     if win._tm_score_spin.value() != win._tm_min_score:
         win._tm_score_spin.blockSignals(True)
@@ -1136,14 +1498,28 @@ def _tm_apply_filter_plan(win, plan) -> None:
             win._tm_origin_import_cb.setChecked(win._tm_origin_import)
         finally:
             win._tm_origin_import_cb.blockSignals(False)
+    combo = getattr(win, "_tm_grouping_combo", None)
+    if combo is not None:
+        grouping_index = combo.findData(win._tm_grouping)
+        if grouping_index >= 0 and combo.currentIndex() != grouping_index:
+            combo.blockSignals(True)
+            try:
+                combo.setCurrentIndex(grouping_index)
+            finally:
+                combo.blockSignals(False)
 
 
 def _on_tm_filters_changed(win) -> None:
+    grouping = "none"
+    combo = getattr(win, "_tm_grouping_combo", None)
+    if combo is not None:
+        grouping = str(combo.currentData() or "none")
     plan = win._tm_workflow.build_filter_plan(
         source_locale=win._tm_source_locale,
         min_score=int(win._tm_score_spin.value()),
         origin_project=bool(win._tm_origin_project_cb.isChecked()),
         origin_import=bool(win._tm_origin_import_cb.isChecked()),
+        grouping=grouping,
     )
     win._tm_apply_filter_plan(plan)
     win._persist_preferences()
@@ -1285,12 +1661,14 @@ def _poll_tm_query(win) -> None:
 
 
 def _show_tm_matches(win, matches: list[TMMatch]) -> None:
+    _ensure_tm_quick_actions(win)
     win._tm_list.clear()
     view = win._tm_workflow.build_suggestions_view(
         matches=matches,
         policy=win._tm_query_policy(),
         source_preview_limit=60,
         target_preview_limit=80,
+        grouping=getattr(win, "_tm_grouping", "none"),
     )
     if not view.items:
         win._set_tm_list_placeholder(view.message)
@@ -1300,12 +1678,24 @@ def _show_tm_matches(win, matches: list[TMMatch]) -> None:
         )
         return
     for view_item in view.items:
+        group_label = getattr(view_item, "group_label", None)
+        if group_label:
+            group_item = QListWidgetItem(group_label)
+            group_item.setFlags(Qt.ItemIsEnabled)
+            group_item.setData(int(Qt.UserRole) + 7, True)
+            win._tm_list.addItem(group_item)
         item = QListWidgetItem(view_item.label)
         item.setData(Qt.UserRole, view_item.match)
         item.setToolTip(view_item.tooltip_html)
         win._tm_list.addItem(item)
-    if win._tm_list.count():
-        win._tm_list.setCurrentRow(0)
+    first_match_row = -1
+    for row in range(win._tm_list.count()):
+        data = win._tm_list.item(row).data(Qt.UserRole)
+        if isinstance(data, TMMatch):
+            first_match_row = row
+            break
+    if first_match_row >= 0:
+        win._tm_list.setCurrentRow(first_match_row)
     else:
         win._set_tm_list_placeholder(view.message)
         win._set_tm_preview(

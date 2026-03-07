@@ -11,8 +11,72 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import Qt
 
 from translationzed_py.core.model import Status
-from translationzed_py.core.qa_service import QAFinding
+from translationzed_py.core.qa_service import (
+    QA_RULE_ORDER,
+    QAFinding,
+    QARuleState,
+    QAService,
+)
 from translationzed_py.gui import MainWindow
+
+
+def _make_basic_qa_project(tmp_path: Path) -> tuple[Path, Path]:
+    root = tmp_path / "proj"
+    root.mkdir()
+    for loc in ("EN", "BE"):
+        (root / loc).mkdir()
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    target_path = root / "BE" / "qa.txt"
+    (root / "EN" / "qa.txt").write_text('L1 = "Hello."\n', encoding="utf-8")
+    target_path.write_text('L1 = "Privet"\n', encoding="utf-8")
+    return root, target_path
+
+
+def _build_snapshot(
+    *,
+    run_id: str,
+    file_path: Path,
+    summary: str,
+    state_by_rule: dict[str, QARuleState] | None = None,
+    note_by_rule: dict[str, str] | None = None,
+):
+    service = QAService()
+    records = service.build_progress_records(run_id=run_id)
+    target_states = state_by_rule or {}
+    notes = note_by_rule or {}
+    timestamp = 100
+    for rule_id in QA_RULE_ORDER:
+        target_state = target_states.get(rule_id, QARuleState.QUEUED)
+        if target_state == QARuleState.QUEUED:
+            continue
+        records = service.transition_rule_state(
+            records=records,
+            run_id=run_id,
+            rule_id=rule_id,
+            new_state=QARuleState.RUNNING,
+            timestamp_ms=timestamp,
+        )
+        timestamp += 1
+        if target_state == QARuleState.RUNNING:
+            continue
+        records = service.transition_rule_state(
+            records=records,
+            run_id=run_id,
+            rule_id=rule_id,
+            new_state=target_state,
+            timestamp_ms=timestamp,
+            note=notes.get(rule_id, ""),
+        )
+        timestamp += 1
+    return service.build_progress_snapshot(
+        run_id=run_id,
+        file_path=file_path,
+        ordered_rules=records,
+        final_summary=summary,
+    )
 
 
 def test_qa_side_panel_lists_findings_and_navigates(qtbot, tmp_path: Path) -> None:
@@ -307,3 +371,77 @@ def test_qa_refresh_does_not_mutate_file_bytes_without_save(
     win._refresh_qa_for_current_file()
 
     assert be_path.read_bytes() == before
+
+
+def test_qa_checklist_renders_fixed_order_state_text_and_notes(
+    qtbot, tmp_path: Path
+) -> None:
+    """Verify checklist text renders in fixed order with state/note mapping."""
+    root, target_path = _make_basic_qa_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._left_qa_btn.click()
+    win._file_chosen(win.fs_model.index_for_path(target_path))
+
+    snapshot = _build_snapshot(
+        run_id="run-1",
+        file_path=target_path,
+        summary="Running QA checks...",
+        state_by_rule={
+            "trailing": QARuleState.DONE,
+            "newlines": QARuleState.RUNNING,
+            "tokens": QARuleState.SKIPPED,
+            "same_source": QARuleState.FAILED,
+            "languagetool": QARuleState.QUEUED,
+        },
+        note_by_rule={
+            "tokens": "Rule disabled in settings.",
+            "same_source": "Rule exception.",
+        },
+    )
+    win._set_qa_progress_snapshots((snapshot,))
+
+    lines = win._qa_checklist_label.text().splitlines()
+    assert lines[0] == "Missing trailing characters: Completed"
+    assert lines[1] == "Missing/extra newlines: Running…"
+    assert (
+        lines[2]
+        == "Protected tokens / placeholders: Skipped (Rule disabled in settings.)"
+    )
+    assert lines[3] == "Translation equals source: Failed (Rule exception.)"
+    assert lines[4] == "LanguageTool: Queued"
+    assert lines[-1] == "Running QA checks..."
+
+
+def test_qa_checklist_resets_to_queued_on_new_run_snapshot(
+    qtbot, tmp_path: Path
+) -> None:
+    """Verify a new QA run snapshot resets checklist rows to queued states."""
+    root, target_path = _make_basic_qa_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._left_qa_btn.click()
+    win._file_chosen(win.fs_model.index_for_path(target_path))
+
+    first_snapshot = _build_snapshot(
+        run_id="run-1",
+        file_path=target_path,
+        summary="QA completed: 1 finding(s) across 5/5 rules.",
+        state_by_rule=dict.fromkeys(QA_RULE_ORDER, QARuleState.DONE),
+    )
+    win._set_qa_progress_snapshots((first_snapshot,))
+    assert "Completed" in win._qa_checklist_label.text()
+
+    second_snapshot = _build_snapshot(
+        run_id="run-2",
+        file_path=target_path,
+        summary="Running QA checks...",
+    )
+    win._set_qa_progress_snapshots((second_snapshot,))
+
+    checklist_text = win._qa_checklist_label.text()
+    assert win._qa_progress_snapshot is not None
+    assert win._qa_progress_snapshot.run_id == "run-2"
+    assert "Missing trailing characters: Queued" in checklist_text
+    assert "Running QA checks..." in checklist_text
+    assert "Completed" not in "\n".join(checklist_text.splitlines()[:5])
