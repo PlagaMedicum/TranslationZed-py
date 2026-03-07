@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from enum import Enum
 from pathlib import Path
+from typing import Literal
 
 from .qa_rules import (
     has_missing_trailing_fragment,
@@ -21,6 +23,61 @@ QA_CODE_NEWLINES = "qa.newlines"
 QA_CODE_TOKENS = "qa.tokens"
 QA_CODE_SAME_AS_SOURCE = "qa.same_source"
 QA_CODE_LANGUAGETOOL = "qa.languagetool"
+
+QARuleId = Literal[
+    "trailing",
+    "newlines",
+    "tokens",
+    "same_source",
+    "languagetool",
+]
+
+
+class QARuleState(Enum):
+    """Represent QA rule state."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+QA_RULE_ORDER: tuple[QARuleId, ...] = (
+    "trailing",
+    "newlines",
+    "tokens",
+    "same_source",
+    "languagetool",
+)
+
+QA_RULE_LABELS: dict[QARuleId, str] = {
+    "trailing": "Missing trailing characters",
+    "newlines": "Missing/extra newlines",
+    "tokens": "Protected tokens / placeholders",
+    "same_source": "Translation equals source",
+    "languagetool": "LanguageTool",
+}
+
+QA_RULE_STATE_TEXT: dict[QARuleState, str] = {
+    QARuleState.QUEUED: "Queued",
+    QARuleState.RUNNING: "Running…",
+    QARuleState.DONE: "Completed",
+    QARuleState.SKIPPED: "Skipped",
+    QARuleState.FAILED: "Failed",
+}
+
+_TERMINAL_QA_RULE_STATES = frozenset(
+    {QARuleState.DONE, QARuleState.SKIPPED, QARuleState.FAILED}
+)
+
+_ALLOWED_QA_RULE_TRANSITIONS: dict[QARuleState, frozenset[QARuleState]] = {
+    QARuleState.QUEUED: frozenset({QARuleState.RUNNING}),
+    QARuleState.RUNNING: _TERMINAL_QA_RULE_STATES,
+    QARuleState.DONE: frozenset(),
+    QARuleState.SKIPPED: frozenset(),
+    QARuleState.FAILED: frozenset(),
+}
 _QA_CODE_SHORT_LABELS = {
     QA_CODE_TRAILING: "trailing",
     QA_CODE_NEWLINES: "newlines",
@@ -66,6 +123,30 @@ class QAFinding:
     excerpt: str
     severity: str = "warning"
     group: str = "format"
+
+
+@dataclass(frozen=True, slots=True)
+class QARuleProgressRecord:
+    """Represent QARuleProgressRecord."""
+
+    run_id: str
+    rule_id: QARuleId
+    state: QARuleState
+    started_at_ms: int | None
+    ended_at_ms: int | None
+    findings_count: int
+    note: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class QAScanProgressSnapshot:
+    """Represent QAScanProgressSnapshot."""
+
+    run_id: str
+    file_path: str
+    ordered_rules: tuple[QARuleProgressRecord, ...]
+    completion_ratio: float
+    final_summary: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +236,64 @@ class QAService:
             current_row=current_row,
             direction=direction,
             root=root,
+        )
+
+    def build_progress_records(
+        self,
+        *,
+        run_id: str,
+        enabled_rules: Sequence[QARuleId] | None = None,
+        skip_disabled_rules: bool = False,
+        disabled_note: str = "Rule disabled.",
+    ) -> tuple[QARuleProgressRecord, ...]:
+        """Build progress records."""
+        return build_qa_progress_records(
+            run_id=run_id,
+            enabled_rules=enabled_rules,
+            skip_disabled_rules=skip_disabled_rules,
+            disabled_note=disabled_note,
+        )
+
+    def transition_rule_state(
+        self,
+        *,
+        records: Sequence[QARuleProgressRecord],
+        run_id: str,
+        rule_id: QARuleId,
+        new_state: QARuleState,
+        timestamp_ms: int | None = None,
+        findings_count: int | None = None,
+        note: str | None = None,
+    ) -> tuple[QARuleProgressRecord, ...]:
+        """Transition one QA rule state."""
+        return transition_qa_rule_state(
+            records=records,
+            run_id=run_id,
+            rule_id=rule_id,
+            new_state=new_state,
+            timestamp_ms=timestamp_ms,
+            findings_count=findings_count,
+            note=note,
+        )
+
+    def completion_ratio(self, records: Sequence[QARuleProgressRecord]) -> float:
+        """Return completion ratio."""
+        return qa_completion_ratio(records)
+
+    def build_progress_snapshot(
+        self,
+        *,
+        run_id: str,
+        file_path: str | Path,
+        ordered_rules: Sequence[QARuleProgressRecord],
+        final_summary: str,
+    ) -> QAScanProgressSnapshot:
+        """Build progress snapshot."""
+        return build_qa_progress_snapshot(
+            run_id=run_id,
+            file_path=file_path,
+            ordered_rules=ordered_rules,
+            final_summary=final_summary,
         )
 
 
@@ -293,6 +432,143 @@ def build_auto_mark_rows(findings: Sequence[QAFinding]) -> tuple[int, ...]:
             continue
         rows.add(finding.row)
     return tuple(sorted(rows))
+
+
+def build_qa_progress_records(
+    *,
+    run_id: str,
+    enabled_rules: Sequence[QARuleId] | None = None,
+    skip_disabled_rules: bool = False,
+    disabled_note: str = "Rule disabled.",
+) -> tuple[QARuleProgressRecord, ...]:
+    """Build ordered QA progress records for a scan run."""
+    normalized_run_id = str(run_id).strip()
+    if not normalized_run_id:
+        raise ValueError("run_id must be non-empty")
+    enabled = set(enabled_rules or QA_RULE_ORDER)
+    ordered: list[QARuleProgressRecord] = []
+    disabled_note_text = str(disabled_note).strip()
+    for rule_id in QA_RULE_ORDER:
+        state = QARuleState.QUEUED
+        note = ""
+        if rule_id not in enabled and skip_disabled_rules:
+            state = QARuleState.SKIPPED
+            note = disabled_note_text
+        ordered.append(
+            QARuleProgressRecord(
+                run_id=normalized_run_id,
+                rule_id=rule_id,
+                state=state,
+                started_at_ms=None,
+                ended_at_ms=None,
+                findings_count=0,
+                note=note,
+            )
+        )
+    return tuple(ordered)
+
+
+def transition_qa_rule_state(
+    *,
+    records: Sequence[QARuleProgressRecord],
+    run_id: str,
+    rule_id: QARuleId,
+    new_state: QARuleState,
+    timestamp_ms: int | None = None,
+    findings_count: int | None = None,
+    note: str | None = None,
+) -> tuple[QARuleProgressRecord, ...]:
+    """Apply one legal state transition for a single QA rule."""
+    current_records = tuple(records)
+    normalized_run_id = str(run_id).strip()
+    if not normalized_run_id:
+        raise ValueError("run_id must be non-empty")
+    if not current_records:
+        raise ValueError("records must be non-empty")
+    _validate_progress_records(current_records, run_id=normalized_run_id)
+    record_index = _find_rule_record_index(current_records, rule_id=rule_id)
+    current = current_records[record_index]
+    if current.state == new_state:
+        raise ValueError(
+            f"rule '{rule_id}' is already in state '{current.state.value}'"
+        )
+    allowed = _ALLOWED_QA_RULE_TRANSITIONS[current.state]
+    if new_state not in allowed:
+        raise ValueError(
+            "illegal QA rule transition: "
+            f"{current.state.value} -> {new_state.value} for '{rule_id}'"
+        )
+    if new_state == QARuleState.RUNNING and current.started_at_ms is not None:
+        raise ValueError(
+            f"rule '{rule_id}' cannot enter running state more than once in a run"
+        )
+    before_ratio = qa_completion_ratio(current_records)
+    updated = replace(
+        current,
+        state=new_state,
+        started_at_ms=(
+            timestamp_ms
+            if new_state == QARuleState.RUNNING and timestamp_ms is not None
+            else current.started_at_ms
+        ),
+        ended_at_ms=(
+            timestamp_ms
+            if new_state in _TERMINAL_QA_RULE_STATES and timestamp_ms is not None
+            else current.ended_at_ms
+        ),
+        findings_count=(
+            int(findings_count)
+            if findings_count is not None
+            else current.findings_count
+        ),
+        note=str(note).strip() if note is not None else current.note,
+    )
+    updated_records = (
+        current_records[:record_index]
+        + (updated,)
+        + current_records[record_index + 1 :]
+    )
+    after_ratio = qa_completion_ratio(updated_records)
+    if after_ratio + 1e-12 < before_ratio:
+        raise ValueError("completion ratio must be non-decreasing within one run")
+    return updated_records
+
+
+def qa_completion_ratio(records: Sequence[QARuleProgressRecord]) -> float:
+    """Return QA scan completion ratio based on terminal rule states."""
+    total = len(records)
+    if total <= 0:
+        return 0.0
+    completed = sum(1 for record in records if record.state in _TERMINAL_QA_RULE_STATES)
+    ratio = completed / total
+    return max(0.0, min(1.0, ratio))
+
+
+def build_qa_progress_snapshot(
+    *,
+    run_id: str,
+    file_path: str | Path,
+    ordered_rules: Sequence[QARuleProgressRecord],
+    final_summary: str,
+) -> QAScanProgressSnapshot:
+    """Build QA progress snapshot DTO for one run/file."""
+    records = tuple(ordered_rules)
+    normalized_run_id = str(run_id).strip()
+    if not normalized_run_id:
+        raise ValueError("run_id must be non-empty")
+    _validate_progress_records(records, run_id=normalized_run_id)
+    normalized_path = (
+        file_path.as_posix()
+        if isinstance(file_path, Path)
+        else Path(str(file_path)).as_posix()
+    )
+    return QAScanProgressSnapshot(
+        run_id=normalized_run_id,
+        file_path=normalized_path,
+        ordered_rules=records,
+        completion_ratio=qa_completion_ratio(records),
+        final_summary=str(final_summary),
+    )
 
 
 def build_qa_navigation_plan(
@@ -440,3 +716,35 @@ def _finding_sort_key(finding: QAFinding) -> tuple[str, int, str]:
         finding.row,
         finding.code,
     )
+
+
+def _validate_progress_records(
+    records: Sequence[QARuleProgressRecord], *, run_id: str
+) -> None:
+    """Validate QA progress record integrity for one run."""
+    seen: set[QARuleId] = set()
+    for record in records:
+        if record.run_id != run_id:
+            raise ValueError(
+                f"record run_id mismatch: expected '{run_id}', got '{record.run_id}'"
+            )
+        if record.rule_id in seen:
+            raise ValueError(f"duplicate QA rule progress record: {record.rule_id}")
+        seen.add(record.rule_id)
+        if record.state == QARuleState.QUEUED and record.ended_at_ms is not None:
+            raise ValueError("queued rule cannot have ended_at_ms")
+        if record.state == QARuleState.RUNNING and record.ended_at_ms is not None:
+            raise ValueError("running rule cannot have ended_at_ms")
+    unknown = set(seen) - set(QA_RULE_ORDER)
+    if unknown:
+        raise ValueError(f"unknown QA rule id(s): {sorted(unknown)}")
+
+
+def _find_rule_record_index(
+    records: Sequence[QARuleProgressRecord], *, rule_id: QARuleId
+) -> int:
+    """Return index of rule progress record in ordered sequence."""
+    for index, record in enumerate(records):
+        if record.rule_id == rule_id:
+            return index
+    raise ValueError(f"missing QA progress record for rule '{rule_id}'")

@@ -4,16 +4,26 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from translationzed_py.core.qa_service import (
     QA_CODE_NEWLINES,
     QA_CODE_SAME_AS_SOURCE,
     QA_CODE_TOKENS,
     QA_CODE_TRAILING,
+    QA_RULE_ORDER,
+    QA_RULE_STATE_TEXT,
     QAFinding,
     QAInputRow,
+    QARuleState,
+    QAScanProgressSnapshot,
     QAService,
     build_qa_panel_plan,
+    build_qa_progress_records,
+    build_qa_progress_snapshot,
+    qa_completion_ratio,
     qa_finding_label,
+    transition_qa_rule_state,
 )
 
 
@@ -238,3 +248,201 @@ def test_qa_service_navigation_plan_moves_and_wraps() -> None:
     )
     assert prev_wrap_plan.finding is not None
     assert prev_wrap_plan.finding.row == 3
+
+
+def test_build_qa_progress_records_uses_fixed_rule_order() -> None:
+    """Verify QA progress records use deterministic fixed ordering."""
+    records = build_qa_progress_records(run_id="run-1")
+    assert tuple(record.rule_id for record in records) == QA_RULE_ORDER
+    assert all(record.state == QARuleState.QUEUED for record in records)
+    assert QA_RULE_STATE_TEXT[QARuleState.QUEUED] == "Queued"
+    assert QA_RULE_STATE_TEXT[QARuleState.RUNNING] == "Running…"
+    assert QA_RULE_STATE_TEXT[QARuleState.DONE] == "Completed"
+    assert QA_RULE_STATE_TEXT[QARuleState.SKIPPED] == "Skipped"
+    assert QA_RULE_STATE_TEXT[QARuleState.FAILED] == "Failed"
+
+
+def test_build_qa_progress_records_can_mark_disabled_rules_as_skipped() -> None:
+    """Verify disabled rules are deterministic skipped records when requested."""
+    records = build_qa_progress_records(
+        run_id="run-1",
+        enabled_rules=("trailing", "tokens"),
+        skip_disabled_rules=True,
+        disabled_note="Disabled by settings.",
+    )
+    by_rule = {record.rule_id: record for record in records}
+    assert by_rule["trailing"].state == QARuleState.QUEUED
+    assert by_rule["tokens"].state == QARuleState.QUEUED
+    assert by_rule["newlines"].state == QARuleState.SKIPPED
+    assert by_rule["same_source"].state == QARuleState.SKIPPED
+    assert by_rule["languagetool"].state == QARuleState.SKIPPED
+    assert by_rule["newlines"].note == "Disabled by settings."
+
+
+def test_transition_qa_rule_state_accepts_legal_transitions() -> None:
+    """Verify queued->running->done transition chain is accepted."""
+    records = build_qa_progress_records(run_id="run-1")
+    records = transition_qa_rule_state(
+        records=records,
+        run_id="run-1",
+        rule_id="trailing",
+        new_state=QARuleState.RUNNING,
+        timestamp_ms=10,
+    )
+    trailing = next(record for record in records if record.rule_id == "trailing")
+    assert trailing.started_at_ms == 10
+    assert trailing.state == QARuleState.RUNNING
+
+    records = transition_qa_rule_state(
+        records=records,
+        run_id="run-1",
+        rule_id="trailing",
+        new_state=QARuleState.DONE,
+        timestamp_ms=25,
+        findings_count=3,
+        note="ok",
+    )
+    trailing = next(record for record in records if record.rule_id == "trailing")
+    assert trailing.state == QARuleState.DONE
+    assert trailing.ended_at_ms == 25
+    assert trailing.findings_count == 3
+    assert trailing.note == "ok"
+
+
+def test_transition_qa_rule_state_rejects_illegal_transitions() -> None:
+    """Verify invalid state transitions are rejected with ValueError."""
+    records = build_qa_progress_records(run_id="run-1")
+    with pytest.raises(ValueError, match="illegal QA rule transition"):
+        transition_qa_rule_state(
+            records=records,
+            run_id="run-1",
+            rule_id="trailing",
+            new_state=QARuleState.DONE,
+        )
+
+    running = transition_qa_rule_state(
+        records=records,
+        run_id="run-1",
+        rule_id="trailing",
+        new_state=QARuleState.RUNNING,
+    )
+    with pytest.raises(ValueError, match="illegal QA rule transition"):
+        transition_qa_rule_state(
+            records=running,
+            run_id="run-1",
+            rule_id="trailing",
+            new_state=QARuleState.QUEUED,
+        )
+    done = transition_qa_rule_state(
+        records=running,
+        run_id="run-1",
+        rule_id="trailing",
+        new_state=QARuleState.DONE,
+    )
+    with pytest.raises(ValueError, match="illegal QA rule transition"):
+        transition_qa_rule_state(
+            records=done,
+            run_id="run-1",
+            rule_id="trailing",
+            new_state=QARuleState.RUNNING,
+        )
+
+
+def test_transition_qa_rule_state_rejects_second_running_in_same_run() -> None:
+    """Verify running state cannot be entered twice for one rule/run."""
+    records = build_qa_progress_records(run_id="run-1")
+    running = transition_qa_rule_state(
+        records=records,
+        run_id="run-1",
+        rule_id="trailing",
+        new_state=QARuleState.RUNNING,
+        timestamp_ms=10,
+    )
+    with pytest.raises(ValueError, match="already in state 'running'"):
+        transition_qa_rule_state(
+            records=running,
+            run_id="run-1",
+            rule_id="trailing",
+            new_state=QARuleState.RUNNING,
+            timestamp_ms=15,
+        )
+
+
+def test_qa_completion_ratio_is_non_decreasing_for_legal_sequence() -> None:
+    """Verify completion ratio does not decrease for legal transitions."""
+    records = build_qa_progress_records(run_id="run-1")
+    ratios = [qa_completion_ratio(records)]
+
+    records = transition_qa_rule_state(
+        records=records,
+        run_id="run-1",
+        rule_id="trailing",
+        new_state=QARuleState.RUNNING,
+        timestamp_ms=10,
+    )
+    ratios.append(qa_completion_ratio(records))
+    records = transition_qa_rule_state(
+        records=records,
+        run_id="run-1",
+        rule_id="trailing",
+        new_state=QARuleState.DONE,
+        timestamp_ms=20,
+    )
+    ratios.append(qa_completion_ratio(records))
+    records = transition_qa_rule_state(
+        records=records,
+        run_id="run-1",
+        rule_id="newlines",
+        new_state=QARuleState.RUNNING,
+        timestamp_ms=21,
+    )
+    ratios.append(qa_completion_ratio(records))
+    records = transition_qa_rule_state(
+        records=records,
+        run_id="run-1",
+        rule_id="newlines",
+        new_state=QARuleState.SKIPPED,
+        timestamp_ms=22,
+    )
+    ratios.append(qa_completion_ratio(records))
+    assert ratios == sorted(ratios)
+
+
+def test_build_qa_progress_snapshot_preserves_schema_fields() -> None:
+    """Verify progress snapshot fields and summary passthrough are preserved."""
+    records = build_qa_progress_records(run_id="run-1")
+    snapshot = build_qa_progress_snapshot(
+        run_id="run-1",
+        file_path=Path("/tmp/proj/BE/ui.txt"),
+        ordered_rules=records,
+        final_summary="QA completed: 0 finding(s) across 0/5 rules.",
+    )
+    assert isinstance(snapshot, QAScanProgressSnapshot)
+    assert snapshot.run_id == "run-1"
+    assert snapshot.file_path == "/tmp/proj/BE/ui.txt"
+    assert tuple(record.rule_id for record in snapshot.ordered_rules) == QA_RULE_ORDER
+    assert snapshot.completion_ratio == 0.0
+    assert snapshot.final_summary == "QA completed: 0 finding(s) across 0/5 rules."
+
+
+def test_qa_service_progress_wrappers_delegate() -> None:
+    """Verify QAService wrappers delegate progress-model helpers."""
+    service = QAService()
+    records = service.build_progress_records(run_id="run-1")
+    assert len(records) == len(QA_RULE_ORDER)
+    records = service.transition_rule_state(
+        records=records,
+        run_id="run-1",
+        rule_id="trailing",
+        new_state=QARuleState.RUNNING,
+        timestamp_ms=10,
+    )
+    ratio = service.completion_ratio(records)
+    assert ratio == 0.0
+    snapshot = service.build_progress_snapshot(
+        run_id="run-1",
+        file_path="/tmp/proj/BE/ui.txt",
+        ordered_rules=records,
+        final_summary="scan running",
+    )
+    assert snapshot.final_summary == "scan running"
