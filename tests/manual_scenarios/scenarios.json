@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "scenarios": [
+    {
+      "id": "open-edit-save-basic",
+      "title": "Open, edit, and save one locale file",
+      "fixture_root": "conflict_manual",
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open BE/ui.txt from the Project tree.",
+        "Edit one translation value in the table or detail editor.",
+        "Use General -> Save and confirm write action.",
+        "Re-open the same file and verify the edited value persists."
+      ],
+      "expected_checks": [
+        "No startup errors are shown.",
+        "Edited row is marked dirty before save and clean after save.",
+        "Saved value remains after re-open."
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_gui_edit_save.py",
+        "tests/test_gui_save_prompt.py"
+      ]
+    },
+    {
+      "id": "conflict-resolution-flow",
+      "title": "Conflict detection and resolution prompt flow",
+      "fixture_root": "conflict_manual",
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open BE/ui.txt and apply edits to create draft/cache state.",
+        "Trigger conflict handling path from save/open workflow.",
+        "Choose merge or keep-disk path in conflict dialog.",
+        "Verify table content and status reflect selected resolution."
+      ],
+      "expected_checks": [
+        "Conflict dialog appears with deterministic choices.",
+        "Selected conflict action is applied consistently.",
+        "No crash occurs and file remains operable after resolution."
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_gui_conflicts.py",
+        "tests/test_conflict_service.py"
+      ]
+    },
+    {
+      "id": "qa-checklist-manual-run",
+      "title": "Manual QA run and checklist update flow",
+      "fixture_root": "perf_root",
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open one BE file from perf fixtures.",
+        "Switch to QA side panel and trigger Run QA.",
+        "Observe checklist state transitions in fixed order.",
+        "Navigate at least one finding via list action."
+      ],
+      "expected_checks": [
+        "QA panel message indicates manual mode before run.",
+        "Checklist rows move through Queued/Running/Completed states.",
+        "Findings list updates and supports navigation."
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_qa_async.py",
+        "tests/test_gui_qa_panel.py"
+      ]
+    },
+    {
+      "id": "tm-apply-triage-flow",
+      "title": "TM triage list and apply flow",
+      "fixture_root": "prod_like",
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open a BE translation file with EN source available.",
+        "Switch to TM panel and run suggestion lookup.",
+        "Apply one suggestion and verify translation updates.",
+        "Confirm grouping/filter controls still respond."
+      ],
+      "expected_checks": [
+        "TM panel renders suggestions without UI freeze.",
+        "Applied suggestion updates current row value.",
+        "TM controls remain interactive after apply."
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_tm_workflow_service.py",
+        "tests/test_gui_tm_preferences.py"
+      ]
+    },
+    {
+      "id": "source-reference-fallback-flow",
+      "title": "Source-reference mode and fallback behavior",
+      "fixture_root": "prod_like",
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open BE file and focus source column header controls.",
+        "Change source-reference mode and fallback settings.",
+        "Navigate several rows and inspect source content updates.",
+        "Re-open preferences and confirm persistence."
+      ],
+      "expected_checks": [
+        "Source-reference selector responds without errors.",
+        "Fallback mode changes update source text deterministically.",
+        "Preferences values round-trip across reopen."
+      ],
+      "env_overrides": {},
+      "prefs_extras": {
+        "SOURCE_REFERENCE_MODE": "EN"
+      },
+      "automation_pytest_selectors": [
+        "tests/test_source_reference_ui.py",
+        "tests/test_source_reference_state.py"
+      ]
+    },
+    {
+      "id": "tzp-writeback-opt-in",
+      "title": "Optional TZP status-comment writeback",
+      "fixture_root": "conflict_manual",
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open BE/ui.txt and edit value and status for one key.",
+        "Save file with TZP writeback opt-in enabled in scenario extras.",
+        "Inspect saved file comments and confirm namespaced TZP marker behavior."
+      ],
+      "expected_checks": [
+        "Writeback is opt-in and active only for this scenario.",
+        "Only namespaced TZP comments are added/updated/removed.",
+        "Non-namespaced user comments are not mutated."
+      ],
+      "env_overrides": {},
+      "prefs_extras": {
+        "TZP_STATUS_COMMENT_WRITEBACK": "true",
+        "TZP_STATUS_COMMENT_PREFIX": "--"
+      },
+      "automation_pytest_selectors": [
+        "tests/test_tzp_comment_policy.py",
+        "tests/test_saver.py"
+      ]
+    }
+  ]
+}

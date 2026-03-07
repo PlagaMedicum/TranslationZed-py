@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "required_workflows": {
+    "open_save": {
+      "description": "Open/edit/save workflow must remain covered by automated GUI tests.",
+      "selectors": [
+        "tests/test_gui_edit_save.py",
+        "tests/test_gui_save_prompt.py"
+      ]
+    },
+    "conflict_resolution": {
+      "description": "Conflict detection and resolution flow must remain covered.",
+      "selectors": [
+        "tests/test_gui_conflicts.py",
+        "tests/test_conflict_service.py"
+      ]
+    },
+    "qa_checklist": {
+      "description": "QA checklist progression and panel UX coverage must remain.",
+      "selectors": [
+        "tests/test_qa_async.py",
+        "tests/test_gui_qa_panel.py"
+      ]
+    },
+    "tm_apply": {
+      "description": "TM suggestion and apply coverage must remain.",
+      "selectors": [
+        "tests/test_tm_workflow_service.py",
+        "tests/test_gui_tm_preferences.py"
+      ]
+    },
+    "source_reference": {
+      "description": "Source-reference mode/fallback coverage must remain.",
+      "selectors": [
+        "tests/test_source_reference_state.py",
+        "tests/test_source_reference_ui.py"
+      ]
+    },
+    "tzp_writeback": {
+      "description": "TZP opt-in comment writeback contracts must remain covered.",
+      "selectors": [
+        "tests/test_tzp_comment_policy.py",
+        "tests/test_saver.py::test_save_tzp_comment_writeback_inserts_and_keeps_spans_valid"
+      ]
+    }
+  },
+  "deprecated_test_replacements": []
+}
