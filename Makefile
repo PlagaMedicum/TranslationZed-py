@@ -20,13 +20,14 @@ MUTATION_PROMOTION_TOKEN_ENV ?= GITHUB_TOKEN
 MUTATION_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/mutation/promotion-readiness.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check \
-	test test-cov test-perf test-perf-scale test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
+.PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check locale-agnostic-check \
+	test test-cov test-qa-v09 test-tmq-v09 test-tmw-v09 test-cr-v09 test-src-a29 test-tzp-a30 test-ui-manual-contract test-a31-manual test-perf test-perf-scale test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build docs-build-lite docs-index docs-api docs-contract docs-check code-triage review-queue-check \
+	docs-index-write \
 	bench bench-check bench-advisory test-mutation \
 	test-mutation-stage mutation-promotion-check mutation-promotion-readiness \
-	test-warnings run clean clean-cache clean-config perf-scenarios perf-dependency-eval ci-deps dist pack pack-win \
+	test-warnings run ui-manual-list ui-manual-run ui-manual-batch clean clean-cache clean-config perf-scenarios perf-dependency-eval ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
 
 # ─── Environment/bootstrap ─────────────────────────────────────────────────────
@@ -64,11 +65,38 @@ typecheck:
 arch-check:
 	VENV=$(VENV) bash scripts/arch_check.sh
 
+locale-agnostic-check:
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/locale_agnostic_check.py $(ARGS)
+
 test:
 	VENV=$(VENV) bash scripts/test.sh
 
 test-cov:
 	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/test_cov.sh
+
+test-qa-v09:
+	VENV=$(VENV) bash scripts/test_qa_v09.sh $(ARGS)
+
+test-tmq-v09:
+	VENV=$(VENV) bash scripts/test_tmq_v09.sh $(ARGS)
+
+test-tmw-v09:
+	VENV=$(VENV) bash scripts/test_tmw_v09.sh $(ARGS)
+
+test-cr-v09:
+	VENV=$(VENV) bash scripts/test_cr_v09.sh $(ARGS)
+
+test-src-a29:
+	VENV=$(VENV) bash scripts/test_src_a29.sh $(ARGS)
+
+test-tzp-a30:
+	VENV=$(VENV) bash scripts/test_tzp_a30.sh $(ARGS)
+
+test-ui-manual-contract:
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/ui_manual_contract_check.py $(ARGS)
+
+test-a31-manual:
+	VENV=$(VENV) bash scripts/test_a31_manual.sh $(ARGS)
 
 test-perf:
 	VENV=$(VENV) bash scripts/test_perf.sh
@@ -95,6 +123,10 @@ docs-index:
 	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/generate_contract_index.py --check \
 		--out docs/reference/contract_index.json
 
+docs-index-write:
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/generate_contract_index.py --write \
+		--out docs/reference/contract_index.json
+
 docs-api: docs-index
 	@echo "docs-api: mkdocstrings API pages validated through docs-index + docs-build"
 
@@ -111,7 +143,7 @@ code-triage:
 docs-contract: review-queue-check code-triage
 	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/docs_contract_check.py --site-root $(ARTIFACTS)/docs/site
 
-docs-check: docstyle docs-build docs-index docs-api docs-contract
+docs-check: docstyle docs-build docs-index docs-api docs-contract locale-agnostic-check
 
 bench:
 	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) BENCH_CURRENT=$(BENCH_CURRENT) \
@@ -174,15 +206,15 @@ test-warnings:
 
 # ─── Fast dev gates ────────────────────────────────────────────────────────────
 ## strict non-mutating quality gate (check-only) for CI
-check: fmt-check lint-check typecheck arch-check test
+check: fmt-check lint-check typecheck arch-check locale-agnostic-check test-ui-manual-contract test
 
 ## local quality gate (allows auto-fix)
-check-local: fmt lint typecheck arch-check test
+check-local: fmt lint typecheck arch-check locale-agnostic-check test-ui-manual-contract test
 
 # ─── Verification umbrella gates ───────────────────────────────────────────────
 ## full local verification core (auto-fix + warning policy)
-verify-core: clean-cache clean-config fmt-changed lint typecheck arch-check perf-advisory \
-	bench-advisory test-cov test-readonly-clean security docs-check
+verify-core: clean-cache clean-config fmt-changed lint typecheck arch-check locale-agnostic-check perf-advisory \
+	bench-advisory test-ui-manual-contract test-cov test-readonly-clean security docs-check
 
 ## local perf gates are advisory; strict blocking lives in verify-ci
 perf-advisory:
@@ -218,8 +250,8 @@ verify:
 	fi
 
 ## strict CI verification core (non-mutating)
-verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-check test-cov test-perf test-perf-scale \
-	test-readonly-clean security docs-check perf-scenarios release-check-if-tag
+verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-check locale-agnostic-check test-cov test-perf test-perf-scale \
+	test-ui-manual-contract test-readonly-clean security docs-check perf-scenarios release-check-if-tag
 
 ## CI benchmark gate helper; can be skipped when a dedicated benchmark job is used.
 verify-ci-bench:
@@ -288,6 +320,29 @@ perf-dependency-eval:
 ## convenience runner: make run ARGS="--help"
 run:
 	VENV=$(VENV) bash scripts/run.sh $(ARGS)
+
+ui-manual-list:
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/ui_manual_runner.py --list $(ARGS)
+
+ui-manual-run:
+	@if [ -z "$(SCENARIO)" ]; then \
+		echo "SCENARIO is required (example: make ui-manual-run SCENARIO=open-edit-save-basic)"; \
+		exit 2; \
+	fi
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/ui_manual_runner.py \
+		--scenario "$(SCENARIO)" \
+		--results-dir "$(ARTIFACTS)/manual-ui" \
+		$(ARGS)
+
+ui-manual-batch:
+	@if [ -z "$(SCENARIOS)" ]; then \
+		echo "SCENARIOS is required (example: make ui-manual-batch SCENARIOS=open-edit-save-basic,qa-checklist-manual-run)"; \
+		exit 2; \
+	fi
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/ui_manual_runner.py \
+		--batch "$(SCENARIOS)" \
+		--results-dir "$(ARTIFACTS)/manual-ui" \
+		$(ARGS)
 
 # ─── Maintenance/packaging ─────────────────────────────────────────────────────
 clean:
