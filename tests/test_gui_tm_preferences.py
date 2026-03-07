@@ -1016,6 +1016,31 @@ def test_preferences_source_reference_ui_copy_is_locale_agnostic(tmp_path, qtbot
     )
 
 
+def test_preferences_view_tab_roundtrip_tzp_writeback_controls(tmp_path, qtbot):
+    """Verify view-tab TZP write-back controls roundtrip and toggle prefix edit state."""
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {
+            "tm_import_dir": str(root / ".tzp" / "tms"),
+            "tzp_writeback_enabled": True,
+            "tzp_comment_prefix": "//",
+        },
+        tm_files=[],
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog._tzp_writeback_check.isChecked() is True
+    assert dialog._tzp_comment_prefix_edit.text() == "//"
+    assert dialog._tzp_comment_prefix_edit.isEnabled() is True
+
+    dialog._tzp_writeback_check.setChecked(False)
+    assert dialog._tzp_comment_prefix_edit.isEnabled() is False
+    dialog._tzp_comment_prefix_edit.setText("")
+    values = dialog.values()
+    assert values["tzp_writeback_enabled"] is False
+    assert values["tzp_comment_prefix"] == ""
+
+
 def test_preferences_source_reference_accept_normalizes_chain_and_presets(
     tmp_path, qtbot
 ):
@@ -1221,6 +1246,36 @@ def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
     assert win._qa_auto_mark_translated_for_review is True
     assert win._qa_auto_mark_proofread_for_review is False
     assert refresh_calls == [True]
+
+
+def test_apply_preferences_updates_tzp_writeback_extras(tmp_path, qtbot, monkeypatch):
+    """Verify apply-preferences updates TZP write-back extras and fallback removal."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    monkeypatch.setattr(win, "_apply_tm_preferences_actions", lambda _values: None)
+    monkeypatch.setattr(win, "_persist_preferences", lambda: None)
+    win._prefs_extras.pop("TZP_STATUS_COMMENT_WRITEBACK", None)
+    win._prefs_extras.pop("TZP_STATUS_COMMENT_PREFIX", None)
+
+    win._apply_preferences(
+        {
+            "tzp_writeback_enabled": True,
+            "tzp_comment_prefix": "//",
+        }
+    )
+    assert win._prefs_extras["TZP_STATUS_COMMENT_WRITEBACK"] == "true"
+    assert win._prefs_extras["TZP_STATUS_COMMENT_PREFIX"] == "//"
+
+    win._apply_preferences(
+        {
+            "tzp_writeback_enabled": False,
+            "tzp_comment_prefix": "",
+        }
+    )
+    assert "TZP_STATUS_COMMENT_WRITEBACK" not in win._prefs_extras
+    assert "TZP_STATUS_COMMENT_PREFIX" not in win._prefs_extras
 
 
 def test_preferences_tm_diagnostics_button_sets_flag(tmp_path, qtbot):

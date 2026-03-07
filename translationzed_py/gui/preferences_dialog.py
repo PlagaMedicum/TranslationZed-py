@@ -175,6 +175,8 @@ class PreferencesDialog(QDialog):
             "source_reference_fallback_presets": (
                 self._source_ref_presets_edit.toPlainText().strip()
             ),
+            "tzp_writeback_enabled": self._tzp_writeback_check.isChecked(),
+            "tzp_comment_prefix": self._tzp_comment_prefix_edit.text().strip(),
             "tm_enabled": changed_tm_enabled,
             "tm_remove_paths": sorted(self._tm_remove_paths),
             "tm_import_paths": list(self._tm_import_paths),
@@ -433,6 +435,9 @@ class PreferencesDialog(QDialog):
         if not enabled:
             self._qa_lt_automark_check.setChecked(False)
 
+    def _sync_tzp_writeback_controls(self, enabled: bool) -> None:
+        self._tzp_comment_prefix_edit.setEnabled(bool(enabled))
+
     def _build_view_tab(self) -> QWidget:
         widget = QWidget(self)
         layout = QFormLayout(widget)
@@ -472,6 +477,23 @@ class PreferencesDialog(QDialog):
         self._source_ref_presets_edit.setPlainText(
             str(self._prefs.get("source_reference_fallback_presets", "")).strip()
         )
+        self._tzp_writeback_check = QCheckBox(
+            "Write namespaced TZP status comments to originals on save",
+            self,
+        )
+        self._tzp_writeback_check.setChecked(
+            bool(self._prefs.get("tzp_writeback_enabled", False))
+        )
+        self._tzp_comment_prefix_edit = QLineEdit(
+            str(self._prefs.get("tzp_comment_prefix", "--")).strip() or "--",
+            self,
+        )
+        self._tzp_comment_prefix_edit.setPlaceholderText("--")
+        self._tzp_comment_prefix_edit.setToolTip(
+            "Comment prefix for generated TZP status comments (for example -- or //)."
+        )
+        self._tzp_writeback_check.toggled.connect(self._sync_tzp_writeback_controls)
+        self._sync_tzp_writeback_controls(self._tzp_writeback_check.isChecked())
         self._wrap_text_check = QCheckBox("Wrap long strings in table", self)
         self._wrap_text_check.setChecked(bool(self._prefs.get("wrap_text", False)))
         self._large_text_opt_check = QCheckBox(
@@ -498,6 +520,8 @@ class PreferencesDialog(QDialog):
         layout.addRow(
             QLabel("Locale fallback presets (JSON)"), self._source_ref_presets_edit
         )
+        layout.addRow(self._tzp_writeback_check)
+        layout.addRow(QLabel("TZP comment prefix"), self._tzp_comment_prefix_edit)
         layout.addRow(self._wrap_text_check)
         layout.addRow(self._large_text_opt_check)
         layout.addRow(self._visual_highlight_check)

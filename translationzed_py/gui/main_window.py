@@ -2679,7 +2679,10 @@ class MainWindow(QMainWindow):
             "qa_auto_mark_translated_for_review": self._qa_auto_mark_translated_for_review,
             "qa_auto_mark_proofread_for_review": self._qa_auto_mark_proofread_for_review,
         }
-        prefs.update(_source_ref_preferences_payload_for_window(self))
+        prefs.update(
+            _source_ref_preferences_payload_for_window(self)
+            | _panel_helpers._tzp_writeback_preferences_payload(self)
+        )
         _lt_adapter.populate_preferences_dialog_values(self, prefs)
         tm_files: list[dict[str, object]] = []
         if self._ensure_tm_store():
@@ -2700,10 +2703,7 @@ class MainWindow(QMainWindow):
                     for rec in self._tm_store.list_import_files()
                 ]
         dialog = PreferencesDialog(
-            prefs,
-            tm_files=tm_files,
-            initial_tab=initial_tab,
-            parent=self,
+            prefs, tm_files=tm_files, initial_tab=initial_tab, parent=self
         )
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
@@ -2806,6 +2806,7 @@ class MainWindow(QMainWindow):
                 self._set_qa_findings(())
                 self._set_qa_panel_message("QA settings changed. Click Run QA.")
         _apply_source_ref_preferences_for_window(self, values)
+        _panel_helpers._apply_tzp_writeback_preferences_for_window(self, values)
         self._default_root = str(values.get("default_root", "")).strip()
         tm_import_dir = str(values.get("tm_import_dir", "")).strip()
         self._tm_import_dir = tm_import_dir or str(self._default_tm_import_dir())
@@ -2842,9 +2843,7 @@ class MainWindow(QMainWindow):
 
     def _apply_tm_preferences_actions(self, values: dict) -> None:
         actions = self._tm_workflow.build_preferences_actions(values)
-        if actions.is_empty():
-            return
-        if not self._ensure_tm_store():
+        if actions.is_empty() or not self._ensure_tm_store():
             return
         if actions.remove_paths and not self._confirm_tm_file_deletion(
             actions.remove_paths

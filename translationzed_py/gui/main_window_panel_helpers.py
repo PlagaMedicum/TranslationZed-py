@@ -1226,6 +1226,33 @@ def _status_comment_writeback_options(
     )
 
 
+def _tzp_writeback_preferences_payload(win) -> dict[str, object]:
+    raw_enabled = str(win._prefs_extras.get("TZP_STATUS_COMMENT_WRITEBACK", "")).strip()
+    enabled = raw_enabled.lower() in {"1", "true", "yes", "on"}
+    prefix = (
+        str(win._prefs_extras.get("TZP_STATUS_COMMENT_PREFIX", "")).strip()
+        or str(win._app_config.comment_prefix).strip()
+        or _StatusCommentWritebackOptions.comment_prefix
+    )
+    return {
+        "tzp_writeback_enabled": enabled,
+        "tzp_comment_prefix": prefix,
+    }
+
+
+def _apply_tzp_writeback_preferences_for_window(win, values: dict[str, object]) -> None:
+    enabled = bool(values.get("tzp_writeback_enabled", False))
+    prefix = str(values.get("tzp_comment_prefix", "")).strip()
+    if enabled:
+        win._prefs_extras["TZP_STATUS_COMMENT_WRITEBACK"] = "true"
+    else:
+        win._prefs_extras.pop("TZP_STATUS_COMMENT_WRITEBACK", None)
+    if prefix:
+        win._prefs_extras["TZP_STATUS_COMMENT_PREFIX"] = prefix
+    else:
+        win._prefs_extras.pop("TZP_STATUS_COMMENT_PREFIX", None)
+
+
 def _persist_preferences(win) -> None:
     geometry = ""
     try:
