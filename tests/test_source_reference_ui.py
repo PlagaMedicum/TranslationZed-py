@@ -48,3 +48,26 @@ def test_sync_source_reference_combo_honors_fallback_order(qtbot) -> None:
         fallback_secondary="EN",
     )
     assert resolved == "BE"
+
+
+def test_sync_source_reference_combo_honors_explicit_fallback_chain(qtbot) -> None:
+    """Verify explicit fallback chain drives deterministic mode resolution."""
+    combo = QComboBox()
+    qtbot.addWidget(combo)
+    resolved = sync_source_reference_combo(
+        combo,
+        current_mode="KO",
+        selected_locales=["BE"],
+        all_locales=["EN", "BE", "RU", "KO"],
+        fallback_chain=("RU", "EN"),
+    )
+    assert resolved == "KO"
+
+    resolved_missing = sync_source_reference_combo(
+        combo,
+        current_mode="JA",
+        selected_locales=["BE"],
+        all_locales=["EN", "BE", "RU"],
+        fallback_chain=("RU", "EN"),
+    )
+    assert resolved_missing == "RU"

@@ -7,6 +7,7 @@ from collections.abc import Iterable, Sequence
 from PySide6.QtWidgets import QComboBox
 
 from translationzed_py.core.source_reference_service import (
+    normalize_source_reference_fallback_chain,
     normalize_source_reference_mode,
     resolve_source_reference_locale,
 )
@@ -55,17 +56,31 @@ def sync_source_reference_combo(
     all_locales: Iterable[str] | None = None,
     fallback_default: str = "EN",
     fallback_secondary: str = "EN",
+    fallback_chain: Iterable[str] | None = None,
 ) -> str:
     """Populate the combo and resolve a valid source-reference mode."""
     available = available_source_reference_locales(
         selected_locales,
         all_locales=all_locales,
     )
+    chain = normalize_source_reference_fallback_chain(
+        fallback_chain,
+        default=(fallback_default, fallback_secondary),
+    )
+    default_locale = (
+        chain[0] if chain else normalize_source_reference_mode(fallback_default)
+    )
+    secondary_locale = (
+        chain[1]
+        if len(chain) > 1
+        else normalize_source_reference_mode(fallback_secondary, default="")
+    )
     resolved = resolve_source_reference_locale(
         current_mode,
         available_locales=available,
-        fallback_locale=fallback_secondary,
-        default=fallback_default,
+        fallback_locale=secondary_locale,
+        fallback_chain=chain[1:],
+        default=default_locale,
     ).resolved_locale
     blocker = combo.blockSignals(True)
     combo.clear()

@@ -33,6 +33,14 @@ class SourceLookupMaterialized:
     keys: list[str] | None = None
 
 
+SOURCE_REFERENCE_FALLBACK_EN_THEN_TARGET = "EN_THEN_TARGET"
+SOURCE_REFERENCE_FALLBACK_TARGET_THEN_EN = "TARGET_THEN_EN"
+_SOURCE_REFERENCE_FALLBACK_POLICIES = {
+    SOURCE_REFERENCE_FALLBACK_EN_THEN_TARGET,
+    SOURCE_REFERENCE_FALLBACK_TARGET_THEN_EN,
+}
+
+
 def source_reference_path_key(root: Path, path: Path) -> str:
     """Execute source reference path key."""
     try:
@@ -94,17 +102,114 @@ def normalize_source_reference_mode(value: object, *, default: str = "EN") -> st
     return raw
 
 
+def normalize_source_reference_fallback_policy(
+    value: object, *, default: str = SOURCE_REFERENCE_FALLBACK_EN_THEN_TARGET
+) -> str:
+    """Normalize source-reference fallback policy token."""
+    raw = str(value).strip().upper()
+    if raw in _SOURCE_REFERENCE_FALLBACK_POLICIES:
+        return raw
+    return default
+
+
+def normalize_source_reference_fallback_chain(
+    value: object, *, default: Iterable[str] = ()
+) -> tuple[str, ...]:
+    """Normalize a source-reference fallback chain into unique locale tokens."""
+    raw_items: Iterable[object]
+    if isinstance(value, str):
+        raw_items = _split_chain_text(value)
+    elif value is None:
+        raw_items = tuple(default)
+    elif isinstance(value, Iterable):
+        raw_items = value
+    else:
+        raw_items = (value,)
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for item in raw_items:
+        code = normalize_source_reference_mode(item, default="")
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        ordered.append(code)
+    return tuple(ordered)
+
+
+def load_source_reference_fallback_presets(
+    raw: object,
+) -> dict[str, tuple[str, ...]]:
+    """Load per-locale source-reference fallback chain presets from JSON text."""
+    text = str(raw or "").strip()
+    if not text:
+        return {}
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+
+    presets: dict[str, tuple[str, ...]] = {}
+    for locale, chain in parsed.items():
+        locale_code = normalize_source_reference_mode(locale, default="")
+        normalized_chain = normalize_source_reference_fallback_chain(chain, default=())
+        if locale_code and normalized_chain:
+            presets[locale_code] = normalized_chain
+    return presets
+
+
+def dump_source_reference_fallback_presets(
+    presets: Mapping[str, Iterable[str]],
+) -> str:
+    """Dump per-locale fallback presets as canonical JSON text."""
+    normalized: dict[str, list[str]] = {}
+    for locale in sorted(presets):
+        locale_code = normalize_source_reference_mode(locale, default="")
+        chain = normalize_source_reference_fallback_chain(
+            presets.get(locale, ()),
+            default=(),
+        )
+        if locale_code and chain:
+            normalized[locale_code] = list(chain)
+    return json.dumps(normalized, ensure_ascii=True, separators=(",", ":"))
+
+
+def build_source_reference_fallback_chain(
+    *,
+    target_locale: str | None,
+    policy: object = SOURCE_REFERENCE_FALLBACK_EN_THEN_TARGET,
+    presets: Mapping[str, Iterable[str]] | None = None,
+) -> tuple[str, ...]:
+    """Build deterministic fallback chain for a target locale."""
+    target = normalize_source_reference_mode(target_locale, default="EN")
+    normalized_policy = normalize_source_reference_fallback_policy(policy)
+    if normalized_policy == SOURCE_REFERENCE_FALLBACK_TARGET_THEN_EN:
+        base_chain: tuple[str, ...] = (target, "EN")
+    else:
+        base_chain = ("EN", target)
+
+    preset_chain = _preset_chain_for_locale(target, presets or {})
+    return normalize_source_reference_fallback_chain(
+        (*preset_chain, *base_chain),
+        default=(),
+    )
+
+
 def resolve_source_reference_locale(
     mode: object,
     *,
     available_locales: Iterable[str],
     fallback_locale: str | None = None,
+    fallback_chain: Iterable[str] | None = None,
     default: str = "EN",
 ) -> SourceReferenceResolution:
     """Resolve source reference locale."""
     requested = normalize_source_reference_mode(mode, default=default)
     available = {str(locale).strip().upper() for locale in available_locales if locale}
     fallback = normalize_source_reference_mode(fallback_locale or "", default="")
+    chain = normalize_source_reference_fallback_chain(fallback_chain, default=())
     normalized_default = normalize_source_reference_mode(default, default="EN")
 
     if requested in available:
@@ -119,6 +224,13 @@ def resolve_source_reference_locale(
             resolved_locale=normalized_default,
             fallback_used=True,
         )
+    for candidate in chain:
+        if candidate in available:
+            return SourceReferenceResolution(
+                requested_mode=requested,
+                resolved_locale=candidate,
+                fallback_used=True,
+            )
     if fallback and fallback in available:
         return SourceReferenceResolution(
             requested_mode=requested,
@@ -301,3 +413,24 @@ def _is_raw_single_entry(entries: EntrySequence) -> bool:
 def _matches_single_raw_target(entries: EntrySequence, path_name: str) -> bool:
     """Execute matches single raw target."""
     return len(entries) == 1 and _entry_key(entries, 0) == path_name
+
+
+def _split_chain_text(raw: str) -> tuple[str, ...]:
+    """Split delimiter-based locale chain text."""
+    text = raw.strip()
+    if not text:
+        return ()
+    for marker in ("->", ">", "|", ";"):
+        text = text.replace(marker, ",")
+    return tuple(part.strip() for part in text.split(","))
+
+
+def _preset_chain_for_locale(
+    locale: str, presets: Mapping[str, Iterable[str]]
+) -> tuple[str, ...]:
+    """Resolve matching preset chain by normalized locale key."""
+    for key, value in presets.items():
+        key_code = normalize_source_reference_mode(key, default="")
+        if key_code == locale:
+            return normalize_source_reference_fallback_chain(value, default=())
+    return ()
