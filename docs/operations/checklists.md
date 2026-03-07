@@ -30,7 +30,9 @@ Quick command-profile orientation:
   - Avoid duplicate reruns by default: `make verify` already executes the strict
     coverage pytest lane (`make test-cov`) once
   - Coverage hard floors in strict lane:
-    package **>=91%**, core **>=96%** (`scripts/test_cov.sh`)
+    package **>=92%**, core **>=97%** (`scripts/test_cov.sh`)
+  - Coverage promotion readiness checker (for future ratchets):
+    `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='<run1.json> <run2.json>'`
 - **Run** `make code-triage` when touching architecture/API docs
   - Mandatory `Document-or-Flag` gate for touched module internals
   - Emits trace artifacts:
@@ -68,6 +70,8 @@ Quick command-profile orientation:
   - Enforces machine-checked no-shrink workflow contract and scenario registry validity
 - **Run** `make test-a31-manual` when touching manual UI runner/checklist runtime code
   - Executes focused A31 suite (`manual_scenario_runtime`, runner/contracts, checklist dialog/startup helpers)
+- **Run** `make test-cov-promotion-contract` when touching coverage ratchet/promotion checker scripts
+  - Executes focused coverage-promotion checker suite (`tests/test_coverage_promotion_check.py`)
 - **Run** `make locale-agnostic-check` when touching production UI copy or contributor guidance docs
   - Hard-fail guard for locale-agnostic policy in production GUI strings and canonical docs guidance text
   - Tests/fixtures are exempt; use allowlist marker `locale-agnostic: allow` only for narrow technical exceptions

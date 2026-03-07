@@ -466,6 +466,25 @@ Execution evidence log:
    1. no weakening of existing strict gates,
    2. test-surface no-shrink contract added before deprecated-test cleanup operations.
 
+## A31-COV-2 [✓] Coverage Ratchet Phase 2 Promotion (2026-03-07)
+
+1. Strict coverage defaults promoted in `scripts/test_cov.sh`:
+   1. package floor from `91` to `92`,
+   2. core floor from `96` to `97`.
+2. Added machine-checkable promotion evidence tooling:
+   1. `scripts/check_coverage_promotion.py`,
+   2. `make coverage-promotion-check`,
+   3. checker regression suite `tests/test_coverage_promotion_check.py`
+      with Make lane `make test-cov-promotion-contract`.
+3. Coverage run artifacts now include deterministic summary payload:
+   1. `artifacts/coverage/coverage_summary.json` contains actual coverage,
+      fail-under floors, and gate-pass status.
+4. Validation evidence (strict):
+   1. `make test-cov` (run #1 with summary artifact),
+   2. `make test-cov` (run #2 with summary artifact),
+   3. `make coverage-promotion-check` across ordered summary artifacts -> `ready=true`,
+   4. `make docs-check`.
+
 ## 0) Non‑negotiable invariants
 
 These are **always-on** constraints; any new feature must preserve them.

@@ -596,12 +596,13 @@ They include:
 ## 6) Coverage Goals
 
 - Enforced gate thresholds:
-    - Core modules (`translationzed_py/core`): **>=96%** line coverage.
-    - Whole package (`translationzed_py`): **>=91%** line coverage.
-- Phase-2 ratchet policy (not default yet):
-    - promote to core **>=97%** and package **>=92%** after two consecutive strict CI runs
-      satisfy the higher bar and evidence is recorded in implementation history.
-- Current strict baseline (2026-03-06):
+    - Core modules (`translationzed_py/core`): **>=97%** line coverage.
+    - Whole package (`translationzed_py`): **>=92%** line coverage.
+- Promotion evidence contract (A31-COV-2, now implemented):
+    - two consecutive strict coverage summaries must qualify at `92/97`,
+    - readiness is machine-checked with `make coverage-promotion-check`,
+    - checker enforces both measured percentages and run-floor metadata.
+- Current strict baseline (2026-03-07):
     - `make test-cov`: **92.3%** whole package.
     - core-only strict run: **97.1%**.
     - `translationzed_py/gui/main_window.py`: **83.4%** (informational, no per-file hard gate).

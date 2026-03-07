@@ -60,6 +60,8 @@ Current/target framing:
 - Perf contract lane: `make test-perf-scale`
 - A31 no-shrink contract gate: `make test-ui-manual-contract`
 - A31 focused test lane: `make test-a31-manual`
+- Strict coverage lane: `make test-cov` (`translationzed_py>=92%`, `core>=97%`)
+- Coverage promotion readiness: `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='<run1.json> <run2.json>'`
 
 Command profile hint:
 

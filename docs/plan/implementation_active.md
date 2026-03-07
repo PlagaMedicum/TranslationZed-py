@@ -7,7 +7,7 @@ _Last updated: 2026-03-07_
 - **Current implementation branch:** `dev`.
 - **Target milestone:** `v0.9.0` (closure completed; post-release deferred stream prep active).
 - **Latest completed milestone on `dev`:** deferred source-reference stream closure (`A29`).
-- **Current active milestone:** manual UI scenario + coverage ratchet stream (`A31`; `A31-MAN-1/2/3` and `A31-COV-1` active).
+- **Current active milestone:** manual UI scenario + coverage ratchet stream (`A31`; MAN packets complete, `A31-COV-2` promoted/validated).
 
 ## 1) Milestone Closure — A28 [✓]
 
@@ -135,7 +135,7 @@ _Last updated: 2026-03-07_
    2. write-back controls are now available in Preferences -> View (`TZP_STATUS_COMMENT_WRITEBACK`, `TZP_STATUS_COMMENT_PREFIX`).
    3. non-namespaced user comments remain immutable in this packet.
 
-## 4) Milestone In Progress — A31 [→]
+## 4) Milestone Closure — A31 [✓]
 
 ### A31 selected deferred stream
 
@@ -163,8 +163,11 @@ _Last updated: 2026-03-07_
    2. add contract gate `make test-ui-manual-contract`.
 4. `A31-COV-1` [✓]
    1. coverage strict defaults raised to package `>=91%`, core `>=96%`.
-5. `A31-COV-2` [ ]
-   1. promote to package `>=92%`, core `>=97%` after two consecutive strict CI confirmations.
+5. `A31-COV-2` [✓]
+   1. promote strict defaults to package `>=92%`, core `>=97%`.
+   2. add machine-checkable consecutive-evidence checker:
+      - `scripts/check_coverage_promotion.py`,
+      - `make coverage-promotion-check`.
 
 ### A31 progress snapshot (2026-03-07)
 
@@ -176,8 +179,15 @@ _Last updated: 2026-03-07_
    1. manual scenario mode is env-gated (`TZP_MANUAL_SCENARIO_FILE`) and does not alter normal startup flow.
    2. scenario checklist output is written only when pass/fail action is chosen.
 3. Coverage ratchet note:
-   1. phase-1 thresholds are active (`91/96`),
-   2. phase-2 (`92/97`) remains policy-only until evidence rule closure.
+   1. phase-2 thresholds are now active (`92/97`),
+   2. readiness evidence is machine-checkable via ordered coverage summaries.
+4. `A31-COV-2` acceptance evidence is green:
+   1. `make test-cov-promotion-contract`,
+   2. `make test-cov COVERAGE_RUN_LABEL=a31-cov2-run1 COVERAGE_SUMMARY_OUT=artifacts/coverage/a31_cov2_run1.json`,
+   3. `make test-cov COVERAGE_RUN_LABEL=a31-cov2-run2 COVERAGE_SUMMARY_OUT=artifacts/coverage/a31_cov2_run2.json`,
+   4. `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='artifacts/coverage/a31_cov2_run1.json artifacts/coverage/a31_cov2_run2.json'`,
+   5. `make verify-fast`,
+   6. `make docs-check`.
 
 ## 5) Immediate Execution Order (Post-A29)
 
@@ -190,8 +200,9 @@ _Last updated: 2026-03-07_
 5. Keep A31 no-shrink/coverage gates green while adding scenarios:
    1. `make test-ui-manual-contract`,
    2. `make test-a31-manual`,
-   3. `make verify-fast`,
-   4. `make docs-check`.
+   3. `make test-cov`,
+   4. `make verify-fast`,
+   5. `make docs-check`.
 
 ## 6) Non-Negotiable Constraints
 

@@ -52,6 +52,9 @@ Canonical behavior still lives in:
 | A30 TZP packet lane | `make test-tzp-a30` | targeted `TZP:` comment-policy + save/workflow/preferences integration suite (`tzp_comment_policy`, parser status-comment paths, saver/file-workflow write-back contracts, `gui_tm_preferences` TZP controls) |
 | A31 manual-framework contract lane | `make test-ui-manual-contract` | machine-check scenario registry + workflow no-shrink coverage contract |
 | A31 manual-framework packet lane | `make test-a31-manual` | focused scenario runtime/runner/contract + GUI checklist startup tests |
+| Coverage strict lane | `make test-cov` | strict coverage gate (`translationzed_py>=92%`, `translationzed_py/core>=97%`) |
+| Coverage promotion contract lane | `make test-cov-promotion-contract` | checker regression suite for consecutive coverage-promotion evidence |
+| Coverage promotion readiness | `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='<run1.json> <run2.json>'` | machine-check two-run tail readiness at `92/97` |
 | Perf contract lane | `make test-perf-scale` | strict parser/search/TM perf-contract tests |
 | Perf scenarios | `make perf-scenarios` | fixture-backed scenario checks |
 | Benchmark compare | `make bench-check` | compares against `tests/benchmarks/baseline.json` |
@@ -68,6 +71,7 @@ Canonical behavior still lives in:
 6. `make ui-manual-list` -> list declarative manual UI scenarios
 7. `make ui-manual-run SCENARIO=<id>` -> launch one scenario in checklist mode
 8. `make ui-manual-batch SCENARIOS=<id1,id2,...>` -> run multiple scenarios sequentially
+9. `make coverage-promotion-check` -> evaluate ordered coverage-summary artifacts for ratchet readiness
 
 ## 7) Command Selection Hints
 

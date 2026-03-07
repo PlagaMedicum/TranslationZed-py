@@ -89,6 +89,7 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    - `tests/test_release_check.py`
    - `tests/test_code_quality_triage.py`
    - `tests/test_benchmark_regression_script.py`
+   - `tests/test_coverage_promotion_check.py`
 
 ## 7.1) Manual UI Scenario Framework (A31)
 
@@ -116,3 +117,4 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 10. Quick strict smoke: `make verify-fast`
 11. A31 no-shrink contract gate: `make test-ui-manual-contract`
 12. A31 focused manual-framework suite: `make test-a31-manual`
+13. Coverage promotion checker contract suite: `make test-cov-promotion-contract`
