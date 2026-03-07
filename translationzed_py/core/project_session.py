@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -205,6 +206,75 @@ class ProjectSessionService:
             resize_splitter=resize_splitter,
         )
 
+    def build_crash_recovery_report(
+        self,
+        *,
+        root: Path,
+        selected_locales: Iterable[str],
+        now_ms: Callable[[], int] | None = None,
+    ) -> CrashRecoveryReport | None:
+        """Build crash recovery report."""
+        return build_crash_recovery_report(
+            root=root,
+            cache_dir=self.cache_dir,
+            cache_ext=self.cache_ext,
+            translation_ext=self.translation_ext,
+            selected_locales=selected_locales,
+            has_drafts=self.has_drafts,
+            now_ms=now_ms,
+        )
+
+    def build_crash_recovery_detection_plan(
+        self,
+        *,
+        root: Path,
+        selected_locales: Iterable[str],
+        startup_accepted: bool,
+        previous_session_unclean: bool,
+        interrupted_draft_marker: bool,
+        now_ms: Callable[[], int] | None = None,
+    ) -> CrashRecoveryDetectionPlan:
+        """Build crash recovery detection plan."""
+        report = self.build_crash_recovery_report(
+            root=root,
+            selected_locales=selected_locales,
+            now_ms=now_ms,
+        )
+        return build_crash_recovery_detection_plan(
+            startup_accepted=startup_accepted,
+            report=report,
+            previous_session_unclean=previous_session_unclean,
+            interrupted_draft_marker=interrupted_draft_marker,
+        )
+
+    def build_crash_recovery_apply_plan(
+        self,
+        *,
+        root: Path,
+        report: CrashRecoveryReport | None,
+        decision: str,
+    ) -> CrashRecoveryApplyPlan:
+        """Build crash recovery apply plan."""
+        return build_crash_recovery_apply_plan(
+            root=root,
+            cache_dir=self.cache_dir,
+            cache_ext=self.cache_ext,
+            report=report,
+            decision=decision,
+        )
+
+    def execute_crash_recovery_apply_plan(
+        self,
+        *,
+        plan: CrashRecoveryApplyPlan,
+        unlink_cache_path: Callable[[Path], None] | None = None,
+    ) -> CrashRecoveryApplyExecution:
+        """Execute crash recovery apply plan."""
+        return execute_crash_recovery_apply_plan(
+            plan=plan,
+            unlink_cache_path=unlink_cache_path,
+        )
+
     def build_orphan_cache_warning(
         self,
         *,
@@ -334,6 +404,58 @@ class TreeRebuildPlan:
     expand_all: bool
     preload_single_root: bool
     resize_splitter: bool
+
+
+@dataclass(frozen=True, slots=True)
+class CrashRecoveryAffectedFile:
+    """Represent CrashRecoveryAffectedFile."""
+
+    file_path: str
+    locale: str
+    draft_value_count: int
+    status_only_count: int
+    cache_mtime_ns: int
+    warning: str
+
+
+@dataclass(frozen=True, slots=True)
+class CrashRecoveryReport:
+    """Represent CrashRecoveryReport."""
+
+    project_root: str
+    generated_at_ms: int
+    affected_files: tuple[CrashRecoveryAffectedFile, ...]
+    total_files: int
+    total_draft_values: int
+    total_status_only: int
+
+
+@dataclass(frozen=True, slots=True)
+class CrashRecoveryDetectionPlan:
+    """Represent CrashRecoveryDetectionPlan."""
+
+    run_recovery_flow: bool
+    report: CrashRecoveryReport | None
+
+
+@dataclass(frozen=True, slots=True)
+class CrashRecoveryApplyPlan:
+    """Represent CrashRecoveryApplyPlan."""
+
+    decision: str
+    continue_startup: bool
+    discard_cache_paths: tuple[Path, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CrashRecoveryApplyExecution:
+    """Represent CrashRecoveryApplyExecution."""
+
+    decision: str
+    continue_startup: bool
+    discarded_cache_paths: tuple[Path, ...]
+    failed_cache_paths: tuple[Path, ...]
+    failure_message: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -516,6 +638,261 @@ def collect_orphan_cache_paths(
         if missing_set:
             out[locale] = sorted(missing_set)
     return out
+
+
+def build_crash_recovery_report(
+    *,
+    root: Path,
+    cache_dir: str,
+    cache_ext: str,
+    translation_ext: str,
+    selected_locales: Iterable[str],
+    has_drafts: Callable[[Path], bool],
+    now_ms: Callable[[], int] | None = None,
+) -> CrashRecoveryReport | None:
+    """Build crash recovery report from draft-bearing cache files."""
+    cache_roots = [path for path in _cache_roots(root, cache_dir) if path.exists()]
+    if not cache_roots:
+        return None
+    locales = _ordered_non_empty(selected_locales)
+    if not locales:
+        return None
+    affected: list[CrashRecoveryAffectedFile] = []
+    seen_originals: set[Path] = set()
+    for cache_root in cache_roots:
+        for locale in locales:
+            cache_locale = cache_root / locale
+            if not cache_locale.exists():
+                continue
+            for cache_path in sorted(cache_locale.rglob(f"*{cache_ext}")):
+                if not has_drafts(cache_path):
+                    continue
+                original = _original_path_from_cache(
+                    root=root,
+                    cache_root=cache_root,
+                    cache_path=cache_path,
+                    translation_ext=translation_ext,
+                )
+                if original is None or not original.exists():
+                    continue
+                if original in seen_originals:
+                    continue
+                seen_originals.add(original)
+                draft_count, status_only_count = _read_cache_entry_counts(
+                    root=root,
+                    file_path=original,
+                )
+                warning = ""
+                if draft_count <= 0:
+                    warning = "draft_flag_without_cache_rows"
+                cache_mtime_ns = _safe_mtime_ns(cache_path)
+                affected.append(
+                    CrashRecoveryAffectedFile(
+                        file_path=_display_file_path(root=root, file_path=original),
+                        locale=locale,
+                        draft_value_count=draft_count,
+                        status_only_count=status_only_count,
+                        cache_mtime_ns=cache_mtime_ns,
+                        warning=warning,
+                    )
+                )
+    if not affected:
+        return None
+    affected.sort(key=lambda rec: (rec.locale, rec.file_path))
+    total_draft_values = sum(rec.draft_value_count for rec in affected)
+    if total_draft_values <= 0:
+        return None
+    total_status_only = sum(rec.status_only_count for rec in affected)
+    now = now_ms or (lambda: int(time.time() * 1000))
+    return CrashRecoveryReport(
+        project_root=str(root),
+        generated_at_ms=max(0, int(now())),
+        affected_files=tuple(affected),
+        total_files=len(affected),
+        total_draft_values=total_draft_values,
+        total_status_only=total_status_only,
+    )
+
+
+def build_crash_recovery_detection_plan(
+    *,
+    startup_accepted: bool,
+    report: CrashRecoveryReport | None,
+    previous_session_unclean: bool,
+    interrupted_draft_marker: bool,
+) -> CrashRecoveryDetectionPlan:
+    """Build crash recovery detection plan."""
+    has_interrupted_signal = previous_session_unclean or interrupted_draft_marker
+    run_recovery_flow = (
+        startup_accepted
+        and has_interrupted_signal
+        and report is not None
+        and report.total_draft_values > 0
+    )
+    return CrashRecoveryDetectionPlan(
+        run_recovery_flow=run_recovery_flow,
+        report=report if run_recovery_flow else None,
+    )
+
+
+def build_crash_recovery_apply_plan(
+    *,
+    root: Path,
+    cache_dir: str,
+    cache_ext: str,
+    report: CrashRecoveryReport | None,
+    decision: str,
+) -> CrashRecoveryApplyPlan:
+    """Build crash recovery decision application plan."""
+    normalized = str(decision or "").strip().lower()
+    if normalized not in {"restore", "discard", "cancel"}:
+        raise ValueError(f"Unsupported crash recovery decision: {decision!r}")
+    if normalized == "cancel":
+        return CrashRecoveryApplyPlan(
+            decision=normalized,
+            continue_startup=False,
+            discard_cache_paths=(),
+        )
+    if normalized != "discard" or report is None:
+        return CrashRecoveryApplyPlan(
+            decision=normalized,
+            continue_startup=True,
+            discard_cache_paths=(),
+        )
+    paths = _recovery_discard_cache_paths(
+        root=root,
+        cache_dir=cache_dir,
+        cache_ext=cache_ext,
+        report=report,
+    )
+    return CrashRecoveryApplyPlan(
+        decision=normalized,
+        continue_startup=True,
+        discard_cache_paths=paths,
+    )
+
+
+def execute_crash_recovery_apply_plan(
+    *,
+    plan: CrashRecoveryApplyPlan,
+    unlink_cache_path: Callable[[Path], None] | None = None,
+) -> CrashRecoveryApplyExecution:
+    """Execute crash recovery decision application plan."""
+    if unlink_cache_path is None:
+
+        def _default_unlink(path: Path) -> None:
+            path.unlink(missing_ok=True)
+
+        unlink_cache_path = _default_unlink
+    if not plan.continue_startup or not plan.discard_cache_paths:
+        return CrashRecoveryApplyExecution(
+            decision=plan.decision,
+            continue_startup=plan.continue_startup,
+            discarded_cache_paths=(),
+            failed_cache_paths=(),
+            failure_message=None,
+        )
+    discarded: list[Path] = []
+    failed: list[Path] = []
+    for path in plan.discard_cache_paths:
+        try:
+            unlink_cache_path(path)
+            discarded.append(path)
+        except Exception:
+            failed.append(path)
+    message = None
+    if failed:
+        message = _format_recovery_discard_failure(failed)
+    return CrashRecoveryApplyExecution(
+        decision=plan.decision,
+        continue_startup=plan.continue_startup,
+        discarded_cache_paths=tuple(discarded),
+        failed_cache_paths=tuple(failed),
+        failure_message=message,
+    )
+
+
+def _recovery_discard_cache_paths(
+    *,
+    root: Path,
+    cache_dir: str,
+    cache_ext: str,
+    report: CrashRecoveryReport,
+) -> tuple[Path, ...]:
+    out: set[Path] = set()
+    for item in report.affected_files:
+        file_path = Path(item.file_path)
+        original = file_path if file_path.is_absolute() else (root / file_path)
+        try:
+            rel = original.relative_to(root)
+        except ValueError:
+            continue
+        for cache_root in _cache_roots(root, cache_dir):
+            out.add((cache_root / rel).with_suffix(cache_ext))
+    return tuple(sorted(out))
+
+
+def _format_recovery_discard_failure(paths: Sequence[Path]) -> str:
+    preview = [path.as_posix() for path in paths[:20]]
+    text = "\n".join(preview)
+    if len(paths) > 20:
+        text = f"{text}\n... ({len(paths) - 20} more)"
+    return text
+
+
+def _ordered_non_empty(values: Iterable[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        code = str(value or "").strip()
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        out.append(code)
+    return out
+
+
+def _original_path_from_cache(
+    *,
+    root: Path,
+    cache_root: Path,
+    cache_path: Path,
+    translation_ext: str,
+) -> Path | None:
+    try:
+        rel = cache_path.relative_to(cache_root)
+    except ValueError:
+        return None
+    return (root / rel).with_suffix(translation_ext)
+
+
+def _display_file_path(*, root: Path, file_path: Path) -> str:
+    try:
+        rel = file_path.relative_to(root)
+    except ValueError:
+        rel = file_path
+    return rel.as_posix()
+
+
+def _safe_mtime_ns(path: Path) -> int:
+    try:
+        return int(path.stat().st_mtime_ns)
+    except OSError:
+        return 0
+
+
+def _read_cache_entry_counts(*, root: Path, file_path: Path) -> tuple[int, int]:
+    from translationzed_py.core import status_cache as _status_cache
+
+    rows = _status_cache.read(root, file_path)
+    draft = 0
+    status_only = 0
+    for item in rows.values():
+        if item.value is None:
+            status_only += 1
+        else:
+            draft += 1
+    return draft, status_only
 
 
 def build_orphan_cache_warning(

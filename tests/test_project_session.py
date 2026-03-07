@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from translationzed_py.core import project_session as project_session_module
+from translationzed_py.core import status_cache
+from translationzed_py.core.model import Entry, Status
 from translationzed_py.core.project_session import (
     CacheMigrationBatchCallbacks,
     CacheMigrationBatchExecution,
@@ -11,6 +16,11 @@ from translationzed_py.core.project_session import (
     CacheMigrationScheduleCallbacks,
     CacheMigrationScheduleExecution,
     CacheMigrationSchedulePlan,
+    CrashRecoveryAffectedFile,
+    CrashRecoveryApplyExecution,
+    CrashRecoveryApplyPlan,
+    CrashRecoveryDetectionPlan,
+    CrashRecoveryReport,
     LocaleResetPlan,
     LocaleSelectionPlan,
     LocaleSwitchPlan,
@@ -21,6 +31,9 @@ from translationzed_py.core.project_session import (
     apply_locale_reset_plan,
     build_cache_migration_batch_plan,
     build_cache_migration_schedule_plan,
+    build_crash_recovery_apply_plan,
+    build_crash_recovery_detection_plan,
+    build_crash_recovery_report,
     build_locale_reset_plan,
     build_locale_selection_plan,
     build_locale_switch_plan,
@@ -31,6 +44,7 @@ from translationzed_py.core.project_session import (
     collect_orphan_cache_paths,
     execute_cache_migration_batch,
     execute_cache_migration_schedule,
+    execute_crash_recovery_apply_plan,
     find_last_opened_file,
     normalize_selected_locales,
     resolve_requested_locales,
@@ -42,6 +56,38 @@ from translationzed_py.core.project_session import (
 def _touch(path: Path, text: str = "x") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _entry(key: str, value: str, status: Status) -> Entry:
+    return Entry(
+        key=key,
+        value=value,
+        status=status,
+        span=(0, 0),
+        segments=(),
+        gaps=(),
+    )
+
+
+def _write_cache_fixture(
+    root: Path,
+    file_path: Path,
+    *,
+    draft_keys: tuple[str, ...],
+    status_only_keys: tuple[str, ...],
+) -> None:
+    entries: list[Entry] = []
+    for key in draft_keys:
+        entries.append(_entry(key, f"{key}_draft", Status.FOR_REVIEW))
+    for key in status_only_keys:
+        entries.append(_entry(key, f"{key}_stable", Status.TRANSLATED))
+    status_cache.write(
+        root,
+        file_path,
+        entries,
+        changed_keys=set(draft_keys),
+        last_opened=1,
+    )
 
 
 def test_collect_draft_files_filters_by_opened_and_locale(tmp_path: Path) -> None:
@@ -128,6 +174,24 @@ def test_find_last_opened_file_returns_none_without_selected_locales(
     assert scanned == 0
 
 
+def test_find_last_opened_file_skips_missing_original_even_with_timestamp(
+    tmp_path: Path,
+) -> None:
+    """Verify find last opened skips cache rows when original source file is missing."""
+    root = tmp_path / "proj"
+    _touch(root / ".tzp" / "cache" / "BE" / "ghost.bin")
+    best, scanned = find_last_opened_file(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        selected_locales=["BE"],
+        read_last_opened=lambda _cache_path: 10,
+    )
+    assert best is None
+    assert scanned == 1
+
+
 def test_collect_draft_files_reads_legacy_cache_dir(tmp_path: Path) -> None:
     """Verify collect draft files reads legacy cache dir."""
     root = tmp_path / "proj"
@@ -138,6 +202,25 @@ def test_collect_draft_files_reads_legacy_cache_dir(tmp_path: Path) -> None:
     files = collect_draft_files(
         root=root,
         cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        has_drafts=lambda cache_path: cache_path == legacy_cache,
+        locales=["BE"],
+    )
+
+    assert files == [root / "BE" / "a.txt"]
+
+
+def test_collect_draft_files_handles_legacy_primary_cache_root(tmp_path: Path) -> None:
+    """Verify draft collection works when cache_dir is configured as legacy root."""
+    root = tmp_path / "proj"
+    _touch(root / "BE" / "a.txt")
+    legacy_cache = root / ".tzp-cache" / "BE" / "a.bin"
+    _touch(legacy_cache)
+
+    files = collect_draft_files(
+        root=root,
+        cache_dir=".tzp-cache",
         cache_ext=".bin",
         translation_ext=".txt",
         has_drafts=lambda cache_path: cache_path == legacy_cache,
@@ -166,6 +249,394 @@ def test_collect_orphan_cache_paths_filters_warned_locales(tmp_path: Path) -> No
 
     assert set(out) == {"BE"}
     assert out["BE"] == [root / ".tzp" / "cache" / "BE" / "orphan.bin"]
+
+
+def test_build_crash_recovery_report_collects_draft_and_status_counts(
+    tmp_path: Path,
+) -> None:
+    """Verify crash recovery report collects deterministic per-file draft/status counts."""
+    root = tmp_path / "proj"
+    file_a = root / "BE" / "a.txt"
+    file_b = root / "BE" / "b.txt"
+    _touch(file_a, 'A = "one"\n')
+    _touch(file_b, 'B = "two"\n')
+    _write_cache_fixture(
+        root,
+        file_a,
+        draft_keys=("A",),
+        status_only_keys=("A_STATUS",),
+    )
+    _write_cache_fixture(
+        root,
+        file_b,
+        draft_keys=("B",),
+        status_only_keys=(),
+    )
+
+    report = build_crash_recovery_report(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        selected_locales=["BE", "BE"],
+        has_drafts=status_cache.read_has_drafts_from_path,
+        now_ms=lambda: 123456,
+    )
+
+    assert report == CrashRecoveryReport(
+        project_root=str(root),
+        generated_at_ms=123456,
+        affected_files=(
+            CrashRecoveryAffectedFile(
+                file_path="BE/a.txt",
+                locale="BE",
+                draft_value_count=1,
+                status_only_count=1,
+                cache_mtime_ns=(root / ".tzp" / "cache" / "BE" / "a.bin")
+                .stat()
+                .st_mtime_ns,
+                warning="",
+            ),
+            CrashRecoveryAffectedFile(
+                file_path="BE/b.txt",
+                locale="BE",
+                draft_value_count=1,
+                status_only_count=0,
+                cache_mtime_ns=(root / ".tzp" / "cache" / "BE" / "b.bin")
+                .stat()
+                .st_mtime_ns,
+                warning="",
+            ),
+        ),
+        total_files=2,
+        total_draft_values=2,
+        total_status_only=1,
+    )
+
+
+def test_build_crash_recovery_report_returns_none_without_drafts(
+    tmp_path: Path,
+) -> None:
+    """Verify crash recovery report returns none when cache has no draft values."""
+    root = tmp_path / "proj"
+    file_a = root / "BE" / "a.txt"
+    _touch(file_a, 'A = "one"\n')
+    _write_cache_fixture(
+        root,
+        file_a,
+        draft_keys=(),
+        status_only_keys=("A_STATUS",),
+    )
+
+    report = build_crash_recovery_report(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        selected_locales=["BE"],
+        has_drafts=status_cache.read_has_drafts_from_path,
+        now_ms=lambda: 1,
+    )
+
+    assert report is None
+
+
+def test_build_crash_recovery_report_returns_none_when_selected_locales_empty(
+    tmp_path: Path,
+) -> None:
+    """Verify crash recovery report returns none when selected locale list is empty."""
+    root = tmp_path / "proj"
+    _touch(root / "BE" / "a.txt")
+    _touch(root / ".tzp" / "cache" / "BE" / "a.bin")
+
+    report = build_crash_recovery_report(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        selected_locales=[],
+        has_drafts=lambda _path: True,
+        now_ms=lambda: 1,
+    )
+
+    assert report is None
+
+
+def test_build_crash_recovery_report_handles_draft_flag_without_cache_rows(
+    tmp_path: Path,
+) -> None:
+    """Verify crash recovery report tolerates draft-flag true with status-only rows."""
+    root = tmp_path / "proj"
+    file_a = root / "BE" / "a.txt"
+    _touch(file_a, 'A = "one"\n')
+    _write_cache_fixture(
+        root,
+        file_a,
+        draft_keys=(),
+        status_only_keys=("A_STATUS",),
+    )
+
+    report = build_crash_recovery_report(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        selected_locales=["BE"],
+        has_drafts=lambda _path: True,
+        now_ms=lambda: 7,
+    )
+
+    assert report is None
+
+
+def test_build_crash_recovery_detection_plan_requires_interrupt_signal() -> None:
+    """Verify crash recovery detection requires startup acceptance and interruption signal."""
+    report = CrashRecoveryReport(
+        project_root="/tmp/proj",
+        generated_at_ms=1,
+        affected_files=(
+            CrashRecoveryAffectedFile(
+                file_path="BE/a.txt",
+                locale="BE",
+                draft_value_count=1,
+                status_only_count=0,
+                cache_mtime_ns=1,
+                warning="",
+            ),
+        ),
+        total_files=1,
+        total_draft_values=1,
+        total_status_only=0,
+    )
+    blocked = build_crash_recovery_detection_plan(
+        startup_accepted=True,
+        report=report,
+        previous_session_unclean=False,
+        interrupted_draft_marker=False,
+    )
+    assert blocked == CrashRecoveryDetectionPlan(
+        run_recovery_flow=False,
+        report=None,
+    )
+
+    enabled = build_crash_recovery_detection_plan(
+        startup_accepted=True,
+        report=report,
+        previous_session_unclean=True,
+        interrupted_draft_marker=False,
+    )
+    assert enabled == CrashRecoveryDetectionPlan(
+        run_recovery_flow=True,
+        report=report,
+    )
+
+
+def test_build_crash_recovery_apply_plan_variants(tmp_path: Path) -> None:
+    """Verify crash recovery apply-plan builder maps restore/discard/cancel deterministically."""
+    root = tmp_path / "proj"
+    report = CrashRecoveryReport(
+        project_root=str(root),
+        generated_at_ms=1,
+        affected_files=(
+            CrashRecoveryAffectedFile(
+                file_path="BE/a.txt",
+                locale="BE",
+                draft_value_count=1,
+                status_only_count=0,
+                cache_mtime_ns=1,
+                warning="",
+            ),
+            CrashRecoveryAffectedFile(
+                file_path=str(root / "BE" / "b.txt"),
+                locale="BE",
+                draft_value_count=1,
+                status_only_count=0,
+                cache_mtime_ns=2,
+                warning="",
+            ),
+            CrashRecoveryAffectedFile(
+                file_path=str(tmp_path / "outside.txt"),
+                locale="BE",
+                draft_value_count=1,
+                status_only_count=0,
+                cache_mtime_ns=3,
+                warning="",
+            ),
+        ),
+        total_files=3,
+        total_draft_values=3,
+        total_status_only=0,
+    )
+    cancel_plan = build_crash_recovery_apply_plan(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        report=report,
+        decision="cancel",
+    )
+    restore_plan = build_crash_recovery_apply_plan(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        report=report,
+        decision="restore",
+    )
+    discard_plan = build_crash_recovery_apply_plan(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        report=report,
+        decision="discard",
+    )
+
+    assert cancel_plan == CrashRecoveryApplyPlan(
+        decision="cancel",
+        continue_startup=False,
+        discard_cache_paths=(),
+    )
+    assert restore_plan == CrashRecoveryApplyPlan(
+        decision="restore",
+        continue_startup=True,
+        discard_cache_paths=(),
+    )
+    assert discard_plan == CrashRecoveryApplyPlan(
+        decision="discard",
+        continue_startup=True,
+        discard_cache_paths=(
+            root / ".tzp" / "cache" / "BE" / "a.bin",
+            root / ".tzp" / "cache" / "BE" / "b.bin",
+            root / ".tzp-cache" / "BE" / "a.bin",
+            root / ".tzp-cache" / "BE" / "b.bin",
+        ),
+    )
+
+
+def test_build_crash_recovery_apply_plan_rejects_unknown_decision(
+    tmp_path: Path,
+) -> None:
+    """Verify crash recovery apply-plan builder rejects unknown decisions."""
+    with pytest.raises(ValueError, match="Unsupported crash recovery decision"):
+        build_crash_recovery_apply_plan(
+            root=tmp_path / "proj",
+            cache_dir=".tzp/cache",
+            cache_ext=".bin",
+            report=None,
+            decision="bad",
+        )
+
+
+def test_execute_crash_recovery_apply_plan_variants(tmp_path: Path) -> None:
+    """Verify crash recovery apply-plan executor handles noop/success/failure deterministically."""
+    root = tmp_path / "proj"
+    path_a = root / ".tzp" / "cache" / "BE" / "a.bin"
+    path_b = root / ".tzp-cache" / "BE" / "a.bin"
+    noop_execution = execute_crash_recovery_apply_plan(
+        plan=CrashRecoveryApplyPlan(
+            decision="cancel",
+            continue_startup=False,
+            discard_cache_paths=(),
+        )
+    )
+    calls: list[Path] = []
+
+    def _unlink(path: Path) -> None:
+        calls.append(path)
+        if path == path_b:
+            raise OSError("unlink failed")
+
+    execution = execute_crash_recovery_apply_plan(
+        plan=CrashRecoveryApplyPlan(
+            decision="discard",
+            continue_startup=True,
+            discard_cache_paths=(path_a, path_b),
+        ),
+        unlink_cache_path=_unlink,
+    )
+
+    assert noop_execution == CrashRecoveryApplyExecution(
+        decision="cancel",
+        continue_startup=False,
+        discarded_cache_paths=(),
+        failed_cache_paths=(),
+        failure_message=None,
+    )
+    assert calls == [path_a, path_b]
+    assert execution.decision == "discard"
+    assert execution.continue_startup is True
+    assert execution.discarded_cache_paths == (path_a,)
+    assert execution.failed_cache_paths == (path_b,)
+    assert execution.failure_message == path_b.as_posix()
+
+
+def test_execute_crash_recovery_apply_plan_uses_default_unlink_for_missing_path(
+    tmp_path: Path,
+) -> None:
+    """Verify crash recovery apply executor uses missing-ok unlink when callback is omitted."""
+    missing_path = tmp_path / "proj" / ".tzp" / "cache" / "BE" / "missing.bin"
+    execution = execute_crash_recovery_apply_plan(
+        plan=CrashRecoveryApplyPlan(
+            decision="discard",
+            continue_startup=True,
+            discard_cache_paths=(missing_path,),
+        )
+    )
+    assert execution == CrashRecoveryApplyExecution(
+        decision="discard",
+        continue_startup=True,
+        discarded_cache_paths=(missing_path,),
+        failed_cache_paths=(),
+        failure_message=None,
+    )
+
+
+def test_execute_crash_recovery_apply_plan_truncates_failure_message_preview(
+    tmp_path: Path,
+) -> None:
+    """Verify crash recovery apply executor truncates failure preview after 20 paths."""
+    failed_paths = tuple(
+        tmp_path / "proj" / ".tzp" / "cache" / "BE" / f"{idx}.bin" for idx in range(21)
+    )
+
+    def _always_fail(_path: Path) -> None:
+        raise OSError("boom")
+
+    execution = execute_crash_recovery_apply_plan(
+        plan=CrashRecoveryApplyPlan(
+            decision="discard",
+            continue_startup=True,
+            discard_cache_paths=failed_paths,
+        ),
+        unlink_cache_path=_always_fail,
+    )
+    assert execution.failed_cache_paths == failed_paths
+    assert execution.failure_message is not None
+    assert "... (1 more)" in execution.failure_message
+
+
+def test_project_session_private_path_helpers_cover_outside_and_missing_cases(
+    tmp_path: Path,
+) -> None:
+    """Verify private path helpers handle outside-root and missing-file fallbacks."""
+    root = tmp_path / "proj"
+    cache_root = root / ".tzp" / "cache"
+    outside_cache = tmp_path / "outside" / "a.bin"
+    outside_file = tmp_path / "outside" / "a.txt"
+    missing_stat = tmp_path / "outside" / "missing.bin"
+
+    assert (
+        project_session_module._original_path_from_cache(
+            root=root,
+            cache_root=cache_root,
+            cache_path=outside_cache,
+            translation_ext=".txt",
+        )
+        is None
+    )
+    assert (
+        project_session_module._display_file_path(root=root, file_path=outside_file)
+        == outside_file.as_posix()
+    )
+    assert project_session_module._safe_mtime_ns(missing_stat) == 0
 
 
 def test_project_session_service_delegates_to_helpers(tmp_path: Path) -> None:
@@ -291,6 +762,34 @@ def test_project_session_service_delegates_to_helpers(tmp_path: Path) -> None:
         detailed_text=".tzp/cache/BE/a.bin",
         orphan_paths=(root / ".tzp" / "cache" / "BE" / "a.bin",),
     )
+    apply_plan = svc.build_crash_recovery_apply_plan(
+        root=root,
+        report=None,
+        decision="cancel",
+    )
+    assert apply_plan == CrashRecoveryApplyPlan(
+        decision="cancel",
+        continue_startup=False,
+        discard_cache_paths=(),
+    )
+    discard_path = root / ".tzp" / "cache" / "BE" / "a.bin"
+    unlinked: list[Path] = []
+    execution = svc.execute_crash_recovery_apply_plan(
+        plan=CrashRecoveryApplyPlan(
+            decision="discard",
+            continue_startup=True,
+            discard_cache_paths=(discard_path,),
+        ),
+        unlink_cache_path=lambda path: unlinked.append(path),
+    )
+    assert execution == CrashRecoveryApplyExecution(
+        decision="discard",
+        continue_startup=True,
+        discarded_cache_paths=(discard_path,),
+        failed_cache_paths=(),
+        failure_message=None,
+    )
+    assert unlinked == [discard_path]
     schedule_plan = svc.build_cache_migration_schedule_plan(
         legacy_paths=[root / ".tzp-cache" / "BE" / "a.bin"],
         batch_size=1,
@@ -312,6 +811,50 @@ def test_project_session_service_delegates_to_helpers(tmp_path: Path) -> None:
         stop_timer=False,
         completion_status_message=None,
     )
+
+
+def test_project_session_service_builds_crash_recovery_detection_plan(
+    tmp_path: Path,
+) -> None:
+    """Verify project session service builds crash recovery report and detection plan."""
+    root = tmp_path / "proj"
+    file_a = root / "BE" / "a.txt"
+    _touch(file_a, 'A = "one"\n')
+    _write_cache_fixture(
+        root,
+        file_a,
+        draft_keys=("A",),
+        status_only_keys=("A_STATUS",),
+    )
+    svc = ProjectSessionService(
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        has_drafts=status_cache.read_has_drafts_from_path,
+        read_last_opened=status_cache.read_last_opened_from_path,
+    )
+
+    report = svc.build_crash_recovery_report(
+        root=root,
+        selected_locales=["BE"],
+        now_ms=lambda: 42,
+    )
+    assert report is not None
+    assert report.total_draft_values == 1
+    assert report.total_status_only == 1
+    assert report.generated_at_ms == 42
+
+    plan = svc.build_crash_recovery_detection_plan(
+        root=root,
+        selected_locales=["BE"],
+        startup_accepted=True,
+        previous_session_unclean=False,
+        interrupted_draft_marker=True,
+        now_ms=lambda: 42,
+    )
+    assert plan.run_recovery_flow is True
+    assert plan.report is not None
+    assert plan.report.total_files == 1
 
 
 def test_normalize_selected_locales_filters_source_unknown_and_duplicates() -> None:
@@ -439,6 +982,22 @@ def test_build_orphan_cache_warning_truncates_preview(tmp_path: Path) -> None:
         ".tzp/cache/BE/a.bin\n.tzp/cache/BE/b.bin\n... (1 more)"
     )
     assert plan.orphan_paths == tuple(orphan_paths)
+
+
+def test_build_orphan_cache_warning_keeps_absolute_paths_outside_root(
+    tmp_path: Path,
+) -> None:
+    """Verify orphan warning preview keeps absolute path for files outside root."""
+    root = tmp_path / "proj"
+    orphan = tmp_path / "outside" / "orphan.bin"
+    plan = build_orphan_cache_warning(
+        locale="BE",
+        orphan_paths=[orphan],
+        root=root,
+    )
+
+    assert plan.detailed_text == orphan.as_posix()
+    assert plan.orphan_paths == (orphan,)
 
 
 def test_build_cache_migration_schedule_plan_variants(tmp_path: Path) -> None:
