@@ -41,6 +41,18 @@ def test_status_comment(tmp_path):
     assert pf.entries[0].status is Status.PROOFREAD
 
 
+def test_namespaced_status_comment(tmp_path):
+    """Verify namespaced status comment parsing."""
+    pf = _tmp('UI_YES = "Так" -- TZP:FOR_REVIEW\n', tmp_path)
+    assert pf.entries[0].status is Status.FOR_REVIEW
+
+
+def test_namespaced_status_comment_double_slash(tmp_path):
+    """Verify namespaced status comment parsing for // style comments."""
+    pf = _tmp('UI_YES = "Так" // TZP:TRANSLATED\n', tmp_path)
+    assert pf.entries[0].status is Status.TRANSLATED
+
+
 def test_parse_cp1251(prod_like_root):
     """Verify parse cp1251."""
     path = prod_like_root / "RU" / "IG_UI_RU.txt"

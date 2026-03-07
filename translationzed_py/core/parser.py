@@ -20,6 +20,7 @@ from translationzed_py.core.parse_utils import (
     _resolve_encoding,
     _unescape,
 )
+from translationzed_py.core.tzp_comment_policy import parse_status_comment
 
 # ── helper --------------------------------------------------------------------
 _STATUS_MAP: dict[str, Status] = {}  # populated on first parse()
@@ -438,8 +439,8 @@ def _parse_entries_stream(
             concat_pending = True
             continue
         if collecting and tok.kind is Kind.COMMENT and seg_spans:
-            tag = tok.text[2:].strip().upper()
-            status = _STATUS_MAP.get(tag, Status.UNTOUCHED)
+            parsed_status = parse_status_comment(tok.text)
+            status = parsed_status if parsed_status is not None else Status.UNTOUCHED
             continue
         if tok.kind is Kind.NEWLINE:
             if collecting and concat_pending:

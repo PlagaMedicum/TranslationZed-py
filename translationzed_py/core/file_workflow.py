@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .model import Entry, EntrySequence
+from .model import Entry, EntrySequence, Status
 from .status_cache import CacheEntry
 
 if TYPE_CHECKING:
@@ -61,12 +61,12 @@ class SaveCurrentRunPlan:
 
 
 @dataclass(frozen=True, slots=True)
-class SaveCurrentCallbacks:
-    """Represent SaveCurrentCallbacks."""
+class StatusCommentWritebackOptions:
+    """Represent optional status-comment write-back settings for save calls."""
 
-    save_file: Callable[[ParsedFile, Mapping[str, str], str], object]
-    write_cache: Callable[[Path, Iterable[Entry], int], object]
-    now_ts: Callable[[], int]
+    enabled: bool = False
+    comment_prefix: str = "--"
+    status_by_key: Mapping[str, Status] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,12 +78,31 @@ class SaveCurrentResult:
 
 
 @dataclass(frozen=True, slots=True)
+class SaveCurrentCallbacks:
+    """Represent SaveCurrentCallbacks."""
+
+    save_file: Callable[
+        [ParsedFile, Mapping[str, str], str, StatusCommentWritebackOptions], object
+    ]
+    write_cache: Callable[[Path, Iterable[Entry], int], object]
+    now_ts: Callable[[], int]
+    status_comment_writeback: StatusCommentWritebackOptions = field(
+        default_factory=StatusCommentWritebackOptions
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class SaveFromCacheCallbacks:
     """Represent SaveFromCacheCallbacks."""
 
     parse_file: Callable[[Path, str], ParsedFile]
-    save_file: Callable[[ParsedFile, Mapping[str, str], str], object]
+    save_file: Callable[
+        [ParsedFile, Mapping[str, str], str, StatusCommentWritebackOptions], object
+    ]
     write_cache: Callable[[Path, Iterable[Entry]], object]
+    status_comment_writeback: StatusCommentWritebackOptions = field(
+        default_factory=StatusCommentWritebackOptions
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -392,7 +411,12 @@ def persist_current_save(
     """Execute persist current save."""
     wrote_original = False
     if changed_values:
-        callbacks.save_file(parsed_file, changed_values, encoding)
+        callbacks.save_file(
+            parsed_file,
+            changed_values,
+            encoding,
+            callbacks.status_comment_writeback,
+        )
         wrote_original = True
     callbacks.write_cache(path, parsed_file.entries, callbacks.now_ts())
     return SaveCurrentResult(
@@ -427,7 +451,12 @@ def write_from_cache(
     )
     parsed.entries = overlay.entries
     if overlay.changed_values:
-        callbacks.save_file(parsed, overlay.changed_values, encoding)
+        callbacks.save_file(
+            parsed,
+            overlay.changed_values,
+            encoding,
+            callbacks.status_comment_writeback,
+        )
     callbacks.write_cache(path, parsed.entries)
     return SaveFromCacheResult(
         had_drafts=True,

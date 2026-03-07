@@ -12,6 +12,7 @@ from translationzed_py.core.file_workflow import (
     SaveCurrentRunPlan,
     SaveFromCacheCallbacks,
     SaveFromCacheParseError,
+    StatusCommentWritebackOptions,
     apply_cache_for_write,
     apply_cache_overlay,
     build_save_current_run_plan,
@@ -266,13 +267,21 @@ def test_persist_current_save_writes_original_and_cache() -> None:
     path = Path("/tmp/a.txt")
     parsed = ParsedFile(path, [_entry("A", "a", Status.UNTOUCHED)], b'A = "a"\n')
     saved_payload: list[tuple[dict[str, str], str]] = []
+    writeback_payload: list[StatusCommentWritebackOptions] = []
     cache_payload: list[tuple[Path, int]] = []
     callbacks = SaveCurrentCallbacks(
-        save_file=lambda _pf, changed, enc: saved_payload.append((dict(changed), enc)),
+        save_file=lambda _pf, changed, enc, writeback: (
+            saved_payload.append((dict(changed), enc)),
+            writeback_payload.append(writeback),
+        ),
         write_cache=lambda write_path, _entries, ts: cache_payload.append(
             (write_path, ts)
         ),
         now_ts=lambda: 777,
+        status_comment_writeback=StatusCommentWritebackOptions(
+            enabled=True,
+            comment_prefix="//",
+        ),
     )
 
     result = service.persist_current_save(
@@ -286,6 +295,9 @@ def test_persist_current_save_writes_original_and_cache() -> None:
     assert result.wrote_original is True
     assert result.wrote_cache is True
     assert saved_payload == [({"A": "b"}, "utf-8")]
+    assert writeback_payload == [
+        StatusCommentWritebackOptions(enabled=True, comment_prefix="//")
+    ]
     assert cache_payload == [(path, 777)]
 
 
@@ -297,7 +309,7 @@ def test_persist_current_save_with_no_changes_still_writes_cache() -> None:
     saved_calls = 0
     cache_calls = 0
 
-    def _save_file(_pf, _changed, _enc):  # type: ignore[no-untyped-def]
+    def _save_file(_pf, _changed, _enc, _writeback):  # type: ignore[no-untyped-def]
         nonlocal saved_calls
         saved_calls += 1
 
@@ -349,7 +361,7 @@ def test_write_from_cache_skips_when_no_draft_values() -> None:
         parse_file=lambda _path, _enc: (_ for _ in ()).throw(
             AssertionError("parse should not run")
         ),
-        save_file=lambda _pf, _vals, _enc: (_ for _ in ()).throw(
+        save_file=lambda _pf, _vals, _enc, _writeback: (_ for _ in ()).throw(
             AssertionError("save should not run")
         ),
         write_cache=lambda _path, _entries: (_ for _ in ()).throw(
@@ -382,14 +394,19 @@ def test_write_from_cache_applies_overlay_and_writes_cache() -> None:
     cache = CacheMap(hash_bits=64)
     cache[1] = CacheEntry(Status.FOR_REVIEW, "draft-a", "orig-a")
     saved_payload: list[tuple[dict[str, str], str]] = []
+    writeback_payload: list[StatusCommentWritebackOptions] = []
     cache_written: list[list[Entry]] = []
 
     callbacks = SaveFromCacheCallbacks(
         parse_file=lambda file_path, _enc: parsed if file_path == path else parsed,
-        save_file=lambda _pf, vals, enc: saved_payload.append((dict(vals), enc)),
+        save_file=lambda _pf, vals, enc, writeback: (
+            saved_payload.append((dict(vals), enc)),
+            writeback_payload.append(writeback),
+        ),
         write_cache=lambda _path, write_entries: cache_written.append(
             list(write_entries)
         ),
+        status_comment_writeback=StatusCommentWritebackOptions(enabled=True),
     )
 
     result = service.write_from_cache(
@@ -404,6 +421,7 @@ def test_write_from_cache_applies_overlay_and_writes_cache() -> None:
     assert result.wrote_original is True
     assert dict(result.changed_values) == {"A": "draft-a"}
     assert saved_payload == [({"A": "draft-a"}, "utf-8")]
+    assert writeback_payload == [StatusCommentWritebackOptions(enabled=True)]
     assert len(cache_written) == 1
     assert cache_written[0][0].status == Status.FOR_REVIEW
 
@@ -418,7 +436,7 @@ def test_write_from_cache_wraps_parse_errors() -> None:
         parse_file=lambda _path, _enc: (_ for _ in ()).throw(
             ValueError("parse-failed")
         ),
-        save_file=lambda _pf, _vals, _enc: None,
+        save_file=lambda _pf, _vals, _enc, _writeback: None,
         write_cache=lambda _path, _entries: None,
     )
 
