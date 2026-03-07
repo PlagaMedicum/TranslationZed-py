@@ -18,6 +18,11 @@ MUTATION_PROMOTION_MIN_KILLED_PERCENT ?= 25
 MUTATION_PROMOTION_REQUIRE_MODE ?= fail
 MUTATION_PROMOTION_TOKEN_ENV ?= GITHUB_TOKEN
 MUTATION_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/mutation/promotion-readiness.json
+COVERAGE_PROMOTION_REQUIRED_CONSECUTIVE ?= 2
+COVERAGE_PROMOTION_MIN_OVERALL ?= 92
+COVERAGE_PROMOTION_MIN_CORE ?= 97
+COVERAGE_PROMOTION_SUMMARIES ?=
+COVERAGE_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/coverage/promotion-readiness.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check locale-agnostic-check \
@@ -27,6 +32,7 @@ MUTATION_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/mutation/promotion-readiness.json
 	docs-index-write \
 	bench bench-check bench-advisory test-mutation \
 	test-mutation-stage mutation-promotion-check mutation-promotion-readiness \
+	test-cov-promotion-contract coverage-promotion-check \
 	test-warnings run ui-manual-list ui-manual-run ui-manual-batch clean clean-cache clean-config perf-scenarios perf-dependency-eval ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
 
@@ -73,6 +79,9 @@ test:
 
 test-cov:
 	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/test_cov.sh
+
+test-cov-promotion-contract:
+	VENV=$(VENV) bash scripts/test_cov_promotion_contract.sh $(ARGS)
 
 test-qa-v09:
 	VENV=$(VENV) bash scripts/test_qa_v09.sh $(ARGS)
@@ -190,6 +199,19 @@ mutation-promotion-readiness:
 		--require-mode "$(MUTATION_PROMOTION_REQUIRE_MODE)" \
 		--token-env "$(MUTATION_PROMOTION_TOKEN_ENV)" \
 		--out-json "$(MUTATION_PROMOTION_OUT_JSON)" \
+		$(ARGS)
+
+coverage-promotion-check:
+	@if [ -z "$(COVERAGE_PROMOTION_SUMMARIES)" ]; then \
+		echo "COVERAGE_PROMOTION_SUMMARIES is required (example: make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='artifacts/coverage/run1.json artifacts/coverage/run2.json')"; \
+		exit 2; \
+	fi
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/check_coverage_promotion.py \
+		--summaries $(COVERAGE_PROMOTION_SUMMARIES) \
+		--required-consecutive "$(COVERAGE_PROMOTION_REQUIRED_CONSECUTIVE)" \
+		--min-overall "$(COVERAGE_PROMOTION_MIN_OVERALL)" \
+		--min-core "$(COVERAGE_PROMOTION_MIN_CORE)" \
+		--out-json "$(COVERAGE_PROMOTION_OUT_JSON)" \
 		$(ARGS)
 
 test-encoding-integrity:
