@@ -464,7 +464,15 @@ Algorithm:
 - Runtime sync uses `QStyleHints.colorSchemeChanged` when available and
   re-applies `SYSTEM` mode without persisting extra overrides.
 
-#### 5.6.5  Save/exit orchestration boundary
+#### 5.6.5  Optional `TZP:` status-comment write-back controls
+
+- Preferences -> View exposes optional write-back controls:
+  - `TZP_STATUS_COMMENT_WRITEBACK` toggle (default disabled),
+  - `TZP_STATUS_COMMENT_PREFIX` text field.
+- Blank prefix input falls back to app `comment_prefix` contract (`--` by default).
+- Controls only affect namespaced `TZP:` comments; user comments remain immutable.
+
+#### 5.6.6  Save/exit orchestration boundary
 
 - `core.save_exit_flow` owns the Qt-free decision flow for:
   - **Write Original** action (`cancel` / `write` / `cache` branches).

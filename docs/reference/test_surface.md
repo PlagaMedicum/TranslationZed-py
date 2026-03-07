@@ -18,6 +18,7 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    - `tests/test_roundtrip.py`
    - `tests/test_regression_roundtrip.py`
    - `tests/test_tzp_comment_policy.py` (`TZP:` parse/format/write-plan contracts)
+   - `tests/test_gui_tm_preferences.py` (`TZP:` write-back preference controls)
 3. Encoding integrity:
    - `tests/test_encoding_diagnostics.py`
    - `tests/test_property_encoding_invariants.py`

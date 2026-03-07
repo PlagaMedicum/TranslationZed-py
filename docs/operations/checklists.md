@@ -61,7 +61,7 @@ Quick command-profile orientation:
     `main_window_bootstrap_helpers`) through Makefile orchestration
 - **Run** `make test-tzp-a30` when touching deferred `TZP:` status-comment policy/write-back contracts
   - Executes focused A30 packet suite (`tzp_comment_policy`, parser status-comment paths,
-    saver/file-workflow write-back integration coverage)
+    saver/file-workflow write-back integration coverage, TZP preference-controls apply/roundtrip coverage)
     through Makefile orchestration
 - **Run** `make test-ui-manual-contract` when touching manual scenario manifests
   or workflow-to-test coverage mappings

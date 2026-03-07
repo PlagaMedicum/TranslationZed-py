@@ -77,7 +77,7 @@ _Last updated: 2026-03-07_
 2. No weakening of existing docs/verify/release gates.
 3. No reopening v0.9 packet scope.
 
-## 3) Milestone In Progress — A30 [→]
+## 3) Milestone Closure — A30 [✓]
 
 ### A30 selected deferred stream
 
@@ -107,8 +107,12 @@ _Last updated: 2026-03-07_
    3. write-path wiring:
       - `persist_current_save` + `write_from_cache` now carry write-back options DTO,
       - GUI adapters pass explicit opt-in options from preferences extras.
-3. `A30-TZP-3` [ ]
-   1. add Preferences/UX controls + canonical docs closure for optional write-back.
+3. `A30-TZP-3` [✓]
+   1. add Preferences/UX controls for optional write-back:
+      - toggle for `TZP_STATUS_COMMENT_WRITEBACK`,
+      - editable `TZP_STATUS_COMMENT_PREFIX`.
+   2. wire apply/persist flow through existing extras contract (core behavior unchanged).
+   3. extend packet lane with GUI preference coverage for write-back controls.
 
 ### A30 progress snapshot (2026-03-07)
 
@@ -121,9 +125,15 @@ _Last updated: 2026-03-07_
    2. `pytest -q -o addopts='' tests/test_file_workflow.py tests/test_saver.py tests/test_tzp_comment_policy.py tests/test_parser_features.py`,
    3. `make docs-check`,
    4. `make verify-fast`.
-3. Runtime behavior note:
+3. `A30-TZP-3` acceptance evidence is green:
+   1. `make test-tzp-a30`,
+   2. `pytest -q -o addopts='' tests/test_gui_tm_preferences.py -k tzp_writeback`,
+   3. `make docs-check`,
+   4. `make verify-fast`.
+4. Runtime behavior note:
    1. `TZP:` write-back remains opt-in and disabled by default (`TZP_STATUS_COMMENT_WRITEBACK=false`).
-   2. non-namespaced user comments remain immutable in this packet.
+   2. write-back controls are now available in Preferences -> View (`TZP_STATUS_COMMENT_WRITEBACK`, `TZP_STATUS_COMMENT_PREFIX`).
+   3. non-namespaced user comments remain immutable in this packet.
 
 ## 4) Milestone In Progress — A31 [→]
 
@@ -176,7 +186,7 @@ _Last updated: 2026-03-07_
 3. Add Makefile-first packet lane for `A30`:
    1. `scripts/test_tzp_a30.sh`,
    2. `make test-tzp-a30`.
-4. Implement `A30-TZP-3` UX/preferences closure for optional write-back controls.
+4. Keep `A30` closure evidence coherent in canonical plan/history docs.
 5. Keep A31 no-shrink/coverage gates green while adding scenarios:
    1. `make test-ui-manual-contract`,
    2. `make test-a31-manual`,

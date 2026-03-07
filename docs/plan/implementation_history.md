@@ -401,7 +401,28 @@ Execution evidence log:
    4. `make verify-fast`.
 6. Scope boundary:
    1. write-back remains opt-in and disabled by default,
-   2. Preferences UI controls remain queued in `A30-TZP-3`.
+   2. Preferences UI controls were queued at this stage and completed in `A30-TZP-3`.
+
+## A30-TZP-3 [✓] Preferences UX + Docs Closure (2026-03-07)
+
+1. Added optional `TZP:` write-back controls to Preferences -> View:
+   1. `tzp_writeback_enabled` toggle,
+   2. `tzp_comment_prefix` editor with deterministic fallback behavior.
+2. Wired runtime apply/persist contracts in GUI preference flow:
+   1. `TZP_STATUS_COMMENT_WRITEBACK` is persisted only when enabled,
+   2. `TZP_STATUS_COMMENT_PREFIX` persists when non-empty, otherwise falls back to app defaults.
+3. Expanded packet lane coverage:
+   1. `tests/test_gui_tm_preferences.py` includes roundtrip and runtime apply tests for TZP controls,
+   2. `scripts/test_tzp_a30.sh` now includes `gui_tm_preferences` TZP-focused selector.
+4. Canonical docs/plan closure updated for A30 stream completion.
+5. Validation evidence:
+   1. `make test-tzp-a30`,
+   2. `pytest -q -o addopts='' tests/test_gui_tm_preferences.py -k tzp_writeback`,
+   3. `make docs-check`,
+   4. `make verify-fast`.
+6. Scope boundary:
+   1. no core writeback algorithm changes in this packet,
+   2. `TZP:` write-back remains opt-in and disabled by default.
 
 ## A31-MAN-1/2/3 [✓] Manual UI Scenario Framework + No-Shrink Contract (2026-03-07)
 

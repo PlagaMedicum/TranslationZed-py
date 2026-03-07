@@ -80,6 +80,10 @@ Quick lookup companion:
 - Preference hygiene guard:
     - deprecated settings keys are auto-pruned from `settings.env` during bootstrap/save;
     missing required defaults are auto-backfilled.
+- `TZP:` write-back preference controls:
+    - Preferences -> View toggle/prefix roundtrip,
+    - runtime apply/persist behavior for `TZP_STATUS_COMMENT_WRITEBACK` and
+      `TZP_STATUS_COMMENT_PREFIX` extras.
 - QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
 - QA same-as-source checks: opt-in `qa.same_source` findings and severity/group label rendering are validated in core + panel tests.
 - QA navigation checks: `F8`/`Shift+F8` next-prev traversal moves between findings with wrap and updates status-bar hint.
