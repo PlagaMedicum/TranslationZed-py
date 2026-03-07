@@ -43,9 +43,9 @@ _ROW_KIND_VIRTUAL = "virtual"
 _STATUS_PRIORITY = {status: idx for idx, status in enumerate(STATUS_ORDER)}
 DIFF_MARKER_ROLE = int(Qt.UserRole) + 41
 _DIFF_MARKER_TOOLTIP = {
-    "NEW": "NEW in EN (missing in locale)",
-    "REMOVED": "Present in locale (missing in EN)",
-    "MODIFIED": "EN source changed since snapshot baseline",
+    "NEW": "Present in source locale (missing in current locale)",
+    "REMOVED": "Present in current locale (missing in source locale)",
+    "MODIFIED": "Source locale text changed since snapshot baseline",
 }
 
 

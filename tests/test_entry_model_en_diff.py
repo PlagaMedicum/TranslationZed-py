@@ -99,3 +99,29 @@ def test_status_filter_and_sort_apply_to_row_mapping() -> None:
 
     model.set_status_filter(None)
     assert model.rowCount() == 3
+
+
+def test_diff_marker_tooltips_use_source_locale_neutral_text() -> None:
+    """Verify diff marker tooltips are source-locale wording, not EN-specific."""
+    model = TranslationModel(
+        _parsed(
+            [
+                _entry("A", "va", status=Status.PROOFREAD),
+                _entry("B", "vb", status=Status.UNTOUCHED),
+                _entry("C", "vc", status=Status.TRANSLATED),
+            ]
+        ),
+        source_values={"A": "sa", "B": "sb", "C": "sc"},
+        diff_marker_by_key={"A": "NEW", "B": "REMOVED", "C": "MODIFIED"},
+    )
+
+    tooltip_new = str(model.data(model.index(0, 0), Qt.ToolTipRole))
+    tooltip_removed = str(model.data(model.index(1, 0), Qt.ToolTipRole))
+    tooltip_modified = str(model.data(model.index(2, 0), Qt.ToolTipRole))
+
+    assert "source locale" in tooltip_new.lower()
+    assert "source locale" in tooltip_removed.lower()
+    assert "source locale" in tooltip_modified.lower()
+    assert " in en " not in tooltip_new.lower()
+    assert " in en " not in tooltip_removed.lower()
+    assert "en source changed" not in tooltip_modified.lower()

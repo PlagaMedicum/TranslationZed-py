@@ -12,6 +12,11 @@ from PySide6.QtWidgets import QLabel, QListWidgetItem, QMessageBox, QSplitter
 
 from translationzed_py.core import preferences
 from translationzed_py.core.model import Status
+from translationzed_py.core.tm_query_contracts import (
+    TMExplainability,
+    TMExplainabilityBand,
+    TMExplainabilityTieBreak,
+)
 from translationzed_py.core.tm_store import TMMatch
 from translationzed_py.gui import MainWindow
 from translationzed_py.gui import main_window as mw
@@ -160,6 +165,197 @@ def test_tm_min_score_persists_to_settings_env(tmp_path, qtbot, monkeypatch):
     saved = preferences.load(None)
     extras = dict(saved.get("__extras__", {}))
     assert extras.get("TM_MIN_SCORE") == "5"
+
+
+def test_tm_grouping_selector_persists_and_renders_group_headers(
+    tmp_path, qtbot, monkeypatch
+):
+    """Verify TM grouping selector persists mode and inserts non-selectable group rows."""
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    monkeypatch.setattr(win, "_persist_preferences", lambda: None)
+
+    assert win._tm_grouping_combo.currentData() == "none"
+    origin_idx = win._tm_grouping_combo.findData("origin")
+    assert origin_idx >= 0
+    win._tm_grouping_combo.setCurrentIndex(origin_idx)
+
+    assert win._tm_grouping == "origin"
+    assert win._prefs_extras["TM_GROUPING"] == "origin"
+
+    win._show_tm_matches(
+        [
+            TMMatch(
+                source_text="Drop all",
+                target_text="Скінуць усё",
+                score=95,
+                origin="project",
+                tm_name=None,
+                tm_path=None,
+                file_path=None,
+                key=None,
+                updated_at=1,
+            ),
+            TMMatch(
+                source_text="Drop one",
+                target_text="Скінуць шт.",
+                score=92,
+                origin="import",
+                tm_name="import_tm",
+                tm_path="/tmp/import_tm.tmx",
+                file_path=None,
+                key=None,
+                updated_at=1,
+            ),
+        ]
+    )
+
+    assert win._tm_list.item(0).text() == "Origin: Project"
+    assert isinstance(win._tm_list.item(1).data(Qt.UserRole), TMMatch)
+    assert win._tm_list.item(2).text() == "Origin: Import"
+    assert isinstance(win._tm_list.item(3).data(Qt.UserRole), TMMatch)
+
+
+def test_tm_explanation_panel_shows_fallback_and_explainability_payload(
+    tmp_path, qtbot
+):
+    """Verify TM explanation panel shows fallback and payload summary text."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    win._show_tm_matches(
+        [
+            TMMatch(
+                source_text="Drop all",
+                target_text="Скінуць усё",
+                score=95,
+                origin="project",
+                tm_name=None,
+                tm_path=None,
+                file_path=None,
+                key=None,
+                updated_at=1,
+            )
+        ]
+    )
+    assert hasattr(win, "_tm_explain_preview")
+    assert "No explainability details for this suggestion." in (
+        win._tm_explain_preview.toPlainText()
+    )
+
+    win._show_tm_matches(
+        [
+            TMMatch(
+                source_text="Drop one",
+                target_text="Скінуць шт.",
+                score=99,
+                origin="import",
+                tm_name="pack",
+                tm_path="/tmp/pack.tmx",
+                file_path=None,
+                key=None,
+                updated_at=2,
+                raw_score=100,
+                explainability=TMExplainability(
+                    score=99,
+                    raw_score=100,
+                    ratio=0.93,
+                    overlap=0.66,
+                    exact_overlap=0.5,
+                    token_bonus=7,
+                    composed_phrase=False,
+                    long_multi_triggered=False,
+                    band=TMExplainabilityBand(
+                        min_base=5,
+                        max_base=20,
+                        min_effective=5,
+                        max_effective=20,
+                    ),
+                    oversized_guard_applied=False,
+                    oversized_guard_passed=None,
+                    cap_reason="fuzzy_to_99",
+                    tie_break=TMExplainabilityTieBreak(
+                        token_count_delta=1,
+                        origin_priority=1,
+                        updated_at=2,
+                    ),
+                    decision_notes=("fuzzy_capped_to_99",),
+                ),
+            )
+        ]
+    )
+    explain = win._tm_explain_preview.toPlainText()
+    assert "Score path: final=99% raw=100% bonus=7 cap=fuzzy_to_99" in explain
+    assert "Tie-break: token_delta=1 origin_priority=1 updated_at=2" in explain
+
+
+def test_tm_quick_shortcuts_navigate_and_apply_under_grouped_view(
+    tmp_path, qtbot, monkeypatch
+):
+    """Verify quick keyboard actions keep grouped-view apply stable."""
+    monkeypatch.chdir(tmp_path)
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    model = win.table.model()
+    assert model is not None
+
+    source_index = model.index(0, 1)
+    value_index = model.index(0, 2)
+    assert source_index.data(Qt.EditRole) == "v"
+    win.table.setCurrentIndex(value_index)
+    win._left_stack.setCurrentIndex(1)
+
+    grouping_idx = win._tm_grouping_combo.findData("origin")
+    win._tm_grouping_combo.setCurrentIndex(grouping_idx)
+    win._show_tm_matches(
+        [
+            TMMatch(
+                source_text="Drop all",
+                target_text="Keyboard Apply A",
+                score=95,
+                origin="project",
+                tm_name=None,
+                tm_path=None,
+                file_path=None,
+                key=None,
+                updated_at=1,
+            ),
+            TMMatch(
+                source_text="Drop one",
+                target_text="Keyboard Apply B",
+                score=92,
+                origin="import",
+                tm_name="pack",
+                tm_path="/tmp/pack.tmx",
+                file_path=None,
+                key=None,
+                updated_at=1,
+            ),
+        ]
+    )
+
+    assert isinstance(win._tm_list.currentItem().data(Qt.UserRole), TMMatch)
+    current_match = win._tm_list.currentItem().data(Qt.UserRole)
+    assert current_match.target_text == "Keyboard Apply A"
+
+    win._tm_next_shortcut.activated.emit()
+    current_match = win._tm_list.currentItem().data(Qt.UserRole)
+    assert isinstance(current_match, TMMatch)
+    assert current_match.target_text == "Keyboard Apply B"
+
+    win._tm_prev_shortcut.activated.emit()
+    current_match = win._tm_list.currentItem().data(Qt.UserRole)
+    assert isinstance(current_match, TMMatch)
+    assert current_match.target_text == "Keyboard Apply A"
+
+    win._tm_apply_shortcut.activated.emit()
+    assert value_index.data(Qt.EditRole) == "Keyboard Apply A"
 
 
 def test_tm_preview_term_sanitizer_drops_short_long_and_duplicates(tmp_path, qtbot):
@@ -440,6 +636,36 @@ def test_source_reference_selector_target_then_en_fallback_policy(
     assert win._source_reference_mode == "BE"
 
 
+def test_source_reference_selector_prefers_locale_preset_chain(
+    tmp_path, qtbot, monkeypatch
+):
+    """Verify source reference selector follows per-locale preset fallback chain."""
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "proj"
+    for loc, value in (("EN", "EN SRC"), ("BE", "BE SRC"), ("RU", "RU SRC")):
+        (root / loc).mkdir(parents=True, exist_ok=True)
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+        (root / loc / "ui.txt").write_text(
+            f'UI_KEY = "{value}"\n',
+            encoding="utf-8",
+        )
+
+    win = MainWindow(str(root), selected_locales=["BE", "RU"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    win._file_chosen(ix)
+    win._source_reference_mode = "KO"
+    win._source_reference_fallback_policy = "EN_THEN_TARGET"
+    win._source_reference_fallback_chain = ("EN",)
+    win._source_reference_fallback_presets = {"BE": ("RU", "EN")}
+    win._sync_source_reference_mode(persist=False)
+
+    assert win._source_reference_mode == "RU"
+
+
 def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
     """Verify tm panel includes imported matches."""
     monkeypatch.chdir(tmp_path)
@@ -594,6 +820,7 @@ def test_tm_panel_source_and_translation_previews_are_resizable(tmp_path, qtbot)
     assert prefs_index < rebuild_index
     assert win._tm_origin_project_cb.text() == "Project"
     assert win._tm_origin_import_cb.text() == "Import"
+    assert win._tm_grouping_combo.currentData() == "none"
     assert win._tm_origin_project_cb.icon().isNull() is True
     assert win._tm_origin_import_cb.icon().isNull() is True
     assert win._tm_prefs_btn.icon().isNull() is False
@@ -731,6 +958,106 @@ def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
     assert values["tm_export_tmx"] is False
     assert values["tm_rebuild"] is False
     assert values["tm_show_diagnostics"] is False
+
+
+def test_preferences_view_tab_roundtrip_source_reference_chain_and_presets(
+    tmp_path, qtbot
+):
+    """Verify view-tab source-reference chain/presets controls roundtrip values."""
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {
+            "tm_import_dir": str(root / ".tzp" / "tms"),
+            "source_reference_fallback_policy": "TARGET_THEN_EN",
+            "source_reference_fallback_chain": "RU,EN",
+            "source_reference_fallback_presets": '{"BE":["RU","EN"]}',
+        },
+        tm_files=[],
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog._source_ref_fallback_combo.currentData() == "TARGET_THEN_EN"
+    assert dialog._source_ref_chain_edit.text() == "RU,EN"
+    assert dialog._source_ref_presets_edit.toPlainText() == '{"BE":["RU","EN"]}'
+
+    dialog._source_ref_chain_edit.setText("KO,RU")
+    dialog._source_ref_presets_edit.setPlainText('{"BE":["KO","RU"]}')
+    values = dialog.values()
+    assert values["source_reference_fallback_chain"] == "KO,RU"
+    assert values["source_reference_fallback_presets"] == '{"BE":["KO","RU"]}'
+
+
+def test_preferences_source_reference_ui_copy_is_locale_agnostic(tmp_path, qtbot):
+    """Verify source-reference preference copy uses locale-agnostic placeholders/labels."""
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {"tm_import_dir": str(root / ".tzp" / "tms")},
+        tm_files=[],
+    )
+    qtbot.addWidget(dialog)
+
+    labels = [
+        dialog._source_ref_fallback_combo.itemText(idx)
+        for idx in range(dialog._source_ref_fallback_combo.count())
+    ]
+    assert labels == [
+        "Source locale, then file locale",
+        "File locale, then source locale",
+    ]
+    assert dialog._source_ref_chain_edit.placeholderText() == "<LOCALE_A>,<LOCALE_B>"
+    assert "<LOCALE_A>,<LOCALE_B>" in dialog._source_ref_chain_edit.toolTip()
+    assert (
+        dialog._source_ref_presets_edit.placeholderText()
+        == '{"<TARGET_LOCALE>":["<SOURCE_LOCALE>","<FALLBACK_LOCALE>"]}'
+    )
+    assert (
+        dialog._lt_locale_map_edit.placeholderText()
+        == '{"<LOCALE_CODE>":"<lt-language-tag>"}'
+    )
+
+
+def test_preferences_source_reference_accept_normalizes_chain_and_presets(
+    tmp_path, qtbot
+):
+    """Verify source-reference controls normalize to canonical payload on accept."""
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {"tm_import_dir": str(root / ".tzp" / "tms")},
+        tm_files=[],
+    )
+    qtbot.addWidget(dialog)
+
+    dialog._source_ref_chain_edit.setText("en -> ru | ko")
+    dialog._source_ref_presets_edit.setPlainText('{"be":["ru","en"]}')
+    dialog._accept_with_validation()
+
+    assert dialog.result() == dialog.DialogCode.Accepted
+    values = dialog.values()
+    assert values["source_reference_fallback_chain"] == "EN,RU,KO"
+    assert values["source_reference_fallback_presets"] == '{"BE":["RU","EN"]}'
+
+
+def test_preferences_source_reference_accept_rejects_invalid_preset_json(
+    tmp_path, qtbot, monkeypatch
+):
+    """Verify invalid source-reference preset JSON blocks accept with warning."""
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {"tm_import_dir": str(root / ".tzp" / "tms")},
+        tm_files=[],
+    )
+    qtbot.addWidget(dialog)
+
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        "translationzed_py.gui.preferences_dialog.QMessageBox.warning",
+        lambda *_args, **_kwargs: warnings.append("warning"),
+    )
+    dialog._source_ref_presets_edit.setPlainText("{bad-json")
+    dialog._accept_with_validation()
+
+    assert dialog.result() != dialog.DialogCode.Accepted
+    assert warnings == ["warning"]
 
 
 def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):

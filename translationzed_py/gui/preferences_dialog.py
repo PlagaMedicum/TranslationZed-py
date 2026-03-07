@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -18,12 +19,20 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QSpinBox,
     QTabWidget,
     QVBoxLayout,
     QWidget,
+)
+
+from translationzed_py.core.source_reference_service import (
+    dump_source_reference_fallback_presets as _dump_source_reference_fallback_presets,
+)
+from translationzed_py.core.source_reference_service import (
+    normalize_source_reference_fallback_chain as _normalize_source_reference_fallback_chain,
 )
 
 _SCOPES = [
@@ -37,8 +46,8 @@ _THEME_MODES = [
     ("Dark", "DARK"),
 ]
 _SOURCE_REF_FALLBACKS = [
-    ("EN, then file locale", "EN_THEN_TARGET"),
-    ("File locale, then EN", "TARGET_THEN_EN"),
+    ("Source locale, then file locale", "EN_THEN_TARGET"),
+    ("File locale, then source locale", "TARGET_THEN_EN"),
 ]
 _LT_MODES = [
     ("Auto", "auto"),
@@ -110,7 +119,7 @@ class PreferencesDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
             self,
         )
-        buttons.accepted.connect(self.accept)
+        buttons.accepted.connect(self._accept_with_validation)
         buttons.rejected.connect(self.reject)
 
         layout = QVBoxLayout(self)
@@ -161,6 +170,10 @@ class PreferencesDialog(QDialog):
             "theme_mode": self._theme_mode_combo.currentData(),
             "source_reference_fallback_policy": (
                 self._source_ref_fallback_combo.currentData()
+            ),
+            "source_reference_fallback_chain": self._source_ref_chain_edit.text().strip(),
+            "source_reference_fallback_presets": (
+                self._source_ref_presets_edit.toPlainText().strip()
             ),
             "tm_enabled": changed_tm_enabled,
             "tm_remove_paths": sorted(self._tm_remove_paths),
@@ -399,7 +412,9 @@ class PreferencesDialog(QDialog):
 
         locale_map_label = QLabel("Locale map JSON", widget)
         self._lt_locale_map_edit = QPlainTextEdit(widget)
-        self._lt_locale_map_edit.setPlaceholderText('{"EN":"en-US","BE":"be-BY"}')
+        self._lt_locale_map_edit.setPlaceholderText(
+            '{"<LOCALE_CODE>":"<lt-language-tag>"}'
+        )
         self._lt_locale_map_edit.setLineWrapMode(QPlainTextEdit.NoWrap)
         self._lt_locale_map_edit.setTabChangesFocus(True)
         self._lt_locale_map_edit.setMinimumHeight(110)
@@ -434,6 +449,29 @@ class PreferencesDialog(QDialog):
             self._prefs.get("source_reference_fallback_policy", "EN_THEN_TARGET")
         ).upper()
         self._set_combo_value(self._source_ref_fallback_combo, source_ref_fallback)
+        self._source_ref_chain_edit = QLineEdit(
+            str(self._prefs.get("source_reference_fallback_chain", "")).strip(),
+            self,
+        )
+        self._source_ref_chain_edit.setPlaceholderText("<LOCALE_A>,<LOCALE_B>")
+        self._source_ref_chain_edit.setToolTip(
+            "Ordered fallback locales after policy baseline, for example "
+            "<LOCALE_A>,<LOCALE_B>."
+        )
+        self._source_ref_presets_edit = QPlainTextEdit(self)
+        self._source_ref_presets_edit.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self._source_ref_presets_edit.setTabChangesFocus(True)
+        self._source_ref_presets_edit.setMinimumHeight(96)
+        self._source_ref_presets_edit.setPlaceholderText(
+            '{"<TARGET_LOCALE>":["<SOURCE_LOCALE>","<FALLBACK_LOCALE>"]}'
+        )
+        self._source_ref_presets_edit.setToolTip(
+            "Per-locale fallback-chain JSON map, for example "
+            '{"<TARGET_LOCALE>":["<SOURCE_LOCALE>","<FALLBACK_LOCALE>"]}'
+        )
+        self._source_ref_presets_edit.setPlainText(
+            str(self._prefs.get("source_reference_fallback_presets", "")).strip()
+        )
         self._wrap_text_check = QCheckBox("Wrap long strings in table", self)
         self._wrap_text_check.setChecked(bool(self._prefs.get("wrap_text", False)))
         self._large_text_opt_check = QCheckBox(
@@ -456,6 +494,10 @@ class PreferencesDialog(QDialog):
         )
         layout.addRow(QLabel("Theme"), self._theme_mode_combo)
         layout.addRow(QLabel("Source fallback"), self._source_ref_fallback_combo)
+        layout.addRow(QLabel("Fallback chain"), self._source_ref_chain_edit)
+        layout.addRow(
+            QLabel("Locale fallback presets (JSON)"), self._source_ref_presets_edit
+        )
         layout.addRow(self._wrap_text_check)
         layout.addRow(self._large_text_opt_check)
         layout.addRow(self._visual_highlight_check)
@@ -728,3 +770,49 @@ class PreferencesDialog(QDialog):
             if combo.itemData(i) == value:
                 combo.setCurrentIndex(i)
                 return
+
+    def _accept_with_validation(self) -> None:
+        """Validate source-reference controls before accepting dialog values."""
+        if not self._normalize_source_reference_controls():
+            return
+        self.accept()
+
+    def _normalize_source_reference_controls(self) -> bool:
+        chain = _normalize_source_reference_fallback_chain(
+            self._source_ref_chain_edit.text(),
+            default=(),
+        )
+        self._source_ref_chain_edit.setText(",".join(chain))
+
+        raw_presets = self._source_ref_presets_edit.toPlainText().strip()
+        if not raw_presets:
+            self._source_ref_presets_edit.clear()
+            return True
+        try:
+            parsed = json.loads(raw_presets)
+        except Exception:
+            QMessageBox.warning(
+                self,
+                "Source fallback presets",
+                "Locale fallback presets must be valid JSON object text.",
+            )
+            return False
+        if not isinstance(parsed, dict):
+            QMessageBox.warning(
+                self,
+                "Source fallback presets",
+                "Locale fallback presets must be a JSON object map.",
+            )
+            return False
+        normalized_payload = _dump_source_reference_fallback_presets(parsed)
+        if normalized_payload == "{}" and parsed:
+            QMessageBox.warning(
+                self,
+                "Source fallback presets",
+                "No valid locale fallback chains were found in the JSON payload.",
+            )
+            return False
+        self._source_ref_presets_edit.setPlainText(
+            "" if normalized_payload == "{}" else normalized_payload
+        )
+        return True
