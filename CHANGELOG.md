@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-03-06
+
+### Added
+- QA live checklist pipeline across core, async, and UI header rendering (queued/running/terminal per-rule visibility with deterministic ordering).
+- TM explainability payloads and deterministic scoring guards for exact/fuzzy paths.
+- TM workflow UX upgrades: grouping modes, grouped-list-safe quick actions, and explanation preview panel.
+- Crash-recovery UC-12 flow with startup decision dialog (`Restore`, `Discard`, `Cancel`) and deterministic apply-plan execution contracts.
+- Packet-focused Makefile lanes for v0.9 workstreams (`test-qa-v09`, `test-tmq-v09`, `test-tmw-v09`, `test-cr-v09`).
+
+### Changed
+- v0.9 canonical docs/spec/plan references synchronized to implemented packet state and release-readiness audit flow.
+- Verification evidence chain hardened for v0.9 closure (`docs-check`, `verify`, `verify-ci`).
+
+### Fixed
+- Restored missing packet-history coherence for executed QA checklist packet (`A19-V9-QA-3`) in implementation history.
+- Eliminated borderline core coverage drift around release gates by expanding deterministic `project_session` branch coverage.
+
 ## [0.8.0] - 2026-03-04
 
 ### Added

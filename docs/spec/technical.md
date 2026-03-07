@@ -44,6 +44,8 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
   Locale switching is exposed from the **Source column header dropdown** (header label
   indicates current mode). Global mode is persisted, and fallback policy
   is configurable (`EN → Target` or `Target → EN`) when selected locale is unavailable.
+  Advanced fallback chain and per-locale preset policy overrides are also supported
+  from Preferences -> View.
 - On startup, check EN hash cache; if changed, show a confirmation dialog to
   reset the cache to the new EN version.
 - Atomic multi‑file save; save/exit flows use explicit write prompts
@@ -68,6 +70,19 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 | **Security**      | Never execute user‑provided code; sanitise paths to prevent traversal.               |
 | **Productivity**  | Startup < 1s for cached project; key search/respond < 50ms typical.                  |
 | **UI Guidelines** | Follow GNOME HIG + KDE HIG via native Qt widgets; keep theme overrides minimal and readability-focused. |
+| **UI Copy Policy** | Production user-facing UI/docs guidance text must stay locale-agnostic (no concrete locale examples). |
+
+### 3.1 Locale-Agnostic UI Text Policy
+
+- Production user-facing UI text and contributor guidance docs must use generic locale tokens.
+- Concrete locale examples in guidance text are disallowed (for example
+  `<LOCALE_A>,<LOCALE_B>`, `{"<TARGET_LOCALE>":["<SOURCE_LOCALE>"]}`,
+  `{"<LOCALE_CODE>":"<lt-language-tag>"}` should be used instead of concrete values).
+- Tests and fixtures are exempt and may use concrete locales for deterministic coverage.
+- Enforcement is hard-fail via `make locale-agnostic-check` and is wired into
+  fast, CI-core, and docs lanes.
+- Narrow exception marker for technical/non-user-facing literals:
+  `locale-agnostic: allow` in the same or previous line comment.
 
 ---
 
@@ -80,6 +95,7 @@ translationzed_py/
 │   ├── parser.py            # loss‑less token parser
 │   ├── parse_utils.py       # token helpers / encoding utilities
 │   ├── lazy_entries.py      # lazy/on-demand entry access for large files
+│   ├── tzp_comment_policy.py # namespaced TZP comment parse/format/write contracts
 │   ├── model.py             # Entry, ParsedFile
 │   ├── saver.py             # multi‑file atomic writer
 │   ├── search.py            # index + query API
@@ -241,9 +257,11 @@ Parse algorithm:
      token boundaries.
 5. Return `ParsedFile` containing `entries`, `raw_bytes`. `entries`, `raw_bytes`.
 6. Status comments are **not** written into localization files by default.
-   If program-generated status markers are later introduced, they must be
-   explicitly namespaced to distinguish them from user comments (e.g. `TZP:`),
-   and only those program‑generated comments are writable.
+   Optional write-back is gated by preferences extras
+   (`TZP_STATUS_COMMENT_WRITEBACK`, `TZP_STATUS_COMMENT_PREFIX`).
+   Program-generated status markers use explicit namespacing (`TZP:`) and
+   deterministic parse/format/write-plan contracts in `core.tzp_comment_policy`;
+   only those namespaced program comments are writable.
 - Related UCs: UC-03, UC-05b, UC-10a.
 
 ### 5.3  `core.model`
@@ -368,6 +386,10 @@ Algorithm:
   - `UI_THEME_MODE=SYSTEM|LIGHT|DARK` (optional extra key; absent means `SYSTEM`)
   - `SOURCE_REFERENCE_MODE=EN|<LOCALE_CODE>` (active extra key for source-column reference locale mode)
   - `SOURCE_REFERENCE_FALLBACK_POLICY=EN_THEN_TARGET|TARGET_THEN_EN` (optional source-reference fallback order)
+  - `SOURCE_REFERENCE_FALLBACK_CHAIN=<locale1,locale2,...>` (optional ordered fallback-chain extension)
+  - `SOURCE_REFERENCE_FALLBACK_PRESETS=<json>` (optional per-locale fallback-chain JSON map, for example `{"<TARGET_LOCALE>":["<SOURCE_LOCALE>","<FALLBACK_LOCALE>"]}`)
+  - `TZP_STATUS_COMMENT_WRITEBACK=true|false` (optional extra key; default `false`)
+  - `TZP_STATUS_COMMENT_PREFIX=<comment-prefix>` (optional extra key; default app `comment_prefix`, usually `--`)
 - LanguageTool endpoint policy:
   - allow `https://*` endpoints
   - allow `http://` only for localhost (`localhost`, `127.0.0.1`, `::1`)
@@ -989,6 +1011,16 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 - **Gate contract**:
   - local umbrella gate: `make verify` (auto-fix allowed; warns on tracked-file changes),
   - CI/release strict gate: `make verify-ci` (non-mutating, fail-on-drift),
+  - manual UI scenario contract gate: `make test-ui-manual-contract`
+    (registry + workflow no-shrink validation),
+  - manual UI scenario packet lane: `make test-a31-manual`,
+  - manual UI scenario runner surface:
+    `make ui-manual-list`,
+    `make ui-manual-run SCENARIO=<id>`,
+    `make ui-manual-batch SCENARIOS=<id1,id2,...>`,
+  - scenario-mode runtime env contracts:
+    `TZP_MANUAL_SCENARIO_FILE=<payload.json>`,
+    `TZP_MANUAL_RESULTS_DIR=<output-dir>`,
   - CI matrix may set `VERIFY_SKIP_BENCH=1` in `verify-ci` when benchmark compare is
     enforced by a dedicated strict benchmark job to avoid duplicate benchmark execution,
   - local heavy tier gate: `make verify-heavy`

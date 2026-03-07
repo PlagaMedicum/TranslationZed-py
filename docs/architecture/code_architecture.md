@@ -1,5 +1,5 @@
 # TranslationZed-Py — Code Architecture
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-05_
 
 This document is the concrete code-level architecture reference.
 It complements:
@@ -594,8 +594,13 @@ flowchart TB
 ## 12) Document-or-Flag Status
 
 Current queue state:
-1. `docs/reference/review_queue.json` currently has no active
-   `REVIEW_REQUIRED` or `IN_REFACTOR` entries.
+1. Active queue entries:
+   - `FLAGGED_MODULE: translationzed_py/core/project_session.py`
+   - status: `IN_REFACTOR` (`A26`, crash-recovery decision application + safety guards)
+   - `FLAGGED_MODULE: translationzed_py/core/tm_query_engine.py`
+   - status: `IN_REFACTOR` (`A21`, TM explainability determinism guards)
+   - `FLAGGED_MODULE: translationzed_py/core/saver.py`
+   - status: `IN_REFACTOR` (`A30-TZP-2`, optional `TZP:` write-back integration in save path)
 2. Previous P1 entries (`preferences.py`, `search_replace_service.py`,
    `tm_store.py`) are closed and retained as historical evidence.
 

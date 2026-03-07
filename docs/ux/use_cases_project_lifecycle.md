@@ -127,11 +127,11 @@ sequenceDiagram
 | Success | If drafts exist and prompt enabled: `Write / Cache only / Cancel`; otherwise cache-only exit. |
 | Post-condition | File handles released and caches persisted per policy. |
 
-## UC-12 Crash Recovery (Target: v0.9)
+## UC-12 Crash Recovery
 
 | Field | Value |
 |---|---|
-| Goal | Define current baseline and locked v0.9 target behavior. |
-| Current behavior (v0.8) | Recovery is cache-based only (`.tzp/cache`); dedicated restore/discard startup dialog is not yet active. |
-| Target behavior (v0.9) | Startup dialog with `Restore`, `Discard`, `Cancel`, and plaintext details in the same window. |
-| Normative target spec | `docs/spec/v0_9/crash_recovery_uc12.md` |
+| Goal | Ensure startup recovery decisions are explicit and deterministic. |
+| Shipped baseline (v0.8) | Recovery is cache-based only (`.tzp/cache`); dedicated restore/discard startup dialog is not active in released v0.8 builds. |
+| Current `dev` behavior (v0.9 implementation) | Startup dialog with `Restore`, `Discard`, `Cancel`, plaintext details, and deterministic decision application guards. |
+| Normative spec | `docs/spec/v0_9/crash_recovery_uc12.md` |

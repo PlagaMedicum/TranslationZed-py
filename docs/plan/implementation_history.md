@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation History
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-07_
 
 > Historical execution log (non-normative).  
 > Current canonical planning scope lives in `docs/plan/implementation_active.md`.
@@ -74,6 +74,376 @@ Execution evidence log:
 1. `v0.8.0` is fully closed and released.
 2. Active planning moved to `A16` in `docs/plan/implementation_active.md` (docs-only v0.9 spec pack).
 3. Historical sections below remain as execution evidence and design lineage for future refactors.
+
+## A17-V9-QA-1 [✓] QA Rule-State Model Foundation (2026-03-04)
+
+1. Added core QA progress contracts in `translationzed_py/core/qa_service.py`:
+   1. `QARuleState` enum,
+   2. `QARuleProgressRecord` DTO,
+   3. `QAScanProgressSnapshot` DTO,
+   4. deterministic fixed rule order and state-text mappings.
+2. Added strict transition/progress helpers with validation:
+   1. legal transition enforcement (`queued -> running -> terminal`),
+   2. terminal-state monotonicity protection,
+   3. no second `running` transition for a rule in one run,
+   4. non-decreasing completion ratio checks.
+3. Added packet tests:
+   1. expanded unit coverage in `tests/test_qa_service.py`,
+   2. focused progress-model suite in `tests/test_qa_progress_model.py`.
+4. Existing QA finding generation and QA panel behavior remain unchanged in this packet
+   (no checklist UI rendering changes yet; async/UI integration is reserved for `V9-QA-2/3`).
+
+## A18-V9-QA-2 [✓] QA Async Instrumentation and Run-ID Guards (2026-03-05)
+
+1. Extended QA async payload in `translationzed_py/gui/qa_async.py`:
+   1. run-id propagation per scan run,
+   2. ordered per-rule progress snapshots attached to job results,
+   3. final-summary snapshot emission for adapter/UI handoff.
+2. Added stale suppression guard in async poll flow:
+   1. stale payloads are rejected when `run_id` mismatches active run,
+   2. path mismatch guard remains in place for file-switch races.
+3. LT failure semantics hardened for async stage:
+   1. LT failures are isolated to LT rule state/note (`failed`/warning notes),
+   2. full QA run continues and returns non-LT findings without global failure.
+4. Added Makefile-first QA packet lane:
+   1. `scripts/test_qa_v09.sh`,
+   2. `make test-qa-v09` target for focused v0.9 QA packet regression suite.
+5. Regression coverage updated:
+   1. `tests/test_qa_async.py` rewritten for run-id/snapshot/LT-failure behavior,
+   2. existing QA panel and service suites remain green.
+
+## A19-V9-QA-3 [✓] QA Panel Checklist Rendering (2026-03-05)
+
+1. Added QA checklist rendering contract in GUI panel helpers:
+   1. fixed rule-order checklist text rendering in QA header,
+   2. deterministic state-text mapping and optional per-rule note projection,
+   3. summary line passthrough from snapshot payload.
+2. Wired checklist state lifecycle in main-window QA flow:
+   1. checklist label initialized in QA panel header and preserved across refreshes,
+   2. snapshot application updates current checklist state,
+   3. new run snapshots reset rows to queued state deterministically.
+3. Added packet coverage in `tests/test_gui_qa_panel.py`:
+   1. fixed-order/state-text/note rendering assertions,
+   2. reset-on-new-run behavior assertions.
+4. Validation chain for QA packet group remained green:
+   1. `make test-qa-v09`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+
+## A20-V9-TMQ-1 [✓] TM Explainability DTO Surface (2026-03-05)
+
+1. Added TM explainability contracts and score-decision DTOs:
+   1. `TMExplainability*` payload dataclasses,
+   2. `TMScoreDecision`,
+   3. `TMMatch.explainability` exposure in `tm_store`.
+2. Wired exact/fuzzy explainability payload emission in TM query engine/store:
+   1. exact-path explainability builder for score/tie-break metadata,
+   2. fuzzy-path explainability for band/guard/cap-reason/decision-notes metadata.
+3. Added packet regression and orchestration updates:
+   1. explainability payload tests in `tests/test_tm_store.py`,
+   2. bit-stability snapshot extension in `tests/test_tm_query_perf_contract.py`,
+   3. Makefile lane `make test-tmq-v09` via `scripts/test_tmq_v09.sh`.
+4. Runtime TM ranking behavior remained deterministic and unchanged in this packet
+   (payload diagnostics only).
+
+## A21-V9-TMQ-2 [✓] TM Explainability Determinism Guards (2026-03-05)
+
+1. Added deterministic explainability guard helpers in
+   `translationzed_py/core/tm_query_scoring.py`:
+   1. ranking-key parity validation (score/raw/tie-break vs explainability payload),
+   2. monotonic order assertion for already sorted fuzzy candidates.
+2. Integrated guard execution in `translationzed_py/core/tm_query_engine.py`:
+   1. guard runs after deterministic candidate sort,
+   2. guard fails fast with `ValueError` on payload/order drift.
+3. Added strict packet tests:
+   1. new unit suite `tests/test_tm_query_scoring.py` for pass/fail guard cases,
+   2. integration test in `tests/test_tm_store.py` proving corrupted sort output is rejected.
+4. Expanded TMQ packet lane coverage:
+   1. `scripts/test_tmq_v09.sh` now includes `tests/test_tm_query_scoring.py`,
+   2. `make test-tmq-v09` remains the canonical packet gate command.
+5. Corpus/perf/equivalence contracts remained green (`tm_store`, ranking corpus,
+   perf bit-stability).
+
+## A22-V9-TMW-1 [✓] TM Triage View Grouping Upgrades (2026-03-05)
+
+1. Added TM grouping view-state contracts in `translationzed_py/core/tm_workflow_service.py`:
+   1. grouping modes (`none`, `origin`, `score_band`),
+   2. grouped suggestion metadata emitted as non-order-changing view annotations.
+2. Added TM panel grouping selector wiring in GUI:
+   1. grouping mode bootstrap from preferences extras (`TM_GROUPING`),
+   2. grouping mode persistence and apply path in TM filter flow.
+3. Added grouped list rendering in TM panel adapter:
+   1. non-selectable group header rows in suggestion list,
+   2. first selectable TM match auto-selection preserved for apply workflow.
+4. Added packet tests and Makefile lane:
+   1. `tests/test_tm_workflow_service.py` grouping contracts,
+   2. `tests/test_gui_tm_preferences.py` grouping persistence/render tests,
+   3. `scripts/test_tmw_v09.sh` + `make test-tmw-v09`.
+5. Validation chain for this packet stayed green:
+   1. `make test-tmw-v09`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+
+## A23-V9-TMW-2 [✓] TM Quick Actions + Explanation Preview (2026-03-05)
+
+1. Added explanation preview contract in `translationzed_py/core/tm_workflow_service.py`:
+   1. `TMSelectionPlan.explanation_preview`,
+   2. deterministic `format_explainability_preview(...)` formatter,
+   3. stable fallback text for no-selection and no-payload states.
+2. Added TM quick actions and explanation panel wiring in
+   `translationzed_py/gui/main_window_panel_helpers.py`:
+   1. keyboard quick actions for next/previous/apply while TM panel is active,
+   2. grouped-list-safe neighbor selection that skips non-selectable header rows,
+   3. lazy explanation panel creation and selection-driven preview updates.
+3. Added packet regression coverage:
+   1. `tests/test_tm_workflow_service.py` for explanation formatter/selection plan text contracts,
+   2. `tests/test_gui_tm_preferences.py` for grouped-view keyboard apply stability and explanation panel content.
+4. Packet validation is green on working tree via Makefile gates:
+   1. `make test-tmw-v09`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+5. User-visible TM ranking/scoring semantics remain unchanged in this packet
+   (workflow UX/projection only).
+
+## A24-V9-CR-1 [✓] Crash Recovery Detection + Report Model (2026-03-05)
+
+1. Added crash-recovery core contracts in `translationzed_py/core/project_session.py`:
+   1. `CrashRecoveryAffectedFile`,
+   2. `CrashRecoveryReport`,
+   3. `CrashRecoveryDetectionPlan`.
+2. Added report-generation and detection-gating helpers for UC-12 preconditions:
+   1. deterministic cache-candidate scanning for selected locales,
+   2. per-file draft/status counters + aggregate totals,
+   3. detection gate requiring startup acceptance, draft candidates, and interrupted signal.
+3. Added service delegation methods for future startup/UI packet wiring:
+   1. `ProjectSessionService.build_crash_recovery_report(...)`,
+   2. `ProjectSessionService.build_crash_recovery_detection_plan(...)`.
+4. Added packet regression coverage and Makefile lane:
+   1. `tests/test_project_session.py` crash-recovery report/detection tests,
+   2. `scripts/test_cr_v09.sh` + `make test-cr-v09`.
+5. Validation chain for this packet stayed green:
+   1. `make test-cr-v09`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+
+## A25-V9-CR-2 [✓] Startup Recovery Dialog Flow (2026-03-06)
+
+1. Added startup recovery dialog orchestration in GUI startup path:
+   1. startup flow now evaluates CR detection plan before post-locale startup tasks,
+   2. cancel decision marks startup abort and clears pending startup timers/plans.
+2. Added deterministic decision prompt contract in panel helpers:
+   1. decision mapping `restore|discard|cancel`,
+   2. same-dialog plaintext details with totals and per-file recovery rows.
+3. Added startup-helper coverage:
+   1. prompt button mapping + details rendering tests in `tests/test_main_window_bootstrap_helpers.py`,
+   2. startup cancel-path tests for helper flow and constructor abort behavior.
+4. Packet acceptance gates stayed green:
+   1. `make test-cr-v09`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+
+## A26-V9-CR-3 [✓] Decision Application + Safety Guards (2026-03-06)
+
+1. Added crash-recovery decision application contracts in `translationzed_py/core/project_session.py`:
+   1. `CrashRecoveryApplyPlan`,
+   2. `CrashRecoveryApplyExecution`,
+   3. deterministic `build_crash_recovery_apply_plan(...)` for `restore|discard|cancel`,
+   4. deterministic/idempotent `execute_crash_recovery_apply_plan(...)` with partial-failure reporting.
+2. Wired startup helper to apply decisions via core contracts:
+   1. `_run_startup_recovery(...)` now builds + executes apply plans after dialog decision,
+   2. cancel path still aborts startup before post-locale tasks,
+   3. discard-partial-failure warning now exposes continue/cancel safe-abort option.
+3. Expanded crash packet tests:
+   1. `tests/test_project_session.py` now covers apply-plan mapping, invalid decisions, execution failure reporting, and service delegation,
+   2. `tests/test_main_window_bootstrap_helpers.py` now covers restore apply-path orchestration and discard-failure abort behavior.
+4. Canonical packet lane remains `make test-cr-v09` (Makefile-first orchestration).
+5. Validation chain stayed green on completion:
+   1. `make test-cr-v09`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+
+## A27-V9-DOC-2 [✓] Post-Implementation Canonical Sync (2026-03-06)
+
+1. Canonical v0.9 docs synchronized with implemented packet reality:
+   1. implementation subtask/spec status wording updated for post-code phase,
+   2. crash-recovery UX/spec language aligned with active startup decision flow.
+2. Plan/history coherence repaired:
+   1. missing executed packet `A19-V9-QA-3` added to historical record,
+   2. active-plan framing advanced from crash packet closure to post-docs closure sequencing.
+3. Document-or-Flag coherence enforced:
+   1. `translationzed_py/core/project_session.py` registered in review queue as active `IN_REFACTOR`,
+   2. architecture document status section updated to match queue state.
+4. Validation chain stayed green on completion:
+   1. `make docs-check`,
+   2. `make verify-fast`.
+
+## A28-V9-CLOSE-1 [✓] v0.9 Completion Audit + Release-Readiness Gates (2026-03-06)
+
+1. Completion audit confirmed packet implementation coverage for v0.9:
+   1. `V9-QA-*`, `V9-TMQ-*`, `V9-TMW-*`, `V9-CR-*`, and `V9-DOC-2` are implemented and represented in canonical docs/history.
+2. Strict gate evidence is green on working tree:
+   1. `make docs-check`,
+   2. `make verify`,
+   3. `make verify-ci`.
+3. Document-or-Flag state remains coherent after gate run:
+   1. `translationzed_py/core/project_session.py` remains `IN_REFACTOR`,
+   2. `translationzed_py/core/tm_query_engine.py` remains `IN_REFACTOR`.
+4. Tag-scoped release metadata gate is now validated:
+   1. release metadata aligned to `0.9.0` in `pyproject.toml` and `translationzed_py/version.py`,
+   2. `CHANGELOG.md` section `[0.9.0]` added with release heading,
+   3. `make release-check TAG=v0.9.0-rc1` passes.
+5. v0.9 closure state:
+   1. packet implementation and strict readiness gates are complete on `dev`,
+   2. next stream is deferred-backlog packetization after release handoff.
+
+## A29-SRC-1 [✓] Source-Reference Fallback Policy Model Foundation (2026-03-06)
+
+1. Deferred stream selection lock:
+   1. selected first post-v0.9 stream is source-column reference mode enhancements.
+2. Core-only packet scope:
+   1. add fallback-policy normalization helpers in `core.source_reference_service`,
+   2. add deterministic multi-step fallback chain model and per-locale preset load/dump contracts,
+   3. extend locale-resolution helper to accept ordered fallback chain candidates.
+3. Packet lane orchestration:
+   1. add `scripts/test_src_a29.sh`,
+   2. add `make test-src-a29` target.
+4. Added packet-level contract coverage:
+   1. expanded `tests/test_source_reference_service.py` for fallback chain/preset coverage,
+   2. new `tests/test_source_reference_policy_model.py` contract suite.
+5. Validation evidence:
+   1. `make test-src-a29`,
+   2. `make docs-check`,
+   3. `make verify-fast`.
+6. UI selector/preferences wiring for presets is explicitly deferred to follow-up packet (`A29-SRC-2`).
+
+## A29-SRC-2 [✓] Source-Reference GUI Wiring for Fallback Chains/Presets (2026-03-06)
+
+1. GUI state wiring completed against `A29-SRC-1` core contracts:
+   1. source-reference state now resolves effective locale with deterministic fallback chains and per-locale presets,
+   2. startup/runtime state can hydrate chain/preset settings from persisted extras.
+2. Preferences surface expanded for source-reference controls:
+   1. add fallback-chain input,
+   2. add locale-preset JSON input,
+   3. apply/persist through existing preferences extras flow.
+3. Packet lane coverage expanded:
+   1. `test-src-a29` now includes `source_reference_ui` and source-reference-focused GUI preferences assertions.
+4. Validation evidence:
+   1. `make test-src-a29`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+5. Scope boundary:
+   1. no broad selector UX redesign in this packet,
+   2. final UX/doc polish remains queued in `A29-SRC-3`.
+
+## A29-SRC-3 [✓] Source-Reference UX/Docs Completion (2026-03-06)
+
+1. Preferences UX hardening completed for source-reference advanced controls:
+   1. add validation gate for fallback preset JSON on dialog accept,
+   2. canonicalize fallback-chain and fallback-preset payloads before persist/apply,
+   3. keep deterministic fail-closed behavior with explicit warning on invalid presets.
+2. Source-reference payload/documentation closure:
+   1. source-reference payload hydration helper added for preferences initialization from persisted extras,
+   2. technical and UX docs updated for `SOURCE_REFERENCE_FALLBACK_CHAIN` and `SOURCE_REFERENCE_FALLBACK_PRESETS`,
+   3. workflow reference wording updated to cover policy + chain + preset contracts.
+3. Packet-level tests expanded:
+   1. source-reference state payload helper coverage,
+   2. GUI preferences acceptance tests for canonicalization and invalid JSON rejection.
+4. Validation evidence:
+   1. `make test-src-a29`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+5. Stream-closure note:
+   1. `A29` source-reference deferred stream is complete,
+   2. next deferred stream selection moves to `A30` planning.
+
+## A30-TZP-1 [✓] `TZP:` Comment-Policy Foundation (2026-03-06)
+
+1. Started deferred stream packet for namespaced program-comment contracts:
+   1. add `core.tzp_comment_policy` for parse/format/write-plan helpers,
+   2. keep deterministic contract: only `TZP:` comments are writable.
+2. Parser compatibility extension:
+   1. status-comment parsing now accepts namespaced `TZP:` markers while preserving legacy comment parsing.
+3. Packet lane orchestration (Makefile-first):
+   1. add `scripts/test_tzp_a30.sh`,
+   2. add `make test-tzp-a30`.
+4. Regression scope for packet:
+   1. new `tests/test_tzp_comment_policy.py`,
+   2. parser status-comment path coverage in `tests/test_parser_features.py`.
+5. Validation evidence:
+   1. `make test-tzp-a30`,
+   2. `make docs-check`,
+   3. `make verify-fast`.
+6. Scope boundary:
+   1. no saver/UI write-back wiring yet,
+   2. packet delivers core contracts only; write-path adoption remains in `A30-TZP-2/3`.
+
+## A30-TZP-2 [✓] Save/Cache Write-Path Integration (2026-03-07)
+
+1. Integrated `TZP:` write-back options into core save orchestration:
+   1. add `StatusCommentWritebackOptions` DTO in `core.file_workflow`,
+   2. wire options through `persist_current_save(...)` and `write_from_cache(...)`.
+2. Extended `core.saver.save(...)` optional contracts:
+   1. opt-in write-back flags (`write_tzp_status_comments`, `tzp_comment_prefix`, `status_by_key`),
+   2. deterministic update/remove of existing namespaced `TZP:` comments,
+   3. non-namespaced user comments are never mutated in this packet.
+3. Wired GUI adapters to pass explicit write-back options:
+   1. options resolved from preferences extras
+      (`TZP_STATUS_COMMENT_WRITEBACK`, `TZP_STATUS_COMMENT_PREFIX`),
+   2. current-save path passes touched-row status overrides for deterministic write-back on edited rows.
+4. Packet regression coverage:
+   1. `tests/test_saver.py` (`TZP:` write-back insert/update/remove + span-refresh guard),
+   2. `tests/test_file_workflow.py` (write-back DTO pass-through for save-current/save-from-cache),
+   3. `scripts/test_tzp_a30.sh` expanded to include saver/file-workflow packet scope.
+5. Validation evidence:
+   1. `make test-tzp-a30`,
+   2. `pytest -q -o addopts='' tests/test_file_workflow.py tests/test_saver.py tests/test_tzp_comment_policy.py tests/test_parser_features.py`,
+   3. `make docs-check`,
+   4. `make verify-fast`.
+6. Scope boundary:
+   1. write-back remains opt-in and disabled by default,
+   2. Preferences UI controls remain queued in `A30-TZP-3`.
+
+## A31-MAN-1/2/3 [✓] Manual UI Scenario Framework + No-Shrink Contract (2026-03-07)
+
+1. Added declarative manual scenario registry and runner surface:
+   1. `tests/manual_scenarios/scenarios.json` (versioned schema with fixture/steps/expected/automation),
+   2. `scripts/ui_manual_runner.py` (`--list`, `--scenario`, `--batch`, `--auto`, `--auto-only`),
+   3. Makefile targets:
+      - `make ui-manual-list`,
+      - `make ui-manual-run SCENARIO=<id>`,
+      - `make ui-manual-batch SCENARIOS=<id1,id2,...>`.
+2. Added scenario-mode startup checklist UX (env-gated):
+   1. runtime contract loader in `gui.manual_scenario_runtime`,
+   2. checklist modal in `gui.manual_scenario_dialog`,
+   3. startup hook wiring in panel/main-window helpers.
+3. Added machine-checked no-shrink workflow coverage contract:
+   1. `tests/manual_scenarios/workflow_test_surface_contract.json`,
+   2. `scripts/ui_manual_contract_check.py`,
+   3. Makefile strict gate integration:
+      - `make test-ui-manual-contract`,
+      - included in `check`, `check-local`, `verify-core`, `verify-ci-core`.
+4. Packet regression coverage added:
+   1. `tests/test_manual_scenario_runtime.py`,
+   2. `tests/test_ui_manual_runner.py`,
+   3. `tests/test_ui_manual_contract_check.py`,
+   4. `tests/test_manual_scenario_startup.py`,
+   5. `tests/test_gui_manual_scenario_dialog.py`,
+   6. packet lane `make test-a31-manual`.
+5. Scope boundary:
+   1. manual scenario framework is dev/test infrastructure only (not user-facing runtime mode),
+   2. normal app startup behavior remains unchanged unless scenario env contract is provided.
+
+## A31-COV-1 [✓] Coverage Ratchet Phase 1 (2026-03-07)
+
+1. Strict coverage defaults raised in `scripts/test_cov.sh`:
+   1. package floor from `90` to `91`,
+   2. core floor from `95` to `96`.
+2. Documentation synced with phase-2 promotion policy:
+   1. phase-2 target (`92/97`) remains non-default,
+   2. promotion requires two consecutive strict CI confirmations.
+3. No regression guard:
+   1. no weakening of existing strict gates,
+   2. test-surface no-shrink contract added before deprecated-test cleanup operations.
 
 ## 0) Non‑negotiable invariants
 

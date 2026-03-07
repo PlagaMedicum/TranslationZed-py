@@ -1,118 +1,187 @@
 # TranslationZed-Py — Active Implementation Plan
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-07_
 
 ## 0) Release Framing
 
 - **Current released baseline:** `v0.8.0` (retagged on 2026-03-04 for completed release notes).
 - **Current implementation branch:** `dev`.
-- **Target milestone:** `v0.9.0`.
-- **Milestone mode:** docs-first, docs-only in this slice.
+- **Target milestone:** `v0.9.0` (closure completed; post-release deferred stream prep active).
+- **Latest completed milestone on `dev`:** deferred source-reference stream closure (`A29`).
+- **Current active milestone:** manual UI scenario + coverage ratchet stream (`A31`; `A31-MAN-1/2/3` and `A31-COV-1` active).
 
-## 1) Active Milestone — A16 [in progress]
+## 1) Milestone Closure — A28 [✓]
 
-### A16 scope (docs-only)
+### A28 closure evidence (2026-03-06)
 
-1. Reset stale/deprecated release-state docs to current truth.
-2. Publish a decision-complete `v0.9.0` specification pack under `docs/spec/v0_9/`.
-3. Expand architecture/API docs so future coding can be executed from docs without design ambiguity.
-4. Harden docs gates to enforce new `v0.9.0` spec completeness and anti-drift.
+1. v0.9 packet completion audit is complete:
+   1. `V9-QA-*`, `V9-TMQ-*`, `V9-TMW-*`, `V9-CR-*`, and `V9-DOC-2` are implemented and represented in canonical docs/history.
+2. Strict readiness gates are green:
+   1. `make docs-check`,
+   2. `make verify`,
+   3. `make verify-ci`.
+3. Tag-scoped release metadata gate is green:
+   1. `make release-check TAG=v0.9.0-rc1`.
+4. Release metadata is aligned to `0.9.0`:
+   1. `pyproject.toml`,
+   2. `translationzed_py/version.py`,
+   3. `CHANGELOG.md` (`[0.9.0]` section present).
 
-### A16 strict out-of-scope
+## 2) Milestone Closure — A29 [✓]
 
-1. No runtime Python/UI behavior changes.
-2. No CI workflow behavior changes except docs-contract checks needed for docs integrity.
-3. No release-threshold changes.
+### A29 selected deferred stream
 
-## 2) A16 Deliverables
+1. Stream lock: source-column reference mode enhancements
+   1. per-locale fallback-policy presets,
+   2. multi-step fallback chains.
+2. Other deferred streams remain queued:
+   1. optional `TZP:` generated comments/write-back,
+   2. crash recovery beyond cache scope.
 
-### 2.1 Drift reset (must land first)
+### A29 packet queue
 
-1. `docs/plan/implementation_history.md`
-   - v0.8 closure marked complete.
-   - stale pending-tag statements removed.
-   - stale `[→]` normalized where already completed.
-2. `docs/operations/checklists.md`
-   - `v0.8.0` moved to historical gate.
-   - `v0.9.0` pre-release gate defined.
-3. `docs/reference/api/core_workflows.md`
-   - stale deferred benchmark statement removed.
-   - stale flagged-module wording reconciled with closed queue.
-4. `docs/reference/quick_context.md`
-   - risk/next-scope refreshed to `v0.9.0` target.
+1. `A29-SRC-1` [✓]
+   1. scope: core fallback-policy model foundation only,
+   2. add deterministic helpers for:
+      - fallback-policy normalization,
+      - fallback-chain normalization,
+      - per-locale preset load/dump,
+      - fallback-chain construction and ordered locale resolution.
+   3. tests: service + policy-model contracts,
+   4. lane: `make test-src-a29`.
+2. `A29-SRC-2` [✓]
+   1. wire preset/chain contracts into GUI source-reference state and preferences surface,
+   2. keep source-header selector behavior deterministic under per-locale presets.
+3. `A29-SRC-3` [✓]
+   1. UX/documentation completion for advanced source-reference selector behavior.
 
-### 2.2 v0.9 spec pack (new)
+### A29 progress snapshot (2026-03-06)
 
-Required files:
-1. `docs/spec/v0_9/overview.md`
-2. `docs/spec/v0_9/qa_live_checklist.md`
-3. `docs/spec/v0_9/tm_quality_explainability.md`
-4. `docs/spec/v0_9/tm_workflow_ux.md`
-5. `docs/spec/v0_9/crash_recovery_uc12.md`
-6. `docs/spec/v0_9/implementation_subtasks.md`
+1. `A29-SRC-1` acceptance evidence is green:
+   1. `make test-src-a29`,
+   2. `make docs-check`,
+   3. `make verify-fast`.
+2. `A29-SRC-2` acceptance evidence is green:
+   1. `make test-src-a29`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+3. `A29-SRC-3` acceptance evidence is green:
+   1. `make test-src-a29`,
+   2. `make verify-fast`,
+   3. `make docs-check`.
+4. Runtime/UI behavior note:
+   1. source-reference fallback chain/preset behavior is now UX-complete for current deferred stream scope.
 
-Required content contract:
-1. formulas and algorithm sections,
-2. schemas and data contracts,
-3. call-chain diagrams,
-4. failure modes,
-5. decision-complete subtask packets for implementation.
+### A29 strict out-of-scope
 
-### 2.3 Architecture/API clarity upgrades
+1. `A29` excludes broad source-selector redesign beyond current header/preferences model.
+2. No weakening of existing docs/verify/release gates.
+3. No reopening v0.9 packet scope.
 
-1. `docs/architecture/code_architecture.md`
-   - concrete UML class/interface diagrams for:
-     1. `project_session`,
-     2. `file_workflow`,
-     3. `search_replace_service`.
-   - controller-to-core call chains for:
-     1. QA scan lifecycle,
-     2. TM query/apply lifecycle,
-     3. startup crash recovery lifecycle.
-2. `docs/architecture/diagrams.md`
-   - add explicit v0.9 target diagrams,
-   - keep one primary rendering per diagram block.
-3. `docs/reference/api/*.md`
-   - enforce structured sections:
-     1. Why this layer exists,
-     2. When not to use,
-     3. Call chains,
-     4. DTO boundaries,
-     5. Failure modes.
+## 3) Milestone In Progress — A30 [→]
 
-### 2.4 Gate hardening
+### A30 selected deferred stream
 
-1. Update `scripts/docs_contract_check.py` to require:
-   1. v0.9 spec pack file presence,
-   2. required headings/anchors for QA/TM/Crash/Subtasks,
-   3. no stale v0.8 pending wording in active docs.
-2. Add/update tests in `tests/test_docs_contract_check.py` for each new rule.
+1. Stream lock: optional program-generated `TZP:` status comments with guarded write-back.
+2. Packetization strategy:
+   1. `A30-TZP-1`: core parse/format/write-plan policy contracts,
+   2. `A30-TZP-2`: saver/session write-path integration behind explicit opt-in,
+   3. `A30-TZP-3`: UX/preferences/docs closure for optional write-back controls.
+3. Safety boundary:
+   1. user comments remain immutable,
+   2. only namespaced `TZP:` comments are writable by program contracts.
 
-## 3) Execution Order (A16)
+### A30 packet queue
 
-1. Drift reset docs.
-2. Docs structure + nav updates.
-3. Add v0.9 spec pack.
-4. Architecture/API rewrite.
-5. Docs contract checker + tests.
-6. Final coherence pass across index/quick-context/module-map/spec links.
+1. `A30-TZP-1` [✓]
+   1. add `core.tzp_comment_policy` deterministic contracts:
+      - namespaced parse (`TZP:`),
+      - canonical formatter,
+      - deterministic write-plan decisions (`insert|update|remove|noop`).
+   2. add parser compatibility support for namespaced status comments.
+   3. add packet lane `make test-tzp-a30`.
+2. `A30-TZP-2` [✓]
+   1. integrate write-plan contracts into save/cache orchestration under explicit opt-in.
+   2. saver behavior contract:
+      - update/remove existing namespaced `TZP:` comments deterministically,
+      - never mutate user-authored non-`TZP:` comments.
+   3. write-path wiring:
+      - `persist_current_save` + `write_from_cache` now carry write-back options DTO,
+      - GUI adapters pass explicit opt-in options from preferences extras.
+3. `A30-TZP-3` [ ]
+   1. add Preferences/UX controls + canonical docs closure for optional write-back.
 
-## 4) Acceptance Criteria (A16)
+### A30 progress snapshot (2026-03-07)
 
-1. Canonical docs no longer claim `v0.8.0` is pending.
-2. `docs/spec/v0_9/*` exists and is linked from docs navigation.
-3. v0.9 pack contains formulas/schemas/algorithms/call chains and implementation packets.
-4. Architecture/API docs are structured and implementation-actionable.
-5. `make docs-check` passes with new completeness checks.
+1. `A30-TZP-1` acceptance evidence is green:
+   1. `make test-tzp-a30`,
+   2. `make docs-check`,
+   3. `make verify-fast`.
+2. `A30-TZP-2` acceptance evidence is green:
+   1. `make test-tzp-a30`,
+   2. `pytest -q -o addopts='' tests/test_file_workflow.py tests/test_saver.py tests/test_tzp_comment_policy.py tests/test_parser_features.py`,
+   3. `make docs-check`,
+   4. `make verify-fast`.
+3. Runtime behavior note:
+   1. `TZP:` write-back remains opt-in and disabled by default (`TZP_STATUS_COMMENT_WRITEBACK=false`).
+   2. non-namespaced user comments remain immutable in this packet.
 
-## 5) Next Milestone Preview (post-A16)
+## 4) Milestone In Progress — A31 [→]
 
-After A16 is green, the coding milestone for `v0.9.0` executes in this order:
-1. QA live checklist UI/state pipeline.
-2. TM quality/explainability upgrades.
-3. TM workflow UX upgrades.
-4. Crash recovery (`UC-12`) restore/discard/details flow.
+### A31 selected deferred stream
 
-(Implementation details for those steps are normative in `docs/spec/v0_9/implementation_subtasks.md`.)
+1. Stream lock: manual UI scenario framework and no-shrink test governance.
+2. Packetization strategy:
+   1. `A31-MAN-1`: scenario registry + runner + fixture mini-environment isolation.
+   2. `A31-MAN-2`: in-app startup checklist modal with pass/fail artifact capture.
+   3. `A31-MAN-3`: automation bridge + machine-checked workflow coverage contract.
+   4. `A31-COV-1`: strict coverage floor ratchet to `91/96`.
+   5. `A31-COV-2`: promotion policy to `92/97` after consecutive strict evidence.
+3. Safety boundary:
+   1. no automated test-surface shrink is allowed by contract.
+   2. deprecated tests can be removed only with replacement selectors.
+
+### A31 packet queue
+
+1. `A31-MAN-1` [✓]
+   1. add scenario registry contract (`tests/manual_scenarios/scenarios.json`).
+   2. add runner surface (`make ui-manual-list`, `make ui-manual-run`, `make ui-manual-batch`).
+2. `A31-MAN-2` [✓]
+   1. add scenario-mode startup hook and checklist modal capture flow.
+   2. persist pass/fail artifacts under `artifacts/manual-ui/`.
+3. `A31-MAN-3` [✓]
+   1. add machine-checked no-shrink workflow map contract.
+   2. add contract gate `make test-ui-manual-contract`.
+4. `A31-COV-1` [✓]
+   1. coverage strict defaults raised to package `>=91%`, core `>=96%`.
+5. `A31-COV-2` [ ]
+   1. promote to package `>=92%`, core `>=97%` after two consecutive strict CI confirmations.
+
+### A31 progress snapshot (2026-03-07)
+
+1. New A31 lanes are wired and documented:
+   1. `make test-ui-manual-contract`,
+   2. `make test-a31-manual`,
+   3. `make ui-manual-list` / `make ui-manual-run` / `make ui-manual-batch`.
+2. Runtime behavior note:
+   1. manual scenario mode is env-gated (`TZP_MANUAL_SCENARIO_FILE`) and does not alter normal startup flow.
+   2. scenario checklist output is written only when pass/fail action is chosen.
+3. Coverage ratchet note:
+   1. phase-1 thresholds are active (`91/96`),
+   2. phase-2 (`92/97`) remains policy-only until evidence rule closure.
+
+## 5) Immediate Execution Order (Post-A29)
+
+1. Keep `A29` closure evidence coherent in canonical plan/history docs.
+2. Keep `A30-TZP-1/2` evidence coherent in canonical plan/history docs.
+3. Add Makefile-first packet lane for `A30`:
+   1. `scripts/test_tzp_a30.sh`,
+   2. `make test-tzp-a30`.
+4. Implement `A30-TZP-3` UX/preferences closure for optional write-back controls.
+5. Keep A31 no-shrink/coverage gates green while adding scenarios:
+   1. `make test-ui-manual-contract`,
+   2. `make test-a31-manual`,
+   3. `make verify-fast`,
+   4. `make docs-check`.
 
 ## 6) Non-Negotiable Constraints
 

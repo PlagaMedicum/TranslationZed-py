@@ -1,5 +1,5 @@
 # TranslationZed-Py — Module Responsibility Map
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-07_
 
 ## 1) Core Domain And Services
 
@@ -7,7 +7,8 @@ _Last updated: 2026-03-04_
 |---|---|
 | `core.model` | Core entry/status/value models and invariants. |
 | `core.parser` / `core.parse_utils` / `core.lazy_entries` | Locale file parsing, span tracking, lazy text handling. |
-| `core.saver` / `core.atomic_io` | Byte-preserving save + atomic replace/write safety. |
+| `core.tzp_comment_policy` | Namespaced `TZP:` program-comment parsing/formatting/write-plan contracts. |
+| `core.saver` / `core.atomic_io` | Byte-preserving save + atomic replace/write safety, with optional namespaced `TZP:` status-comment write-back. |
 | `core.status_cache` / `core.en_hash_cache` | Draft/status cache and EN baseline hash tracking. |
 | `core.en_diff_snapshot` / `core.en_diff_service` / `core.en_insert_plan` | EN diff markers (`NEW/REMOVED/MODIFIED`) and insertion planning. |
 | `core.project_scanner` | Locale/project discovery and metadata extraction. |
@@ -34,6 +35,7 @@ _Last updated: 2026-03-04_
 | `gui.main_window` | Qt adapter/orchestrator for menus, widgets, and service delegation. |
 | `gui.main_window_panel_helpers` | Sidebar/TM/QA/search/progress helper orchestration. |
 | `gui.main_window_en_diff_helpers` | GUI wiring for EN-diff badges and insertion prompts. |
+| `gui.manual_scenario_runtime` / `gui.manual_scenario_dialog` | Manual UI scenario runtime contract parsing and checklist modal capture flow. |
 | `gui.entry_model` / `gui.commands` | Table model, undo/redo command integration, row mapping. |
 | `gui.delegates` | Cell rendering/edit delegates (status, key, multiline, visual text). |
 | `gui.fs_model` | Project tree model with locale/file nodes. |

@@ -1,9 +1,14 @@
 # v0.9.0 Crash Recovery Contract (UC-12)
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-06_
 
 ## 1) Purpose
 
-Activate previously deferred crash recovery UX with explicit startup decisions.
+Activate crash recovery UX with explicit startup decisions.
+
+Implementation status on `dev` (2026-03-06):
+1. `V9-CR-1` detection/report pipeline is implemented.
+2. `V9-CR-2` startup dialog flow is implemented.
+3. `V9-CR-3` decision-application safety guards are implemented.
 
 ## 2) Detection Contract
 

@@ -1,5 +1,5 @@
 # Core Data/IO API
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-07_
 
 ## 1) Why This Layer Exists
 
@@ -132,6 +132,12 @@ When touching this layer, preserve these priorities in order:
       members_order: source
 
 ## 11) Saver API
+
+Current status:
+1. `translationzed_py.core.saver` is currently flagged for deep review in
+   `docs/reference/review_queue.json` (`IN_REFACTOR`, `A30-TZP-2`).
+2. Optional `TZP:` write-back remains opt-in and must preserve default byte-fidelity
+   invariants when disabled.
 
 ::: translationzed_py.core.saver
     options:

@@ -1,10 +1,23 @@
 # v0.9.0 Implementation Subtasks (Decision-Complete)
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-06_
 
 ## 1) Purpose
 
-This document defines implementation packets for future coding after docs-only A16.
-Each packet is decision-complete and dependency-ordered.
+This document defines the decision-complete packet structure for v0.9.
+Packets remain dependency-ordered and are used as canonical scope references for
+execution history and closure audits.
+
+## 1.1 Execution Status Snapshot (2026-03-06)
+
+1. Completed packets:
+   1. `V9-DOC-1`
+   2. `V9-QA-1`, `V9-QA-2`, `V9-QA-3`
+   3. `V9-TMQ-1`, `V9-TMQ-2`
+   4. `V9-TMW-1`, `V9-TMW-2`
+   5. `V9-CR-1`, `V9-CR-2`, `V9-CR-3`
+2. Active status at time of this snapshot:
+   1. no `V9-*` behavior packet is active (packet catalog scope is complete),
+   2. milestone-level closure audit (`A28`) is complete and readiness evidence is green.
 
 ## 2) Packet Template (Mandatory)
 

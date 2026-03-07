@@ -95,6 +95,95 @@
       ],
       "risk_level": "P1",
       "status": "CLOSED"
+    },
+    {
+      "closed_at": null,
+      "closure_criteria": [
+        "Extract crash-recovery decision application helpers to reduce module size and ownership overlap",
+        "Keep deterministic restore/discard/cancel semantics and no-write-on-open invariant",
+        "Keep crash packet lane and fast/docs gates green"
+      ],
+      "evidence": [
+        "A24-A26 introduced crash-recovery report/detection/dialog/apply orchestration in one core module",
+        "code-triage marked translationzed_py/core/project_session.py as REVIEW_REQUIRED (line_count=1269)",
+        "CR packet validation chain remains green via make test-cr-v09 + make verify-fast + make docs-check"
+      ],
+      "module_path": "translationzed_py/core/project_session.py",
+      "opened_at": "2026-03-06",
+      "owner": "core-maintainers",
+      "reason_codes": [
+        "COMPLEXITY",
+        "DOC_DRIFT"
+      ],
+      "refactor_scope": "separate crash-recovery, locale/session planning, and cache-migration concerns while preserving existing startup behavior",
+      "required_tests": [
+        "tests/test_project_session.py",
+        "tests/test_main_window_bootstrap_helpers.py",
+        "tests/test_fs_model.py",
+        "tests/test_main_window_progress.py"
+      ],
+      "risk_level": "P1",
+      "status": "IN_REFACTOR"
+    },
+    {
+      "closed_at": null,
+      "closure_criteria": [
+        "Emit TM explainability payload for exact and fuzzy matches without changing ranking order",
+        "Integrate determinism guard that rejects explainability/ranking key drift",
+        "Keep TM corpus equivalence/perf contracts green",
+        "Keep docs-check and packet lanes green for TMQ work"
+      ],
+      "evidence": [
+        "A20 V9-TMQ-1 adds score-path diagnostics across tm_query_contracts/scoring/engine",
+        "A21 V9-TMQ-2 adds scoring guard validation and fail-fast drift checks in tm_query_engine/tm_query_scoring",
+        "code-triage flagged touched module as REVIEW_REQUIRED due complexity-sensitive path ownership",
+        "Validation chain on 2026-03-05: make test-tmq-v09, make verify-fast, make docs-check"
+      ],
+      "module_path": "translationzed_py/core/tm_query_engine.py",
+      "opened_at": "2026-03-05",
+      "owner": "core-maintainers",
+      "reason_codes": [
+        "COMPLEXITY",
+        "DOC_DRIFT"
+      ],
+      "refactor_scope": "add explainability metadata emission for TM query decisions while preserving ranking semantics",
+      "required_tests": [
+        "tests/test_tm_store.py",
+        "tests/test_tm_ranking_corpus.py",
+        "tests/test_tm_query_perf_contract.py"
+      ],
+      "risk_level": "P1",
+      "status": "IN_REFACTOR"
+    },
+    {
+      "closed_at": null,
+      "closure_criteria": [
+        "Keep byte-preserving saver behavior and round-trip invariants unchanged when write-back is disabled",
+        "Keep optional TZP write-back deterministic for insert/update/remove of namespaced comments",
+        "Keep user-authored non-TZP comments immutable",
+        "Keep docs-check and fast gate green for A30-TZP packet lane"
+      ],
+      "evidence": [
+        "A30-TZP-2 extends saver with optional TZP write-back path guarded by explicit opt-in settings",
+        "code-triage flagged translationzed_py/core/saver.py as REVIEW_REQUIRED after save-path behavior expansion",
+        "Packet validation chain: make test-tzp-a30, make docs-check, make verify-fast"
+      ],
+      "module_path": "translationzed_py/core/saver.py",
+      "opened_at": "2026-03-07",
+      "owner": "core-maintainers",
+      "reason_codes": [
+        "COMPLEXITY",
+        "DOC_DRIFT"
+      ],
+      "refactor_scope": "introduce guarded TZP comment write-back while preserving default byte-fidelity and existing saver semantics",
+      "required_tests": [
+        "tests/test_saver.py",
+        "tests/test_file_workflow.py",
+        "tests/test_tzp_comment_policy.py",
+        "tests/test_parser_features.py"
+      ],
+      "risk_level": "P1",
+      "status": "IN_REFACTOR"
     }
   ],
   "version": 1

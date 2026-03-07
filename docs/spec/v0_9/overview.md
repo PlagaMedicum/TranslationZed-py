@@ -1,5 +1,5 @@
 # v0.9.0 Target Specification — Overview
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-06_
 
 ## 1) Purpose
 
@@ -10,6 +10,13 @@ human/LLM execution handoff.
 Current/target framing:
 - Current shipped baseline: `v0.8.0`
 - Target scope: `v0.9.0`
+
+Implementation status snapshot on `dev` (2026-03-06):
+1. QA packets `V9-QA-1/2/3` are implemented.
+2. TM packets `V9-TMQ-1/2` and `V9-TMW-1/2` are implemented.
+3. Crash packets `V9-CR-1/2/3` are implemented.
+4. v0.9 closure/readiness audit (`A28`) is complete on `dev` (`docs-check`, `verify`, `verify-ci`, `release-check TAG=v0.9.0-rc1`).
+5. Next implementation stream is deferred backlog packetization (post-v0.9).
 
 ## 2) Release Goals
 
@@ -58,9 +65,10 @@ Implementation packets are defined in:
 These packets are decision-complete and ordered by dependency. Code
 implementation should follow packet IDs exactly.
 
-## 8) Acceptance Baseline for Leaving Docs-Only Phase
+## 8) Docs Baseline and Post-Code Sync
 
 1. All v0.9 target spec files exist and are linked in docs navigation.
 2. Required formulas/schemas/decision tables are present.
 3. Architecture and API docs contain concrete call chains and boundaries.
 4. Docs quality gates pass (`make docs-check`).
+5. Post-code packet history and active plan references are coherent with implemented packets.

@@ -1,5 +1,5 @@
 # TranslationZed-Py — Quick Context
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-07_
 
 ## 1) What This Project Is
 
@@ -14,7 +14,7 @@ Primary constraints:
 Current/target framing:
 
 - **Current released baseline:** `v0.8.0`
-- **Current planning target:** `v0.9.0` (docs-first specification phase)
+- **Current planning target:** `v0.9.0` (deferred stream execution on `dev`)
 
 ## 2) Fast Mental Model
 
@@ -52,17 +52,21 @@ Current/target framing:
 - Local umbrella gate: `make verify`
 - Strict CI-equivalent gate: `make verify-ci`
 - Docs quality gate: `make docs-check`
+- Locale-agnostic copy gate: `make locale-agnostic-check`
 - Strict docs build: `make docs-build`
 - Docs triage gate: `make code-triage`
 - Review queue schema gate: `make review-queue-check`
 - Contract index drift gate: `make docs-index`
 - Perf contract lane: `make test-perf-scale`
+- A31 no-shrink contract gate: `make test-ui-manual-contract`
+- A31 focused test lane: `make test-a31-manual`
 
 Command profile hint:
 
 1. Use `make verify` for normal local work.
 2. Use `make verify-ci` for strict CI parity.
-3. Use `make verify-heavy` only when heavy mutation/perf evidence is needed.
+3. Use `make locale-agnostic-check` when touching production UI text or guidance docs.
+4. Use `make verify-heavy` only when heavy mutation/perf evidence is needed.
 
 ## 6) Known High-Risk Areas
 

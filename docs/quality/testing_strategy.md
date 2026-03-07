@@ -27,8 +27,8 @@ Quick lookup companion:
 | Target area | Planned verification focus | Primary test modules (planned/extended) |
 |---|---|---|
 | QA live checklist | rule-order invariants, state transitions, completion-ratio monotonicity, LT note semantics | `tests/test_qa_async.py`, `tests/test_gui_qa_panel.py`, new QA progress DTO tests |
-| TM explainability | payload correctness (`raw`, `ratio`, `bonus`, cap reasons), deterministic ordering unchanged | `tests/test_tm_store.py`, `tests/test_tm_ranking_corpus.py`, explainability payload contract tests |
-| TM workflow UX | grouping/sorting view invariants, quick-apply parity (keyboard/mouse), non-blocking empty/error states | TM panel GUI tests, `tests/test_gui_tm_preferences.py` extensions |
+| TM explainability | payload correctness (`raw`, `ratio`, `bonus`, cap reasons), deterministic ordering unchanged | `tests/test_tm_query_scoring.py`, `tests/test_tm_store.py`, `tests/test_tm_ranking_corpus.py`, `tests/test_tm_query_perf_contract.py` |
+| TM workflow UX | grouping/sorting view invariants, quick-apply parity (keyboard/mouse), non-blocking empty/error states | `tests/test_tm_workflow_service.py`, `tests/test_gui_tm_preferences.py`, TM panel GUI tests |
 | Crash recovery (UC-12) | startup candidate detection, restore/discard/cancel semantics, plaintext details, no-write-on-open invariant | project-session/startup tests, new crash-recovery integration tests |
 
 ---
@@ -137,6 +137,24 @@ Quick lookup companion:
 ### 2.3 GUI Smoke Tests
 - App starts headless (`QT_QPA_PLATFORM=offscreen`).
 - Table renders, basic editing works.
+
+### 2.3b Manual UI Scenario Framework (A31)
+- Declarative scenario registry: `tests/manual_scenarios/scenarios.json`
+  with versioned contracts (`id`, `title`, `fixture_root`, `selected_locales`,
+  `steps`, `expected_checks`, optional env/prefs/automation fields).
+- Runner surface:
+  - `make ui-manual-list`
+  - `make ui-manual-run SCENARIO=<id>`
+  - `make ui-manual-batch SCENARIOS=<id1,id2,...>`
+- Scenario-mode runtime contracts:
+  - `TZP_MANUAL_SCENARIO_FILE=<path>`
+  - `TZP_MANUAL_RESULTS_DIR=<path>`
+- Checklist UX contract:
+  - in scenario mode, startup presents a modal step checklist with expected outcomes,
+  - pass/fail + notes are persisted under `artifacts/manual-ui/*.json`.
+- No-shrink workflow contract:
+  - `tests/manual_scenarios/workflow_test_surface_contract.json`
+  - machine-check target: `make test-ui-manual-contract`.
 
 ### 2.4 Crash‑Resilience Tests (manual)
 - Edit several translations (ensure cache writes occur).
@@ -324,7 +342,14 @@ Quick lookup companion:
   - `make docs-index`
   - `make review-queue-check`
   - `make code-triage`
+  - `make locale-agnostic-check`
   - `scripts/docs_contract_check.py --site-root artifacts/docs/site`
+- `make locale-agnostic-check` fails on production-path locale-biased guidance:
+  - concrete locale-code chain examples in user-facing UI/doc text (use `<LOCALE_A>,<LOCALE_B>` placeholders instead),
+  - concrete locale-map JSON examples in user-facing UI/doc text,
+  - EN-centric source/fallback labels in production UI copy.
+  - tests/fixtures are exempt by contract; narrow exception marker:
+    `locale-agnostic: allow`.
 - `scripts/docs_contract_check.py` fails on:
   - known stale terminology and missing canonical-doc presence checks,
   - rendered canonical HTML pseudo-list paragraphs (paragraph text that must
@@ -567,11 +592,14 @@ They include:
 ## 6) Coverage Goals
 
 - Enforced gate thresholds:
-    - Core modules (`translationzed_py/core`): **>=95%** line coverage.
-    - Whole package (`translationzed_py`): **>=90%** line coverage.
-- Current strict baseline (2026-02-22):
-    - `make test-cov`: **92.2%** whole package.
-    - core-only strict run: **95.7%**.
+    - Core modules (`translationzed_py/core`): **>=96%** line coverage.
+    - Whole package (`translationzed_py`): **>=91%** line coverage.
+- Phase-2 ratchet policy (not default yet):
+    - promote to core **>=97%** and package **>=92%** after two consecutive strict CI runs
+      satisfy the higher bar and evidence is recorded in implementation history.
+- Current strict baseline (2026-03-06):
+    - `make test-cov`: **92.3%** whole package.
+    - core-only strict run: **97.1%**.
     - `translationzed_py/gui/main_window.py`: **83.4%** (informational, no per-file hard gate).
 - GUI: smoke and integration coverage sufficient to validate wiring.
 - Cover **all known structure/encoding edge-cases** found in production files.

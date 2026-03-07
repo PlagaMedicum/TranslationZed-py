@@ -1,5 +1,5 @@
 # Core Workflows API
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-05_
 
 ## 1) Why This Layer Exists
 
@@ -118,13 +118,13 @@ When not to use:
 ### 4.7 `source_reference_service`
 
 Why use:
-1. normalize source-reference mode and fallback policy in one Qt-free boundary,
+1. normalize source-reference mode plus fallback policy/chain/preset contracts in one Qt-free boundary,
 2. keep file-path resolution deterministic for target/reference locale pairing,
 3. prevent stale source-search behavior through explicit mode-aware lookup rules.
 
 When not to use:
 1. do not perform path rewrite logic in GUI widgets,
-2. do not parse fallback policy strings directly in adapters,
+2. do not parse fallback policy/chain/preset strings directly in adapters,
 3. do not add mode-specific search/TM hacks outside this service.
 
 ## 5) DTO Boundaries
@@ -318,6 +318,12 @@ Current status:
       members_order: source
 
 ## 14) TM Workflow API
+
+Warning:
+1. `translationzed_py.core.tm_query_engine` is currently flagged for deep review in
+   `docs/reference/review_queue.json` during `V9-TMQ-2`/`A21`.
+2. Keep changes in this module tightly scoped to determinism guards and explainability
+   metadata contracts until queue closure criteria are met.
 
 ::: translationzed_py.core.tm_workflow_service
     options:

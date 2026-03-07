@@ -1,4 +1,4 @@
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-07_
 
 # Checklists
 
@@ -29,6 +29,8 @@ Quick command-profile orientation:
     strict full-repo formatting remains enforced by CI `fmt-check` gates
   - Avoid duplicate reruns by default: `make verify` already executes the strict
     coverage pytest lane (`make test-cov`) once
+  - Coverage hard floors in strict lane:
+    package **>=91%**, core **>=96%** (`scripts/test_cov.sh`)
 - **Run** `make code-triage` when touching architecture/API docs
   - Mandatory `Document-or-Flag` gate for touched module internals
   - Emits trace artifacts:
@@ -45,6 +47,34 @@ Quick command-profile orientation:
   - Includes strict search Wave-2 contract (`>=30%` median speedup at 20k by default)
   - Includes TM warm-cache and cold-cache first-pass speedup gates
   - Use for same-run legacy-vs-optimized comparisons before tightening CI thresholds
+- **Run** `make test-qa-v09` when touching v0.9 QA checklist/state pipeline work
+  - Executes focused QA packet regression suite (`qa_service`, `qa_progress_model`,
+    `qa_async`, `gui_qa_panel`) through Makefile orchestration
+- **Run** `make test-tmq-v09` when touching v0.9 TM explainability/ranking diagnostics work
+  - Executes focused TMQ packet regression suite (`tm_store`, `tm_ranking_corpus`,
+    `tm_query_perf_contract`) through Makefile orchestration
+- **Run** `make test-tmw-v09` when touching v0.9 TM workflow triage/grouping behavior
+  - Executes focused TMW packet regression suite (`tm_workflow_service`,
+    `gui_tm_preferences`) through Makefile orchestration
+- **Run** `make test-cr-v09` when touching v0.9 crash-recovery detection/startup work
+  - Executes focused CR packet regression suite (`project_session`,
+    `main_window_bootstrap_helpers`) through Makefile orchestration
+- **Run** `make test-tzp-a30` when touching deferred `TZP:` status-comment policy/write-back contracts
+  - Executes focused A30 packet suite (`tzp_comment_policy`, parser status-comment paths,
+    saver/file-workflow write-back integration coverage)
+    through Makefile orchestration
+- **Run** `make test-ui-manual-contract` when touching manual scenario manifests
+  or workflow-to-test coverage mappings
+  - Enforces machine-checked no-shrink workflow contract and scenario registry validity
+- **Run** `make test-a31-manual` when touching manual UI runner/checklist runtime code
+  - Executes focused A31 suite (`manual_scenario_runtime`, runner/contracts, checklist dialog/startup helpers)
+- **Run** `make locale-agnostic-check` when touching production UI copy or contributor guidance docs
+  - Hard-fail guard for locale-agnostic policy in production GUI strings and canonical docs guidance text
+  - Tests/fixtures are exempt; use allowlist marker `locale-agnostic: allow` only for narrow technical exceptions
+- **Use** manual scenario runner for repeatable UI hand-checks:
+  - `make ui-manual-list`
+  - `make ui-manual-run SCENARIO=<id>`
+  - `make ui-manual-batch SCENARIOS=<id1,id2,...>`
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
   with CI (non-mutating, fail-on-drift)
 - **Run** `make verify-heavy` when you need full strict gates plus advisory mutation

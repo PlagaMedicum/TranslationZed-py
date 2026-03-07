@@ -1,5 +1,5 @@
 # TranslationZed-Py — Automation Surface
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-07_
 
 ## 1) Purpose
 
@@ -34,6 +34,7 @@ Canonical behavior still lives in:
 | Goal | Command | Script entrypoint |
 |---|---|---|
 | Full docs gate | `make docs-check` | `scripts/docstyle.sh`, `scripts/docs_build.sh`, `scripts/docs_contract_check.py` |
+| Locale-agnostic copy guard | `make locale-agnostic-check` | `scripts/locale_agnostic_check.py` |
 | Docs build only | `make docs-build` | `scripts/docs_build.sh` |
 | Contract index drift | `make docs-index` | `scripts/generate_contract_index.py --check` |
 | Review queue schema | `make review-queue-check` | `scripts/review_queue_check.py` |
@@ -43,6 +44,14 @@ Canonical behavior still lives in:
 
 | Goal | Command | Behavior |
 |---|---|---|
+| v0.9 QA packet lane | `make test-qa-v09` | targeted QA packet suite (`qa_service`, `qa_progress_model`, `qa_async`, `gui_qa_panel`) |
+| v0.9 TMQ packet lane | `make test-tmq-v09` | targeted TM quality/explainability suite (`tm_query_scoring`, `tm_store`, `tm_ranking_corpus`, `tm_query_perf_contract`) |
+| v0.9 TMW packet lane | `make test-tmw-v09` | targeted TM workflow UX suite (`tm_workflow_service`, `gui_tm_preferences`) |
+| v0.9 CR packet lane | `make test-cr-v09` | targeted crash-recovery/session bootstrap suite (`project_session`, `main_window_bootstrap_helpers`) |
+| A29 SRC packet lane | `make test-src-a29` | targeted source-reference policy + GUI wiring suite (`source_reference_service`, `source_reference_policy_model`, `source_reference_state`, `source_reference_ui`, source-reference-focused `gui_tm_preferences`) |
+| A30 TZP packet lane | `make test-tzp-a30` | targeted `TZP:` comment-policy + save/workflow integration suite (`tzp_comment_policy`, parser status-comment paths, saver/file-workflow write-back contracts) |
+| A31 manual-framework contract lane | `make test-ui-manual-contract` | machine-check scenario registry + workflow no-shrink coverage contract |
+| A31 manual-framework packet lane | `make test-a31-manual` | focused scenario runtime/runner/contract + GUI checklist startup tests |
 | Perf contract lane | `make test-perf-scale` | strict parser/search/TM perf-contract tests |
 | Perf scenarios | `make perf-scenarios` | fixture-backed scenario checks |
 | Benchmark compare | `make bench-check` | compares against `tests/benchmarks/baseline.json` |
@@ -54,8 +63,11 @@ Canonical behavior still lives in:
 1. `make verify` -> `verify-core` + optional `release-check-if-tag`
 2. `make verify-core` -> fmt/lint/typecheck/arch/test/perf/doc/security umbrellas
 3. `make verify-ci` -> strict check-only `verify-ci-core` + bench gate
-4. `make docs-check` -> docstyle + docs-build + docs-index + docs-contract
+4. `make docs-check` -> docstyle + docs-build + docs-index + docs-contract + locale-agnostic-check
 5. `make run` -> `scripts/run.sh` (`python -m translationzed_py` entrypoint)
+6. `make ui-manual-list` -> list declarative manual UI scenarios
+7. `make ui-manual-run SCENARIO=<id>` -> launch one scenario in checklist mode
+8. `make ui-manual-batch SCENARIOS=<id1,id2,...>` -> run multiple scenarios sequentially
 
 ## 7) Command Selection Hints
 
