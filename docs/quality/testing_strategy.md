@@ -115,7 +115,10 @@ Quick lookup companion:
     totals are updated incrementally on edits without full locale recompute.
 - Status-bar text contract checks:
     - default fallback text is `Ready to edit`,
-    - operational message text and scope indicators coexist with progress strip.
+    - operational message text and scope indicators coexist with progress strip,
+    - mixed multi-row status selection appends
+      `Selection: mixed (N rows)` only while selection contains at least two rows
+      with more than one status value.
 - Empty-state coverage:
     - main content quick-start placeholder is visible before first file open and
     hidden when a file table is loaded.

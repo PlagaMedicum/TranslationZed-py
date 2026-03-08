@@ -278,6 +278,27 @@ _Last updated: 2026-03-08_
    1. no core data-model or persistence-schema changes,
    2. locale-agnostic production UI copy policy remains mandatory.
 
+### A34 progress snapshot (2026-03-08)
+
+1. Runtime helper implementation is in place:
+   1. status bar appends `Selection: mixed (N rows)` only for mixed-status multi-row selections,
+   2. single-row, uniform multi-row, and empty selection behavior remains unchanged.
+2. Packet test surface and lane are in place:
+   1. `scripts/test_status_a34.sh`,
+   2. `make test-status-a34`,
+   3. targeted mixed-indicator coverage in `tests/test_main_window_cache_replace_helpers.py`.
+3. Manual scenario coverage entry was added:
+   1. `tests/manual_scenarios/scenarios.json` includes `status-triage-mixed-indicator`,
+   2. automation bridge selectors and run artifact generation are wired.
+4. Current evidence on `dev`:
+   1. `make test-status-a34`,
+   2. `make test-ui-manual-contract`,
+   3. `make ui-manual-run SCENARIO=status-triage-mixed-indicator ARGS='--auto-only'`,
+   4. `make verify-fast`,
+   5. `make docs-check`.
+5. Remaining closure evidence for this UI packet:
+   1. interactive manual scenario pass/fail checklist artifact (non-`auto-only`) is still required for final packet closure.
+
 ## 8) Immediate Execution Order (A34)
 
 1. Implement `A34-UX-1` in panel helper layer only (no broader GUI refactor).

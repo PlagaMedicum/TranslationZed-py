@@ -62,6 +62,7 @@ Current/target framing:
 - A31 focused test lane: `make test-a31-manual`
 - Randomized/property fast lane: `make test-prop-fast` (`TZP_PROP_PROFILE=fast`)
 - Randomized/property slow lane: `make test-prop-slow` (`TZP_PROP_PROFILE=slow`)
+- A34 status-triage packet lane: `make test-status-a34`
 - Strict coverage lane: `make test-cov` (`translationzed_py>=92%`, `core>=97%`)
 - Coverage promotion readiness: `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='<run1.json> <run2.json>'`
 

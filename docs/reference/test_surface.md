@@ -83,6 +83,13 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 3. LanguageTool integration:
    - `tests/test_languagetool.py`
 
+## 5.1) Status Triage / Selection UX
+
+1. Status-bar and selection helper contracts:
+   - `tests/test_main_window_cache_replace_helpers.py`
+2. Action wiring and triage adapter integration:
+   - `tests/test_gui_service_adapters.py`
+
 ## 6) TM Ranking / Workflow / Import
 
 1. TM ranking/determinism/perf:
@@ -136,3 +143,4 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 13. Coverage promotion checker contract suite: `make test-cov-promotion-contract`
 14. Randomized/property fast profile: `make test-prop-fast`
 15. Randomized/property slow profile: `make test-prop-slow`
+16. A34 status-triage packet lane: `make test-status-a34`

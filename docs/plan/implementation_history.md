@@ -130,6 +130,30 @@ Execution evidence log:
    5. `make verify-fast`,
    6. `make docs-check`.
 
+## A34-UX-1 [→] Status-Triage Mixed Selection Indicator (2026-03-08)
+
+1. Added mixed-selection status-bar projection in panel helpers:
+   1. append `Selection: mixed (N rows)` only when at least two selected rows
+      contain more than one status value,
+   2. unchanged behavior for single-row, uniform multi-row, and empty selection.
+2. Added packet-focused lane and tests:
+   1. `scripts/test_status_a34.sh`,
+   2. `make test-status-a34`,
+   3. targeted assertions in `tests/test_main_window_cache_replace_helpers.py`.
+3. Added manual-scenario registry entry for UI evidence:
+   1. `status-triage-mixed-indicator` in `tests/manual_scenarios/scenarios.json`.
+4. Synced UX/testing/orientation docs for the packet lane and behavior contract:
+   1. checklists + automation/test surface references include `make test-status-a34`,
+   2. status-triage UX contract now documents mixed-selection indicator behavior.
+5. Current evidence:
+   1. `make test-status-a34`,
+   2. `make test-ui-manual-contract`,
+   3. `make ui-manual-run SCENARIO=status-triage-mixed-indicator ARGS='--auto-only'`,
+   4. `make verify-fast`,
+   5. `make docs-check`.
+6. Remaining closure evidence:
+   1. interactive manual scenario checklist pass/fail artifact (non-`auto-only`) is pending.
+
 ## A17-V9-QA-1 [✓] QA Rule-State Model Foundation (2026-03-04)
 
 1. Added core QA progress contracts in `translationzed_py/core/qa_service.py`:

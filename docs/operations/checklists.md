@@ -77,6 +77,8 @@ Quick command-profile orientation:
 - **Run** `make test-prop-slow` for deeper randomized evidence before heavy merges
   or when validating scheduled/heavy-lane parity
   - Executes the same randomized/stateful suites in slow profile (`TZP_PROP_PROFILE=slow`)
+- **Run** `make test-status-a34` when touching status-triage/status-bar selection UX
+  - Executes targeted status-bar mixed-selection and status-triage helper contracts
 - **Run** `make locale-agnostic-check` when touching production UI copy or contributor guidance docs
   - Hard-fail guard for locale-agnostic policy in production GUI strings and canonical docs guidance text
   - Tests/fixtures are exempt; use allowlist marker `locale-agnostic: allow` only for narrow technical exceptions
