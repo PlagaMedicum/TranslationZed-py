@@ -5,9 +5,10 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
+from tests.hypothesis_profile import prop_settings
 from translationzed_py.core.parser import parse
 from translationzed_py.core.saver import save
 
@@ -25,7 +26,7 @@ from translationzed_py.core.saver import save
         max_size=40,
     ),
 )
-@settings(max_examples=45, deadline=None)
+@prop_settings(fast_examples=45, slow_examples=220)
 def test_property_save_respects_declared_encoding(
     encoding: str,
     initial: str,

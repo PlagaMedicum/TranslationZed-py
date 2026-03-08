@@ -6,9 +6,10 @@ import string
 import tempfile
 from pathlib import Path
 
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
+from tests.hypothesis_profile import prop_settings
 from translationzed_py.core.parser import parse
 from translationzed_py.core.saver import save
 
@@ -29,7 +30,7 @@ _VALUE = st.text(
         st.tuples(_KEY, _VALUE), min_size=1, max_size=25, unique_by=lambda pair: pair[0]
     )
 )
-@settings(max_examples=40, deadline=None)
+@prop_settings(fast_examples=40, slow_examples=200)
 def test_property_parser_saver_roundtrip_identity(
     pairs: list[tuple[str, str]],
 ) -> None:

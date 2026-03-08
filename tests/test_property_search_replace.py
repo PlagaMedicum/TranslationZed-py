@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 
+from tests.hypothesis_profile import prop_settings
 from translationzed_py.core.search_replace_service import (
     build_replace_request,
     replace_text,
@@ -28,7 +29,7 @@ from translationzed_py.core.search_replace_service import (
         max_size=8,
     ),
 )
-@settings(max_examples=60, deadline=None)
+@prop_settings(fast_examples=60, slow_examples=300)
 def test_property_literal_replace_all_matches_python(
     text: str,
     query: str,

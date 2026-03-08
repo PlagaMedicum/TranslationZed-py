@@ -26,7 +26,7 @@ COVERAGE_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/coverage/promotion-readiness.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check locale-agnostic-check \
-	test test-cov test-qa-v09 test-tmq-v09 test-tmw-v09 test-cr-v09 test-src-a29 test-tzp-a30 test-ui-manual-contract test-a31-manual test-perf test-perf-scale test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
+	test test-cov test-prop-fast test-prop-slow test-qa-v09 test-tmq-v09 test-tmw-v09 test-cr-v09 test-src-a29 test-tzp-a30 test-ui-manual-contract test-a31-manual test-perf test-perf-scale test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build docs-build-lite docs-index docs-api docs-contract docs-check code-triage review-queue-check \
 	docs-index-write \
@@ -79,6 +79,12 @@ test:
 
 test-cov:
 	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/test_cov.sh
+
+test-prop-fast:
+	VENV=$(VENV) bash scripts/test_prop_fast.sh $(ARGS)
+
+test-prop-slow:
+	VENV=$(VENV) bash scripts/test_prop_slow.sh $(ARGS)
 
 test-cov-promotion-contract:
 	VENV=$(VENV) bash scripts/test_cov_promotion_contract.sh $(ARGS)
@@ -300,7 +306,7 @@ verify-ci:
 	fi
 
 ## tiered heavy verification (advisory mutation + optional extra checks)
-verify-heavy-extra: test-perf-heavy test-mutation
+verify-heavy-extra: test-perf-heavy test-prop-slow test-mutation
 
 ## tiered heavy verification (strict base + heavy extras)
 verify-heavy: verify-ci verify-heavy-extra
