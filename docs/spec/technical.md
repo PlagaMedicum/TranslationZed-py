@@ -33,8 +33,10 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 - Present file tree (with sub‑dirs) and a 4‑column table (Key | Source | Translation | Status),
   where **Source** is the English string by default; **EN is not editable**.
 - One file open at a time in the table (no tabs in current scope).
-- On startup, open the **most recently opened file** across the selected locales.
-  The timestamp is stored in each file’s cache header for fast lookup.
+- On startup, apply project-scoped workspace session snapshot first (if valid),
+  then fallback to opening the **most recently opened file** across selected locales
+  when snapshot does not restore file context.
+  Last-opened timestamp is stored in each file’s cache header for deterministic fallback lookup.
 - Status per Entry: **Untouched** (initial state), **For review**, **Translated**, **Proofread**.
   Future statuses remain pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
@@ -107,6 +109,7 @@ translationzed_py/
 │   ├── conflict_service.py  # conflict policy + merge planning (non-Qt)
 │   ├── file_workflow.py     # file/cache overlay + cache-save planning (non-Qt)
 │   ├── project_session.py   # session cache scan + auto-open selection (non-Qt)
+│   ├── session_resume.py    # startup workspace snapshot DTO + cache persistence (non-Qt)
 │   ├── render_workflow_service.py # large-file render/span policy (non-Qt)
 │   ├── search_replace_service.py # scope/search/replace planning (non-Qt)
 │   ├── source_reference_service.py # source-reference locale/path planning (non-Qt)
@@ -568,15 +571,17 @@ if dirty_files and not prompt_save():
   `Apply` / `Skip` / `Edit` / `Cancel`.
   `Apply` inserts generated snippets in EN order (comment copy/dedup preserved),
   `Skip` keeps drafts pending, `Edit` edits insertion snippets only with bounded context.
-- Architecture watchdog enforces `translationzed_py/gui/main_window.py <= 5400`
+- Architecture watchdog enforces `translationzed_py/gui/main_window.py <= 5450`
   (`make arch-check` + `tests/test_architecture_guard.py`).
 - Locale selection uses checkboxes for multi-select; EN is excluded from the
   editable tree and used as Source. The left tree shows **one root per locale**.
 - Locale chooser ordering: locales sorted alphanumerically, **checked locales
   float to the top** while preserving alphanumeric order inside each group.
 - Locale chooser remembers **last selected locales** and pre-checks them.
-- On startup, table opens the most recently opened file across selected locales
-  (timestamp stored in cache headers). If no history exists, no file is auto-opened.
+- On startup, post-locale flow applies session-resume snapshot from
+  `<root>/<cache_dir>/session.resume.json` first (schema-validated, versioned).
+  If snapshot cannot restore active file context, table falls back to most-recent
+  auto-open across selected locales (timestamp stored in cache headers).
 - File tree shows a **dirty dot (●)** prefix for files with cached draft values.
 - Save/Exit prompt lists draft files in selected locales and allows per-file deselection before write.
 - Detail editor bottom-right counter displays live Source/Translation char counts and Translation delta vs Source.
@@ -588,7 +593,7 @@ if dirty_files and not prompt_save():
   selection normalization (exclude source locale, deduplicate while preserving user order),
   lazy-tree mode decision, locale-switch plan/no-op detection, and locale-switch apply intent
   flags (`should_apply`, reset/schedule), plus post-locale startup task planning
-  (`cache-scan` + `auto-open`), post-locale startup task execution order,
+  (`cache-scan` + `session-resume` + `auto-open-fallback`), post-locale startup task execution order,
   and tree-rebuild render intent
   (`expand_all` / `preload_single_root` / `resize_splitter`) are also delegated there,
   along with locale-reset intent and callback execution policy for GUI session-state clearing.
@@ -1065,10 +1070,13 @@ Instead of sprint dates, the project is broken into **six sequential phases**.  
 
 ## 9  Crash Recovery
 
-Current builds use **cache‑only** recovery:
+Current builds use cache-root startup recovery + session resume:
 - Drafts are persisted to `.tzp/cache` on edit.
-- No separate temp recovery file is created.
-- If future crash recovery is needed, it will build on cache state only.
+- Crash recovery dialog uses explicit `Restore` / `Discard` / `Cancel`.
+- `Discard` removes recovery cache entries and the project session snapshot file
+  (`session.resume.json`) from project cache root.
+- Session resume is startup-only and project-scoped; invalid or unknown-version
+  snapshots are ignored safely with fallback startup behavior.
 
 ---
 

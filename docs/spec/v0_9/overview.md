@@ -16,7 +16,7 @@ Implementation status snapshot on `dev` (2026-03-06):
 2. TM packets `V9-TMQ-1/2` and `V9-TMW-1/2` are implemented.
 3. Crash packets `V9-CR-1/2/3` are implemented.
 4. v0.9 closure/readiness audit (`A28`) is complete on `dev` (`docs-check`, `verify`, `verify-ci`, `release-check TAG=v0.9.0-rc1`).
-5. Next implementation stream is deferred backlog packetization (post-v0.9).
+5. Next implementation stream on `dev` is deferred crash/session-resume packet `A32-CRX`.
 
 ## 2) Release Goals
 

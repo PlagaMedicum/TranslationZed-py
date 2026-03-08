@@ -75,6 +75,28 @@ Execution evidence log:
 2. Active planning moved to `A16` in `docs/plan/implementation_active.md` (docs-only v0.9 spec pack).
 3. Historical sections below remain as execution evidence and design lineage for future refactors.
 
+## A32-CRX [→] Project-Scoped Session Resume + Crash Integration (2026-03-07)
+
+1. Added core session-resume contract module:
+   1. `translationzed_py/core/session_resume.py` with versioned DTO
+      (`SessionResumeSnapshot`) and strict schema parsing.
+   2. project-cache read/write/delete helpers and safe fallback behavior
+      (invalid/unknown version -> ignore snapshot).
+2. Extended `core.project_session` startup/discard orchestration:
+   1. post-locale startup task plan now includes `session-resume` step before auto-open fallback,
+   2. `run_post_locale_startup_tasks` applies auto-open only when session-resume does not restore context,
+   3. crash-recovery `discard` plan now includes session snapshot path deletion.
+3. Added GUI startup/runtime wiring:
+   1. debounced session snapshot writes on workspace mutations,
+   2. startup applies session snapshot first and restores locales/view/search/TM/file/row when valid,
+   3. startup fallback to last-opened file remains active when snapshot context is unavailable.
+4. Added regression coverage:
+   1. `tests/test_project_session.py` extended for snapshot contracts and startup ordering,
+   2. `tests/test_main_window_bootstrap_helpers.py` extended for snapshot-first/fallback startup behavior.
+5. Validation evidence (current packet):
+   1. `make test-cr-v09`,
+   2. `pytest -q -o addopts='' tests/test_project_session.py tests/test_main_window_bootstrap_helpers.py`.
+
 ## A17-V9-QA-1 [✓] QA Rule-State Model Foundation (2026-03-04)
 
 1. Added core QA progress contracts in `translationzed_py/core/qa_service.py`:

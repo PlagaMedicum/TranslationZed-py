@@ -1,5 +1,5 @@
 # TranslationZed-Py — Code Architecture
-_Last updated: 2026-03-05_
+_Last updated: 2026-03-07_
 
 This document is the concrete code-level architecture reference.
 It complements:
@@ -170,6 +170,10 @@ classDiagram
     +apply_locale_reset_plan(...)
     +build_post_locale_startup_plan(...)
     +run_post_locale_startup_tasks(...)
+    +build_session_resume_snapshot(...)
+    +read_session_resume_snapshot(...)
+    +write_session_resume_snapshot(...)
+    +resolve_session_resume_active_path(...)
     +build_tree_rebuild_plan(...)
     +execute_cache_migration_schedule(...)
     +execute_cache_migration_batch(...)
@@ -179,6 +183,7 @@ classDiagram
   class LocaleSwitchPlan
   class LocaleResetPlan
   class PostLocaleStartupPlan
+  class SessionResumeSnapshot
   class TreeRebuildPlan
   class CacheMigrationSchedulePlan
   class CacheMigrationBatchPlan
@@ -191,6 +196,7 @@ classDiagram
   ProjectSessionService --> LocaleSwitchPlan
   ProjectSessionService --> LocaleResetPlan
   ProjectSessionService --> PostLocaleStartupPlan
+  ProjectSessionService --> SessionResumeSnapshot
   ProjectSessionService --> TreeRebuildPlan
   ProjectSessionService --> CacheMigrationSchedulePlan
   ProjectSessionService --> CacheMigrationBatchPlan
@@ -210,6 +216,8 @@ sequenceDiagram
   GUI->>PS: apply_locale_reset_plan(...callbacks...)
   GUI->>PS: build_post_locale_startup_plan(...)
   GUI->>PS: run_post_locale_startup_tasks(...)
+  GUI->>PS: read_session_resume_snapshot(...)
+  GUI->>PS: write_session_resume_snapshot(...)
   GUI->>PS: build_tree_rebuild_plan(...)
 ```
 
@@ -541,6 +549,7 @@ sequenceDiagram
   participant APP as app startup
   participant MW as MainWindow
   participant PS as project_session
+  participant SR as session_resume
   participant CR as crash-recovery service
   participant DLG as recovery dialog
 
@@ -550,6 +559,9 @@ sequenceDiagram
   MW->>DLG: show Restore/Discard/Cancel + plaintext details
   DLG-->>MW: decision
   MW->>CR: apply decision
+  MW->>SR: read/validate startup snapshot
+  MW->>PS: apply snapshot-first startup context
+  MW->>PS: fallback auto-open only when snapshot context missing
   MW->>PS: continue open flow or abort safely
 ```
 ## 10) Dependency Direction Contract

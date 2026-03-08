@@ -78,13 +78,11 @@ Command profile hint:
 4. Documentation drift between canonical and derived docs.
 5. Low-confidence modules must be flagged, queued, and refactored before deep docs.
 
-## 7) Next-Scope (v0.9.0)
+## 7) Next Scope (Deferred Stream)
 
-1. QA panel live rule-checklist status (multi-line, rule-by-rule states).
-2. TM upgrades:
-   - explainability payload and UI visibility of score decisions,
-   - workflow UX upgrades for faster triage/apply/navigation.
-3. Crash recovery UC-12 activation:
-   - startup recovery dialog with `Restore` / `Discard` / `Cancel`,
-   - plaintext details review in the same window.
-4. Full docs/API/architecture coherence for implementation-ready handoff.
+1. `A32-CRX`: project-scoped workspace session-resume snapshots.
+2. Startup ordering contract:
+   - apply session snapshot first,
+   - fallback to last-opened auto-open only when snapshot does not restore file context.
+3. Crash-recovery discard extension:
+   - discard deletes recovery cache entries and session snapshot cache file.

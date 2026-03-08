@@ -47,7 +47,7 @@ Canonical behavior still lives in:
 | v0.9 QA packet lane | `make test-qa-v09` | targeted QA packet suite (`qa_service`, `qa_progress_model`, `qa_async`, `gui_qa_panel`) |
 | v0.9 TMQ packet lane | `make test-tmq-v09` | targeted TM quality/explainability suite (`tm_query_scoring`, `tm_store`, `tm_ranking_corpus`, `tm_query_perf_contract`) |
 | v0.9 TMW packet lane | `make test-tmw-v09` | targeted TM workflow UX suite (`tm_workflow_service`, `gui_tm_preferences`) |
-| v0.9 CR packet lane | `make test-cr-v09` | targeted crash-recovery/session bootstrap suite (`project_session`, `main_window_bootstrap_helpers`) |
+| v0.9 CR packet lane | `make test-cr-v09` | targeted crash-recovery + session-resume startup suite (`project_session`, `main_window_bootstrap_helpers`) |
 | A29 SRC packet lane | `make test-src-a29` | targeted source-reference policy + GUI wiring suite (`source_reference_service`, `source_reference_policy_model`, `source_reference_state`, `source_reference_ui`, source-reference-focused `gui_tm_preferences`) |
 | A30 TZP packet lane | `make test-tzp-a30` | targeted `TZP:` comment-policy + save/workflow/preferences integration suite (`tzp_comment_policy`, parser status-comment paths, saver/file-workflow write-back contracts, `gui_tm_preferences` TZP controls) |
 | A31 manual-framework contract lane | `make test-ui-manual-contract` | machine-check scenario registry + workflow no-shrink coverage contract |

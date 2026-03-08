@@ -43,6 +43,9 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    - `tests/test_project_session.py`
 2. Startup helper integration guard:
    - `tests/test_main_window_bootstrap_helpers.py`
+3. Session-resume snapshot contracts (A32):
+   - `tests/test_project_session.py`
+   - `tests/test_main_window_bootstrap_helpers.py`
 
 ## 4) Search / Replace / Source Reference
 

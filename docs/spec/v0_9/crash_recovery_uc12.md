@@ -1,5 +1,5 @@
 # v0.9.0 Crash Recovery Contract (UC-12)
-_Last updated: 2026-03-06_
+_Last updated: 2026-03-07_
 
 ## 1) Purpose
 
@@ -9,6 +9,7 @@ Implementation status on `dev` (2026-03-06):
 1. `V9-CR-1` detection/report pipeline is implemented.
 2. `V9-CR-2` startup dialog flow is implemented.
 3. `V9-CR-3` decision-application safety guards are implemented.
+4. `A32-CRX` startup session-resume integration is implemented.
 
 ## 2) Detection Contract
 
@@ -34,16 +35,28 @@ Additional requirement:
    - continue project open flow.
 2. `Discard`
    - delete recovery-eligible cache entries (scoped to current project),
+   - delete project session snapshot cache file (`session.resume.json`),
    - continue project open flow with clean state.
 3. `Cancel`
    - abort open flow,
    - no mutation to original locale files.
+
+### 4.1 Session Resume Startup Contract
+
+1. Session resume snapshot file is project-scoped cache data:
+   - `<root>/<cache_dir>/session.resume.json`.
+2. Startup post-locale order is fixed:
+   - cache scan,
+   - session-resume apply,
+   - auto-open fallback only when snapshot does not restore file context.
+3. Snapshot schema is versioned and strictly validated; invalid or unknown-version payloads are ignored safely.
 
 ## 5) Safety Invariants
 
 1. No-write-on-open remains true.
 2. Discard must require explicit user action in recovery dialog.
 3. Restore/discard operations must be deterministic and idempotent for repeated startup attempts.
+4. Session-resume apply must remain startup-only and must not bypass no-write-on-open guarantees.
 
 ## 6) Recovery Report Schema
 
@@ -73,6 +86,7 @@ CrashRecoveryReport {
 sequenceDiagram
   participant APP as startup
   participant PS as project_session
+  participant SR as session_resume
   participant CR as recovery_service
   participant UI as recovery_dialog
 
@@ -82,6 +96,8 @@ sequenceDiagram
   APP->>UI: show Restore/Discard/Cancel + plaintext details
   UI-->>APP: user decision
   APP->>CR: apply decision
+  APP->>SR: read/validate session snapshot
+  APP->>PS: apply snapshot first, auto-open fallback if needed
   APP->>PS: continue or abort startup flow
 ```
 
@@ -98,6 +114,12 @@ sequenceDiagram
    - no file/caches unexpectedly mutated.
 4. No recovery candidates:
    - no dialog shown.
+5. Session snapshot valid:
+   - startup restores workspace state/file context first,
+   - last-opened fallback is skipped when context is restored.
+6. Session snapshot invalid/unknown version:
+   - snapshot ignored without exception leakage,
+   - startup continues with last-opened fallback behavior.
 
 ## 9) Rollback / Failure Handling
 

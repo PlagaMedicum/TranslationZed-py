@@ -5,9 +5,9 @@ _Last updated: 2026-03-07_
 
 - **Current released baseline:** `v0.8.0` (retagged on 2026-03-04 for completed release notes).
 - **Current implementation branch:** `dev`.
-- **Target milestone:** `v0.9.0` (closure completed; post-release deferred stream prep active).
-- **Latest completed milestone on `dev`:** deferred source-reference stream closure (`A29`).
-- **Current active milestone:** manual UI scenario + coverage ratchet stream (`A31`; MAN packets complete, `A31-COV-2` promoted/validated).
+- **Target milestone:** `v0.9.0` deferred-stream continuation on `dev` (`A32-CRX` active).
+- **Latest completed milestone on `dev`:** manual UI scenario + coverage ratchet stream (`A31`).
+- **Current active milestone:** crash/session-resume deferred stream (`A32`).
 
 ## 1) Milestone Closure — A28 [✓]
 
@@ -189,22 +189,48 @@ _Last updated: 2026-03-07_
    5. `make verify-fast`,
    6. `make docs-check`.
 
-## 5) Immediate Execution Order (Post-A29)
+## 5) Active Milestone — A32 [in progress]
 
-1. Keep `A29` closure evidence coherent in canonical plan/history docs.
-2. Keep `A30-TZP-1/2` evidence coherent in canonical plan/history docs.
-3. Add Makefile-first packet lane for `A30`:
-   1. `scripts/test_tzp_a30.sh`,
-   2. `make test-tzp-a30`.
-4. Keep `A30` closure evidence coherent in canonical plan/history docs.
-5. Keep A31 no-shrink/coverage gates green while adding scenarios:
-   1. `make test-ui-manual-contract`,
-   2. `make test-a31-manual`,
+### A32 selected deferred stream
+
+1. Stream lock: project-scoped session resume integrated with crash-recovery startup flow.
+2. Packetization strategy:
+   1. `A32-CRX-1`: core snapshot DTO/schema/read-write-delete contracts.
+   2. `A32-CRX-2`: startup + GUI runtime capture/apply wiring.
+   3. `A32-CRX-3`: lane/docs closure and regression guards.
+3. Safety boundary:
+   1. no-write-on-open invariant remains unchanged.
+   2. crash-recovery `Discard` also deletes session snapshot cache file.
+
+### A32 progress snapshot (2026-03-07)
+
+1. `A32-CRX-1/2` implementation is in progress on `dev`:
+   1. `core.session_resume` added (versioned snapshot schema + strict validation/fallback),
+   2. `core.project_session` startup/discard orchestration expanded for session-resume task and snapshot deletion,
+   3. startup GUI wiring adds snapshot-first apply with auto-open fallback.
+2. Crash lane evidence is green for current working tree:
+   1. `make test-cr-v09`,
+   2. `pytest -q -o addopts='' tests/test_project_session.py tests/test_main_window_bootstrap_helpers.py`.
+
+### A32 strict out-of-scope
+
+1. No broader crash-recovery architecture redesign outside project cache scope.
+2. No new third-party dependencies.
+3. No release-policy or coverage-policy changes in this packet.
+
+## 6) Immediate Execution Order (A32)
+
+1. Complete `A32-CRX-3` docs/lane closure with no behavior regressions.
+2. Keep crash lane and strict gates green:
+   1. `make test-cr-v09`,
+   2. `make verify-fast`,
    3. `make test-cov`,
-   4. `make verify-fast`,
-   5. `make docs-check`.
+   4. `make docs-check`.
+3. Preserve deferred stream sequencing after `A32`:
+   1. `A29`/`A30`/`A31` remain closed,
+   2. no reopening closed packet scopes.
 
-## 6) Non-Negotiable Constraints
+## 7) Non-Negotiable Constraints
 
 1. Canonical behavior remains defined by `docs/spec/technical.md` and `docs/ux/use_cases.md`.
 2. History docs are non-normative and must not conflict with canonical docs.

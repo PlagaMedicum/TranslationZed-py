@@ -36,6 +36,7 @@ flowchart LR
 | `parser` | tolerant decode + tokenization + span extraction | preserve source offsets for saver |
 | `saver` | span-based patch writer | do not mutate non-literal bytes |
 | `status_cache` | per-file draft/status cache | deterministic read/write; no hidden writes |
+| `session_resume` | project-scoped startup workspace snapshot persistence | strict schema/version validation with safe ignore fallback |
 | `en_diff_snapshot` | EN baseline snapshot persistence | snapshot consistency after save |
 | `en_insert_plan` | NEW-key insertion preview/apply planning | EN order + comment dedup |
 | `tm_store` + TM query modules | TM persistence + fuzzy ranking | deterministic ordering and score behavior |
@@ -108,8 +109,9 @@ sequenceDiagram
 ## 8) v0.9 Target Notes
 
 1. TM explainability payload emission is planned in `v0.9` without score/order drift.
-2. Crash-recovery report generation may extend cache-read surfaces but must preserve no-write-on-open behavior.
-3. Any new data payload must remain deterministic and explicitly schema-documented in canonical specs.
+2. Crash-recovery/session-resume startup data surfaces must preserve no-write-on-open behavior.
+3. Session-resume snapshot payload (`session.resume.json`) is project cache scoped and versioned.
+4. Any new data payload must remain deterministic and explicitly schema-documented in canonical specs.
 
 ## 9) Change-Safety Focus
 

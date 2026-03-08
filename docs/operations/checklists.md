@@ -58,7 +58,7 @@ Quick command-profile orientation:
 - **Run** `make test-tmw-v09` when touching v0.9 TM workflow triage/grouping behavior
   - Executes focused TMW packet regression suite (`tm_workflow_service`,
     `gui_tm_preferences`) through Makefile orchestration
-- **Run** `make test-cr-v09` when touching v0.9 crash-recovery detection/startup work
+- **Run** `make test-cr-v09` when touching crash-recovery/session-resume startup work
   - Executes focused CR packet regression suite (`project_session`,
     `main_window_bootstrap_helpers`) through Makefile orchestration
 - **Run** `make test-tzp-a30` when touching deferred `TZP:` status-comment policy/write-back contracts

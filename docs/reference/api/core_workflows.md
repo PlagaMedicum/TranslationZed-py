@@ -1,5 +1,5 @@
 # Core Workflows API
-_Last updated: 2026-03-05_
+_Last updated: 2026-03-07_
 
 ## 1) Why This Layer Exists
 
@@ -33,6 +33,7 @@ flowchart LR
 | Module | Purpose | Typical Entry Points |
 |---|---|---|
 | `project_session` | session bootstrap and locale/file orchestration | `build_*plan`, `apply_*result` |
+| `session_resume` | project-scoped startup snapshot DTO/schema and cache-file persistence | `build_*snapshot`, `read_*snapshot`, `write_*snapshot`, `resolve_*path` |
 | `file_workflow` | open/save/merge/cache write plans | `build_open_*`, `build_save_*`, `apply_*` |
 | `search_replace_service` | multi-scope search/replace orchestration | `build_search_plan`, `run_replace_*` |
 | `qa_service` | QA finding generation and list planning | `scan_*`, `build_panel_*` |
@@ -126,6 +127,18 @@ When not to use:
 1. do not perform path rewrite logic in GUI widgets,
 2. do not parse fallback policy/chain/preset strings directly in adapters,
 3. do not add mode-specific search/TM hacks outside this service.
+
+### 4.8 `session_resume`
+
+Why use:
+1. keep startup workspace snapshot schema/version validation centralized and Qt-free,
+2. keep snapshot read/write/delete behavior deterministic in project cache scope,
+3. avoid ad-hoc startup state files in GUI code.
+
+When not to use:
+1. do not use this module for runtime widget updates directly (GUI adapters apply snapshot),
+2. do not bypass schema validation with direct JSON parsing in adapters,
+3. do not store project-scoped resume state in global preferences.
 
 ## 5) DTO Boundaries
 
@@ -223,11 +236,28 @@ sequenceDiagram
   GUI->>CF: execute_persist_resolution(...)
 ```
 
+### 6.7 Startup session-resume chain
+
+```mermaid
+sequenceDiagram
+  participant GUI as main_window
+  participant PS as ProjectSessionService
+  participant SR as session_resume
+
+  GUI->>PS: build_post_locale_startup_plan(...)
+  GUI->>PS: run_post_locale_startup_tasks(...)
+  PS->>SR: read_session_resume_snapshot(...)
+  SR-->>GUI: SessionResumeSnapshot | none
+  GUI->>PS: apply snapshot context (locales/view/file/row)
+  GUI->>PS: auto-open fallback only when snapshot does not restore file context
+```
+
 ## 7) Scenario Map (What Calls What)
 
 1. Open/switch locale:
-   1. `project_session` builds locale/session plan,
-   2. `file_workflow` executes open/load/cache-overlay plans.
+   1. `project_session` builds locale/session plan and startup task ordering,
+   2. `session_resume` provides startup snapshot DTO/schema and persistence,
+   3. `file_workflow` executes open/load/cache-overlay plans.
 2. Save/exit:
    1. `file_workflow` builds save plan,
    2. saver/cache callbacks execute deterministic writes.
@@ -261,8 +291,10 @@ sequenceDiagram
 
 1. QA workflow orchestration will gain rule-progress snapshots and checklist state transitions.
 2. TM workflow orchestration will gain explainability payload delivery to UI adapters.
-3. Startup/open orchestration will gain crash-recovery decision routing (`Restore`/`Discard`/`Cancel`).
-4. These additions must preserve current `v0.8` deterministic ordering, no-write-on-open, and explicit error-surface contracts.
+3. Startup/open orchestration includes crash-recovery decision routing (`Restore`/`Discard`/`Cancel`).
+4. Startup post-locale flow applies session-resume snapshot first, then falls back to last-opened auto-open.
+5. Discard path removes recovery cache entries and the project session-resume snapshot.
+6. These additions must preserve current `v0.8` deterministic ordering, no-write-on-open, and explicit error-surface contracts.
 
 ## 10) Project Session API
 
@@ -362,6 +394,18 @@ Warning:
 ## 17) Source Reference Workflow API
 
 ::: translationzed_py.core.source_reference_service
+    options:
+      show_root_heading: true
+      show_root_toc_entry: true
+      members: true
+      filters:
+        - "!^__"
+      show_source: false
+      members_order: source
+
+## 18) Session Resume API
+
+::: translationzed_py.core.session_resume
     options:
       show_root_heading: true
       show_root_toc_entry: true

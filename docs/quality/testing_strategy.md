@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-07_
 
 ---
 
@@ -29,7 +29,7 @@ Quick lookup companion:
 | QA live checklist | rule-order invariants, state transitions, completion-ratio monotonicity, LT note semantics | `tests/test_qa_async.py`, `tests/test_gui_qa_panel.py`, new QA progress DTO tests |
 | TM explainability | payload correctness (`raw`, `ratio`, `bonus`, cap reasons), deterministic ordering unchanged | `tests/test_tm_query_scoring.py`, `tests/test_tm_store.py`, `tests/test_tm_ranking_corpus.py`, `tests/test_tm_query_perf_contract.py` |
 | TM workflow UX | grouping/sorting view invariants, quick-apply parity (keyboard/mouse), non-blocking empty/error states | `tests/test_tm_workflow_service.py`, `tests/test_gui_tm_preferences.py`, TM panel GUI tests |
-| Crash recovery (UC-12) | startup candidate detection, restore/discard/cancel semantics, plaintext details, no-write-on-open invariant | project-session/startup tests, new crash-recovery integration tests |
+| Crash recovery (UC-12) + session resume (A32) | startup candidate detection, restore/discard/cancel semantics, snapshot-first startup ordering, discard snapshot deletion, no-write-on-open invariant | project-session/startup tests, crash-recovery/session-resume integration tests |
 
 ---
 
@@ -104,7 +104,7 @@ Quick lookup companion:
 - Source-reference search cache guard: switching source locale invalidates
   cached source rows so Source-column search results cannot reuse stale mode data.
 - Architecture guards enforce allowed GUI->core imports and
-  `main_window.py <= 5400` line-budget threshold.
+  `main_window.py <= 5450` line-budget threshold.
 - TM architecture guard enforces refactor closure thresholds for
   `tm_store.py` (`tests/test_tm_store_structure.py`).
 - Sidebar progress integration checks:
@@ -560,7 +560,7 @@ They include:
   preparation
   before execution (covered across main-window dialog-flow tests).
 - Architecture guardrail checks: import-boundary allowlist + strict
-  `gui/main_window.py <= 5400` watchdog
+  `gui/main_window.py <= 5450` watchdog
   (`tests/test_architecture_guard.py`, `make arch-check`).
 
 **Not covered yet (automation gaps, by layer):**
