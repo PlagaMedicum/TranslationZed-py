@@ -219,9 +219,10 @@ def test_tm_grouping_selector_persists_and_renders_group_headers(
 
 
 def test_tm_explanation_panel_shows_fallback_and_explainability_payload(
-    tmp_path, qtbot
+    tmp_path, qtbot, monkeypatch
 ):
     """Verify TM explanation panel shows fallback and payload summary text."""
+    monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -782,8 +783,11 @@ def test_tm_panel_does_not_expose_locale_variants_ui(tmp_path, qtbot):
     assert not hasattr(win, "_tm_variants_list")
 
 
-def test_tm_panel_source_and_translation_previews_are_resizable(tmp_path, qtbot):
+def test_tm_panel_source_and_translation_previews_are_resizable(
+    tmp_path, qtbot, monkeypatch
+):
     """Verify tm panel keeps a single resizable splitter and explicit TM labels."""
+    monkeypatch.chdir(tmp_path)
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)

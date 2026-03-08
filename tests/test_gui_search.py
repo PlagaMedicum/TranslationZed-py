@@ -11,8 +11,9 @@ from PySide6.QtCore import Qt
 from translationzed_py.gui import MainWindow
 
 
-def test_search_selects_first_match(qtbot, tmp_path: Path):
+def test_search_selects_first_match(qtbot, tmp_path: Path, monkeypatch):
     """Verify search selects first match."""
+    monkeypatch.chdir(tmp_path)
     dst = tmp_path / "proj"
     dst.mkdir()
     for loc in ("EN", "BE"):
