@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation History
-_Last updated: 2026-03-07_
+_Last updated: 2026-03-08_
 
 > Historical execution log (non-normative).  
 > Current canonical planning scope lives in `docs/plan/implementation_active.md`.
@@ -75,7 +75,7 @@ Execution evidence log:
 2. Active planning moved to `A16` in `docs/plan/implementation_active.md` (docs-only v0.9 spec pack).
 3. Historical sections below remain as execution evidence and design lineage for future refactors.
 
-## A32-CRX [→] Project-Scoped Session Resume + Crash Integration (2026-03-07)
+## A32-CRX [✓] Project-Scoped Session Resume + Crash Integration (2026-03-08)
 
 1. Added core session-resume contract module:
    1. `translationzed_py/core/session_resume.py` with versioned DTO
@@ -93,9 +93,42 @@ Execution evidence log:
 4. Added regression coverage:
    1. `tests/test_project_session.py` extended for snapshot contracts and startup ordering,
    2. `tests/test_main_window_bootstrap_helpers.py` extended for snapshot-first/fallback startup behavior.
-5. Validation evidence (current packet):
+5. Validation evidence:
    1. `make test-cr-v09`,
-   2. `pytest -q -o addopts='' tests/test_project_session.py tests/test_main_window_bootstrap_helpers.py`.
+   2. `pytest -q -o addopts='' tests/test_project_session.py tests/test_main_window_bootstrap_helpers.py`,
+   3. `make verify-fast`,
+   4. `make docs-check`.
+
+## A33-TEST-1 [✓] Randomized/Stateful Testing Policy Uplift (2026-03-08)
+
+1. Added randomized-profile foundation for property/stateful suites:
+   1. shared profile helper `tests/hypothesis_profile.py`,
+   2. profile contract `TZP_PROP_PROFILE=fast|slow` (default `fast`).
+2. Migrated baseline property suites to profile-aware settings:
+   1. parser/saver roundtrip invariants,
+   2. search/replace equivalence invariants,
+   3. encoding-preservation save invariants.
+3. Added new randomized/stateful core-boundary suites:
+   1. project-session startup/crash invariants
+      (`tests/test_property_project_session_stateful.py`),
+   2. QA progress state-machine invariants
+      (`tests/test_property_qa_progress_stateful.py`),
+   3. TM metamorphic/filtering invariants
+      (`tests/test_property_tm_invariants.py`).
+4. Added randomized-lane Make/script orchestration:
+   1. `scripts/test_prop_fast.sh` + `make test-prop-fast`,
+   2. `scripts/test_prop_slow.sh` + `make test-prop-slow`,
+   3. heavy-extra lane now includes randomized slow sweep (`verify-heavy-extra`).
+5. Synced testing policy/orientation docs and drift guards:
+   1. testing/checklists/automation/test-surface references include randomized lanes,
+   2. docs-contract validator enforces randomized-policy snippet presence.
+6. Validation evidence:
+   1. `make test-prop-fast`,
+   2. `make test-prop-slow`,
+   3. `make test-ui-manual-contract`,
+   4. `make verify-heavy-extra`,
+   5. `make verify-fast`,
+   6. `make docs-check`.
 
 ## A17-V9-QA-1 [✓] QA Rule-State Model Foundation (2026-03-04)
 

@@ -83,9 +83,9 @@ Command profile hint:
 
 ## 7) Next Scope (Deferred Stream)
 
-1. `A32-CRX`: project-scoped workspace session-resume snapshots.
-2. Startup ordering contract:
-   - apply session snapshot first,
-   - fallback to last-opened auto-open only when snapshot does not restore file context.
-3. Crash-recovery discard extension:
-   - discard deletes recovery cache entries and session snapshot cache file.
+1. `A33-TEST-1` is closed:
+   - randomized/stateful policy lanes are active (`make test-prop-fast`, `make test-prop-slow`).
+2. Active deferred packet is `A34-UX-1`:
+   - status bar appends `Selection: mixed (N rows)` for mixed-status multi-row selections.
+3. UI-packet evidence rule remains active:
+   - attach at least one relevant manual scenario artifact under `artifacts/manual-ui/`.

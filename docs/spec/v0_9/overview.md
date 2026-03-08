@@ -1,5 +1,5 @@
 # v0.9.0 Target Specification — Overview
-_Last updated: 2026-03-06_
+_Last updated: 2026-03-08_
 
 ## 1) Purpose
 
@@ -11,12 +11,12 @@ Current/target framing:
 - Current shipped baseline: `v0.8.0`
 - Target scope: `v0.9.0`
 
-Implementation status snapshot on `dev` (2026-03-06):
+Implementation status snapshot on `dev` (2026-03-08):
 1. QA packets `V9-QA-1/2/3` are implemented.
 2. TM packets `V9-TMQ-1/2` and `V9-TMW-1/2` are implemented.
 3. Crash packets `V9-CR-1/2/3` are implemented.
 4. v0.9 closure/readiness audit (`A28`) is complete on `dev` (`docs-check`, `verify`, `verify-ci`, `release-check TAG=v0.9.0-rc1`).
-5. Next implementation stream on `dev` is deferred crash/session-resume packet `A32-CRX`.
+5. Deferred stream continuation on `dev` has `A32-CRX` and `A33-TEST-1` closed; current active packet is `A34-UX-1`.
 
 ## 2) Release Goals
 

@@ -1,13 +1,13 @@
 # TranslationZed-Py — Active Implementation Plan
-_Last updated: 2026-03-07_
+_Last updated: 2026-03-08_
 
 ## 0) Release Framing
 
 - **Current released baseline:** `v0.8.0` (retagged on 2026-03-04 for completed release notes).
 - **Current implementation branch:** `dev`.
-- **Target milestone:** `v0.9.0` deferred-stream continuation on `dev` (`A32-CRX` active).
-- **Latest completed milestone on `dev`:** manual UI scenario + coverage ratchet stream (`A31`).
-- **Current active milestone:** crash/session-resume deferred stream (`A32`).
+- **Target milestone:** `v0.9.0` deferred-stream continuation on `dev` (`A34-UX-1` active).
+- **Latest completed milestone on `dev`:** randomized/stateful testing policy uplift stream (`A33`).
+- **Current active milestone:** status-triage mixed-selection indicator packet (`A34`).
 
 ## 1) Milestone Closure — A28 [✓]
 
@@ -189,7 +189,7 @@ _Last updated: 2026-03-07_
    5. `make verify-fast`,
    6. `make docs-check`.
 
-## 5) Active Milestone — A32 [in progress]
+## 5) Milestone Closure — A32 [✓]
 
 ### A32 selected deferred stream
 
@@ -202,15 +202,20 @@ _Last updated: 2026-03-07_
    1. no-write-on-open invariant remains unchanged.
    2. crash-recovery `Discard` also deletes session snapshot cache file.
 
-### A32 progress snapshot (2026-03-07)
+### A32 progress snapshot (2026-03-08)
 
-1. `A32-CRX-1/2` implementation is in progress on `dev`:
+1. `A32-CRX-1/2` implementation landed on `dev`:
    1. `core.session_resume` added (versioned snapshot schema + strict validation/fallback),
    2. `core.project_session` startup/discard orchestration expanded for session-resume task and snapshot deletion,
    3. startup GUI wiring adds snapshot-first apply with auto-open fallback.
-2. Crash lane evidence is green for current working tree:
+2. `A32-CRX-3` docs/lane closure is complete:
+   1. startup ordering and discard semantics are synced in plan/history/spec references,
+   2. crash lane and startup-helper regression suites include session-resume coverage.
+3. Crash lane evidence is green:
    1. `make test-cr-v09`,
-   2. `pytest -q -o addopts='' tests/test_project_session.py tests/test_main_window_bootstrap_helpers.py`.
+   2. `pytest -q -o addopts='' tests/test_project_session.py tests/test_main_window_bootstrap_helpers.py`,
+   3. `make verify-fast`,
+   4. `make docs-check`.
 
 ### A32 strict out-of-scope
 
@@ -218,19 +223,76 @@ _Last updated: 2026-03-07_
 2. No new third-party dependencies.
 3. No release-policy or coverage-policy changes in this packet.
 
-## 6) Immediate Execution Order (A32)
+## 6) Milestone Closure — A33 [✓]
 
-1. Complete `A32-CRX-3` docs/lane closure with no behavior regressions.
-2. Keep crash lane and strict gates green:
-   1. `make test-cr-v09`,
-   2. `make verify-fast`,
-   3. `make test-cov`,
-   4. `make docs-check`.
-3. Preserve deferred stream sequencing after `A32`:
-   1. `A29`/`A30`/`A31` remain closed,
+### A33 selected deferred stream
+
+1. Stream lock: Niri-inspired randomized/stateful testing policy uplift.
+2. Packetized scope:
+   1. randomized-profile contract (`TZP_PROP_PROFILE=fast|slow`) and shared profile helper,
+   2. new core-boundary randomized/stateful suites for session, QA progress, and TM invariants,
+   3. heavy lane integration (`verify-heavy-extra` includes slow randomized sweep),
+   4. docs-policy uplift with explicit UI packet manual-scenario artifact requirement.
+3. Safety boundary:
+   1. no shrink of deterministic/unit/manual automated surface,
+   2. coverage thresholds stay at `translationzed_py>=92%`, `core>=97%`.
+
+### A33 progress snapshot (2026-03-08)
+
+1. Randomized/stateful foundation landed:
+   1. `tests/hypothesis_profile.py`,
+   2. migrated baseline property suites,
+   3. added stateful suites:
+      - `tests/test_property_project_session_stateful.py`,
+      - `tests/test_property_qa_progress_stateful.py`,
+      - `tests/test_property_tm_invariants.py`.
+2. New randomized lanes are wired:
+   1. `make test-prop-fast`,
+   2. `make test-prop-slow`,
+   3. `make verify-heavy-extra` includes `test-prop-slow`.
+3. Docs and drift guards are synced:
+   1. testing/checklist/automation/test-surface docs include randomized lane guidance,
+   2. docs-contract validator enforces randomized-policy surface snippets.
+4. Acceptance evidence is green:
+   1. `make test-prop-fast`,
+   2. `make test-prop-slow`,
+   3. `make test-ui-manual-contract`,
+   4. `make verify-heavy-extra`,
+   5. `make verify-fast`,
+   6. `make docs-check`.
+
+## 7) Active Milestone — A34 [in progress]
+
+### A34 selected deferred stream
+
+1. Stream lock: status-triage UX deferred-item closure (`A34-UX-1`).
+2. Packet scope:
+   1. status-bar mixed-selection projection:
+      - append `Selection: mixed (N rows)` only for multi-row mixed-status selection,
+      - keep single-row/uniform/empty selection text unchanged.
+   2. packet lane:
+      - `make test-status-a34`.
+   3. manual scenario evidence:
+      - add dedicated status-triage mixed-selection scenario in registry.
+3. Safety boundary:
+   1. no core data-model or persistence-schema changes,
+   2. locale-agnostic production UI copy policy remains mandatory.
+
+## 8) Immediate Execution Order (A34)
+
+1. Implement `A34-UX-1` in panel helper layer only (no broader GUI refactor).
+2. Keep UI packet evidence strict:
+   1. `make test-status-a34`,
+   2. `make test-ui-manual-contract`,
+   3. `make ui-manual-run SCENARIO=status-triage-mixed-indicator`.
+3. Keep umbrella strict gates green:
+   1. `make verify-fast`,
+   2. `make docs-check`.
+4. Preserve deferred stream sequencing after `A34`:
+   1. `A29`/`A30`/`A31`/`A32`/`A33` remain closed,
    2. no reopening closed packet scopes.
 
-## 7) Non-Negotiable Constraints
+## 9) Non-Negotiable Constraints
 
 1. Canonical behavior remains defined by `docs/spec/technical.md` and `docs/ux/use_cases.md`.
 2. History docs are non-normative and must not conflict with canonical docs.
