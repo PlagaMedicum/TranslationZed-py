@@ -816,6 +816,7 @@ class MainWindow(QMainWindow):
         self._tm_rebuild_timer.setSingleShot(False)
         self._tm_rebuild_timer.setInterval(100)
         self._tm_rebuild_timer.timeout.connect(self._poll_tm_rebuild)
+        _panel_helpers._init_session_resume_runtime(self)
 
         self._main_splitter = QSplitter(Qt.Vertical, self)
         self._content_splitter = QSplitter(Qt.Horizontal, self)
@@ -906,6 +907,9 @@ class MainWindow(QMainWindow):
         self.search_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.search_edit.setMinimumWidth(320)
         self.search_edit.textChanged.connect(self._on_search_controls_changed)
+        self.search_edit.textChanged.connect(
+            lambda _text: _panel_helpers._schedule_session_resume_snapshot(self)
+        )
         self.search_edit.returnPressed.connect(self._trigger_search)
         self.toolbar.addWidget(self.search_edit)
         self.search_prev_btn = QToolButton(self)
@@ -959,6 +963,9 @@ class MainWindow(QMainWindow):
         self.replace_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.replace_edit.setMinimumWidth(self.search_edit.minimumWidth())
         self.replace_edit.textChanged.connect(self._update_replace_enabled)
+        self.replace_edit.textChanged.connect(
+            lambda _text: _panel_helpers._schedule_session_resume_snapshot(self)
+        )
         self.replace_toolbar.addWidget(self.replace_edit)
         self.replace_btn = QToolButton(self)
         self.replace_btn.setIcon(
@@ -1104,6 +1111,9 @@ class MainWindow(QMainWindow):
             toggle_layout.addWidget(btn)
         toggle_layout.addStretch(1)
         self._left_group.buttonClicked.connect(self._on_left_panel_changed)
+        self._left_group.buttonClicked.connect(
+            lambda _button: _panel_helpers._schedule_session_resume_snapshot(self)
+        )
         self._left_stack = QStackedWidget(self._left_panel)
         self.tree = QTreeView()
         self._init_locales(
@@ -1546,6 +1556,9 @@ class MainWindow(QMainWindow):
         self.detail_toggle.setToolButtonStyle(Qt.ToolButtonIconOnly)
         self._update_detail_toggle(False)
         self.detail_toggle.toggled.connect(self._toggle_detail_panel)
+        self.detail_toggle.toggled.connect(
+            lambda _checked: _panel_helpers._schedule_session_resume_snapshot(self)
+        )
         self._detail_counter_label = QLabel("", self)
         self._detail_counter_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self._detail_counter_label.setToolTip(
@@ -3801,6 +3814,7 @@ class MainWindow(QMainWindow):
             selected_locales=self._selected_locales
         )
         self._pending_post_locale_plan = plan
+        _panel_helpers._schedule_session_resume_snapshot(self)
         if not plan.should_schedule:
             return
         if self._post_locale_timer.isActive():
@@ -3815,6 +3829,7 @@ class MainWindow(QMainWindow):
                 selected_locales=self._selected_locales
             )
         if not plan.should_schedule:
+            _panel_helpers._complete_session_resume_startup(self)
             return
         perf_trace = PERF_TRACE
         perf_start = perf_trace.start("startup")
@@ -3823,9 +3838,13 @@ class MainWindow(QMainWindow):
             executed = self._project_session_service.run_post_locale_startup_tasks(
                 plan=plan,
                 run_cache_scan=self._mark_cached_dirty,
+                run_session_resume=lambda: _panel_helpers._apply_session_resume_snapshot(
+                    self
+                ),
                 run_auto_open=self._auto_open_last_file,
             )
         finally:
+            _panel_helpers._complete_session_resume_startup(self)
             perf_trace.stop("startup", perf_start, items=executed, unit="tasks")
 
     def _hash_for_cache(
@@ -5298,6 +5317,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         """Guard close with save flow checks and worker shutdown."""
+        if getattr(self, "_startup_aborted", False):
+            event.accept()
+            return
         if self._merge_active:
             event.ignore()
             return
@@ -5310,6 +5332,7 @@ class MainWindow(QMainWindow):
         ):
             event.ignore()
             return
+        _panel_helpers._flush_session_resume_snapshot(self)
         self._stop_timers()
         if self._system_theme_sync_connected:
             _disconnect_system_theme_sync(self._on_system_color_scheme_changed)
@@ -5382,6 +5405,7 @@ class MainWindow(QMainWindow):
             self._tooltip_timer,
             self._tree_width_timer,
             self._post_locale_timer,
+            self._session_resume_timer,
             self._qa_refresh_timer,
             self._qa_scan_timer,
             self._lt_debounce_timer,

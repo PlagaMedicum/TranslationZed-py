@@ -74,6 +74,7 @@ from .tm_preview import apply_tm_preview_highlights as _apply_tm_preview_highlig
 from .tm_preview import prepare_tm_preview_terms as _prepare_tm_preview_terms
 
 _PROGRESS_POLL_INTERVAL_MS = 70
+_SESSION_RESUME_WRITE_DEBOUNCE_MS = 280
 
 
 def _run_startup_recovery(win) -> bool:
@@ -1177,6 +1178,264 @@ def _schedule_post_startup_hooks(win) -> None:
         QTimer.singleShot(0, lambda: _show_manual_scenario_dialog(win))
 
 
+def _init_session_resume_runtime(win) -> None:
+    if hasattr(win, "_session_resume_timer") and win._session_resume_timer is not None:
+        return
+    win._session_resume_timer = QTimer(win)
+    win._session_resume_timer.setSingleShot(True)
+    win._session_resume_timer.setInterval(_SESSION_RESUME_WRITE_DEBOUNCE_MS)
+    win._session_resume_timer.timeout.connect(
+        lambda: _flush_session_resume_snapshot(win)
+    )
+    win._session_resume_startup_pending = True
+    win._session_resume_apply_in_progress = False
+    win._session_resume_write_pending = False
+
+
+def _complete_session_resume_startup(win) -> None:
+    if not bool(getattr(win, "_session_resume_startup_pending", False)):
+        return
+    win._session_resume_startup_pending = False
+    _schedule_session_resume_snapshot(win)
+
+
+def _schedule_session_resume_snapshot(win) -> None:
+    timer = getattr(win, "_session_resume_timer", None)
+    if timer is None:
+        return
+    if bool(getattr(win, "_startup_aborted", False)):
+        return
+    if bool(getattr(win, "_session_resume_startup_pending", False)):
+        return
+    if bool(getattr(win, "_session_resume_apply_in_progress", False)):
+        return
+    win._session_resume_write_pending = True
+    if timer.isActive():
+        timer.stop()
+    timer.start()
+
+
+def _flush_session_resume_snapshot(win) -> None:
+    if not bool(getattr(win, "_session_resume_write_pending", False)):
+        return
+    win._session_resume_write_pending = False
+    if bool(getattr(win, "_session_resume_startup_pending", False)):
+        return
+    if bool(getattr(win, "_session_resume_apply_in_progress", False)):
+        return
+    try:
+        snapshot = _build_session_resume_snapshot(win)
+        win._project_session_service.write_session_resume_snapshot(
+            root=win._root,
+            snapshot=snapshot,
+        )
+    except Exception:
+        return
+
+
+def _build_session_resume_snapshot(win):
+    current = getattr(win, "_current_pf", None)
+    active_file_relpath = None
+    if current is not None:
+        with contextlib.suppress(Exception):
+            active_file_relpath = current.path.relative_to(win._root).as_posix()
+    active_row = None
+    if getattr(win, "_current_model", None) is not None:
+        current_index = win.table.currentIndex()
+        if current_index.isValid():
+            active_row = int(current_index.row())
+    left_panel_index = 0
+    left_stack = getattr(win, "_left_stack", None)
+    if left_stack is not None:
+        left_panel_index = max(0, int(left_stack.currentIndex()))
+    detail_panel = getattr(win, "_detail_panel", None)
+    detail_visible = bool(detail_panel is not None and detail_panel.isVisible())
+    search_text = win.search_edit.text() if getattr(win, "search_edit", None) else ""
+    replace_text = win.replace_edit.text() if getattr(win, "replace_edit", None) else ""
+    return win._project_session_service.build_session_resume_snapshot(
+        generated_at_ms=int(time.time() * 1000),
+        selected_locales=list(getattr(win, "_selected_locales", [])),
+        active_file_relpath=active_file_relpath,
+        active_row=active_row,
+        left_panel_index=left_panel_index,
+        detail_visible=detail_visible,
+        search_text=search_text,
+        replace_text=replace_text,
+        search_case_sensitive=bool(getattr(win, "_search_case_sensitive", False)),
+        tm_min_score=int(getattr(win, "_tm_min_score", 50)),
+        tm_grouping_mode=str(getattr(win, "_tm_grouping", "none")),
+        tm_origin_project=bool(getattr(win, "_tm_origin_project", True)),
+        tm_origin_import=bool(getattr(win, "_tm_origin_import", True)),
+    )
+
+
+def _apply_session_resume_snapshot(win) -> bool:
+    if not bool(getattr(win, "_session_resume_startup_pending", False)):
+        return False
+    snapshot = win._project_session_service.read_session_resume_snapshot(root=win._root)
+    if snapshot is None:
+        return False
+    win._session_resume_apply_in_progress = True
+    try:
+        _apply_session_resume_locales(win, snapshot.selected_locales)
+        _apply_session_resume_panel_state(win, int(snapshot.left_panel_index))
+        _apply_session_resume_detail_visibility(win, bool(snapshot.detail_visible))
+        _apply_session_resume_search_state(
+            win,
+            search_text=str(snapshot.search_text),
+            replace_text=str(snapshot.replace_text),
+            search_case_sensitive=bool(snapshot.search_case_sensitive),
+        )
+        _apply_session_resume_tm_state(
+            win,
+            tm_min_score=int(snapshot.tm_min_score),
+            tm_grouping_mode=str(snapshot.tm_grouping_mode),
+            tm_origin_project=bool(snapshot.tm_origin_project),
+            tm_origin_import=bool(snapshot.tm_origin_import),
+        )
+        return _apply_session_resume_active_context(
+            win,
+            active_file_relpath=snapshot.active_file_relpath,
+            active_row=snapshot.active_row,
+        )
+    except Exception:
+        return False
+    finally:
+        win._session_resume_apply_in_progress = False
+
+
+def _apply_session_resume_locales(win, selected_locales: Sequence[str]) -> None:
+    if not selected_locales:
+        return
+    plan = win._project_session_service.build_locale_switch_plan(
+        requested_locales=selected_locales,
+        available_locales=win._locales.keys(),
+        current_locales=win._selected_locales,
+    )
+    if plan is None or not plan.should_apply:
+        return
+    win._selected_locales = list(plan.selected_locales)
+    win._sync_source_reference_mode(persist=False)
+    if plan.reset_session_state:
+        reset_plan = win._project_session_service.build_locale_reset_plan()
+        win._apply_locale_reset_plan(reset_plan)
+    tree_plan = win._project_session_service.build_tree_rebuild_plan(
+        selected_locales=win._selected_locales,
+        resize_splitter=False,
+    )
+    win._rebuild_tree_for_selected_locales(tree_plan=tree_plan)
+    win._tm_bootstrap_pending = plan.tm_bootstrap_pending
+
+
+def _apply_session_resume_panel_state(win, panel_index: int) -> None:
+    if not hasattr(win, "_left_stack"):
+        return
+    count = int(win._left_stack.count())
+    if count <= 0:
+        return
+    target_index = max(0, min(int(panel_index), count - 1))
+    button = win._left_group.button(target_index)
+    if button is None:
+        win._left_stack.setCurrentIndex(target_index)
+        return
+    if not button.isChecked():
+        button.setChecked(True)
+    win._on_left_panel_changed(button)
+
+
+def _apply_session_resume_detail_visibility(win, detail_visible: bool) -> None:
+    if not hasattr(win, "detail_toggle"):
+        return
+    if bool(win.detail_toggle.isChecked()) != bool(detail_visible):
+        win.detail_toggle.setChecked(bool(detail_visible))
+    else:
+        win._toggle_detail_panel(bool(detail_visible))
+
+
+def _apply_session_resume_search_state(
+    win,
+    *,
+    search_text: str,
+    replace_text: str,
+    search_case_sensitive: bool,
+) -> None:
+    if hasattr(win, "search_edit") and win.search_edit.text() != search_text:
+        win.search_edit.setText(search_text)
+    if hasattr(win, "replace_edit") and win.replace_edit.text() != replace_text:
+        win.replace_edit.setText(replace_text)
+    win._search_case_sensitive = bool(search_case_sensitive)
+    win._prefs_extras["SEARCH_CASE_SENSITIVE"] = (
+        "true" if win._search_case_sensitive else "false"
+    )
+    if hasattr(win, "search_case_btn"):
+        win.search_case_btn.blockSignals(True)
+        try:
+            win.search_case_btn.setChecked(win._search_case_sensitive)
+        finally:
+            win.search_case_btn.blockSignals(False)
+    win._update_case_toggle_ui()
+    win._on_search_controls_changed()
+
+
+def _apply_session_resume_tm_state(
+    win,
+    *,
+    tm_min_score: int,
+    tm_grouping_mode: str,
+    tm_origin_project: bool,
+    tm_origin_import: bool,
+) -> None:
+    plan = win._tm_workflow.build_filter_plan(
+        source_locale=win._tm_source_locale,
+        min_score=int(tm_min_score),
+        origin_project=bool(tm_origin_project),
+        origin_import=bool(tm_origin_import),
+        grouping=tm_grouping_mode,
+    )
+    win._tm_apply_filter_plan(plan)
+    win._schedule_tm_update()
+
+
+def _apply_session_resume_active_context(
+    win,
+    *,
+    active_file_relpath: str | None,
+    active_row: int | None,
+) -> bool:
+    path = win._project_session_service.resolve_session_resume_active_path(
+        root=win._root,
+        active_file_relpath=active_file_relpath,
+    )
+    if path is None or not path.exists():
+        return False
+    index = win.fs_model.index_for_path(path)
+    if not index.isValid():
+        return False
+    win._file_chosen(index)
+    if (
+        win._current_pf is None
+        or win._current_pf.path != path
+        or win._current_model is None
+    ):
+        return False
+    if active_row is None:
+        return True
+    row = int(active_row)
+    if row < 0 or row >= win._current_model.rowCount():
+        return False
+    column = 2 if win._current_model.columnCount() > 2 else 0
+    model_index = win._current_model.index(row, column)
+    selection = win.table.selectionModel()
+    if selection is None:
+        return False
+    selection.setCurrentIndex(
+        model_index,
+        QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+    )
+    win.table.scrollTo(model_index, QAbstractItemView.PositionAtCenter)
+    return True
+
+
 def _save_parsed_file_with_writeback(
     _win,
     parsed_file,
@@ -1322,6 +1581,7 @@ def _on_selection_changed(win, current, previous) -> None:
             win._sync_detail_editors()
         win._update_status_bar()
         win._schedule_tm_update()
+        _schedule_session_resume_snapshot(win)
     finally:
         perf_trace.stop("selection", perf_start, items=1, unit="events")
 
@@ -1551,6 +1811,7 @@ def _on_tm_filters_changed(win) -> None:
     win._tm_apply_filter_plan(plan)
     win._persist_preferences()
     win._update_tm_suggestions()
+    _schedule_session_resume_snapshot(win)
 
 
 def _current_tm_lookup(win) -> tuple[str, str] | None:
@@ -1835,6 +2096,7 @@ def _update_status_bar(win) -> None:
     win.statusBar().showMessage(" | ".join(parts))
     _refresh_progress_ui(win)
     win._update_scope_indicators()
+    _schedule_session_resume_snapshot(win)
 
 
 def _update_scope_indicators(win) -> None:

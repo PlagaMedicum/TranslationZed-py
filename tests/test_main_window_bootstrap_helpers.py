@@ -870,6 +870,118 @@ def test_main_window_startup_aborts_when_crash_recovery_is_cancelled(
     assert win._startup_aborted is True
 
 
+def test_run_post_locale_tasks_prefers_session_resume_before_auto_open(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify startup post-locale flow runs session-resume before auto-open fallback."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._post_locale_timer.stop()
+    win._pending_post_locale_plan = (
+        win._project_session_service.build_post_locale_startup_plan(
+            selected_locales=["BE"]
+        )
+    )
+    win._session_resume_startup_pending = True
+    calls: list[str] = []
+    monkeypatch.setattr(win, "_mark_cached_dirty", lambda: calls.append("scan"))
+    monkeypatch.setattr(win, "_auto_open_last_file", lambda: calls.append("open"))
+    monkeypatch.setattr(
+        mw._panel_helpers,
+        "_apply_session_resume_snapshot",
+        lambda _win: (calls.append("resume"), True)[1],
+    )
+
+    win._run_post_locale_tasks()
+
+    assert calls == ["scan", "resume"]
+    assert win._session_resume_startup_pending is False
+
+
+def test_run_post_locale_tasks_falls_back_to_auto_open_when_resume_not_applied(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify startup post-locale flow runs auto-open when resume apply returns false."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._post_locale_timer.stop()
+    win._pending_post_locale_plan = (
+        win._project_session_service.build_post_locale_startup_plan(
+            selected_locales=["BE"]
+        )
+    )
+    win._session_resume_startup_pending = True
+    calls: list[str] = []
+    monkeypatch.setattr(win, "_mark_cached_dirty", lambda: calls.append("scan"))
+    monkeypatch.setattr(win, "_auto_open_last_file", lambda: calls.append("open"))
+    monkeypatch.setattr(
+        mw._panel_helpers,
+        "_apply_session_resume_snapshot",
+        lambda _win: (calls.append("resume"), False)[1],
+    )
+
+    win._run_post_locale_tasks()
+
+    assert calls == ["scan", "resume", "open"]
+    assert win._session_resume_startup_pending is False
+
+
+def test_apply_session_resume_snapshot_restores_file_row_and_keeps_no_write_on_open(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify session-resume apply restores context without forcing cache write on open."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._post_locale_timer.stop()
+    win._pending_post_locale_plan = None
+    win._session_resume_startup_pending = True
+    snapshot = win._project_session_service.build_session_resume_snapshot(
+        generated_at_ms=1,
+        selected_locales=["BE"],
+        active_file_relpath="BE/ui.txt",
+        active_row=0,
+        left_panel_index=0,
+        detail_visible=True,
+        search_text="query",
+        replace_text="replace",
+        search_case_sensitive=True,
+        tm_min_score=70,
+        tm_grouping_mode="origin",
+        tm_origin_project=True,
+        tm_origin_import=False,
+    )
+    win._project_session_service.write_session_resume_snapshot(
+        root=win._root,
+        snapshot=snapshot,
+    )
+    writes: list[str] = []
+    monkeypatch.setattr(
+        win,
+        "_write_cache_current",
+        lambda: (writes.append("write"), True)[1],
+    )
+
+    applied = mw._panel_helpers._apply_session_resume_snapshot(win)
+
+    assert applied is True
+    assert writes == ["write"]
+    assert win._current_pf is not None
+    assert win._current_pf.path == root / "BE" / "ui.txt"
+    assert win.table.currentIndex().isValid()
+    assert win.table.currentIndex().row() == 0
+    assert win.search_edit.text() == "query"
+    assert win.replace_edit.text() == "replace"
+
+
 def test_warn_orphan_caches_purge_deletes_existing_and_ignores_unlink_errors(
     qtbot,
     tmp_path,

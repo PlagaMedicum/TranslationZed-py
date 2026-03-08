@@ -111,12 +111,14 @@ def test_post_locale_startup_and_migration_timer_helpers(
             *,
             plan,
             run_cache_scan,
+            run_session_resume,
             run_auto_open,
         ):  # type: ignore[no-untyped-def]
             calls.append(("run", bool(plan.should_schedule)))
             run_cache_scan()
+            run_session_resume()
             run_auto_open()
-            return 2
+            return 3
 
     monkeypatch.setattr(win, "_project_session_service", _SpyService())
     executed: list[str] = []
