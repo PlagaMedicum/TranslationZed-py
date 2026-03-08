@@ -882,6 +882,65 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
     assert indicator_widget.toolTip() == "Replace scope: Locale"
 
 
+def test_update_status_bar_appends_mixed_selection_indicator(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Status bar should surface mixed multi-row status selection context."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    shown_messages: list[str] = []
+    monkeypatch.setattr(
+        win.statusBar(),
+        "showMessage",
+        lambda text: shown_messages.append(str(text)),
+    )
+    monkeypatch.setattr(win, "_update_scope_indicators", lambda: None)
+
+    class _Index:
+        @staticmethod
+        def isValid() -> bool:  # noqa: N802
+            return True
+
+        @staticmethod
+        def row() -> int:
+            return 2
+
+    class _RowModel:
+        statuses = {
+            1: Status.UNTOUCHED,
+            2: Status.FOR_REVIEW,
+            3: Status.UNTOUCHED,
+        }
+
+        @staticmethod
+        def rowCount() -> int:  # noqa: N802
+            return 7
+
+        @classmethod
+        def status_for_row(cls, row: int):  # type: ignore[no-untyped-def]
+            return cls.statuses.get(row)
+
+    win._current_model = _RowModel()  # type: ignore[assignment]
+    win._current_pf = None
+    monkeypatch.setattr(win.table, "currentIndex", lambda: _Index(), raising=False)
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [1, 2], raising=False)
+    win._update_status_bar()
+    assert "Selection: mixed (2 rows)" in shown_messages[-1]
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [1, 3], raising=False)
+    win._update_status_bar()
+    assert "Selection: mixed" not in shown_messages[-1]
+
+    monkeypatch.setattr(win, "_selected_rows", lambda: [2], raising=False)
+    win._update_status_bar()
+    assert "Selection: mixed" not in shown_messages[-1]
+
+
 def test_status_apply_helpers_cover_row_filtering_and_qa_auto_mark_paths(
     qtbot,
     tmp_path,

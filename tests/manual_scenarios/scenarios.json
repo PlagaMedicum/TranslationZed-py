@@ -154,6 +154,31 @@
         "tests/test_tzp_comment_policy.py",
         "tests/test_saver.py"
       ]
+    },
+    {
+      "id": "status-triage-mixed-indicator",
+      "title": "Status triage mixed-selection status-bar indicator",
+      "fixture_root": "conflict_manual",
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open BE/ui.txt and select multiple rows with different status values.",
+        "Use toolbar status actions to keep at least two selected rows in different statuses.",
+        "Observe status bar while mixed selection stays active.",
+        "Switch selection to a single row and then to uniform multi-row selection."
+      ],
+      "expected_checks": [
+        "Status bar shows Selection: mixed (N rows) only for mixed multi-row selection.",
+        "Indicator is not shown for single-row selection.",
+        "Indicator is not shown for uniform multi-row status selection."
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_main_window_cache_replace_helpers.py",
+        "tests/test_gui_service_adapters.py"
+      ]
     }
   ]
 }

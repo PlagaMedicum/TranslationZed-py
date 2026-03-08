@@ -2075,6 +2075,22 @@ def _selected_rows(win) -> list[int]:
     return sorted(rows)
 
 
+def _mixed_selection_status_text(win) -> str | None:
+    if not win._current_model:
+        return None
+    status_for_row = getattr(win._current_model, "status_for_row", None)
+    if not callable(status_for_row):
+        return None
+    rows = win._selected_rows()
+    if len(rows) < 2:
+        return None
+    statuses = {status_for_row(row) for row in rows}
+    statuses.discard(None)
+    if len(statuses) <= 1:
+        return None
+    return f"Selection: mixed ({len(rows)} rows)"
+
+
 def _update_status_bar(win) -> None:
     parts: list[str] = []
     if win._last_saved_text:
@@ -2085,6 +2101,8 @@ def _update_status_bar(win) -> None:
         idx = win.table.currentIndex()
         if idx.isValid():
             parts.append(f"Row {idx.row() + 1} / {win._current_model.rowCount()}")
+    if mixed_selection := _mixed_selection_status_text(win):
+        parts.append(mixed_selection)
     if win._current_pf:
         try:
             rel = win._current_pf.path.relative_to(win._root)
