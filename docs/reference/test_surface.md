@@ -1,5 +1,5 @@
 # TranslationZed-Py — Test Surface
-_Last updated: 2026-03-07_
+_Last updated: 2026-03-08_
 
 ## 1) Purpose
 
@@ -23,6 +23,19 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    - `tests/test_encoding_diagnostics.py`
    - `tests/test_property_encoding_invariants.py`
    - `tests/test_gui_save_encoding.py`
+
+## 2.1) Randomized / Stateful Invariants
+
+1. Property profile helper:
+   - `tests/hypothesis_profile.py`
+2. Parser/saver/search baseline property suites:
+   - `tests/test_property_parser_saver.py`
+   - `tests/test_property_search_replace.py`
+   - `tests/test_property_encoding_invariants.py`
+3. Stateful orchestration suites:
+   - `tests/test_property_project_session_stateful.py`
+   - `tests/test_property_qa_progress_stateful.py`
+   - `tests/test_property_tm_invariants.py`
 
 ## 3) Open / Save / Session / Conflict
 
@@ -121,3 +134,5 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 11. A31 no-shrink contract gate: `make test-ui-manual-contract`
 12. A31 focused manual-framework suite: `make test-a31-manual`
 13. Coverage promotion checker contract suite: `make test-cov-promotion-contract`
+14. Randomized/property fast profile: `make test-prop-fast`
+15. Randomized/property slow profile: `make test-prop-slow`

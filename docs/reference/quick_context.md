@@ -1,5 +1,5 @@
 # TranslationZed-Py — Quick Context
-_Last updated: 2026-03-07_
+_Last updated: 2026-03-08_
 
 ## 1) What This Project Is
 
@@ -60,6 +60,8 @@ Current/target framing:
 - Perf contract lane: `make test-perf-scale`
 - A31 no-shrink contract gate: `make test-ui-manual-contract`
 - A31 focused test lane: `make test-a31-manual`
+- Randomized/property fast lane: `make test-prop-fast` (`TZP_PROP_PROFILE=fast`)
+- Randomized/property slow lane: `make test-prop-slow` (`TZP_PROP_PROFILE=slow`)
 - Strict coverage lane: `make test-cov` (`translationzed_py>=92%`, `core>=97%`)
 - Coverage promotion readiness: `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='<run1.json> <run2.json>'`
 
@@ -69,6 +71,7 @@ Command profile hint:
 2. Use `make verify-ci` for strict CI parity.
 3. Use `make locale-agnostic-check` when touching production UI text or guidance docs.
 4. Use `make verify-heavy` only when heavy mutation/perf evidence is needed.
+5. Use `make test-prop-slow` before heavy merges that touch core orchestration/state machines.
 
 ## 6) Known High-Risk Areas
 

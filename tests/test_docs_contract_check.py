@@ -385,3 +385,30 @@ def test_quick_context_orientation_links_pass_with_paths(tmp_path: Path) -> None
     )
     errors = module._validate_quick_context_orientation_links(docs_root)
     assert errors == []
+
+
+def test_randomized_policy_surface_detects_missing_snippets(tmp_path: Path) -> None:
+    """Randomized policy docs should fail when required snippets are absent."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel in module.RANDOMIZED_POLICY_SNIPPETS:
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# Placeholder\n", encoding="utf-8")
+    errors = module._validate_randomized_policy_surface(docs_root)
+    assert errors
+    assert any("missing randomized/stateful policy snippet" in err for err in errors)
+
+
+def test_randomized_policy_surface_passes_with_required_snippets(
+    tmp_path: Path,
+) -> None:
+    """Randomized policy docs should pass when required snippets are present."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel, snippets in module.RANDOMIZED_POLICY_SNIPPETS.items():
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
+    errors = module._validate_randomized_policy_surface(docs_root)
+    assert errors == []

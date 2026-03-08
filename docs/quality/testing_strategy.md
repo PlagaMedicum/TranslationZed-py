@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-03-07_
+_Last updated: 2026-03-08_
 
 ---
 
@@ -260,10 +260,29 @@ Quick lookup companion:
   `make fmt-check` (CI/release lanes).
 
 ### 2.9 Property and mutation testing
+- Randomized-profile contract (Hypothesis):
+    - `TZP_PROP_PROFILE=fast|slow` (default: `fast`).
+    - Shared profile helper: `tests/hypothesis_profile.py`.
+    - `fast` profile is strict-and-practical for local iteration.
+    - `slow` profile is deeper exploration for heavy/scheduled evidence lanes.
+- Dedicated randomized lanes:
+    - `make test-prop-fast` runs profile-scoped randomized/property suites.
+    - `make test-prop-slow` runs the same suites at higher example/step budgets.
+    - Heavy strict randomized sweep is enforced via `make verify-heavy-extra`
+      (includes `make test-prop-slow`).
+- Randomized/stateful stratum mapping is normative:
+    - Core workflow/state-machine changes require deterministic tests plus
+      randomized/stateful invariants on core/service boundaries.
+    - UI-facing changes require automated tests plus at least one relevant manual
+      scenario run artifact from the A31 framework (`artifacts/manual-ui/*.json`).
 - Property-based tests (Hypothesis) are part of the default suite for:
     - parser/saver round-trip invariants,
     - encoding preservation invariants on save,
     - literal search/replace transformation equivalence.
+- Stateful randomized suites additionally cover:
+    - project-session startup/crash orchestration invariants,
+    - QA rule-progress transition invariants,
+    - TM filtering/metamorphic invariants (origin + min-score monotonicity).
 - Mutation testing is configured for critical core modules:
   `parser`, `saver`, `status_cache`, `project_session`, `save_exit_flow`,
   `conflict_service`, `search_replace_service`.

@@ -1,4 +1,4 @@
-_Last updated: 2026-03-07_
+_Last updated: 2026-03-08_
 
 # Checklists
 
@@ -72,6 +72,11 @@ Quick command-profile orientation:
   - Executes focused A31 suite (`manual_scenario_runtime`, runner/contracts, checklist dialog/startup helpers)
 - **Run** `make test-cov-promotion-contract` when touching coverage ratchet/promotion checker scripts
   - Executes focused coverage-promotion checker suite (`tests/test_coverage_promotion_check.py`)
+- **Run** `make test-prop-fast` when touching core orchestration/state-machine logic
+  - Executes randomized/stateful invariants in fast profile (`TZP_PROP_PROFILE=fast`)
+- **Run** `make test-prop-slow` for deeper randomized evidence before heavy merges
+  or when validating scheduled/heavy-lane parity
+  - Executes the same randomized/stateful suites in slow profile (`TZP_PROP_PROFILE=slow`)
 - **Run** `make locale-agnostic-check` when touching production UI copy or contributor guidance docs
   - Hard-fail guard for locale-agnostic policy in production GUI strings and canonical docs guidance text
   - Tests/fixtures are exempt; use allowlist marker `locale-agnostic: allow` only for narrow technical exceptions
@@ -79,6 +84,8 @@ Quick command-profile orientation:
   - `make ui-manual-list`
   - `make ui-manual-run SCENARIO=<id>`
   - `make ui-manual-batch SCENARIOS=<id1,id2,...>`
+  - For UI-facing packets, attach at least one relevant scenario result artifact
+    (`artifacts/manual-ui/*.json`) in PR evidence; backend-only packets are exempt
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
   with CI (non-mutating, fail-on-drift)
 - **Run** `make verify-heavy` when you need full strict gates plus advisory mutation
