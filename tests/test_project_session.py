@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,7 @@ from translationzed_py.core.project_session import (
     OrphanCacheWarningPlan,
     PostLocaleStartupPlan,
     ProjectSessionService,
+    SessionResumeSnapshot,
     TreeRebuildPlan,
     apply_locale_reset_plan,
     build_cache_migration_batch_plan,
@@ -505,6 +507,7 @@ def test_build_crash_recovery_apply_plan_variants(tmp_path: Path) -> None:
         discard_cache_paths=(
             root / ".tzp" / "cache" / "BE" / "a.bin",
             root / ".tzp" / "cache" / "BE" / "b.bin",
+            root / ".tzp" / "cache" / "session.resume.json",
             root / ".tzp-cache" / "BE" / "a.bin",
             root / ".tzp-cache" / "BE" / "b.bin",
         ),
@@ -523,6 +526,25 @@ def test_build_crash_recovery_apply_plan_rejects_unknown_decision(
             report=None,
             decision="bad",
         )
+
+
+def test_build_crash_recovery_apply_plan_discard_without_report_keeps_snapshot_delete(
+    tmp_path: Path,
+) -> None:
+    """Verify discard plan includes session snapshot delete even without report payload."""
+    root = tmp_path / "proj"
+    plan = build_crash_recovery_apply_plan(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        report=None,
+        decision="discard",
+    )
+    assert plan == CrashRecoveryApplyPlan(
+        decision="discard",
+        continue_startup=True,
+        discard_cache_paths=(root / ".tzp" / "cache" / "session.resume.json",),
+    )
 
 
 def test_execute_crash_recovery_apply_plan_variants(tmp_path: Path) -> None:
@@ -727,19 +749,21 @@ def test_project_session_service_delegates_to_helpers(tmp_path: Path) -> None:
     assert startup_plan == PostLocaleStartupPlan(
         should_schedule=True,
         run_cache_scan=True,
+        run_session_resume=True,
         run_auto_open=True,
-        task_count=2,
+        task_count=3,
     )
     calls: list[str] = []
     assert (
         svc.run_post_locale_startup_tasks(
             plan=startup_plan,
             run_cache_scan=lambda: calls.append("scan"),
+            run_session_resume=lambda: (calls.append("resume"), False)[1],
             run_auto_open=lambda: calls.append("open"),
         )
-        == 2
+        == 3
     )
-    assert calls == ["scan", "open"]
+    assert calls == ["scan", "resume", "open"]
     tree_plan = svc.build_tree_rebuild_plan(
         selected_locales=["BE"],
         resize_splitter=True,
@@ -855,6 +879,107 @@ def test_project_session_service_builds_crash_recovery_detection_plan(
     assert plan.run_recovery_flow is True
     assert plan.report is not None
     assert plan.report.total_files == 1
+
+
+def test_project_session_service_session_resume_snapshot_roundtrip(
+    tmp_path: Path,
+) -> None:
+    """Verify session-resume snapshot build/read/write/resolve contracts are deterministic."""
+    root = tmp_path / "proj"
+    _touch(root / "BE" / "a.txt", 'A = "one"\n')
+    svc = ProjectSessionService(
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        has_drafts=lambda _path: False,
+        read_last_opened=lambda _path: 0,
+    )
+    snapshot = svc.build_session_resume_snapshot(
+        generated_at_ms=123,
+        selected_locales=["BE", "BE", "RU"],
+        active_file_relpath="BE/a.txt",
+        active_row=7,
+        left_panel_index=2,
+        detail_visible=True,
+        search_text="foo",
+        replace_text="bar",
+        search_case_sensitive=True,
+        tm_min_score=80,
+        tm_grouping_mode="origin",
+        tm_origin_project=True,
+        tm_origin_import=False,
+    )
+    assert snapshot == SessionResumeSnapshot(
+        version=1,
+        generated_at_ms=123,
+        selected_locales=("BE", "RU"),
+        active_file_relpath="BE/a.txt",
+        active_row=7,
+        left_panel_index=2,
+        detail_visible=True,
+        search_text="foo",
+        replace_text="bar",
+        search_case_sensitive=True,
+        tm_min_score=80,
+        tm_grouping_mode="origin",
+        tm_origin_project=True,
+        tm_origin_import=False,
+    )
+    path = svc.write_session_resume_snapshot(root=root, snapshot=snapshot)
+    assert path == root / ".tzp" / "cache" / "session.resume.json"
+    loaded = svc.read_session_resume_snapshot(root=root)
+    assert loaded == snapshot
+    assert (
+        svc.resolve_session_resume_active_path(
+            root=root,
+            active_file_relpath="BE/a.txt",
+        )
+        == (root / "BE" / "a.txt").resolve()
+    )
+    assert (
+        svc.resolve_session_resume_active_path(
+            root=root,
+            active_file_relpath="../outside.txt",
+        )
+        is None
+    )
+
+
+def test_project_session_service_session_resume_snapshot_reader_ignores_invalid_payloads(
+    tmp_path: Path,
+) -> None:
+    """Verify invalid snapshot payloads are ignored without exception leakage."""
+    root = tmp_path / "proj"
+    svc = ProjectSessionService(
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        has_drafts=lambda _path: False,
+        read_last_opened=lambda _path: 0,
+    )
+    path = svc.session_resume_snapshot_path(root=root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{not-json", encoding="utf-8")
+    assert svc.read_session_resume_snapshot(root=root) is None
+
+    payload = {
+        "version": 999,
+        "generated_at_ms": 1,
+        "selected_locales": ["BE"],
+        "active_file_relpath": None,
+        "active_row": None,
+        "left_panel_index": 0,
+        "detail_visible": True,
+        "search_text": "",
+        "replace_text": "",
+        "search_case_sensitive": False,
+        "tm_min_score": 50,
+        "tm_grouping_mode": "none",
+        "tm_origin_project": True,
+        "tm_origin_import": True,
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    assert svc.read_session_resume_snapshot(root=root) is None
 
 
 def test_normalize_selected_locales_filters_source_unknown_and_duplicates() -> None:
@@ -1321,8 +1446,9 @@ def test_build_post_locale_startup_plan_for_non_empty_locales() -> None:
     assert plan == PostLocaleStartupPlan(
         should_schedule=True,
         run_cache_scan=True,
+        run_session_resume=True,
         run_auto_open=True,
-        task_count=2,
+        task_count=3,
     )
 
 
@@ -1332,6 +1458,7 @@ def test_build_post_locale_startup_plan_for_empty_locales() -> None:
     assert plan == PostLocaleStartupPlan(
         should_schedule=False,
         run_cache_scan=False,
+        run_session_resume=False,
         run_auto_open=False,
         task_count=0,
     )
@@ -1342,17 +1469,39 @@ def test_run_post_locale_startup_tasks_executes_enabled_tasks_in_order() -> None
     plan = PostLocaleStartupPlan(
         should_schedule=True,
         run_cache_scan=True,
+        run_session_resume=True,
         run_auto_open=True,
-        task_count=2,
+        task_count=3,
     )
     calls: list[str] = []
     executed = run_post_locale_startup_tasks(
         plan=plan,
         run_cache_scan=lambda: calls.append("scan"),
+        run_session_resume=lambda: (calls.append("resume"), False)[1],
+        run_auto_open=lambda: calls.append("open"),
+    )
+    assert executed == 3
+    assert calls == ["scan", "resume", "open"]
+
+
+def test_run_post_locale_startup_tasks_skips_auto_open_when_resume_applies() -> None:
+    """Verify startup auto-open fallback is skipped when session resume restores context."""
+    plan = PostLocaleStartupPlan(
+        should_schedule=True,
+        run_cache_scan=True,
+        run_session_resume=True,
+        run_auto_open=True,
+        task_count=3,
+    )
+    calls: list[str] = []
+    executed = run_post_locale_startup_tasks(
+        plan=plan,
+        run_cache_scan=lambda: calls.append("scan"),
+        run_session_resume=lambda: (calls.append("resume"), True)[1],
         run_auto_open=lambda: calls.append("open"),
     )
     assert executed == 2
-    assert calls == ["scan", "open"]
+    assert calls == ["scan", "resume"]
 
 
 def test_run_post_locale_startup_tasks_skips_disabled_plan() -> None:
@@ -1360,13 +1509,15 @@ def test_run_post_locale_startup_tasks_skips_disabled_plan() -> None:
     plan = PostLocaleStartupPlan(
         should_schedule=False,
         run_cache_scan=True,
+        run_session_resume=True,
         run_auto_open=True,
-        task_count=2,
+        task_count=3,
     )
     calls: list[str] = []
     executed = run_post_locale_startup_tasks(
         plan=plan,
         run_cache_scan=lambda: calls.append("scan"),
+        run_session_resume=lambda: (calls.append("resume"), False)[1],
         run_auto_open=lambda: calls.append("open"),
     )
     assert executed == 0

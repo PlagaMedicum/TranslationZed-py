@@ -8,6 +8,24 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from translationzed_py.core.app_config import LEGACY_CACHE_DIR
+from translationzed_py.core.session_resume import (
+    SessionResumeSnapshot,
+)
+from translationzed_py.core.session_resume import (
+    build_session_resume_snapshot as _build_session_resume_snapshot,
+)
+from translationzed_py.core.session_resume import (
+    read_session_resume_snapshot as _read_session_resume_snapshot,
+)
+from translationzed_py.core.session_resume import (
+    resolve_session_resume_active_path as _resolve_session_resume_active_path,
+)
+from translationzed_py.core.session_resume import (
+    session_resume_snapshot_path as _session_resume_snapshot_path,
+)
+from translationzed_py.core.session_resume import (
+    write_session_resume_snapshot as _write_session_resume_snapshot,
+)
 
 
 def _cache_roots(root: Path, cache_dir: str) -> tuple[Path, ...]:
@@ -185,13 +203,84 @@ class ProjectSessionService:
         *,
         plan: PostLocaleStartupPlan,
         run_cache_scan: Callable[[], None],
+        run_session_resume: Callable[[], bool],
         run_auto_open: Callable[[], None],
     ) -> int:
         """Run post locale startup tasks."""
         return run_post_locale_startup_tasks(
             plan=plan,
             run_cache_scan=run_cache_scan,
+            run_session_resume=run_session_resume,
             run_auto_open=run_auto_open,
+        )
+
+    def build_session_resume_snapshot(
+        self,
+        *,
+        generated_at_ms: int,
+        selected_locales: Sequence[str],
+        active_file_relpath: str | None,
+        active_row: int | None,
+        left_panel_index: int,
+        detail_visible: bool,
+        search_text: str,
+        replace_text: str,
+        search_case_sensitive: bool,
+        tm_min_score: int,
+        tm_grouping_mode: str,
+        tm_origin_project: bool,
+        tm_origin_import: bool,
+    ) -> SessionResumeSnapshot:
+        """Build normalized session-resume snapshot DTO."""
+        return _build_session_resume_snapshot(
+            generated_at_ms=generated_at_ms,
+            selected_locales=selected_locales,
+            active_file_relpath=active_file_relpath,
+            active_row=active_row,
+            left_panel_index=left_panel_index,
+            detail_visible=detail_visible,
+            search_text=search_text,
+            replace_text=replace_text,
+            search_case_sensitive=search_case_sensitive,
+            tm_min_score=tm_min_score,
+            tm_grouping_mode=tm_grouping_mode,
+            tm_origin_project=tm_origin_project,
+            tm_origin_import=tm_origin_import,
+        )
+
+    def read_session_resume_snapshot(
+        self, *, root: Path
+    ) -> SessionResumeSnapshot | None:
+        """Read project-scoped session-resume snapshot."""
+        return _read_session_resume_snapshot(root=root, cache_dir=self.cache_dir)
+
+    def write_session_resume_snapshot(
+        self,
+        *,
+        root: Path,
+        snapshot: SessionResumeSnapshot,
+    ) -> Path:
+        """Write project-scoped session-resume snapshot."""
+        return _write_session_resume_snapshot(
+            root=root,
+            cache_dir=self.cache_dir,
+            snapshot=snapshot,
+        )
+
+    def session_resume_snapshot_path(self, *, root: Path) -> Path:
+        """Return canonical project session-resume snapshot path."""
+        return _session_resume_snapshot_path(root=root, cache_dir=self.cache_dir)
+
+    def resolve_session_resume_active_path(
+        self,
+        *,
+        root: Path,
+        active_file_relpath: str | None,
+    ) -> Path | None:
+        """Resolve in-project path for session-resume active file pointer."""
+        return _resolve_session_resume_active_path(
+            root=root,
+            active_file_relpath=active_file_relpath,
         )
 
     def build_tree_rebuild_plan(
@@ -392,6 +481,7 @@ class PostLocaleStartupPlan:
 
     should_schedule: bool
     run_cache_scan: bool
+    run_session_resume: bool
     run_auto_open: bool
     task_count: int
 
@@ -753,7 +843,7 @@ def build_crash_recovery_apply_plan(
             continue_startup=False,
             discard_cache_paths=(),
         )
-    if normalized != "discard" or report is None:
+    if normalized != "discard":
         return CrashRecoveryApplyPlan(
             decision=normalized,
             continue_startup=True,
@@ -817,18 +907,19 @@ def _recovery_discard_cache_paths(
     root: Path,
     cache_dir: str,
     cache_ext: str,
-    report: CrashRecoveryReport,
+    report: CrashRecoveryReport | None,
 ) -> tuple[Path, ...]:
-    out: set[Path] = set()
-    for item in report.affected_files:
-        file_path = Path(item.file_path)
-        original = file_path if file_path.is_absolute() else (root / file_path)
-        try:
-            rel = original.relative_to(root)
-        except ValueError:
-            continue
-        for cache_root in _cache_roots(root, cache_dir):
-            out.add((cache_root / rel).with_suffix(cache_ext))
+    out: set[Path] = {_session_resume_snapshot_path(root=root, cache_dir=cache_dir)}
+    if report is not None:
+        for item in report.affected_files:
+            file_path = Path(item.file_path)
+            original = file_path if file_path.is_absolute() else (root / file_path)
+            try:
+                rel = original.relative_to(root)
+            except ValueError:
+                continue
+            for cache_root in _cache_roots(root, cache_dir):
+                out.add((cache_root / rel).with_suffix(cache_ext))
     return tuple(sorted(out))
 
 
@@ -1222,14 +1313,16 @@ def build_post_locale_startup_plan(
         return PostLocaleStartupPlan(
             should_schedule=False,
             run_cache_scan=False,
+            run_session_resume=False,
             run_auto_open=False,
             task_count=0,
         )
     return PostLocaleStartupPlan(
         should_schedule=True,
         run_cache_scan=True,
+        run_session_resume=True,
         run_auto_open=True,
-        task_count=2,
+        task_count=3,
     )
 
 
@@ -1237,6 +1330,7 @@ def run_post_locale_startup_tasks(
     *,
     plan: PostLocaleStartupPlan,
     run_cache_scan: Callable[[], None],
+    run_session_resume: Callable[[], bool],
     run_auto_open: Callable[[], None],
 ) -> int:
     """Run post locale startup tasks."""
@@ -1246,7 +1340,11 @@ def run_post_locale_startup_tasks(
     if plan.run_cache_scan:
         run_cache_scan()
         executed += 1
-    if plan.run_auto_open:
+    resume_applied = False
+    if plan.run_session_resume:
+        resume_applied = bool(run_session_resume())
+        executed += 1
+    if plan.run_auto_open and not resume_applied:
         run_auto_open()
         executed += 1
     return executed
