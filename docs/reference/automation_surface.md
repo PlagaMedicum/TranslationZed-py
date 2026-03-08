@@ -73,11 +73,12 @@ Canonical behavior still lives in:
 5. `make run` -> `scripts/run.sh` (`python -m translationzed_py` entrypoint)
 6. `make ui-manual-list` -> list declarative manual UI scenarios
 7. `make ui-manual-run SCENARIO=<id>` -> launch one scenario in checklist mode
-8. `make ui-manual-batch SCENARIOS=<id1,id2,...>` -> run multiple scenarios sequentially
-9. `make coverage-promotion-check` -> evaluate ordered coverage-summary artifacts for ratchet readiness
-10. `make test-prop-fast` -> run randomized/property fast profile (`TZP_PROP_PROFILE=fast`)
-11. `make test-prop-slow` -> run randomized/property slow profile (`TZP_PROP_PROFILE=slow`)
-12. `make test-status-a34` -> run status-triage mixed-selection packet suite
+8. `make ui-manual-headless SCENARIO=<id> RESULT=passed|failed` -> write checklist artifact without launching Qt GUI (headless fallback)
+9. `make ui-manual-batch SCENARIOS=<id1,id2,...>` -> run multiple scenarios sequentially
+10. `make coverage-promotion-check` -> evaluate ordered coverage-summary artifacts for ratchet readiness
+11. `make test-prop-fast` -> run randomized/property fast profile (`TZP_PROP_PROFILE=fast`)
+12. `make test-prop-slow` -> run randomized/property slow profile (`TZP_PROP_PROFILE=slow`)
+13. `make test-status-a34` -> run status-triage mixed-selection packet suite
 
 ## 7) Command Selection Hints
 

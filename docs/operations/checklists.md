@@ -85,6 +85,7 @@ Quick command-profile orientation:
 - **Use** manual scenario runner for repeatable UI hand-checks:
   - `make ui-manual-list`
   - `make ui-manual-run SCENARIO=<id>`
+  - `make ui-manual-headless SCENARIO=<id> RESULT=passed|failed` for no-display environments
   - `make ui-manual-batch SCENARIOS=<id1,id2,...>`
   - For UI-facing packets, attach at least one relevant scenario result artifact
     (`artifacts/manual-ui/*.json`) in PR evidence; backend-only packets are exempt

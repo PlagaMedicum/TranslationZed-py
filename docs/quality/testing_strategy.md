@@ -152,6 +152,7 @@ Quick lookup companion:
 - Runner surface:
   - `make ui-manual-list`
   - `make ui-manual-run SCENARIO=<id>`
+  - `make ui-manual-headless SCENARIO=<id> RESULT=passed|failed`
   - `make ui-manual-batch SCENARIOS=<id1,id2,...>`
 - Scenario-mode runtime contracts:
   - `TZP_MANUAL_SCENARIO_FILE=<path>`
@@ -159,6 +160,8 @@ Quick lookup companion:
 - Checklist UX contract:
   - in scenario mode, startup presents a modal step checklist with expected outcomes,
   - pass/fail + notes are persisted under `artifacts/manual-ui/*.json`.
+  - headless fallback (`ui-manual-headless`) writes checklist-style artifacts
+    without Qt GUI launch; treat this as non-interactive evidence only.
 - No-shrink workflow contract:
   - `tests/manual_scenarios/workflow_test_surface_contract.json`
   - machine-check target: `make test-ui-manual-contract`.

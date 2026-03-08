@@ -60,6 +60,7 @@ Current/target framing:
 - Perf contract lane: `make test-perf-scale`
 - A31 no-shrink contract gate: `make test-ui-manual-contract`
 - A31 focused test lane: `make test-a31-manual`
+- Manual scenario headless fallback: `make ui-manual-headless SCENARIO=<id> RESULT=passed|failed`
 - Randomized/property fast lane: `make test-prop-fast` (`TZP_PROP_PROFILE=fast`)
 - Randomized/property slow lane: `make test-prop-slow` (`TZP_PROP_PROFILE=slow`)
 - A34 status-triage packet lane: `make test-status-a34`
