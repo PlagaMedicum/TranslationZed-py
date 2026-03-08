@@ -84,6 +84,8 @@ def test_run_one_scenario_writes_artifact_and_runs_manual_and_auto(
         results_dir=results_dir,
         auto=True,
         auto_only=False,
+        headless_result=None,
+        headless_notes="",
     )
     assert rc == 0
     assert len(calls) == 2
@@ -95,6 +97,68 @@ def test_run_one_scenario_writes_artifact_and_runs_manual_and_auto(
     assert payload["mode"] == "manual+auto"
     assert payload["manual_return_code"] == 0
     assert payload["auto_return_code"] == 0
+
+
+def test_run_one_scenario_headless_manual_result_skips_gui_launch(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Headless manual-result mode should write checklist artifact without GUI subprocess."""
+    module = _load_module()
+    repo_root = tmp_path / "repo"
+    _make_fixture(repo_root, "demo")
+    scenario = parse_manual_scenario(
+        {
+            "id": "demo",
+            "title": "Demo",
+            "fixture_root": "demo",
+            "selected_locales": ["EN"],
+            "steps": ["one"],
+            "expected_checks": ["ok"],
+            "env_overrides": {},
+            "prefs_extras": {},
+            "automation_pytest_selectors": ["tests/test_gui_smoke.py"],
+        }
+    )
+
+    calls: list[list[str]] = []
+
+    def _fake_run(cmd, **kwargs):  # type: ignore[no-untyped-def]
+        calls.append(list(cmd))
+        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", _fake_run)
+    results_dir = tmp_path / "artifacts" / "manual-ui"
+    rc = module._run_one_scenario(
+        scenario=scenario,
+        repo_root=repo_root,
+        results_dir=results_dir,
+        auto=True,
+        auto_only=False,
+        headless_result="passed",
+        headless_notes="headless",
+    )
+    assert rc == 0
+    assert len(calls) == 1
+    assert calls[0][:3] == [sys.executable, "-m", "pytest"]
+
+    run_artifacts = list(results_dir.glob("demo-run-*.json"))
+    assert run_artifacts
+    run_payload = json.loads(run_artifacts[0].read_text(encoding="utf-8"))
+    assert run_payload["mode"] == "headless-manual+auto"
+    assert run_payload["manual_return_code"] == 0
+    assert run_payload["auto_return_code"] == 0
+
+    checklist_artifacts = [
+        path for path in results_dir.glob("demo-*.json") if "-run-" not in path.name
+    ]
+    assert checklist_artifacts
+    checklist_payload = json.loads(
+        checklist_artifacts[0].read_text(encoding="utf-8")
+    )
+    assert checklist_payload["result"] == "passed"
+    assert checklist_payload["headless"] is True
+    assert checklist_payload["notes"] == "headless"
 
 
 def test_main_list_uses_sorted_registry_order(
@@ -146,9 +210,62 @@ def test_main_list_uses_sorted_registry_order(
             results_dir="artifacts/manual-ui",
             auto=False,
             auto_only=False,
+            headless_result="",
+            headless_notes="",
         ),
     )
     assert module.main() == 0
     out = capsys.readouterr().out.strip().splitlines()
     assert out[0].startswith("a-first\t")
     assert out[1].startswith("z-last\t")
+
+
+def test_main_rejects_auto_only_with_headless_result(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    """CLI should reject conflicting auto-only and headless-result flags."""
+    module = _load_module()
+    repo_root = tmp_path / "repo"
+    registry_path = repo_root / "tests" / "manual_scenarios"
+    registry_path.mkdir(parents=True, exist_ok=True)
+    (registry_path / "scenarios.json").write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "scenarios": [
+                    {
+                        "id": "demo",
+                        "title": "Demo",
+                        "fixture_root": "demo",
+                        "selected_locales": ["EN"],
+                        "steps": ["one"],
+                        "expected_checks": ["ok"],
+                    },
+                ],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    _make_fixture(repo_root, "demo")
+    monkeypatch.setattr(module, "_repo_root", lambda: repo_root)
+    monkeypatch.setattr(
+        module,
+        "_parse_args",
+        lambda: SimpleNamespace(
+            registry="tests/manual_scenarios/scenarios.json",
+            list=False,
+            scenario="demo",
+            batch="",
+            results_dir="artifacts/manual-ui",
+            auto=False,
+            auto_only=True,
+            headless_result="passed",
+            headless_notes="",
+        ),
+    )
+    assert module.main() == 2
+    assert "--auto-only cannot be combined with --headless-result" in capsys.readouterr().out

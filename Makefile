@@ -33,7 +33,7 @@ COVERAGE_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/coverage/promotion-readiness.json
 	bench bench-check bench-advisory test-mutation \
 	test-mutation-stage mutation-promotion-check mutation-promotion-readiness \
 	test-cov-promotion-contract coverage-promotion-check \
-	test-warnings run ui-manual-list ui-manual-run ui-manual-batch clean clean-cache clean-config perf-scenarios perf-dependency-eval ci-deps dist pack pack-win \
+	test-warnings run ui-manual-list ui-manual-run ui-manual-headless ui-manual-batch clean clean-cache clean-config perf-scenarios perf-dependency-eval ci-deps dist pack pack-win \
 	test-encoding-integrity diagnose-encoding test-readonly-clean
 
 # ─── Environment/bootstrap ─────────────────────────────────────────────────────
@@ -363,6 +363,21 @@ ui-manual-run:
 	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/ui_manual_runner.py \
 		--scenario "$(SCENARIO)" \
 		--results-dir "$(ARTIFACTS)/manual-ui" \
+		$(ARGS)
+
+ui-manual-headless:
+	@if [ -z "$(SCENARIO)" ]; then \
+		echo "SCENARIO is required (example: make ui-manual-headless SCENARIO=open-edit-save-basic RESULT=passed)"; \
+		exit 2; \
+	fi
+	@if [ -z "$(RESULT)" ]; then \
+		echo "RESULT is required (allowed: passed|failed)"; \
+		exit 2; \
+	fi
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/ui_manual_runner.py \
+		--scenario "$(SCENARIO)" \
+		--results-dir "$(ARTIFACTS)/manual-ui" \
+		--headless-result "$(RESULT)" \
 		$(ARGS)
 
 ui-manual-batch:

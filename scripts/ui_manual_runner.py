@@ -123,6 +123,38 @@ def _write_run_artifact(
     return out_path
 
 
+def _write_headless_manual_artifact(
+    *,
+    results_dir: Path,
+    runtime: ManualScenarioRuntime,
+    result: str,
+    notes: str,
+) -> Path:
+    results_dir.mkdir(parents=True, exist_ok=True)
+    stamp_ms = int(time.time() * 1000)
+    safe_id = runtime.scenario.id.replace("/", "_")
+    out_path = results_dir / f"{safe_id}-{stamp_ms}.json"
+    payload: dict[str, Any] = {
+        "version": runtime.version,
+        "scenario_id": runtime.scenario.id,
+        "title": runtime.scenario.title,
+        "fixture_root": runtime.scenario.fixture_root,
+        "project_root": runtime.project_root,
+        "result": result,
+        "checked_steps": [],
+        "all_steps": list(runtime.scenario.steps),
+        "expected_checks": list(runtime.scenario.expected_checks),
+        "notes": notes.strip(),
+        "completed_at_ms": stamp_ms,
+        "headless": True,
+    }
+    out_path.write_text(
+        json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return out_path
+
+
 def _run_one_scenario(
     *,
     scenario: ManualScenario,
@@ -130,6 +162,8 @@ def _run_one_scenario(
     results_dir: Path,
     auto: bool,
     auto_only: bool,
+    headless_result: str | None,
+    headless_notes: str,
 ) -> int:
     with tempfile.TemporaryDirectory(prefix=f"tzp-manual-{scenario.id}-") as raw_temp:
         temp_root = Path(raw_temp)
@@ -146,12 +180,29 @@ def _run_one_scenario(
         manual_rc: int | None = None
         auto_rc: int | None = None
         mode = "manual"
-        if auto_only:
+        if headless_result is not None:
+            mode = "headless-manual"
+            if auto:
+                mode = "headless-manual+auto"
+        elif auto_only:
             mode = "auto-only"
         elif auto:
             mode = "manual+auto"
 
-        if not auto_only:
+        if headless_result is not None:
+            checklist = _write_headless_manual_artifact(
+                results_dir=results_dir,
+                runtime=ManualScenarioRuntime(
+                    version=SCENARIO_REGISTRY_VERSION,
+                    scenario=scenario,
+                    project_root=str(project_root.resolve()),
+                ),
+                result=headless_result,
+                notes=headless_notes,
+            )
+            print(f"ui-manual-runner: wrote headless checklist artifact {checklist}")
+            manual_rc = 0
+        elif not auto_only:
             manual_proc = _run_manual_app(
                 project_root=project_root,
                 runtime_payload_path=runtime_payload_path,
@@ -221,6 +272,17 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip manual app launch and execute automation selectors only.",
     )
+    parser.add_argument(
+        "--headless-result",
+        choices=("passed", "failed"),
+        default="",
+        help="Write checklist-style manual artifact without launching GUI.",
+    )
+    parser.add_argument(
+        "--headless-notes",
+        default="",
+        help="Optional notes stored in headless checklist artifact.",
+    )
     return parser.parse_args()
 
 
@@ -256,6 +318,12 @@ def main() -> int:
         print("ui-manual-runner: no valid scenario IDs provided")
         return 2
 
+    if args.auto_only and args.headless_result:
+        print(
+            "ui-manual-runner: --auto-only cannot be combined with --headless-result"
+        )
+        return 2
+
     results_dir = (repo_root / args.results_dir).resolve()
     exit_codes: list[int] = []
     for scenario_id in selected_ids:
@@ -271,6 +339,8 @@ def main() -> int:
             results_dir=results_dir,
             auto=bool(args.auto),
             auto_only=bool(args.auto_only),
+            headless_result=(str(args.headless_result).strip() or None),
+            headless_notes=str(args.headless_notes),
         )
         exit_codes.append(rc)
 
