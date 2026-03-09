@@ -22,6 +22,7 @@ REQUIRED_WORKFLOW_KEYS = (
     "qa_checklist",
     "tm_apply",
     "source_reference",
+    "search_replace",
     "tzp_writeback",
 )
 

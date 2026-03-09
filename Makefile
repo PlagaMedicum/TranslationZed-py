@@ -26,7 +26,7 @@ COVERAGE_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/coverage/promotion-readiness.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
 .PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check locale-agnostic-check \
-	test test-cov test-prop-fast test-prop-slow test-status-a34 test-qa-v09 test-tmq-v09 test-tmw-v09 test-cr-v09 test-src-a29 test-tzp-a30 test-ui-manual-contract test-a31-manual test-perf test-perf-scale test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
+	test test-cov test-prop-fast test-prop-slow test-search-a35 test-status-a34 test-qa-v09 test-tmq-v09 test-tmw-v09 test-cr-v09 test-src-a29 test-tzp-a30 test-ui-manual-contract test-a31-manual test-perf test-perf-scale test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
 	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
 	security docstyle docs-build docs-build-lite docs-index docs-api docs-contract docs-check code-triage review-queue-check \
 	docs-index-write \
@@ -85,6 +85,9 @@ test-prop-fast:
 
 test-prop-slow:
 	VENV=$(VENV) bash scripts/test_prop_slow.sh $(ARGS)
+
+test-search-a35:
+	VENV=$(VENV) bash scripts/test_search_a35.sh $(ARGS)
 
 test-status-a34:
 	VENV=$(VENV) bash scripts/test_status_a34.sh $(ARGS)

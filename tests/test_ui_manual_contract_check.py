@@ -45,6 +45,9 @@ def _seed_repo_paths(repo_root: Path) -> None:
         "tests/test_gui_tm_preferences.py",
         "tests/test_source_reference_state.py",
         "tests/test_source_reference_ui.py",
+        "tests/test_search_replace_service.py",
+        "tests/test_main_window_replace_merge_clipboard.py",
+        "tests/test_gui_service_adapters.py",
         "tests/test_tzp_comment_policy.py",
         "tests/test_saver.py",
     ):
@@ -93,6 +96,10 @@ def _write_contract(path: Path, *, missing_key: str | None = None) -> None:
         "source_reference": {
             "description": "x",
             "selectors": ["tests/test_source_reference_ui.py"],
+        },
+        "search_replace": {
+            "description": "x",
+            "selectors": ["tests/test_search_replace_service.py"],
         },
         "tzp_writeback": {
             "description": "x",

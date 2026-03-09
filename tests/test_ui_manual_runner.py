@@ -153,9 +153,7 @@ def test_run_one_scenario_headless_manual_result_skips_gui_launch(
         path for path in results_dir.glob("demo-*.json") if "-run-" not in path.name
     ]
     assert checklist_artifacts
-    checklist_payload = json.loads(
-        checklist_artifacts[0].read_text(encoding="utf-8")
-    )
+    checklist_payload = json.loads(checklist_artifacts[0].read_text(encoding="utf-8"))
     assert checklist_payload["result"] == "passed"
     assert checklist_payload["headless"] is True
     assert checklist_payload["notes"] == "headless"
@@ -268,4 +266,7 @@ def test_main_rejects_auto_only_with_headless_result(
         ),
     )
     assert module.main() == 2
-    assert "--auto-only cannot be combined with --headless-result" in capsys.readouterr().out
+    assert (
+        "--auto-only cannot be combined with --headless-result"
+        in capsys.readouterr().out
+    )

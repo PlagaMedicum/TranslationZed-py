@@ -319,9 +319,7 @@ def main() -> int:
         return 2
 
     if args.auto_only and args.headless_result:
-        print(
-            "ui-manual-runner: --auto-only cannot be combined with --headless-result"
-        )
+        print("ui-manual-runner: --auto-only cannot be combined with --headless-result")
         return 2
 
     results_dir = (repo_root / args.results_dir).resolve()

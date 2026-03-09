@@ -36,6 +36,14 @@
         "tests/test_source_reference_ui.py"
       ]
     },
+    "search_replace": {
+      "description": "Search/replace planning and GUI confirmation coverage must remain.",
+      "selectors": [
+        "tests/test_search_replace_service.py",
+        "tests/test_main_window_replace_merge_clipboard.py",
+        "tests/test_gui_service_adapters.py"
+      ]
+    },
     "tzp_writeback": {
       "description": "TZP opt-in comment writeback contracts must remain covered.",
       "selectors": [

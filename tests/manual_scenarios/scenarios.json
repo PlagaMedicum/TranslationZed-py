@@ -179,6 +179,33 @@
         "tests/test_main_window_cache_replace_helpers.py",
         "tests/test_gui_service_adapters.py"
       ]
+    },
+    {
+      "id": "search-replace-sidebar-all-scopes",
+      "title": "Search+replace sidebar flow with all-scope confirmation",
+      "fixture_root": "conflict_manual",
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open BE/ui.txt and switch to Search panel.",
+        "Use sidebar controls to set query, replacement, regex, case, and search field.",
+        "Run Replace All in FILE scope, then LOCALE/POOL scopes via Preferences, and confirm modal summary each time.",
+        "Cancel one confirmation and verify no replacement is applied for that run."
+      ],
+      "expected_checks": [
+        "Sidebar and toolbar controls stay synchronized in both directions.",
+        "Replace All confirmation modal appears for FILE, LOCALE, and POOL when matches exist.",
+        "Modal summary includes scope label, total replacements, and affected files.",
+        "Cancel prevents apply and leaves values unchanged for the canceled run."
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_search_replace_service.py",
+        "tests/test_main_window_replace_merge_clipboard.py",
+        "tests/test_gui_service_adapters.py"
+      ]
     }
   ]
 }
