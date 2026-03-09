@@ -377,12 +377,36 @@ def test_replace_helper_branches_cover_toggle_align_enable_and_request(
     assert win.replace_edit.isEnabled() is True
     assert win.replace_btn.isEnabled() is True
     assert win.replace_all_btn.isEnabled() is True
+    assert win._search_panel_replace_edit.isEnabled() is True
+    assert win._search_panel_replace_btn.isEnabled() is True
+    assert win._search_panel_replace_all_btn.isEnabled() is True
 
     win.search_edit.setText("   ")
     win._update_replace_enabled()
     assert win.replace_edit.isEnabled() is False
     assert win.replace_btn.isEnabled() is False
     assert win.replace_all_btn.isEnabled() is False
+    assert win._search_panel_replace_edit.isEnabled() is False
+    assert win._search_panel_replace_btn.isEnabled() is False
+    assert win._search_panel_replace_all_btn.isEnabled() is False
+
+    win.search_edit.setText("toolbar-query")
+    win.replace_edit.setText("toolbar-replace")
+    win.regex_check.setChecked(True)
+    win.search_mode.setCurrentIndex(1)
+    assert win._search_panel_query_edit.text() == "toolbar-query"
+    assert win._search_panel_replace_edit.text() == "toolbar-replace"
+    assert win._search_panel_regex_check.isChecked() is True
+    assert win._search_panel_mode_combo.currentIndex() == 1
+
+    win._search_panel_query_edit.setText("sidebar-query")
+    win._search_panel_replace_edit.setText("sidebar-replace")
+    win._search_panel_regex_check.setChecked(False)
+    win._search_panel_mode_combo.setCurrentIndex(2)
+    assert win.search_edit.text() == "sidebar-query"
+    assert win.replace_edit.text() == "sidebar-replace"
+    assert win.regex_check.isChecked() is False
+    assert win.search_mode.currentIndex() == 2
 
     warnings: list[tuple[str, str]] = []
     monkeypatch.setattr(

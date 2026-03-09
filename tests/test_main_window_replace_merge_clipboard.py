@@ -51,9 +51,20 @@ class _DialogStub:
     _confirm = True
     _instances: list[_DialogStub] = []
 
-    def __init__(self, counts, scope_label: str, _parent) -> None:  # type: ignore[no-untyped-def]
+    def __init__(
+        self,
+        counts,
+        scope_label: str,
+        *,
+        total_matches: int,
+        affected_files: int,
+        parent,
+    ) -> None:  # type: ignore[no-untyped-def]
         self.counts = list(counts)
         self.scope_label = scope_label
+        self.total_matches = int(total_matches)
+        self.affected_files = int(affected_files)
+        self.parent = parent
         self.exec_calls = 0
         _DialogStub._instances.append(self)
 
@@ -182,6 +193,8 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
     plan_box["value"] = SimpleNamespace(
         run_replace=False,
         show_confirmation=False,
+        total_matches=0,
+        affected_files=0,
         counts=(),
         scope_label="Selection",
     )
@@ -192,6 +205,8 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
     plan_box["value"] = SimpleNamespace(
         run_replace=True,
         show_confirmation=True,
+        total_matches=1,
+        affected_files=1,
         counts=((str(current_path), 1),),
         scope_label="Selection",
     )
@@ -200,6 +215,8 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
     assert service.plan_calls == 3
     assert service.apply_calls == 0
     assert _DialogStub._instances[-1].exec_calls == 1
+    assert _DialogStub._instances[-1].total_matches == 1
+    assert _DialogStub._instances[-1].affected_files == 1
 
     _DialogStub._confirm = True
     apply_box["value"] = False

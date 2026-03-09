@@ -15,12 +15,18 @@ from PySide6.QtCore import QItemSelectionModel, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut, QTextOption
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
+    QComboBox,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
+    QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
     QStyle,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -1657,6 +1663,168 @@ def _set_tm_list_placeholder(win, text: str) -> None:
     item.setFlags(Qt.ItemIsEnabled)
     item.setData(int(Qt.UserRole) + 7, True)
     win._tm_list.insertItem(0, item)
+
+
+def _init_search_panel_controls(
+    win,
+    *,
+    search_layout: QVBoxLayout,
+    search_header: QHBoxLayout,
+    placeholder_text: str,
+) -> None:
+    win._search_panel_query_edit = QLineEdit(win._search_panel)
+    win._search_panel_query_edit.setPlaceholderText("Search")
+    win._search_panel_query_edit.textChanged.connect(
+        lambda _text: _sync_search_toolbar_from_sidebar(win)
+    )
+    win._search_panel_query_edit.returnPressed.connect(win._trigger_search)
+    win._search_panel_prev_btn = QToolButton(win._search_panel)
+    win._search_panel_prev_btn.setAutoRaise(True)
+    win._search_panel_prev_btn.setIcon(
+        win.style().standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
+    )
+    win._search_panel_prev_btn.setToolTip("Find previous match")
+    win._search_panel_prev_btn.clicked.connect(win._search_prev)
+    win._search_panel_next_btn = QToolButton(win._search_panel)
+    win._search_panel_next_btn.setAutoRaise(True)
+    win._search_panel_next_btn.setIcon(
+        win.style().standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
+    )
+    win._search_panel_next_btn.setToolTip("Find next match")
+    win._search_panel_next_btn.clicked.connect(win._search_next)
+    win._search_panel_replace_edit = QLineEdit(win._search_panel)
+    win._search_panel_replace_edit.setPlaceholderText("Replace")
+    win._search_panel_replace_edit.textChanged.connect(
+        lambda _text: _sync_search_toolbar_from_sidebar(win)
+    )
+    win._search_panel_replace_btn = QToolButton(win._search_panel)
+    win._search_panel_replace_btn.setAutoRaise(True)
+    win._search_panel_replace_btn.setIcon(
+        win.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton)
+    )
+    win._search_panel_replace_btn.setToolTip("Replace current match in Trans")
+    win._search_panel_replace_btn.clicked.connect(win._replace_current)
+    win._search_panel_replace_all_btn = QToolButton(win._search_panel)
+    win._search_panel_replace_all_btn.setAutoRaise(True)
+    win._search_panel_replace_all_btn.setText("All")
+    win._search_panel_replace_all_btn.setToolTip(
+        "Replace all matches in the active replace scope"
+    )
+    win._search_panel_replace_all_btn.clicked.connect(win._replace_all)
+    win._search_panel_regex_check = QCheckBox("Regex", win._search_panel)
+    win._search_panel_regex_check.toggled.connect(
+        lambda _checked: _sync_search_toolbar_from_sidebar(win)
+    )
+    win._search_panel_case_btn = QToolButton(win._search_panel)
+    win._search_panel_case_btn.setCheckable(True)
+    win._search_panel_case_btn.setAutoRaise(True)
+    win._search_panel_case_btn.setText("Aa")
+    win._search_panel_case_btn.toggled.connect(
+        lambda _checked: _sync_search_toolbar_from_sidebar(win)
+    )
+    win._search_panel_mode_combo = QComboBox(win._search_panel)
+    win._search_panel_mode_combo.addItem("Key", 0)
+    win._search_panel_mode_combo.addItem("Source", 1)
+    win._search_panel_mode_combo.addItem("Trans", 2)
+    win._search_panel_mode_combo.currentIndexChanged.connect(
+        lambda _index: _sync_search_toolbar_from_sidebar(win)
+    )
+
+    search_query_row = QHBoxLayout()
+    search_query_row.setContentsMargins(0, 0, 0, 0)
+    search_query_row.setSpacing(4)
+    search_query_row.addWidget(win._search_panel_query_edit, 1)
+    search_query_row.addWidget(win._search_panel_prev_btn)
+    search_query_row.addWidget(win._search_panel_next_btn)
+    search_replace_row = QHBoxLayout()
+    search_replace_row.setContentsMargins(0, 0, 0, 0)
+    search_replace_row.setSpacing(4)
+    search_replace_row.addWidget(win._search_panel_replace_edit, 1)
+    search_replace_row.addWidget(win._search_panel_replace_btn)
+    search_replace_row.addWidget(win._search_panel_replace_all_btn)
+    search_options_row = QHBoxLayout()
+    search_options_row.setContentsMargins(0, 0, 0, 0)
+    search_options_row.setSpacing(6)
+    search_options_row.addWidget(win._search_panel_regex_check)
+    search_options_row.addWidget(win._search_panel_case_btn)
+    search_options_row.addWidget(QLabel("Search in:", win._search_panel))
+    search_options_row.addWidget(win._search_panel_mode_combo)
+    search_options_row.addStretch(1)
+    search_header.addWidget(win._search_prefs_btn)
+    win._search_results_list = QListWidget(win._search_panel)
+    win._search_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
+    win._search_results_list.itemActivated.connect(win._open_search_result_item)
+    win._search_results_list.itemClicked.connect(win._open_search_result_item)
+    _set_search_list_placeholder(win, placeholder_text)
+    search_layout.addLayout(search_header)
+    search_layout.addLayout(search_query_row)
+    search_layout.addLayout(search_replace_row)
+    search_layout.addLayout(search_options_row)
+    search_layout.addWidget(win._search_results_list)
+    _sync_search_sidebar_from_toolbar(win)
+    _sync_search_sidebar_enabled_state(win)
+
+
+def _sync_search_sidebar_from_toolbar(win) -> None:
+    if win._search_control_sync_in_progress:
+        return
+    if not hasattr(win, "_search_panel_query_edit"):
+        return
+    win._search_control_sync_in_progress = True
+    try:
+        query = win.search_edit.text()
+        replacement = win.replace_edit.text()
+        regex_checked = win.regex_check.isChecked()
+        case_checked = win.search_case_btn.isChecked()
+        mode_index = win.search_mode.currentIndex()
+        if win._search_panel_query_edit.text() != query:
+            win._search_panel_query_edit.setText(query)
+        if win._search_panel_replace_edit.text() != replacement:
+            win._search_panel_replace_edit.setText(replacement)
+        if win._search_panel_regex_check.isChecked() != regex_checked:
+            win._search_panel_regex_check.setChecked(regex_checked)
+        if win._search_panel_case_btn.isChecked() != case_checked:
+            win._search_panel_case_btn.setChecked(case_checked)
+        if win._search_panel_mode_combo.currentIndex() != mode_index:
+            win._search_panel_mode_combo.setCurrentIndex(mode_index)
+    finally:
+        win._search_control_sync_in_progress = False
+    _sync_search_sidebar_enabled_state(win)
+
+
+def _sync_search_toolbar_from_sidebar(win) -> None:
+    if win._search_control_sync_in_progress:
+        return
+    if not hasattr(win, "_search_panel_query_edit"):
+        return
+    win._search_control_sync_in_progress = True
+    try:
+        query = win._search_panel_query_edit.text()
+        replacement = win._search_panel_replace_edit.text()
+        regex_checked = win._search_panel_regex_check.isChecked()
+        case_checked = win._search_panel_case_btn.isChecked()
+        mode_index = win._search_panel_mode_combo.currentIndex()
+        if win.search_edit.text() != query:
+            win.search_edit.setText(query)
+        if win.replace_edit.text() != replacement:
+            win.replace_edit.setText(replacement)
+        if win.regex_check.isChecked() != regex_checked:
+            win.regex_check.setChecked(regex_checked)
+        if win.search_case_btn.isChecked() != case_checked:
+            win.search_case_btn.setChecked(case_checked)
+        if win.search_mode.currentIndex() != mode_index:
+            win.search_mode.setCurrentIndex(mode_index)
+    finally:
+        win._search_control_sync_in_progress = False
+    _sync_search_sidebar_enabled_state(win)
+
+
+def _sync_search_sidebar_enabled_state(win) -> None:
+    if not hasattr(win, "_search_panel_replace_edit"):
+        return
+    win._search_panel_replace_edit.setEnabled(win.replace_edit.isEnabled())
+    win._search_panel_replace_btn.setEnabled(win.replace_btn.isEnabled())
+    win._search_panel_replace_all_btn.setEnabled(win.replace_all_btn.isEnabled())
 
 
 def _set_search_list_placeholder(win, text: str) -> None:

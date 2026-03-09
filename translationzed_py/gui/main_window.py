@@ -876,6 +876,9 @@ class MainWindow(QMainWindow):
         self.toolbar.addSeparator()
         self.regex_check = QCheckBox("Regex", self)
         self.regex_check.stateChanged.connect(self._on_search_controls_changed)
+        self.regex_check.stateChanged.connect(
+            lambda _state: self._sync_search_sidebar_from_toolbar()
+        )
         self.regex_help = QLabel(
             '<a href="https://docs.python.org/3/library/re.html">'
             '<span style="vertical-align:super; font-size:smaller;">?</span>'
@@ -907,6 +910,9 @@ class MainWindow(QMainWindow):
         self.search_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.search_edit.setMinimumWidth(320)
         self.search_edit.textChanged.connect(self._on_search_controls_changed)
+        self.search_edit.textChanged.connect(
+            lambda _text: self._sync_search_sidebar_from_toolbar()
+        )
         self.search_edit.textChanged.connect(
             lambda _text: _panel_helpers._schedule_session_resume_snapshot(self)
         )
@@ -948,6 +954,9 @@ class MainWindow(QMainWindow):
         self.search_mode.addItem("Trans", 2)
         self.search_mode.setCurrentIndex(2)
         self.search_mode.currentIndexChanged.connect(self._on_search_controls_changed)
+        self.search_mode.currentIndexChanged.connect(
+            lambda _index: self._sync_search_sidebar_from_toolbar()
+        )
         self.toolbar.addWidget(self.search_mode)
 
         self.addToolBarBreak()
@@ -963,6 +972,9 @@ class MainWindow(QMainWindow):
         self.replace_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.replace_edit.setMinimumWidth(self.search_edit.minimumWidth())
         self.replace_edit.textChanged.connect(self._update_replace_enabled)
+        self.replace_edit.textChanged.connect(
+            lambda _text: self._sync_search_sidebar_from_toolbar()
+        )
         self.replace_edit.textChanged.connect(
             lambda _text: _panel_helpers._schedule_session_resume_snapshot(self)
         )
@@ -996,6 +1008,7 @@ class MainWindow(QMainWindow):
         self._search_cache_row_limit = 5000
         self._search_panel_result_limit = 200
         self._replace_visible = False
+        self._search_control_sync_in_progress = False
         self._search_progress_text = ""
         self._row_resize_timer = QTimer(self)
         self._row_resize_timer.setSingleShot(True)
@@ -1258,14 +1271,12 @@ class MainWindow(QMainWindow):
         self._search_prefs_btn.clicked.connect(
             lambda _checked=False: self._open_preferences(initial_tab=_PREF_TAB_SEARCH)
         )
-        search_header.addWidget(self._search_prefs_btn)
-        self._search_results_list = QListWidget(self._search_panel)
-        self._search_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
-        self._search_results_list.itemActivated.connect(self._open_search_result_item)
-        self._search_results_list.itemClicked.connect(self._open_search_result_item)
-        self._set_search_list_placeholder(_SEARCH_DEFAULT_PLACEHOLDER)
-        search_layout.addLayout(search_header)
-        search_layout.addWidget(self._search_results_list)
+        _panel_helpers._init_search_panel_controls(
+            self,
+            search_layout=search_layout,
+            search_header=search_header,
+            placeholder_text=_SEARCH_DEFAULT_PLACEHOLDER,
+        )
         self._left_stack.addWidget(self._search_panel)
 
         self._qa_panel = QWidget(self._left_panel)
@@ -4167,6 +4178,7 @@ class MainWindow(QMainWindow):
     def _on_search_controls_changed(self, *_args) -> None:
         # Search runs only on explicit Enter/Next/Prev, not on typing.
         self._update_replace_enabled()
+        self._sync_search_sidebar_from_toolbar()
         self._search_progress_text = ""
         self._update_status_bar()
         if self._search_timer.isActive():
@@ -4193,6 +4205,7 @@ class MainWindow(QMainWindow):
             "true" if self._search_case_sensitive else "false"
         )
         self._update_case_toggle_ui()
+        self._sync_search_sidebar_from_toolbar()
         self._on_search_controls_changed()
         self._persist_preferences()
 
@@ -4233,6 +4246,7 @@ class MainWindow(QMainWindow):
         enabled = bool(replace_allowed and has_query)
         for widget in (self.replace_edit, self.replace_btn, self.replace_all_btn):
             widget.setEnabled(enabled)
+        self._sync_search_sidebar_enabled_state()
 
     def _prepare_replace_request(self) -> _ReplaceRequest | None:
         query = self.search_edit.text()
@@ -4417,7 +4431,11 @@ class MainWindow(QMainWindow):
             return
         if run_plan.show_confirmation:
             dialog = ReplaceFilesDialog(
-                list(run_plan.counts), run_plan.scope_label, self
+                list(run_plan.counts),
+                run_plan.scope_label,
+                total_matches=run_plan.total_matches,
+                affected_files=run_plan.affected_files,
+                parent=self,
             )
             dialog.exec()
             if not dialog.confirmed():
@@ -5258,6 +5276,11 @@ class MainWindow(QMainWindow):
     _schedule_tm_update = _panel_helpers._schedule_tm_update
     _set_tm_progress_visible = _panel_helpers._set_tm_progress_visible
     _set_tm_list_placeholder = _panel_helpers._set_tm_list_placeholder
+    _sync_search_sidebar_from_toolbar = _panel_helpers._sync_search_sidebar_from_toolbar
+    _sync_search_toolbar_from_sidebar = _panel_helpers._sync_search_toolbar_from_sidebar
+    _sync_search_sidebar_enabled_state = (
+        _panel_helpers._sync_search_sidebar_enabled_state
+    )
     _set_search_list_placeholder = _panel_helpers._set_search_list_placeholder
     _set_qa_list_placeholder = _panel_helpers._set_qa_list_placeholder
     _update_tm_apply_state = _panel_helpers._update_tm_apply_state
