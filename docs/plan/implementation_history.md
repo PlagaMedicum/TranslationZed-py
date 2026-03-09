@@ -1,5 +1,5 @@
 # TranslationZed-Py — Implementation History
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-09_
 
 > Historical execution log (non-normative).  
 > Current canonical planning scope lives in `docs/plan/implementation_active.md`.
@@ -130,7 +130,7 @@ Execution evidence log:
    5. `make verify-fast`,
    6. `make docs-check`.
 
-## A34-UX-1 [→] Status-Triage Mixed Selection Indicator (2026-03-08)
+## A34-UX-1 [✓] Status-Triage Mixed Selection Indicator (2026-03-08)
 
 1. Added mixed-selection status-bar projection in panel helpers:
    1. append `Selection: mixed (N rows)` only when at least two selected rows
@@ -151,8 +151,35 @@ Execution evidence log:
    3. `make ui-manual-run SCENARIO=status-triage-mixed-indicator ARGS='--auto-only'`,
    4. `make verify-fast`,
    5. `make docs-check`.
-6. Remaining closure evidence:
-   1. interactive manual scenario checklist pass/fail artifact (non-`auto-only`) is pending.
+6. Two-stage closure note:
+   1. implementation/docs/tests are complete,
+   2. one interactive manual scenario checklist artifact (non-`auto-only`) remains tracked as release-evidence debt.
+
+## A35-SRX-1 [✓] Search+Replace Sidebar Coherence + All-Scope Confirmation (2026-03-09)
+
+1. Delivered packet objective:
+   1. Search panel upgraded to full Search+Replace controls with deterministic toolbar/sidebar sync,
+   2. replace-all confirmation modal enforced for FILE/LOCALE/POOL when matches exist.
+2. Contract updates landed in this packet:
+   1. replace-all run-plan summary fields (`total_matches`, `affected_files`),
+   2. all-scope positive-match confirmation policy,
+   3. modal summary copy includes scope, total replacements, and affected files.
+3. Orchestration and no-shrink surface updates:
+   1. new packet lane `make test-search-a35`,
+   2. manual scenario `search-replace-sidebar-all-scopes`,
+   3. workflow contract includes `search_replace` mapping.
+4. Docs and drift-guard updates:
+   1. testing/orientation/checklist docs include `make test-search-a35`,
+   2. docs-contract checker enforces A35 search/replace lane references.
+5. Current evidence:
+   1. `make test-search-a35`,
+   2. `make test-ui-manual-contract`,
+   3. `make ui-manual-run SCENARIO=search-replace-sidebar-all-scopes ARGS='--headless-result passed --headless-notes "a35 automation fallback"'`,
+   4. `make verify-fast`,
+   5. `make docs-check`.
+6. Two-stage closure note:
+   1. implementation/docs/tests are complete,
+   2. one interactive manual scenario checklist artifact (non-`--headless-result` and non-`--auto-only`) remains tracked as release-evidence debt.
 
 ## A17-V9-QA-1 [✓] QA Rule-State Model Foundation (2026-03-04)
 

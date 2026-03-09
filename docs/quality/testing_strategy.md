@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-09_
 
 ---
 
@@ -276,11 +276,15 @@ Quick lookup companion:
     - `make test-prop-slow` runs the same suites at higher example/step budgets.
     - Heavy strict randomized sweep is enforced via `make verify-heavy-extra`
       (includes `make test-prop-slow`).
+- Packet-focused search/replace lane:
+    - `make test-search-a35` runs Search+Replace sidebar sync and all-scope
+      replace-all confirmation contracts.
 - Randomized/stateful stratum mapping is normative:
     - Core workflow/state-machine changes require deterministic tests plus
       randomized/stateful invariants on core/service boundaries.
     - UI-facing changes require automated tests plus at least one relevant manual
       scenario run artifact from the A31 framework (`artifacts/manual-ui/*.json`).
+      For A35 work, use scenario `search-replace-sidebar-all-scopes`.
 - Property-based tests (Hypothesis) are part of the default suite for:
     - parser/saver round-trip invariants,
     - encoding preservation invariants on save,

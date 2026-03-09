@@ -1,5 +1,5 @@
 # TranslationZed-Py — Test Surface
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-09_
 
 ## 1) Purpose
 
@@ -67,6 +67,7 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    - `tests/test_search_replace_service.py`
    - `tests/test_search_wave2_equivalence.py`
    - `tests/test_search_perf_contract.py`
+   - `tests/test_main_window_replace_merge_clipboard.py`
 2. Source reference behavior:
    - `tests/test_source_reference_service.py`
    - `tests/test_source_reference_ui.py`
@@ -144,3 +145,4 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 14. Randomized/property fast profile: `make test-prop-fast`
 15. Randomized/property slow profile: `make test-prop-slow`
 16. A34 status-triage packet lane: `make test-status-a34`
+17. A35 search/replace packet lane: `make test-search-a35`

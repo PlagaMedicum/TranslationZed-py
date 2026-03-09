@@ -327,7 +327,7 @@ Algorithm:
   scope file resolution, search traversal anchors/fallbacks, search-run request planning
   (query/files/field flags/anchor setup), search-panel result label
   formatting, search-panel result-list planning/status policy, replace-all run-policy
-  planning (confirmation/skip for multi-file scopes), file-level replace-all
+  planning (explicit confirmation for positive-match FILE/LOCALE/POOL scopes), file-level replace-all
   parse/cache/write orchestration via callbacks, model-row replace-all
   orchestration via row callbacks, single-row replace request/build and apply
   orchestration, search-row cache stamp collection policy (file/cache/source mtime
@@ -617,8 +617,13 @@ if dirty_files and not prompt_save():
 - Regex help: a small **“?”** button opens Python `re` docs in the browser.
 - Search execution is explicit (Enter / next / previous); typing only updates controls,
   it does not auto-run search.
-- Left Search side panel shows a minimal match list generated from current toolbar query/scope;
-  each item is `<relative path>:<row> · <one-line excerpt>` and click navigates to that match.
+- Left Search side panel provides full Search+Replace controls plus result list:
+  query, replacement, regex toggle, case toggle, search-field selector, next/previous,
+  replace-current, replace-all, and result rows generated from current scope.
+  Search sidebar controls and top-toolbar controls are synchronized both ways.
+  Replace-all confirmation modal is required for FILE/LOCALE/POOL scopes when matches exist
+  and shows scope, total replacements, affected files, and per-file counts.
+  Each result item is `<relative path>:<row> · <one-line excerpt>` and click navigates to that match.
   Search panel includes a quick Preferences shortcut to open the Search/Replace tab.
   Relative paths in UI/report text are normalized to `/` separators on all platforms.
 - Left QA side panel (shipped in v0.7.0) uses core-provided finding DTOs and renders compact

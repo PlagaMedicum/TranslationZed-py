@@ -1,5 +1,5 @@
 # TranslationZed-Py — Quick Context
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-09_
 
 ## 1) What This Project Is
 
@@ -64,6 +64,7 @@ Current/target framing:
 - Randomized/property fast lane: `make test-prop-fast` (`TZP_PROP_PROFILE=fast`)
 - Randomized/property slow lane: `make test-prop-slow` (`TZP_PROP_PROFILE=slow`)
 - A34 status-triage packet lane: `make test-status-a34`
+- A35 search/replace packet lane: `make test-search-a35`
 - Strict coverage lane: `make test-cov` (`translationzed_py>=92%`, `core>=97%`)
 - Coverage promotion readiness: `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='<run1.json> <run2.json>'`
 
@@ -87,7 +88,12 @@ Command profile hint:
 
 1. `A33-TEST-1` is closed:
    - randomized/stateful policy lanes are active (`make test-prop-fast`, `make test-prop-slow`).
-2. Active deferred packet is `A34-UX-1`:
-   - status bar appends `Selection: mixed (N rows)` for mixed-status multi-row selections.
-3. UI-packet evidence rule remains active:
+2. `A34-UX-1` is staged complete:
+   - code/docs/tests are complete; one interactive manual artifact remains tracked as release-evidence debt.
+3. `A35-SRX-1` is staged complete:
+   - Search panel is upgraded to full Search+Replace controls,
+   - replace-all confirmation is required for FILE/LOCALE/POOL when matches exist.
+4. Deferred stream sequencing handoff is active:
+   - next packet selection is pending after `A35` staged closure.
+5. UI-packet evidence rule remains active:
    - attach at least one relevant manual scenario artifact under `artifacts/manual-ui/`.

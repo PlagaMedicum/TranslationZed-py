@@ -1,13 +1,13 @@
 # TranslationZed-Py — Active Implementation Plan
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-09_
 
 ## 0) Release Framing
 
 - **Current released baseline:** `v0.8.0` (retagged on 2026-03-04 for completed release notes).
 - **Current implementation branch:** `dev`.
-- **Target milestone:** `v0.9.0` deferred-stream continuation on `dev` (`A34-UX-1` active).
-- **Latest completed milestone on `dev`:** randomized/stateful testing policy uplift stream (`A33`).
-- **Current active milestone:** status-triage mixed-selection indicator packet (`A34`).
+- **Target milestone:** `v0.9.0` deferred-stream continuation on `dev` (`A35-SRX-1` staged complete; next packet selection pending).
+- **Latest completed milestone on `dev`:** search/replace sidebar and confirmation policy packet (`A35`, staged closure).
+- **Current active milestone:** deferred-stream sequencing handoff after `A35`.
 
 ## 1) Milestone Closure — A28 [✓]
 
@@ -261,59 +261,57 @@ _Last updated: 2026-03-08_
    5. `make verify-fast`,
    6. `make docs-check`.
 
-## 7) Active Milestone — A34 [in progress]
+## 7) Milestone Closure — A34 [staged complete]
 
-### A34 selected deferred stream
+### A34 closure snapshot (2026-03-09)
 
-1. Stream lock: status-triage UX deferred-item closure (`A34-UX-1`).
-2. Packet scope:
-   1. status-bar mixed-selection projection:
-      - append `Selection: mixed (N rows)` only for multi-row mixed-status selection,
-      - keep single-row/uniform/empty selection text unchanged.
-   2. packet lane:
-      - `make test-status-a34`.
-   3. manual scenario evidence:
-      - add dedicated status-triage mixed-selection scenario in registry.
-3. Safety boundary:
-   1. no core data-model or persistence-schema changes,
-   2. locale-agnostic production UI copy policy remains mandatory.
-
-### A34 progress snapshot (2026-03-08)
-
-1. Runtime helper implementation is in place:
+1. Implementation/test/docs scope is complete:
    1. status bar appends `Selection: mixed (N rows)` only for mixed-status multi-row selections,
-   2. single-row, uniform multi-row, and empty selection behavior remains unchanged.
-2. Packet test surface and lane are in place:
-   1. `scripts/test_status_a34.sh`,
-   2. `make test-status-a34`,
-   3. targeted mixed-indicator coverage in `tests/test_main_window_cache_replace_helpers.py`.
-3. Manual scenario coverage entry was added:
-   1. `tests/manual_scenarios/scenarios.json` includes `status-triage-mixed-indicator`,
-   2. automation bridge selectors and run artifact generation are wired.
+   2. packet lane `make test-status-a34` is wired and green,
+   3. scenario registry includes `status-triage-mixed-indicator`.
+2. Two-stage closure status:
+   1. code/docs/test closure is complete,
+   2. remaining release-evidence debt is one interactive manual checklist artifact
+      (non-`auto-only`) for `status-triage-mixed-indicator`.
+
+## 8) Milestone Closure — A35 [staged complete]
+
+### A35 closure snapshot (2026-03-09)
+
+1. Stream lock delivered: search/replace sidebar coherence + replace-all confirmation policy (`A35-SRX-1`).
+2. Landed packet scope:
+   1. Search panel upgraded to full Search+Replace controls,
+   2. toolbar/sidebar control sync is deterministic in both directions,
+   3. replace-all confirmation modal enforced for FILE/LOCALE/POOL with positive matches,
+   4. packet lane `make test-search-a35` is wired and green,
+   5. manual scenario `search-replace-sidebar-all-scopes` is registered.
+3. Safety boundary retained:
+   1. replace scope remains Preferences-driven,
+   2. no per-file toggle UI in confirmation modal,
+   3. locale-agnostic production copy policy remains mandatory.
 4. Current evidence on `dev`:
-   1. `make test-status-a34`,
+   1. `make test-search-a35`,
    2. `make test-ui-manual-contract`,
-   3. `make ui-manual-run SCENARIO=status-triage-mixed-indicator ARGS='--auto-only'`,
+   3. `make ui-manual-run SCENARIO=search-replace-sidebar-all-scopes ARGS='--headless-result passed --headless-notes "a35 automation fallback"'`,
    4. `make verify-fast`,
    5. `make docs-check`.
-5. Remaining closure evidence for this UI packet:
-   1. interactive manual scenario pass/fail checklist artifact (non-`auto-only`) is still required for final packet closure.
+5. Two-stage closure note:
+   1. implementation/docs/tests are complete,
+   2. one interactive manual scenario checklist artifact (non-`--headless-result` and non-`--auto-only`) remains tracked as release-evidence debt.
 
-## 8) Immediate Execution Order (A34)
+## 9) Immediate Execution Order (Post-A35)
 
-1. Implement `A34-UX-1` in panel helper layer only (no broader GUI refactor).
-2. Keep UI packet evidence strict:
-   1. `make test-status-a34`,
-   2. `make test-ui-manual-contract`,
-   3. `make ui-manual-run SCENARIO=status-triage-mixed-indicator`.
-3. Keep umbrella strict gates green:
+1. Preserve staged closures and evidence debt tracking:
+   1. `A34` and `A35` are staged complete with interactive-manual evidence debt noted.
+2. Keep umbrella strict gates green:
    1. `make verify-fast`,
    2. `make docs-check`.
-4. Preserve deferred stream sequencing after `A34`:
-   1. `A29`/`A30`/`A31`/`A32`/`A33` remain closed,
-   2. no reopening closed packet scopes.
-
-## 9) Non-Negotiable Constraints
+3. Preserve deferred stream sequencing:
+   1. `A29`/`A30`/`A31`/`A32`/`A33` are closed,
+   2. `A34` is staged complete (interactive evidence debt tracked),
+   3. `A35` is staged complete (interactive evidence debt tracked),
+   4. no reopening closed packet implementation scopes.
+## 10) Non-Negotiable Constraints
 
 1. Canonical behavior remains defined by `docs/spec/technical.md` and `docs/ux/use_cases.md`.
 2. History docs are non-normative and must not conflict with canonical docs.

@@ -49,8 +49,8 @@ sequenceDiagram
 |---|---|
 | Goal | Perform scoped replacement safely across rows/files. |
 | Trigger | Replace mode enabled in top bar. |
-| Success | Supports single replace and replace-all in configured scope; regex capture replacement allowed; empty-match regex guarded to one replacement per cell. |
-| Safety | Multi-file replace requires explicit confirmation summary. |
+| Success | Supports single replace and replace-all in configured scope; regex capture replacement allowed; empty-match regex guarded to one replacement per cell; Search sidebar and toolbar controls stay synchronized. |
+| Safety | Replace-all requires explicit confirmation summary for FILE, LOCALE, and POOL scopes when matches exist. |
 
 ## UC-13m QA Findings Side Panel
 

@@ -1,5 +1,5 @@
 # TranslationZed-Py — Automation Surface
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-09_
 
 ## 1) Purpose
 
@@ -55,6 +55,7 @@ Canonical behavior still lives in:
 | Randomized fast lane | `make test-prop-fast` | Hypothesis fast profile (`TZP_PROP_PROFILE=fast`) for property/stateful suites |
 | Randomized slow lane | `make test-prop-slow` | Hypothesis slow profile (`TZP_PROP_PROFILE=slow`) for deeper state-space sweeps |
 | A34 status-triage packet lane | `make test-status-a34` | targeted status-bar mixed-selection indicator and status-triage helper coverage |
+| A35 search/replace packet lane | `make test-search-a35` | targeted Search+Replace sidebar sync, replace-all confirmation, and dialog summary contracts |
 | Coverage strict lane | `make test-cov` | strict coverage gate (`translationzed_py>=92%`, `translationzed_py/core>=97%`) |
 | Coverage promotion contract lane | `make test-cov-promotion-contract` | checker regression suite for consecutive coverage-promotion evidence |
 | Coverage promotion readiness | `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='<run1.json> <run2.json>'` | machine-check two-run tail readiness at `92/97` |
@@ -79,6 +80,7 @@ Canonical behavior still lives in:
 11. `make test-prop-fast` -> run randomized/property fast profile (`TZP_PROP_PROFILE=fast`)
 12. `make test-prop-slow` -> run randomized/property slow profile (`TZP_PROP_PROFILE=slow`)
 13. `make test-status-a34` -> run status-triage mixed-selection packet suite
+14. `make test-search-a35` -> run Search+Replace sidebar and all-scope replace-all confirmation suite
 
 ## 7) Command Selection Hints
 

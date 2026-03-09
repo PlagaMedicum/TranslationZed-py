@@ -1,4 +1,4 @@
-_Last updated: 2026-03-08_
+_Last updated: 2026-03-09_
 
 # Checklists
 
@@ -79,6 +79,9 @@ Quick command-profile orientation:
   - Executes the same randomized/stateful suites in slow profile (`TZP_PROP_PROFILE=slow`)
 - **Run** `make test-status-a34` when touching status-triage/status-bar selection UX
   - Executes targeted status-bar mixed-selection and status-triage helper contracts
+- **Run** `make test-search-a35` when touching Search/Replace sidebar controls,
+  replace-all confirmation policy, or replace dialog summary behavior
+  - Executes targeted Search+Replace sidebar sync + all-scope confirmation contracts
 - **Run** `make locale-agnostic-check` when touching production UI copy or contributor guidance docs
   - Hard-fail guard for locale-agnostic policy in production GUI strings and canonical docs guidance text
   - Tests/fixtures are exempt; use allowlist marker `locale-agnostic: allow` only for narrow technical exceptions
@@ -89,6 +92,8 @@ Quick command-profile orientation:
   - `make ui-manual-batch SCENARIOS=<id1,id2,...>`
   - For UI-facing packets, attach at least one relevant scenario result artifact
     (`artifacts/manual-ui/*.json`) in PR evidence; backend-only packets are exempt
+  - For A35 Search/Replace packet evidence, run
+    `make ui-manual-run SCENARIO=search-replace-sidebar-all-scopes`
 - **Run** `make verify-ci` before opening a PR when you need strict check-only parity
   with CI (non-mutating, fail-on-drift)
 - **Run** `make verify-heavy` when you need full strict gates plus advisory mutation
