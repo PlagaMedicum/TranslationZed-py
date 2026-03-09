@@ -98,8 +98,19 @@ def test_tm_language_dialog_defaults_and_skip_all_flow(qtbot) -> None:
 
 def test_replace_files_dialog_renders_items_and_confirms(qtbot) -> None:
     """Verify replace-all dialog renders file rows and confirm state."""
-    dialog = ReplaceFilesDialog([("one.txt", 3), "two.txt"], "locale")
+    dialog = ReplaceFilesDialog(
+        [("one.txt", 3), "two.txt"],
+        "Pool (2)",
+        total_matches=4,
+        affected_files=2,
+    )
     qtbot.addWidget(dialog)
+    from PySide6.QtWidgets import QLabel
+
+    labels = [widget.text() for widget in dialog.findChildren(QLabel)]
+    assert any("Scope: Pool (2)" in text for text in labels)
+    assert any("Total replacements: 4" in text for text in labels)
+    assert any("Affected files: 2" in text for text in labels)
 
     assert dialog.confirmed() is False
     dialog._confirm()

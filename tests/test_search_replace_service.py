@@ -517,8 +517,8 @@ def test_build_replace_all_plan_aggregates_counts() -> None:
     assert plan.counts == [("a", 1), ("b", 2)]
 
 
-def test_build_replace_all_run_plan_file_scope_skips_confirmation() -> None:
-    """Verify build replace all run plan file scope skips confirmation."""
+def test_build_replace_all_run_plan_file_scope_requires_confirmation() -> None:
+    """Verify build replace all run plan requires confirmation for file scope."""
     files = [Path("a.txt")]
     plan = build_replace_all_run_plan(
         scope="FILE",
@@ -532,8 +532,11 @@ def test_build_replace_all_run_plan_file_scope_skips_confirmation() -> None:
     )
     assert plan is not None
     assert plan.run_replace is True
-    assert plan.show_confirmation is False
+    assert plan.show_confirmation is True
     assert plan.scope_label == "File"
+    assert plan.total_matches == 3
+    assert plan.affected_files == 1
+    assert list(plan.counts) == [("a", 3)]
 
 
 def test_build_replace_all_run_plan_multi_file_requires_confirmation() -> None:
@@ -553,6 +556,8 @@ def test_build_replace_all_run_plan_multi_file_requires_confirmation() -> None:
     assert plan.run_replace is True
     assert plan.show_confirmation is True
     assert plan.scope_label == "Locale BE"
+    assert plan.total_matches == 3
+    assert plan.affected_files == 2
     assert list(plan.counts) == [("a", 1), ("b", 2)]
 
 
@@ -573,6 +578,9 @@ def test_build_replace_all_run_plan_multi_file_zero_total_skips_replace() -> Non
     assert plan.run_replace is False
     assert plan.show_confirmation is False
     assert plan.scope_label == "Pool (2)"
+    assert plan.total_matches == 0
+    assert plan.affected_files == 0
+    assert list(plan.counts) == []
 
 
 def test_apply_replace_all_runs_current_then_other_files() -> None:

@@ -52,6 +52,8 @@ class ReplaceAllRunPlan:
     run_replace: bool
     show_confirmation: bool
     scope_label: str
+    total_matches: int
+    affected_files: int
     counts: tuple[tuple[str, int], ...]
 
 
@@ -658,17 +660,6 @@ def build_replace_all_run_plan(
     count_in_file: Callable[[Path], int | None],
 ) -> ReplaceAllRunPlan | None:
     """Build replace all run plan."""
-    if scope == "FILE" or len(files) <= 1:
-        return ReplaceAllRunPlan(
-            run_replace=True,
-            show_confirmation=False,
-            scope_label=scope_label(
-                scope=scope,
-                current_locale=current_locale,
-                selected_locale_count=selected_locale_count,
-            ),
-            counts=(),
-        )
     planned = build_replace_all_plan(
         files=files,
         current_file=current_file,
@@ -687,6 +678,8 @@ def build_replace_all_run_plan(
                 current_locale=current_locale,
                 selected_locale_count=selected_locale_count,
             ),
+            total_matches=0,
+            affected_files=0,
             counts=(),
         )
     return ReplaceAllRunPlan(
@@ -697,6 +690,8 @@ def build_replace_all_run_plan(
             current_locale=current_locale,
             selected_locale_count=selected_locale_count,
         ),
+        total_matches=planned.total,
+        affected_files=len(planned.counts),
         counts=tuple(planned.counts),
     )
 

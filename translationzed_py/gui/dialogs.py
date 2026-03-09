@@ -267,16 +267,26 @@ class ReplaceFilesDialog(QDialog):
         self,
         files: Iterable[str] | Iterable[tuple[str, int]],
         scope_label: str,
+        *,
+        total_matches: int,
+        affected_files: int,
         parent=None,
     ) -> None:
         """Initialize the instance."""
         super().__init__(parent)
-        self.setWindowTitle("Replace in multiple files")
+        self.setWindowTitle("Confirm Replace All")
         self.setModal(True)
         self._confirmed = False
 
         main_layout = QVBoxLayout(self)
-        main_layout.addWidget(QLabel(f"Replace matches in {scope_label} files:"))
+        summary = QLabel(self)
+        summary.setWordWrap(True)
+        summary.setText(
+            f"Scope: {scope_label}\n"
+            f"Total replacements: {max(0, int(total_matches))}\n"
+            f"Affected files: {max(0, int(affected_files))}"
+        )
+        main_layout.addWidget(summary)
 
         list_widget = QListWidget(self)
         list_widget.setSelectionMode(QAbstractItemView.NoSelection)
