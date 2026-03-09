@@ -295,6 +295,27 @@ RANDOMIZED_POLICY_SNIPPETS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+A35_SEARCH_REPLACE_SNIPPETS: dict[str, tuple[str, ...]] = {
+    "quality/testing_strategy.md": (
+        "make test-search-a35",
+        "search-replace-sidebar-all-scopes",
+    ),
+    "operations/checklists.md": (
+        "make test-search-a35",
+        "search-replace-sidebar-all-scopes",
+    ),
+    "reference/automation_surface.md": (
+        "make test-search-a35",
+        "A35 search/replace packet lane",
+    ),
+    "reference/test_surface.md": (
+        "make test-search-a35",
+        "tests/test_main_window_replace_merge_clipboard.py",
+        "tests/test_search_replace_service.py",
+    ),
+    "reference/quick_context.md": ("make test-search-a35",),
+}
+
 
 def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -600,6 +621,22 @@ def _validate_randomized_policy_surface(docs_root: Path) -> list[str]:
     return errors
 
 
+def _validate_a35_search_replace_surface(docs_root: Path) -> list[str]:
+    errors: list[str] = []
+    for rel, snippets in A35_SEARCH_REPLACE_SNIPPETS.items():
+        path = docs_root / rel
+        if not path.is_file():
+            errors.append(f"missing A35 search/replace policy page: {path}")
+            continue
+        text = _read_text(path)
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(
+                    f"{path}: missing A35 search/replace policy snippet: {snippet!r}"
+                )
+    return errors
+
+
 def _validate_active_plan_drift(docs_root: Path) -> list[str]:
     errors: list[str] = []
     active_path = docs_root / "plan/implementation_active.md"
@@ -815,6 +852,7 @@ def main() -> int:
     errors.extend(_validate_workflow_api_surface(docs_root))
     errors.extend(_validate_quick_context_orientation_links(docs_root))
     errors.extend(_validate_randomized_policy_surface(docs_root))
+    errors.extend(_validate_a35_search_replace_surface(docs_root))
     errors.extend(_validate_active_plan_drift(docs_root))
     errors.extend(_validate_tm_long_variant_contract(docs_root))
     errors.extend(_validate_mkdocs_contract(Path.cwd()))

@@ -412,3 +412,30 @@ def test_randomized_policy_surface_passes_with_required_snippets(
         path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
     errors = module._validate_randomized_policy_surface(docs_root)
     assert errors == []
+
+
+def test_a35_search_replace_surface_detects_missing_snippets(tmp_path: Path) -> None:
+    """A35 docs surface should fail when required snippets are absent."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel in module.A35_SEARCH_REPLACE_SNIPPETS:
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# Placeholder\n", encoding="utf-8")
+    errors = module._validate_a35_search_replace_surface(docs_root)
+    assert errors
+    assert any("missing A35 search/replace policy snippet" in err for err in errors)
+
+
+def test_a35_search_replace_surface_passes_with_required_snippets(
+    tmp_path: Path,
+) -> None:
+    """A35 docs surface should pass when required snippets are present."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel, snippets in module.A35_SEARCH_REPLACE_SNIPPETS.items():
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
+    errors = module._validate_a35_search_replace_surface(docs_root)
+    assert errors == []
