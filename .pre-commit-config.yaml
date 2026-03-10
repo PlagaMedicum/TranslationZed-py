@@ -1,17 +1,15 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
+  - repo: local
     hooks:
-      - id: ruff
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
-    hooks:
-      - id: mypy
-  - repo: https://github.com/psf/black
-    rev: 24.1.0
-    hooks:
-      - id: black
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.8
-    hooks:
-      - id: bandit
+      - id: gate-commit
+        name: gate-commit
+        entry: make gate-commit
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+      - id: gate-push
+        name: gate-push
+        entry: make gate-push
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

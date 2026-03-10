@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "default_fast_targets": [],
+  "full_targets": [
+    "test-a31-manual",
+    "test-cr-v09",
+    "test-qa-v09",
+    "test-search-a37",
+    "test-src-a29",
+    "test-status-a34",
+    "test-tmq-v09",
+    "test-tmw-v09",
+    "test-tzp-a30",
+    "test-ui-manual-contract"
+  ],
+  "rules": [
+    {
+      "id": "manual-framework",
+      "description": "Manual scenario framework/runtime and contract files",
+      "match_globs": [
+        "scripts/ui_manual_*",
+        "tests/manual_scenarios/**",
+        "tests/test_manual_scenario*.py",
+        "tests/test_ui_manual_*.py",
+        "translationzed_py/gui/manual_scenario_*.py"
+      ],
+      "targets_fast": [
+        "test-a31-manual",
+        "test-ui-manual-contract"
+      ],
+      "targets_full": [
+        "test-a31-manual",
+        "test-ui-manual-contract"
+      ]
+    },
+    {
+      "id": "qa",
+      "description": "QA rule model, async orchestration, and panel integration",
+      "match_globs": [
+        "translationzed_py/core/qa*.py",
+        "translationzed_py/gui/qa*.py",
+        "tests/test_qa*.py",
+        "tests/test_gui_qa_panel.py"
+      ],
+      "targets_fast": [
+        "test-qa-v09"
+      ],
+      "targets_full": [
+        "test-qa-v09"
+      ]
+    },
+    {
+      "id": "tmq",
+      "description": "TM ranking/scoring/explainability core",
+      "match_globs": [
+        "translationzed_py/core/tm_query*.py",
+        "translationzed_py/core/tm_store*.py",
+        "tests/test_tm_query*.py",
+        "tests/test_tm_store*.py",
+        "tests/test_tm_ranking_corpus.py"
+      ],
+      "targets_fast": [
+        "test-tmq-v09"
+      ],
+      "targets_full": [
+        "test-tmq-v09"
+      ]
+    },
+    {
+      "id": "tmw",
+      "description": "TM workflow grouping/apply UX integration",
+      "match_globs": [
+        "translationzed_py/core/tm_workflow_service.py",
+        "tests/test_tm_workflow_service.py",
+        "tests/test_gui_tm_preferences.py"
+      ],
+      "targets_fast": [
+        "test-tmw-v09"
+      ],
+      "targets_full": [
+        "test-tmw-v09"
+      ]
+    },
+    {
+      "id": "cr",
+      "description": "Crash/session-resume startup flow",
+      "match_globs": [
+        "translationzed_py/core/project_session.py",
+        "translationzed_py/core/session_resume.py",
+        "translationzed_py/gui/main_window_bootstrap*.py",
+        "tests/test_project_session.py",
+        "tests/test_main_window_bootstrap_helpers.py"
+      ],
+      "targets_fast": [
+        "test-cr-v09"
+      ],
+      "targets_full": [
+        "test-cr-v09"
+      ]
+    },
+    {
+      "id": "source-reference",
+      "description": "Source-reference fallback policy and GUI binding",
+      "match_globs": [
+        "translationzed_py/core/source_reference*.py",
+        "translationzed_py/gui/source_reference*.py",
+        "tests/test_source_reference*.py"
+      ],
+      "targets_fast": [
+        "test-src-a29"
+      ],
+      "targets_full": [
+        "test-src-a29"
+      ]
+    },
+    {
+      "id": "tzp-writeback",
+      "description": "TZP comment write-back pipeline",
+      "match_globs": [
+        "translationzed_py/core/tzp_comment_policy.py",
+        "translationzed_py/core/parser.py",
+        "translationzed_py/core/saver.py",
+        "translationzed_py/core/file_workflow.py",
+        "tests/test_tzp_comment_policy.py",
+        "tests/test_parser_features.py",
+        "tests/test_saver.py",
+        "tests/test_file_workflow.py"
+      ],
+      "targets_fast": [
+        "test-tzp-a30"
+      ],
+      "targets_full": [
+        "test-tzp-a30"
+      ]
+    },
+    {
+      "id": "search-replace",
+      "description": "Search/replace planning and UI confirmation flow",
+      "match_globs": [
+        "translationzed_py/core/search_replace_service.py",
+        "translationzed_py/gui/main_window*.py",
+        "translationzed_py/gui/dialogs.py",
+        "tests/test_search_replace_service.py",
+        "tests/test_main_window_replace_merge_clipboard.py",
+        "tests/test_gui_service_adapters.py",
+        "tests/test_gui_dialogs.py"
+      ],
+      "targets_fast": [
+        "test-search-a37"
+      ],
+      "targets_full": [
+        "test-search-a37"
+      ]
+    },
+    {
+      "id": "status-triage",
+      "description": "Status-bar mixed-selection indicator and triage helpers",
+      "match_globs": [
+        "translationzed_py/gui/main_window_panel_helpers.py",
+        "tests/test_main_window_cache_replace_helpers.py"
+      ],
+      "targets_fast": [
+        "test-status-a34"
+      ],
+      "targets_full": [
+        "test-status-a34"
+      ]
+    }
+  ]
+}

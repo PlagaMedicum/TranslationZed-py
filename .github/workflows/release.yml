@@ -49,8 +49,8 @@ jobs:
               sys.exit(2)
           print(f"Release tag: {tag}")
           PY
-      - name: Verify project quality gates (strict)
-        run: make verify-ci TAG=${{ env.RELEASE_TAG }} BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20
+      - name: Verify project quality gates (strict L6)
+        run: make gate-release TAG=${{ env.RELEASE_TAG }}
 
   build:
     needs: preflight

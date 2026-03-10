@@ -11,6 +11,17 @@ case "$FMT_SCOPE" in
     while IFS= read -r path; do
       PY_FILES+=("$path")
     done < <(python_source_files)
+    if [ "${#PY_FILES[@]}" -eq 0 ]; then
+      echo "fmt: no Python sources discovered under translationzed_py/tests/scripts."
+      exit 0
+    fi
+    for path in "${PY_FILES[@]}"; do
+      (
+        cd "$ROOT_DIR"
+        "$VENV_PY" -m black --fast --workers 1 "$path"
+      )
+    done
+    exit 0
     ;;
   changed)
     PY_FILES=()
@@ -34,16 +45,9 @@ if [ "${#PY_FILES[@]}" -eq 0 ]; then
 fi
 
 if [ "$FMT_SCOPE" = "changed" ]; then
-  for path in "${PY_FILES[@]}"; do
-    (
-      cd "$ROOT_DIR"
-      "$VENV_PY" -m black --fast "$path"
-    )
-  done
+  (
+    cd "$ROOT_DIR"
+    "$VENV_PY" -m black --fast --workers 1 "${PY_FILES[@]}"
+  )
   exit 0
 fi
-
-(
-  cd "$ROOT_DIR"
-  "$VENV_PY" -m black --fast "${PY_FILES[@]}"
-)

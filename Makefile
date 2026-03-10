@@ -25,12 +25,12 @@ COVERAGE_PROMOTION_SUMMARIES ?=
 COVERAGE_PROMOTION_OUT_JSON ?= $(ARTIFACTS)/coverage/promotion-readiness.json
 
 # ─── Meta targets ─────────────────────────────────────────────────────────────
-.PHONY: venv install precommit fmt fmt-changed fmt-check lint lint-check typecheck arch-check locale-agnostic-check \
-	test test-cov test-prop-fast test-prop-slow test-search-a35 test-status-a34 test-qa-v09 test-tmq-v09 test-tmw-v09 test-cr-v09 test-src-a29 test-tzp-a30 test-ui-manual-contract test-a31-manual test-perf test-perf-scale test-perf-heavy perf-advisory check check-local verify verify-ci verify-ci-core verify-ci-bench verify-core \
-	verify-heavy verify-heavy-extra verify-fast release-check release-check-if-tag release-dry-run \
+.PHONY: venv install precommit fmt fmt-changed fmt-check fmt-check-changed lint lint-check typecheck arch-check locale-agnostic-check \
+	test test-cov test-core-fast test-routed-fast test-routed-full test-prop-fast test-prop-slow test-search-a35 test-search-a37 test-status-a34 test-qa-v09 test-tmq-v09 test-tmw-v09 test-cr-v09 test-src-a29 test-tzp-a30 test-ui-manual-contract test-a31-manual test-perf test-perf-scale test-perf-heavy \
+	gate-dev gate-commit gate-push gate-task-close gate-ci-pr gate-heavy-advisory gate-release release-check release-dry-run release-evidence-check \
 	security docstyle docs-build docs-build-lite docs-index docs-api docs-contract docs-check code-triage review-queue-check \
 	docs-index-write \
-	bench bench-check bench-advisory test-mutation \
+	bench bench-check test-mutation \
 	test-mutation-stage mutation-promotion-check mutation-promotion-readiness \
 	test-cov-promotion-contract coverage-promotion-check \
 	test-warnings run ui-manual-list ui-manual-run ui-manual-headless ui-manual-batch clean clean-cache clean-config perf-scenarios perf-dependency-eval ci-deps dist pack pack-win \
@@ -59,6 +59,9 @@ fmt-changed:
 fmt-check:
 	VENV=$(VENV) bash scripts/fmt_check.sh
 
+fmt-check-changed:
+	FMT_SCOPE=changed VENV=$(VENV) bash scripts/fmt_check.sh
+
 lint:
 	VENV=$(VENV) bash scripts/lint.sh
 
@@ -80,6 +83,29 @@ test:
 test-cov:
 	VENV=$(VENV) ARTIFACTS=$(ARTIFACTS) bash scripts/test_cov.sh
 
+test-core-fast:
+	VENV=$(VENV) bash scripts/test_core_fast.sh $(ARGS)
+
+test-routed-fast:
+	@set -e; \
+	targets="$$(VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/select_test_targets.py --mode fast --output shell $(ARGS))"; \
+	if [ -z "$$targets" ]; then \
+		echo "test-routed-fast: no packet lanes matched changed files."; \
+	else \
+		for target in $$targets; do \
+			echo "test-routed-fast: running $$target"; \
+			$(MAKE) "$$target"; \
+		done; \
+	fi
+
+test-routed-full:
+	@set -e; \
+	targets="$$(VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/select_test_targets.py --mode full --output shell $(ARGS))"; \
+	for target in $$targets; do \
+		echo "test-routed-full: running $$target"; \
+		$(MAKE) "$$target"; \
+	done
+
 test-prop-fast:
 	VENV=$(VENV) bash scripts/test_prop_fast.sh $(ARGS)
 
@@ -88,6 +114,9 @@ test-prop-slow:
 
 test-search-a35:
 	VENV=$(VENV) bash scripts/test_search_a35.sh $(ARGS)
+
+test-search-a37:
+	VENV=$(VENV) bash scripts/test_search_a37.sh $(ARGS)
 
 test-status-a34:
 	VENV=$(VENV) bash scripts/test_status_a34.sh $(ARGS)
@@ -238,110 +267,64 @@ test-readonly-clean:
 test-warnings:
 	VENV=$(VENV) bash scripts/test_warnings.sh
 
-# ─── Fast dev gates ────────────────────────────────────────────────────────────
-## strict non-mutating quality gate (check-only) for CI
-check: fmt-check lint-check typecheck arch-check locale-agnostic-check test-ui-manual-contract test
+# ─── Layered policy gates ─────────────────────────────────────────────────────
+## L0 regular dev loop
+gate-dev: fmt-check-changed lint-check typecheck arch-check locale-agnostic-check
 
-## local quality gate (allows auto-fix)
-check-local: fmt lint typecheck arch-check locale-agnostic-check test-ui-manual-contract test
+## L1 pre-commit (hook target)
+gate-commit: gate-dev test-ui-manual-contract
 
-# ─── Verification umbrella gates ───────────────────────────────────────────────
-## full local verification core (auto-fix + warning policy)
-verify-core: clean-cache clean-config fmt-changed lint typecheck arch-check locale-agnostic-check perf-advisory \
-	bench-advisory test-ui-manual-contract test-cov test-readonly-clean security docs-check
+## L2 pre-push (hook target)
+gate-push: gate-commit test-core-fast test-routed-fast test-readonly-clean
 
-## local perf gates are advisory; strict blocking lives in verify-ci
-perf-advisory:
-	@$(MAKE) test-perf || { \
-		echo "verify warning: test-perf failed (advisory in local verify)."; \
+## L3 task-close / docs-close gate
+gate-task-close: gate-push test-cov docs-check test-perf-scale
+
+## L4 strict CI gate for push/PR
+gate-ci-pr: clean-cache clean-config fmt-check lint-check typecheck arch-check locale-agnostic-check \
+	test-ui-manual-contract test-core-fast test-cov \
+	test-readonly-clean security docs-check test-perf-scale
+
+## L5 heavy advisory lane (scheduled/manual)
+gate-heavy-advisory:
+	@$(MAKE) test-prop-slow || { \
+		echo "gate-heavy-advisory warning: test-prop-slow failed (advisory)."; \
 	}
-	@$(MAKE) test-perf-scale || { \
-		echo "verify warning: test-perf-scale failed (advisory in local verify)."; \
+	@$(MAKE) test-perf-heavy || { \
+		echo "gate-heavy-advisory warning: test-perf-heavy failed (advisory)."; \
 	}
-	@$(MAKE) perf-scenarios || { \
-		echo "verify warning: perf-scenarios failed (advisory in local verify)."; \
-	}
-
-## local benchmark regression is advisory; strict blocking lives in verify-ci
-bench-advisory:
-	@$(MAKE) bench-check BENCH_COMPARE_MODE=warn || { \
-		echo "verify warning: bench-check failed (advisory in local verify)."; \
+	@$(MAKE) test-mutation-stage MUTATION_STAGE=soft MUTATION_STAGE_MIN_KILLED_PERCENT=$(MUTATION_STAGE_MIN_KILLED_PERCENT) || { \
+		echo "gate-heavy-advisory warning: mutation lane failed (advisory)."; \
 	}
 
-## full local verification (auto-fix allowed, warn if tracked files changed)
-verify:
-	@set -e; \
-	before="$$(mktemp)"; \
-	after="$$(mktemp)"; \
-	trap 'rm -f "$$before" "$$after"' EXIT; \
-	git status --porcelain --untracked-files=no >"$$before"; \
-	$(MAKE) verify-core; \
-	$(MAKE) release-check-if-tag TAG=$(TAG); \
-	git status --porcelain --untracked-files=no >"$$after"; \
-	if ! cmp -s "$$before" "$$after"; then \
-		echo "verify warning: auto-fixers changed tracked files. Review and commit updates."; \
-		diff -u "$$before" "$$after" || true; \
+## L6 release-tag strict gate
+gate-release:
+	@if [ -z "$(TAG)" ]; then \
+		echo "TAG is required (example: make gate-release TAG=v0.9.0-rc1)"; \
+		exit 2; \
 	fi
+	$(MAKE) gate-ci-pr
+	$(MAKE) bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20
+	$(MAKE) test-prop-slow
+	$(MAKE) test-perf-heavy
+	$(MAKE) test-mutation-stage MUTATION_STAGE=strict MUTATION_STAGE_MIN_KILLED_PERCENT=$(MUTATION_STAGE_MIN_KILLED_PERCENT)
+	$(MAKE) release-check TAG=$(TAG)
 
-## strict CI verification core (non-mutating)
-verify-ci-core: clean-cache clean-config fmt-check lint-check typecheck arch-check locale-agnostic-check test-cov test-perf test-perf-scale \
-	test-ui-manual-contract test-readonly-clean security docs-check perf-scenarios release-check-if-tag
-
-## CI benchmark gate helper; can be skipped when a dedicated benchmark job is used.
-verify-ci-bench:
-	@if [ "$(VERIFY_SKIP_BENCH)" = "1" ]; then \
-		echo "verify-ci: bench-check skipped (VERIFY_SKIP_BENCH=1; use dedicated benchmark gate)."; \
-	else \
-		$(MAKE) bench-check; \
-	fi
-
-## strict CI verification (non-mutating + fail-on-drift)
-verify-ci:
-	@set -e; \
-	before="$$(mktemp)"; \
-	after="$$(mktemp)"; \
-	trap 'rm -f "$$before" "$$after"' EXIT; \
-	git status --porcelain --untracked-files=no >"$$before"; \
-	$(MAKE) verify-ci-core TAG=$(TAG); \
-	$(MAKE) verify-ci-bench; \
-	git status --porcelain --untracked-files=no >"$$after"; \
-	if ! cmp -s "$$before" "$$after"; then \
-		echo "verify-ci failed: tracked files changed during verification."; \
-		diff -u "$$before" "$$after" || true; \
-		exit 1; \
-	fi
-
-## tiered heavy verification (advisory mutation + optional extra checks)
-verify-heavy-extra: test-perf-heavy test-prop-slow test-mutation
-
-## tiered heavy verification (strict base + heavy extras)
-verify-heavy: verify-ci verify-heavy-extra
-
-## fastest strict developer gate
-verify-fast: check
-
-# ─── Release gates ─────────────────────────────────────────────────────────────
-## run release-check only when TAG is provided (keeps verify single-command friendly)
-release-check-if-tag:
-	@if [ -n "$(TAG)" ]; then \
-		echo "TAG=$(TAG) detected; running release-check"; \
-		$(MAKE) release-check TAG=$(TAG); \
-	else \
-		echo "release-check skipped (set TAG=vX.Y.Z to include it)"; \
-	fi
-
+# ─── Release checks ───────────────────────────────────────────────────────────
 ## validate release tag/version/changelog alignment
-release-check:
+release-check: release-evidence-check
 	TAG=$(TAG) VENV=$(VENV) bash scripts/release_check.sh $(ARGS)
+
+release-evidence-check:
+	VENV=$(VENV) PY=$(PY) bash scripts/run_python.sh scripts/release_evidence_check.py $(ARGS)
 
 ## run release-candidate dry run gates before final tagging
 release-dry-run:
 	@if [ -z "$(TAG)" ]; then \
-		echo "TAG is required (example: make release-dry-run TAG=v0.6.0-rc1)"; \
+		echo "TAG is required (example: make release-dry-run TAG=v0.9.0-rc1)"; \
 		exit 2; \
 	fi
-	$(MAKE) verify TAG=$(TAG)
-	$(MAKE) release-check TAG=$(TAG)
+	$(MAKE) gate-release TAG=$(TAG)
 
 # ─── Utilities ─────────────────────────────────────────────────────────────────
 ## run perf scenarios against fixture translation files
