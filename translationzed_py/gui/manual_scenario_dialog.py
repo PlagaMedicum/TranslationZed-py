@@ -1,4 +1,4 @@
-"""Modal checklist dialog for manual UI scenario runs."""
+"""Checklist dialog for manual UI scenario runs."""
 
 from __future__ import annotations
 

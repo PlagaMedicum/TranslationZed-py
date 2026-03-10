@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import html
 import os
+import re
 import time
 from collections.abc import Iterable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -31,7 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from translationzed_py.core import parse_lazy
+from translationzed_py.core import parse, parse_lazy
 from translationzed_py.core.file_workflow import (
     StatusCommentWritebackOptions as _StatusCommentWritebackOptions,
 )
@@ -52,6 +53,15 @@ from translationzed_py.core.search import Match as _SearchMatch
 from translationzed_py.core.search import SearchField as _SearchField
 from translationzed_py.core.search import SearchQueryPlan as _SearchQueryPlan
 from translationzed_py.core.search import SearchRow as _SearchRow
+from translationzed_py.core.search_replace_service import (
+    ReplaceAllFileParseError as _ReplaceAllFileParseError,
+)
+from translationzed_py.core.search_replace_service import (
+    ReplaceAllFilePreviewCallbacks as _ReplaceAllFilePreviewCallbacks,
+)
+from translationzed_py.core.search_replace_service import (
+    ReplaceAllRowsPreviewCallbacks as _ReplaceAllRowsPreviewCallbacks,
+)
 from translationzed_py.core.status_cache import read as _read_status_cache
 from translationzed_py.core.tm_query import TMQueryKey, TMQueryPolicy
 from translationzed_py.core.tm_store import TMMatch, TMStore
@@ -61,6 +71,7 @@ from translationzed_py.core.tm_workflow_service import (
 
 from . import languagetool_adapter as _lt_adapter
 from .delegates import MAX_VISUAL_CHARS
+from .dialogs import ReplaceFilesDialog
 from .manual_scenario_dialog import ManualScenarioChecklistDialog
 from .manual_scenario_runtime import (
     SCENARIO_ENV_FILE,
@@ -81,6 +92,205 @@ from .tm_preview import prepare_tm_preview_terms as _prepare_tm_preview_terms
 
 _PROGRESS_POLL_INTERVAL_MS = 70
 _SESSION_RESUME_WRITE_DEBOUNCE_MS = 280
+
+
+def display_path_for_root(root: Path, path: Path) -> str:
+    """Return path relative to root when possible, otherwise absolute-ish string."""
+    with contextlib.suppress(ValueError):
+        return str(path.relative_to(root))
+    return str(path)
+
+
+def _replace_all_preview_in_model(
+    win,
+    *,
+    pattern: re.Pattern[str],
+    replacement: str,
+    use_regex: bool,
+    matches_empty: bool,
+    has_group_ref: bool,
+) -> tuple[tuple[int, str, str], ...] | None:
+    model = getattr(win, "_current_model", None)
+    if model is None:
+        return ()
+    callbacks = _ReplaceAllRowsPreviewCallbacks(
+        row_count=model.rowCount,
+        read_text=lambda row: model.index(row, 2).data(Qt.EditRole),
+    )
+    try:
+        return win._search_replace_service.preview_replace_all_in_rows(
+            pattern=pattern,
+            replacement=replacement,
+            use_regex=use_regex,
+            matches_empty=matches_empty,
+            has_group_ref=has_group_ref,
+            callbacks=callbacks,
+        )
+    except re.error as exc:
+        QMessageBox.warning(win, "Replace failed", str(exc))
+        return None
+
+
+def _replace_all_preview_in_file(
+    win,
+    *,
+    path: Path,
+    pattern: re.Pattern[str],
+    replacement: str,
+    use_regex: bool,
+    matches_empty: bool,
+    has_group_ref: bool,
+) -> tuple[tuple[int, str, str], ...] | None:
+    locale = win._locale_for_path(path)
+    meta = win._locales.get(locale)
+    encoding = getattr(meta, "charset", "utf-8")
+    callbacks = _ReplaceAllFilePreviewCallbacks(
+        parse_file=lambda file_path: parse(file_path, encoding=encoding),
+        read_cache=lambda file_path: _read_status_cache(win._root, file_path),
+    )
+    try:
+        return win._search_replace_service.preview_replace_all_in_file(
+            path,
+            pattern=pattern,
+            replacement=replacement,
+            use_regex=use_regex,
+            matches_empty=matches_empty,
+            has_group_ref=has_group_ref,
+            callbacks=callbacks,
+            hash_for_entry=lambda entry, cache_map: win._hash_for_cache(
+                entry, cache_map
+            ),
+        )
+    except _ReplaceAllFileParseError as exc:
+        win._report_parse_error(exc.path, exc.original)
+        return None
+    except re.error as exc:
+        QMessageBox.warning(win, "Replace failed", str(exc))
+        return None
+
+
+def build_replace_all_impact_preview(
+    win,
+    *,
+    run_plan,
+    files: list[Path],
+    current_path: Path | None,
+    display_name,
+    request,
+):
+    """Build A37 replace-all impact preview using existing window adapters."""
+    return win._search_replace_service.build_replace_all_impact_preview(
+        run_plan=run_plan,
+        files=files,
+        current_file=current_path,
+        display_name=display_name,
+        preview_in_current=lambda: _replace_all_preview_in_model(
+            win,
+            pattern=request.pattern,
+            replacement=request.replacement,
+            use_regex=request.use_regex,
+            matches_empty=request.matches_empty,
+            has_group_ref=request.has_group_ref,
+        ),
+        preview_in_file=lambda path: _replace_all_preview_in_file(
+            win,
+            path=path,
+            pattern=request.pattern,
+            replacement=request.replacement,
+            use_regex=request.use_regex,
+            matches_empty=request.matches_empty,
+            has_group_ref=request.has_group_ref,
+        ),
+        row_cap=1000,
+    )
+
+
+def run_replace_all(win) -> None:
+    """Execute replace-all orchestration for MainWindow."""
+    if not win._current_model:
+        return
+    request = win._prepare_replace_request()
+    if request is None:
+        return
+    scope = win._replace_scope
+    files = win._files_for_scope(scope)
+    if not files:
+        return
+    current_path = win._current_pf.path if win._current_pf else None
+    locale = win._locale_for_path(current_path) if current_path is not None else None
+
+    def display_name(path: Path) -> str:
+        return display_path_for_root(win._root, path)
+
+    run_plan = win._search_replace_service.build_replace_all_run_plan(
+        scope=scope,
+        current_locale=locale,
+        selected_locale_count=len(win._selected_locales),
+        files=files,
+        current_file=current_path,
+        display_name=display_name,
+        count_in_current=lambda: win._replace_all_count_in_model(
+            request.pattern,
+            request.replacement,
+            request.use_regex,
+            request.matches_empty,
+            request.has_group_ref,
+        ),
+        count_in_file=lambda path: win._replace_all_count_in_file(
+            path,
+            request.pattern,
+            request.replacement,
+            request.use_regex,
+            request.matches_empty,
+            request.has_group_ref,
+        ),
+    )
+    if run_plan is None or not run_plan.run_replace:
+        return
+    if run_plan.show_confirmation:
+        impact_preview = build_replace_all_impact_preview(
+            win,
+            run_plan=run_plan,
+            files=files,
+            current_path=current_path,
+            display_name=display_name,
+            request=request,
+        )
+        if impact_preview is None:
+            return
+        dialog = ReplaceFilesDialog(
+            list(run_plan.counts),
+            run_plan.scope_label,
+            total_matches=run_plan.total_matches,
+            affected_files=run_plan.affected_files,
+            impact_preview=impact_preview,
+            parent=win,
+        )
+        dialog.exec()
+        if not dialog.confirmed():
+            return
+    applied = win._search_replace_service.apply_replace_all(
+        files=files,
+        current_file=current_path,
+        apply_in_current=lambda: win._replace_all_in_model(
+            request.pattern,
+            request.replacement,
+            request.use_regex,
+            request.matches_empty,
+            request.has_group_ref,
+        ),
+        apply_in_file=lambda path: win._replace_all_in_file(
+            path,
+            request.pattern,
+            request.replacement,
+            request.use_regex,
+            request.matches_empty,
+            request.has_group_ref,
+        ),
+    )
+    if not applied:
+        return
+    win._schedule_search()
 
 
 def _run_startup_recovery(win) -> bool:
@@ -1139,6 +1349,7 @@ def _prepare_manual_scenario(
         return selected_locales
     win._manual_scenario_runtime = runtime
     win._manual_scenario_dialog_shown = False
+    win._manual_scenario_dialog = None
     if runtime.scenario.prefs_extras:
         win._prefs_extras.update(runtime.scenario.prefs_extras)
     if selected_locales is not None:
@@ -1159,6 +1370,13 @@ def _show_manual_scenario_dialog(win) -> None:
     runtime = getattr(win, "_manual_scenario_runtime", None)
     if not isinstance(runtime, ManualScenarioRuntime):
         return
+    active_dialog = getattr(win, "_manual_scenario_dialog", None)
+    if active_dialog is not None:
+        with contextlib.suppress(RuntimeError, AttributeError):
+            if active_dialog.isVisible():
+                active_dialog.raise_()
+                active_dialog.activateWindow()
+                return
     if bool(getattr(win, "_manual_scenario_dialog_shown", False)):
         return
     win._manual_scenario_dialog_shown = True
@@ -1167,13 +1385,24 @@ def _show_manual_scenario_dialog(win) -> None:
         results_dir=_manual_scenario_results_dir(),
         parent=win,
     )
-    dialog.exec()
-    result = dialog.final_result
-    if result:
-        win.statusBar().showMessage(
-            f"Manual scenario '{runtime.scenario.id}' marked {result}.",
-            8000,
-        )
+    win._manual_scenario_dialog = dialog
+    dialog.setModal(False)
+    dialog.setWindowModality(Qt.WindowModality.NonModal)
+    dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+
+    def _on_finished(_result_code: int) -> None:
+        result = dialog.final_result
+        if result:
+            win.statusBar().showMessage(
+                f"Manual scenario '{runtime.scenario.id}' marked {result}.",
+                8000,
+            )
+        win._manual_scenario_dialog = None
+
+    dialog.finished.connect(_on_finished)
+    dialog.show()
+    dialog.raise_()
+    dialog.activateWindow()
 
 
 def _schedule_post_startup_hooks(win) -> None:

@@ -269,7 +269,6 @@ from .dialogs import (
     AboutDialog,
     ConflictChoiceDialog,
     LocaleChooserDialog,
-    ReplaceFilesDialog,
     SaveFilesDialog,
     TmLanguageDialog,
 )
@@ -4383,85 +4382,7 @@ class MainWindow(QMainWindow):
             return None
 
     def _replace_all(self) -> None:
-        if not self._current_model:
-            return
-        request = self._prepare_replace_request()
-        if request is None:
-            return
-        scope = self._replace_scope
-        files = self._files_for_scope(scope)
-        if not files:
-            return
-        current_path = self._current_pf.path if self._current_pf else None
-        locale = (
-            self._locale_for_path(current_path) if current_path is not None else None
-        )
-
-        def _display_name(path: Path) -> str:
-            with contextlib.suppress(ValueError):
-                return str(path.relative_to(self._root))
-            return str(path)
-
-        run_plan = self._search_replace_service.build_replace_all_run_plan(
-            scope=scope,
-            current_locale=locale,
-            selected_locale_count=len(self._selected_locales),
-            files=files,
-            current_file=current_path,
-            display_name=_display_name,
-            count_in_current=lambda: self._replace_all_count_in_model(
-                request.pattern,
-                request.replacement,
-                request.use_regex,
-                request.matches_empty,
-                request.has_group_ref,
-            ),
-            count_in_file=lambda path: self._replace_all_count_in_file(
-                path,
-                request.pattern,
-                request.replacement,
-                request.use_regex,
-                request.matches_empty,
-                request.has_group_ref,
-            ),
-        )
-        if run_plan is None:
-            return
-        if not run_plan.run_replace:
-            return
-        if run_plan.show_confirmation:
-            dialog = ReplaceFilesDialog(
-                list(run_plan.counts),
-                run_plan.scope_label,
-                total_matches=run_plan.total_matches,
-                affected_files=run_plan.affected_files,
-                parent=self,
-            )
-            dialog.exec()
-            if not dialog.confirmed():
-                return
-        applied = self._search_replace_service.apply_replace_all(
-            files=files,
-            current_file=current_path,
-            apply_in_current=lambda: self._replace_all_in_model(
-                request.pattern,
-                request.replacement,
-                request.use_regex,
-                request.matches_empty,
-                request.has_group_ref,
-            ),
-            apply_in_file=lambda path: self._replace_all_in_file(
-                path,
-                request.pattern,
-                request.replacement,
-                request.use_regex,
-                request.matches_empty,
-                request.has_group_ref,
-            ),
-        )
-        if not applied:
-            return
-        self._schedule_search()
+        _panel_helpers.run_replace_all(self)
 
     def _replace_all_in_model(
         self,

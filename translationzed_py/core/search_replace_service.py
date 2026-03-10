@@ -58,6 +58,30 @@ class ReplaceAllRunPlan:
 
 
 @dataclass(frozen=True, slots=True)
+class ReplaceAllImpactPreviewRow:
+    """Represent ReplaceAllImpactPreviewRow."""
+
+    file: str
+    row: int
+    before: str
+    after: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReplaceAllImpactPreview:
+    """Represent ReplaceAllImpactPreview."""
+
+    scope_label: str
+    total_matches: int
+    affected_files: int
+    rows: tuple[ReplaceAllImpactPreviewRow, ...]
+    rendered_rows: int
+    omitted_rows: int
+    truncated: bool
+    row_cap: int
+
+
+@dataclass(frozen=True, slots=True)
 class ReplaceAllFileCountCallbacks:
     """Represent ReplaceAllFileCountCallbacks."""
 
@@ -92,6 +116,14 @@ class ReplaceAllRowsCallbacks:
 
 
 @dataclass(frozen=True, slots=True)
+class ReplaceAllRowsPreviewCallbacks:
+    """Represent ReplaceAllRowsPreviewCallbacks."""
+
+    row_count: Callable[[], int]
+    read_text: Callable[[int], str | None]
+
+
+@dataclass(frozen=True, slots=True)
 class ReplaceAllRowsApplyResult:
     """Represent ReplaceAllRowsApplyResult."""
 
@@ -104,6 +136,14 @@ class ReplaceCurrentRowCallbacks:
 
     read_text: Callable[[int], str | None]
     write_text: Callable[[int, str], object]
+
+
+@dataclass(frozen=True, slots=True)
+class ReplaceAllFilePreviewCallbacks:
+    """Represent ReplaceAllFilePreviewCallbacks."""
+
+    parse_file: Callable[[Path], ParsedFile]
+    read_cache: Callable[[Path], Mapping[int, CacheEntry]]
 
 
 class ReplaceRequestError(Exception):
@@ -257,10 +297,13 @@ class SearchReplaceService:
             "build_replace_all_plan",
             "build_replace_request",
             "build_replace_all_run_plan",
+            "build_replace_all_impact_preview",
             "apply_replace_all",
             "apply_replace_in_row",
+            "preview_replace_all_in_file",
             "count_replace_all_in_file",
             "apply_replace_all_in_file",
+            "preview_replace_all_in_rows",
             "count_replace_all_in_rows",
             "apply_replace_all_in_rows",
             "search_result_label",
@@ -696,6 +739,50 @@ def build_replace_all_run_plan(
     )
 
 
+def build_replace_all_impact_preview(
+    *,
+    run_plan: ReplaceAllRunPlan,
+    files: list[Path],
+    current_file: Path | None,
+    display_name: Callable[[Path], str],
+    preview_in_current: Callable[[], Sequence[tuple[int, str, str]] | None],
+    preview_in_file: Callable[[Path], Sequence[tuple[int, str, str]] | None],
+    row_cap: int = 1000,
+) -> ReplaceAllImpactPreview | None:
+    """Build replace-all impact preview summary and per-row entries."""
+    cap = max(1, int(row_cap))
+    ordered_files = prioritize_current_file(files, current_file)
+    all_rows: list[ReplaceAllImpactPreviewRow] = []
+    for path in ordered_files:
+        if current_file is not None and path == current_file:
+            rows = preview_in_current()
+        else:
+            rows = preview_in_file(path)
+        if rows is None:
+            return None
+        for row, before, after in sorted(rows, key=lambda item: int(item[0])):
+            all_rows.append(
+                ReplaceAllImpactPreviewRow(
+                    file=display_name(path),
+                    row=max(1, int(row)),
+                    before=str(before),
+                    after=str(after),
+                )
+            )
+    rendered = tuple(all_rows[:cap])
+    omitted_rows = max(0, len(all_rows) - len(rendered))
+    return ReplaceAllImpactPreview(
+        scope_label=run_plan.scope_label,
+        total_matches=run_plan.total_matches,
+        affected_files=run_plan.affected_files,
+        rows=rendered,
+        rendered_rows=len(rendered),
+        omitted_rows=omitted_rows,
+        truncated=omitted_rows > 0,
+        row_cap=cap,
+    )
+
+
 def build_replace_request(
     *,
     query: str,
@@ -1011,6 +1098,43 @@ def apply_replace_all(
     return True
 
 
+def preview_replace_all_in_file(
+    path: Path,
+    *,
+    pattern: re.Pattern[str],
+    replacement: str,
+    use_regex: bool,
+    matches_empty: bool,
+    has_group_ref: bool,
+    callbacks: ReplaceAllFilePreviewCallbacks,
+    hash_for_entry: Callable[[Entry, Mapping[int, CacheEntry]], int],
+) -> tuple[tuple[int, str, str], ...]:
+    """Build replace-all preview rows for one file."""
+    parsed, cache_map = _load_replace_file(
+        path, callbacks.parse_file, callbacks.read_cache
+    )
+    rows: list[tuple[int, str, str]] = []
+    for row_idx, entry in enumerate(parsed.entries, start=1):
+        _, value, _status = _resolve_entry_overlay(
+            entry=entry,
+            cache_map=cache_map,
+            hash_for_entry=hash_for_entry,
+        )
+        before = "" if value is None else str(value)
+        changed, after = replace_text(
+            before,
+            pattern=pattern,
+            replacement=replacement,
+            use_regex=use_regex,
+            matches_empty=matches_empty,
+            has_group_ref=has_group_ref,
+            mode="all",
+        )
+        if changed:
+            rows.append((row_idx, before, after))
+    return tuple(rows)
+
+
 def count_replace_all_in_file(
     path: Path,
     *,
@@ -1103,6 +1227,34 @@ def apply_replace_all_in_file(
         changed_keys=changed_keys,
         changed_any=bool(changed_keys),
     )
+
+
+def preview_replace_all_in_rows(
+    *,
+    pattern: re.Pattern[str],
+    replacement: str,
+    use_regex: bool,
+    matches_empty: bool,
+    has_group_ref: bool,
+    callbacks: ReplaceAllRowsPreviewCallbacks,
+) -> tuple[tuple[int, str, str], ...]:
+    """Build replace-all preview rows for active model rows."""
+    rows: list[tuple[int, str, str]] = []
+    for row_idx in range(callbacks.row_count()):
+        text = callbacks.read_text(row_idx)
+        before = "" if text is None else str(text)
+        changed, after = replace_text(
+            before,
+            pattern=pattern,
+            replacement=replacement,
+            use_regex=use_regex,
+            matches_empty=matches_empty,
+            has_group_ref=has_group_ref,
+            mode="all",
+        )
+        if changed:
+            rows.append((row_idx + 1, before, after))
+    return tuple(rows)
 
 
 def count_replace_all_in_rows(

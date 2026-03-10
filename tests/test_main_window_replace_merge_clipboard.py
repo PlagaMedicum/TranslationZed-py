@@ -58,12 +58,14 @@ class _DialogStub:
         *,
         total_matches: int,
         affected_files: int,
+        impact_preview,
         parent,
     ) -> None:  # type: ignore[no-untyped-def]
         self.counts = list(counts)
         self.scope_label = scope_label
         self.total_matches = int(total_matches)
         self.affected_files = int(affected_files)
+        self.impact_preview = impact_preview
         self.parent = parent
         self.exec_calls = 0
         _DialogStub._instances.append(self)
@@ -114,8 +116,21 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
     plan_box: dict[str, object | None] = {"value": None}
     apply_box = {"value": True}
     count_hits: list[str] = []
+    preview_hits: list[str] = []
     apply_hits: list[str] = []
     schedule_hits: list[str] = []
+    preview_box: dict[str, object | None] = {
+        "value": SimpleNamespace(
+            scope_label="Selection",
+            total_matches=1,
+            affected_files=1,
+            rows=(SimpleNamespace(file="ui.txt", row=1, before="OK", after="GOOD"),),
+            rendered_rows=1,
+            omitted_rows=0,
+            truncated=False,
+            row_cap=1000,
+        )
+    }
 
     class _Service:
         """Search/replace service stub for run-plan and apply phases."""
@@ -155,13 +170,20 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
         lambda *_args: count_hits.append("file") or 3,
     )
     monkeypatch.setattr(
+        mw._panel_helpers,
+        "build_replace_all_impact_preview",
+        lambda *_args, **_kwargs: preview_hits.append("model")
+        or preview_hits.append("file")
+        or preview_box["value"],
+    )
+    monkeypatch.setattr(
         win, "_replace_all_in_model", lambda *_args: apply_hits.append("model") or True
     )
     monkeypatch.setattr(
         win, "_replace_all_in_file", lambda *_args: apply_hits.append("file") or True
     )
     monkeypatch.setattr(win, "_schedule_search", lambda: schedule_hits.append("search"))
-    monkeypatch.setattr(mw, "ReplaceFilesDialog", _DialogStub)
+    monkeypatch.setattr(mw._panel_helpers, "ReplaceFilesDialog", _DialogStub)
     _DialogStub._instances.clear()
 
     win._current_model = None
@@ -210,29 +232,58 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
         counts=((str(current_path), 1),),
         scope_label="Selection",
     )
-    _DialogStub._confirm = False
+    preview_box["value"] = None
     win._replace_all()
     assert service.plan_calls == 3
+    assert service.apply_calls == 0
+    assert _DialogStub._instances == []
+
+    preview_box["value"] = SimpleNamespace(
+        scope_label="Selection",
+        total_matches=1,
+        affected_files=1,
+        rows=(SimpleNamespace(file="ui.txt", row=1, before="OK", after="GOOD"),),
+        rendered_rows=1,
+        omitted_rows=0,
+        truncated=False,
+        row_cap=1000,
+    )
+    _DialogStub._confirm = False
+    win._replace_all()
+    assert service.plan_calls == 4
     assert service.apply_calls == 0
     assert _DialogStub._instances[-1].exec_calls == 1
     assert _DialogStub._instances[-1].total_matches == 1
     assert _DialogStub._instances[-1].affected_files == 1
+    assert _DialogStub._instances[-1].impact_preview is preview_box["value"]
 
     _DialogStub._confirm = True
     apply_box["value"] = False
     win._replace_all()
-    assert service.plan_calls == 4
+    assert service.plan_calls == 5
     assert service.apply_calls == 1
     assert schedule_hits == []
 
     apply_box["value"] = True
     win._replace_all()
-    assert service.plan_calls == 5
+    assert service.plan_calls == 6
     assert service.apply_calls == 2
     assert schedule_hits == ["search"]
     assert count_hits == [
         "model",
         "file",
+        "model",
+        "file",
+        "model",
+        "file",
+        "model",
+        "file",
+        "model",
+        "file",
+        "model",
+        "file",
+    ]
+    assert preview_hits == [
         "model",
         "file",
         "model",

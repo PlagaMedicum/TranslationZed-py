@@ -14,8 +14,11 @@ from translationzed_py.core.search_replace_service import (
     ReplaceAllFileApplyResult,
     ReplaceAllFileCountCallbacks,
     ReplaceAllFileParseError,
+    ReplaceAllFilePreviewCallbacks,
+    ReplaceAllImpactPreviewRow,
     ReplaceAllRowsApplyResult,
     ReplaceAllRowsCallbacks,
+    ReplaceAllRowsPreviewCallbacks,
     ReplaceCurrentRowCallbacks,
     ReplaceRequest,
     ReplaceRequestError,
@@ -34,6 +37,7 @@ from translationzed_py.core.search_replace_service import (
     apply_replace_in_row,
     build_match_apply_plan,
     build_match_open_plan,
+    build_replace_all_impact_preview,
     build_replace_all_plan,
     build_replace_all_run_plan,
     build_replace_request,
@@ -47,6 +51,8 @@ from translationzed_py.core.search_replace_service import (
     fallback_row,
     find_match_in_rows,
     load_search_rows_from_file,
+    preview_replace_all_in_file,
+    preview_replace_all_in_rows,
     prioritize_current_file,
     replace_text,
     scope_files,
@@ -583,6 +589,90 @@ def test_build_replace_all_run_plan_multi_file_zero_total_skips_replace() -> Non
     assert list(plan.counts) == []
 
 
+def test_build_replace_all_impact_preview_is_deterministic_and_capped() -> None:
+    """Verify impact preview uses deterministic ordering with row-cap truncation."""
+    files = [Path("a.txt"), Path("b.txt"), Path("c.txt")]
+    run_plan = build_replace_all_run_plan(
+        scope="POOL",
+        current_locale="BE",
+        selected_locale_count=2,
+        files=files,
+        current_file=Path("b.txt"),
+        display_name=lambda path: path.stem,
+        count_in_current=lambda: 2,
+        count_in_file=lambda _path: 2,
+    )
+    assert run_plan is not None
+    preview = build_replace_all_impact_preview(
+        run_plan=run_plan,
+        files=files,
+        current_file=Path("b.txt"),
+        display_name=lambda path: path.stem,
+        preview_in_current=lambda: ((2, "cur-two", "cur-two*"), (1, "cur", "cur*")),
+        preview_in_file=lambda path: (
+            ((3, f"{path.stem}-three", f"{path.stem}-three*"),)
+            if path == Path("a.txt")
+            else ((1, f"{path.stem}-one", f"{path.stem}-one*"),)
+        ),
+        row_cap=3,
+    )
+    assert preview is not None
+    assert preview.scope_label == "Pool (2)"
+    assert preview.total_matches == 6
+    assert preview.affected_files == 3
+    assert preview.truncated is True
+    assert preview.rendered_rows == 3
+    assert preview.omitted_rows == 1
+    assert preview.rows == (
+        ReplaceAllImpactPreviewRow("b", 1, "cur", "cur*"),
+        ReplaceAllImpactPreviewRow("b", 2, "cur-two", "cur-two*"),
+        ReplaceAllImpactPreviewRow("a", 3, "a-three", "a-three*"),
+    )
+
+
+def test_build_replace_all_impact_preview_aborts_on_preview_error() -> None:
+    """Verify impact preview builder aborts when any preview callback fails."""
+    run_plan = build_replace_all_run_plan(
+        scope="FILE",
+        current_locale="BE",
+        selected_locale_count=1,
+        files=[Path("a.txt")],
+        current_file=Path("a.txt"),
+        display_name=lambda path: path.stem,
+        count_in_current=lambda: 1,
+        count_in_file=lambda _path: 0,
+    )
+    assert run_plan is not None
+    preview = build_replace_all_impact_preview(
+        run_plan=run_plan,
+        files=[Path("a.txt")],
+        current_file=Path("a.txt"),
+        display_name=lambda path: path.stem,
+        preview_in_current=lambda: None,
+        preview_in_file=lambda _path: (),
+    )
+    assert preview is None
+
+
+def test_preview_replace_all_in_rows_returns_one_based_rows() -> None:
+    """Verify row preview helper emits one-based row IDs and before/after text."""
+    rows = preview_replace_all_in_rows(
+        pattern=re.compile("Needle"),
+        replacement="Token",
+        use_regex=False,
+        matches_empty=False,
+        has_group_ref=False,
+        callbacks=ReplaceAllRowsPreviewCallbacks(
+            row_count=lambda: 3,
+            read_text=lambda row: ("Needle", "skip", "Needle-2")[row],
+        ),
+    )
+    assert rows == (
+        (1, "Needle", "Token"),
+        (3, "Needle-2", "Token-2"),
+    )
+
+
 def test_apply_replace_all_runs_current_then_other_files() -> None:
     """Verify apply replace all runs current then other files."""
     files = [Path("a.txt"), Path("b.txt"), Path("c.txt")]
@@ -630,6 +720,28 @@ def test_search_replace_service_wraps_replace_all_helpers() -> None:
     )
     assert run_plan is not None
     assert run_plan.run_replace is True
+    preview_rows = service.preview_replace_all_in_rows(
+        pattern=re.compile("Drop"),
+        replacement="Use",
+        use_regex=False,
+        matches_empty=False,
+        has_group_ref=False,
+        callbacks=ReplaceAllRowsPreviewCallbacks(
+            row_count=lambda: 1,
+            read_text=lambda _row: "Drop",
+        ),
+    )
+    assert preview_rows == ((1, "Drop", "Use"),)
+    impact = service.build_replace_all_impact_preview(
+        run_plan=run_plan,
+        files=files,
+        current_file=Path("a.txt"),
+        display_name=lambda path: str(path),
+        preview_in_current=lambda: preview_rows,
+        preview_in_file=lambda _path: (),
+    )
+    assert impact is not None
+    assert impact.rows == (ReplaceAllImpactPreviewRow("a.txt", 1, "Drop", "Use"),)
 
 
 def _entry(key: str, value: str, status: Status = Status.UNTOUCHED) -> Entry:
@@ -669,6 +781,32 @@ def test_count_replace_all_in_file_uses_cache_overlay_text() -> None:
     )
 
     assert count == 1
+
+
+def test_preview_replace_all_in_file_uses_cache_overlay_and_rows() -> None:
+    """Verify file preview helper uses cache overlay text and preserves row index."""
+    path = Path("BE/ui.txt")
+    parsed = ParsedFile(path, [_entry("A", "Drop one"), _entry("B", "Rest")], b"")
+    cache = CacheMap(hash_bits=64)
+    cache[11] = CacheEntry(
+        status=Status.TRANSLATED, value="Drop all", original="Drop one"
+    )
+
+    rows = preview_replace_all_in_file(
+        path,
+        pattern=re.compile("Drop"),
+        replacement="Use",
+        use_regex=False,
+        matches_empty=False,
+        has_group_ref=False,
+        callbacks=ReplaceAllFilePreviewCallbacks(
+            parse_file=lambda _path: parsed,
+            read_cache=lambda _path: cache,
+        ),
+        hash_for_entry=lambda entry, _cache: 11 if entry.key == "A" else 12,
+    )
+
+    assert rows == ((1, "Drop all", "Use all"),)
 
 
 def test_apply_replace_all_in_file_marks_translated_and_writes_cache() -> None:
