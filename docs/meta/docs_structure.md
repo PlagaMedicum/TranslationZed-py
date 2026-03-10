@@ -1,5 +1,5 @@
 # TranslationZed-Py — Documentation Structure
-_Last updated: 2026-03-04_
+_Last updated: 2026-03-09_
 
 ## 1) Purpose
 
@@ -128,6 +128,10 @@ The goal is zero normative drift across specs, execution docs, and operations do
 - `docs/reference/contract_index.md` + `docs/reference/contract_index.json`
   - Machine-readable symbol contract index.
   - Owns deterministic core symbol/context extraction for LLM/human retrieval.
+
+- `docs/reference/gate_policy_registry.json`
+  - Machine-readable layered gate policy registry.
+  - Owns normative `L0..L6` command/trigger/check matrix contract for docs/Make/CI parity.
 
 - `docs/reference/review_queue.md` + `docs/reference/review_queue.json`
   - Deep-review queue contract.

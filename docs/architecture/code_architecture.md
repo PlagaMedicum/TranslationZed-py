@@ -613,8 +613,10 @@ Current queue state:
    - status: `IN_REFACTOR` (`A21`, TM explainability determinism guards)
    - `FLAGGED_MODULE: translationzed_py/core/saver.py`
    - status: `IN_REFACTOR` (`A30-TZP-2`, optional `TZP:` write-back integration in save path)
-2. Previous P1 entries (`preferences.py`, `search_replace_service.py`,
-   `tm_store.py`) are closed and retained as historical evidence.
+   - `FLAGGED_MODULE: translationzed_py/core/search_replace_service.py`
+   - status: `IN_REFACTOR` (`A37-SRX-2`, impact-preview + safer replace-all apply flow)
+2. Previous P1 entries (`preferences.py`, `tm_store.py`) are closed and retained
+   as historical evidence.
 
 Rule when new risk is detected:
 1. Add `FLAGGED_MODULE: translationzed_py/<path>.py` in this document.

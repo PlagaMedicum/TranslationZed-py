@@ -323,9 +323,10 @@ sequenceDiagram
 ## 12) Search/Replace Workflow API
 
 Current status:
-1. review-queue entry for `translationzed_py/core/search_replace_service.py` is closed in v0.8 lane.
-2. strict benchmark and equivalence contracts are green in current baseline.
-3. v0.9 target work may expand workflow UX, but this module is not currently flagged.
+1. `translationzed_py.core.search_replace_service` is currently flagged for deep review in
+   `docs/reference/review_queue.json` during `A37-SRX-2`.
+2. strict benchmark and equivalence contracts remain required in current baseline.
+3. keep impact-preview and checkbox-gated replace flow changes tightly scoped until closure criteria pass.
 
 ::: translationzed_py.core.search_replace_service
     options:

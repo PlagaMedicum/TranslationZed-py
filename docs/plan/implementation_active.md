@@ -5,9 +5,9 @@ _Last updated: 2026-03-09_
 
 - **Current released baseline:** `v0.8.0` (retagged on 2026-03-04 for completed release notes).
 - **Current implementation branch:** `dev`.
-- **Target milestone:** `v0.9.0` deferred-stream continuation on `dev` (`A35-SRX-1` staged complete; next packet selection pending).
-- **Latest completed milestone on `dev`:** search/replace sidebar and confirmation policy packet (`A35`, staged closure).
-- **Current active milestone:** deferred-stream sequencing handoff after `A35`.
+- **Target milestone:** `v0.9.0` deferred-stream continuation on `dev` (`A36-REL-1` closure complete; `A37-SRX-2` implementation active).
+- **Latest completed milestone on `dev`:** release-evidence closure and guard packet (`A36`).
+- **Current active milestone:** `A37-SRX-2` implementation (impact preview + two-step apply safety).
 
 ## 1) Milestone Closure — A28 [✓]
 
@@ -261,7 +261,7 @@ _Last updated: 2026-03-09_
    5. `make verify-fast`,
    6. `make docs-check`.
 
-## 7) Milestone Closure — A34 [staged complete]
+## 7) Milestone Closure — A34 [✓]
 
 ### A34 closure snapshot (2026-03-09)
 
@@ -269,12 +269,12 @@ _Last updated: 2026-03-09_
    1. status bar appends `Selection: mixed (N rows)` only for mixed-status multi-row selections,
    2. packet lane `make test-status-a34` is wired and green,
    3. scenario registry includes `status-triage-mixed-indicator`.
-2. Two-stage closure status:
-   1. code/docs/test closure is complete,
-   2. remaining release-evidence debt is one interactive manual checklist artifact
-      (non-`auto-only`) for `status-triage-mixed-indicator`.
+2. Release-evidence closure is complete via tracked A36 records:
+   1. `tests/manual_scenarios/release_evidence_manifest.json`,
+   2. `tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-checklist.json`,
+   3. `tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-run.json`.
 
-## 8) Milestone Closure — A35 [staged complete]
+## 8) Milestone Closure — A35 [✓]
 
 ### A35 closure snapshot (2026-03-09)
 
@@ -292,26 +292,55 @@ _Last updated: 2026-03-09_
 4. Current evidence on `dev`:
    1. `make test-search-a35`,
    2. `make test-ui-manual-contract`,
-   3. `make ui-manual-run SCENARIO=search-replace-sidebar-all-scopes ARGS='--headless-result passed --headless-notes "a35 automation fallback"'`,
+   3. `make release-evidence-check`,
    4. `make verify-fast`,
    5. `make docs-check`.
-5. Two-stage closure note:
-   1. implementation/docs/tests are complete,
-   2. one interactive manual scenario checklist artifact (non-`--headless-result` and non-`--auto-only`) remains tracked as release-evidence debt.
+5. Release-evidence closure is complete via tracked A36 records:
+   1. `tests/manual_scenarios/release_evidence_manifest.json`,
+   2. `tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-checklist.json`,
+   3. `tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-run.json`.
 
-## 9) Immediate Execution Order (Post-A35)
+## 9) Milestone Closure — A36 [✓]
 
-1. Preserve staged closures and evidence debt tracking:
-   1. `A34` and `A35` are staged complete with interactive-manual evidence debt noted.
+### A36 closure snapshot (2026-03-09)
+
+1. Release-evidence contracts are now machine-checkable:
+   1. checker script `scripts/release_evidence_check.py`,
+   2. Make lane `make release-evidence-check`,
+   3. release lane wiring enforces evidence check in `release-check` / `release-dry-run`.
+2. Tracked closure evidence is recorded:
+   1. `tests/manual_scenarios/release_evidence_manifest.json`,
+   2. `tests/manual_scenarios/release_evidence/*.json`.
+3. A34/A35 staged debt is cleared and synced in canonical orientation docs.
+
+## 10) Active Milestone — A37 [in progress]
+
+### A37-SRX-2 implementation (2026-03-09)
+
+1. Stream objective:
+   1. Search/Replace follow-up with richer replace-all impact preview and safer apply confirmation.
+2. Locked constraints:
+   1. replace scope remains Preferences-driven,
+   2. no sidebar scope selector,
+   3. apply model remains all-or-cancel (no per-file include/exclude).
+3. Current delivery surface:
+   1. active packet lane `make test-search-a37`,
+   2. manual scenario `search-replace-impact-preview-safe-apply`,
+   3. route search/replace changed-file mapping to A37 lane.
+
+## 11) Immediate Execution Order (Post-A36)
+
+1. Preserve closure and evidence contracts:
+   1. `A34`, `A35`, and `A36` remain closed with tracked release evidence.
 2. Keep umbrella strict gates green:
    1. `make verify-fast`,
    2. `make docs-check`.
-3. Preserve deferred stream sequencing:
+3. Proceed with deferred stream sequencing:
    1. `A29`/`A30`/`A31`/`A32`/`A33` are closed,
-   2. `A34` is staged complete (interactive evidence debt tracked),
-   3. `A35` is staged complete (interactive evidence debt tracked),
+   2. `A34`/`A35`/`A36` are closed,
+   3. `A37-SRX-2` implementation is active with no-sidebar-scope-selector constraint,
    4. no reopening closed packet implementation scopes.
-## 10) Non-Negotiable Constraints
+## 12) Non-Negotiable Constraints
 
 1. Canonical behavior remains defined by `docs/spec/technical.md` and `docs/ux/use_cases.md`.
 2. History docs are non-normative and must not conflict with canonical docs.

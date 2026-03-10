@@ -145,15 +145,16 @@ Execution evidence log:
 4. Synced UX/testing/orientation docs for the packet lane and behavior contract:
    1. checklists + automation/test surface references include `make test-status-a34`,
    2. status-triage UX contract now documents mixed-selection indicator behavior.
-5. Current evidence:
+5. Closure evidence:
    1. `make test-status-a34`,
    2. `make test-ui-manual-contract`,
-   3. `make ui-manual-run SCENARIO=status-triage-mixed-indicator ARGS='--auto-only'`,
+   3. `make release-evidence-check`,
    4. `make verify-fast`,
    5. `make docs-check`.
-6. Two-stage closure note:
-   1. implementation/docs/tests are complete,
-   2. one interactive manual scenario checklist artifact (non-`auto-only`) remains tracked as release-evidence debt.
+6. Interactive release evidence is closed and tracked:
+   1. `tests/manual_scenarios/release_evidence_manifest.json`,
+   2. `tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-checklist.json`,
+   3. `tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-run.json`.
 
 ## A35-SRX-1 [✓] Search+Replace Sidebar Coherence + All-Scope Confirmation (2026-03-09)
 
@@ -171,15 +172,43 @@ Execution evidence log:
 4. Docs and drift-guard updates:
    1. testing/orientation/checklist docs include `make test-search-a35`,
    2. docs-contract checker enforces A35 search/replace lane references.
-5. Current evidence:
+5. Closure evidence:
    1. `make test-search-a35`,
    2. `make test-ui-manual-contract`,
-   3. `make ui-manual-run SCENARIO=search-replace-sidebar-all-scopes ARGS='--headless-result passed --headless-notes "a35 automation fallback"'`,
+   3. `make release-evidence-check`,
    4. `make verify-fast`,
    5. `make docs-check`.
-6. Two-stage closure note:
-   1. implementation/docs/tests are complete,
-   2. one interactive manual scenario checklist artifact (non-`--headless-result` and non-`--auto-only`) remains tracked as release-evidence debt.
+6. Interactive release evidence is closed and tracked:
+   1. `tests/manual_scenarios/release_evidence_manifest.json`,
+   2. `tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-checklist.json`,
+   3. `tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-run.json`.
+
+## A36-REL-1 [✓] Release-Evidence Guard + Closure Sync (2026-03-09)
+
+1. Added machine-checkable release-evidence contract:
+   1. checker script `scripts/release_evidence_check.py`,
+   2. tracked manifest `tests/manual_scenarios/release_evidence_manifest.json`,
+   3. tracked records `tests/manual_scenarios/release_evidence/*.json`.
+2. Added release-evidence lane and release-path enforcement:
+   1. `make release-evidence-check`,
+   2. `release-check` now runs release-evidence validation before tag/version checks.
+3. Added regression tests and docs-contract drift guards:
+   1. `tests/test_release_evidence_check.py`,
+   2. docs-contract snippets enforce `make release-evidence-check` + `make test-search-a37` presence in canonical docs.
+4. Closure result:
+   1. A34/A35 release-evidence debt is removed,
+   2. active plan now advances to `A37-SRX-2` lock.
+
+## A37-SRX-2 [in progress] Search/Replace Impact-Preview Packet (2026-03-09)
+
+1. Implementation scope is active for this step.
+2. Locked constraints remain:
+   1. replace scope remains Preferences-driven,
+   2. no sidebar scope selector,
+   3. apply model remains all-or-cancel (no per-file include/exclude).
+3. Active packet lane and evidence path:
+   1. `make test-search-a37` is active,
+   2. manual scenario `search-replace-impact-preview-safe-apply` is registered.
 
 ## A17-V9-QA-1 [✓] QA Rule-State Model Foundation (2026-03-04)
 

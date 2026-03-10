@@ -55,14 +55,16 @@ Run tests:
 make test
 ```
 
-Run full local verification (auto-fix + warning if files changed):
+Run layered local gates:
 ```bash
-make verify
+make gate-dev
+make gate-commit
+make gate-push
 ```
 
-Run strict CI-equivalent verification (check-only, non-mutating):
+Run strict CI PR/push gate:
 ```bash
-make verify-ci
+make gate-ci-pr
 ```
 
 Notes:

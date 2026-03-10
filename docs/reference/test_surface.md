@@ -111,6 +111,11 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    - `tests/test_review_queue_check.py`
 2. Release/tooling policy:
    - `tests/test_release_check.py`
+   - `tests/test_release_evidence_check.py`
+   - `tests/test_gate_policy_registry.py`
+   - `tests/test_gate_layers_makefile.py`
+   - `tests/test_ci_gate_workflows.py`
+   - `tests/test_select_test_targets.py`
    - `tests/test_code_quality_triage.py`
    - `tests/test_benchmark_regression_script.py`
    - `tests/test_coverage_promotion_check.py`
@@ -137,12 +142,20 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 6. v0.9 CR packet suite: `make test-cr-v09`
 7. A29 source-reference packet suite: `make test-src-a29` (core policy contracts + GUI state/UI wiring subset)
 8. A30 `TZP:` packet suite: `make test-tzp-a30` (`tzp_comment_policy`, parser status-comment paths, saver/file-workflow write-back contracts)
-9. Strict CI-like baseline: `make verify-ci`
-10. Quick strict smoke: `make verify-fast`
-11. A31 no-shrink contract gate: `make test-ui-manual-contract`
-12. A31 focused manual-framework suite: `make test-a31-manual`
-13. Coverage promotion checker contract suite: `make test-cov-promotion-contract`
-14. Randomized/property fast profile: `make test-prop-fast`
-15. Randomized/property slow profile: `make test-prop-slow`
-16. A34 status-triage packet lane: `make test-status-a34`
-17. A35 search/replace packet lane: `make test-search-a35`
+9. `L0` regular gate: `make gate-dev`
+10. `L1` pre-commit gate: `make gate-commit`
+11. `L2` pre-push gate: `make gate-push`
+12. `L3` task/docs close gate: `make gate-task-close`
+13. `L4` CI strict gate: `make gate-ci-pr`
+14. `L5` heavy advisory gate: `make gate-heavy-advisory`
+15. `L6` release strict gate: `make gate-release TAG=vX.Y.Z`
+16. A31 no-shrink contract gate: `make test-ui-manual-contract`
+17. A31 focused manual-framework suite: `make test-a31-manual`
+18. Coverage promotion checker contract suite: `make test-cov-promotion-contract`
+19. Randomized/property fast profile: `make test-prop-fast`
+20. Randomized/property slow profile: `make test-prop-slow`
+21. A34 status-triage packet lane: `make test-status-a34`
+22. A35 search/replace packet lane: `make test-search-a35`
+23. A37 search/replace lane: `make test-search-a37`
+24. A37 manual scenario: `search-replace-impact-preview-safe-apply`
+24. Release evidence guard lane: `make release-evidence-check`

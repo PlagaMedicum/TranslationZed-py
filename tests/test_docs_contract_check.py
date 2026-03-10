@@ -439,3 +439,234 @@ def test_a35_search_replace_surface_passes_with_required_snippets(
         path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
     errors = module._validate_a35_search_replace_surface(docs_root)
     assert errors == []
+
+
+def test_a36_release_evidence_surface_detects_missing_snippets(tmp_path: Path) -> None:
+    """A36 docs surface should fail when required snippets are absent."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel in module.A36_RELEASE_EVIDENCE_SNIPPETS:
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# Placeholder\n", encoding="utf-8")
+    errors = module._validate_a36_release_evidence_surface(docs_root)
+    assert errors
+    assert any("missing A36 release-evidence policy snippet" in err for err in errors)
+
+
+def test_a36_release_evidence_surface_passes_with_required_snippets(
+    tmp_path: Path,
+) -> None:
+    """A36 docs surface should pass when required snippets are present."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel, snippets in module.A36_RELEASE_EVIDENCE_SNIPPETS.items():
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
+    errors = module._validate_a36_release_evidence_surface(docs_root)
+    assert errors == []
+
+
+def test_a37_search_preview_surface_detects_missing_snippets(tmp_path: Path) -> None:
+    """A37 docs surface should fail when required snippets are absent."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel in module.A37_SEARCH_PREVIEW_SNIPPETS:
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# Placeholder\n", encoding="utf-8")
+    errors = module._validate_a37_search_preview_surface(docs_root)
+    assert errors
+    assert any("missing A37 search-preview policy snippet" in err for err in errors)
+
+
+def test_a37_search_preview_surface_passes_with_required_snippets(
+    tmp_path: Path,
+) -> None:
+    """A37 docs surface should pass when required snippets are present."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel, snippets in module.A37_SEARCH_PREVIEW_SNIPPETS.items():
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
+    errors = module._validate_a37_search_preview_surface(docs_root)
+    assert errors == []
+
+
+def test_a38_gate_policy_surface_detects_missing_snippets(tmp_path: Path) -> None:
+    """A38 docs surface should fail when required snippets are absent."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel in module.A38_GATE_POLICY_SURFACE_SNIPPETS:
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# Placeholder\n", encoding="utf-8")
+    errors = module._validate_a38_gate_policy_surface(docs_root)
+    assert errors
+    assert any("missing A38 gate-policy snippet" in err for err in errors)
+
+
+def test_a38_gate_policy_surface_passes_with_required_snippets(
+    tmp_path: Path,
+) -> None:
+    """A38 docs surface should pass when required snippets are present."""
+    module = _load_docs_contract_module()
+    docs_root = tmp_path / "docs"
+    for rel, snippets in module.A38_GATE_POLICY_SURFACE_SNIPPETS.items():
+        path = docs_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
+    errors = module._validate_a38_gate_policy_surface(docs_root)
+    assert errors == []
+
+
+def test_a38_gate_policy_registry_detects_missing_make_target(tmp_path: Path) -> None:
+    """A38 policy registry should fail when command target is missing in Makefile."""
+    module = _load_docs_contract_module()
+    repo_root = tmp_path / "repo"
+    docs_root = repo_root / "docs"
+    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
+    (repo_root / "Makefile").write_text("gate-dev:\n\t@echo ok\n", encoding="utf-8")
+    (docs_root / "reference" / "gate_policy_registry.json").write_text(
+        """
+{
+  "version": 1,
+  "layers": [
+    {
+      "id": "L0",
+      "name": "Regular",
+      "trigger": "local",
+      "command": "make gate-dev",
+      "included_checks": ["fmt-check"],
+      "mode": "blocking",
+      "artifacts": ["none"],
+      "duplicate_run_exclusions": ["none"]
+    },
+    {
+      "id": "L1",
+      "name": "Commit",
+      "trigger": "hook",
+      "command": "make gate-missing",
+      "included_checks": ["gate-dev"],
+      "mode": "blocking",
+      "artifacts": ["none"],
+      "duplicate_run_exclusions": ["none"]
+    },
+    {
+      "id": "L2",
+      "name": "Push",
+      "trigger": "hook",
+      "command": "make gate-dev",
+      "included_checks": ["gate-dev"],
+      "mode": "blocking",
+      "artifacts": ["none"],
+      "duplicate_run_exclusions": ["none"]
+    },
+    {
+      "id": "L3",
+      "name": "Close",
+      "trigger": "manual",
+      "command": "make gate-dev",
+      "included_checks": ["gate-dev"],
+      "mode": "blocking",
+      "artifacts": ["none"],
+      "duplicate_run_exclusions": ["none"]
+    },
+    {
+      "id": "L4",
+      "name": "CI",
+      "trigger": "ci",
+      "command": "make gate-dev",
+      "included_checks": ["gate-dev"],
+      "mode": "blocking",
+      "artifacts": ["none"],
+      "duplicate_run_exclusions": ["none"]
+    },
+    {
+      "id": "L5",
+      "name": "Heavy",
+      "trigger": "schedule",
+      "command": "make gate-dev",
+      "included_checks": ["gate-dev"],
+      "mode": "advisory",
+      "artifacts": ["none"],
+      "duplicate_run_exclusions": ["none"]
+    },
+    {
+      "id": "L6",
+      "name": "Release",
+      "trigger": "tag",
+      "command": "make gate-dev",
+      "included_checks": ["gate-dev"],
+      "mode": "blocking",
+      "artifacts": ["none"],
+      "duplicate_run_exclusions": ["none"]
+    }
+  ]
+}
+        """.strip() + "\n",
+        encoding="utf-8",
+    )
+    errors = module._validate_a38_gate_policy_registry(docs_root, repo_root)
+    assert errors
+    assert any("target missing in Makefile" in err for err in errors)
+
+
+def test_a38_gate_policy_registry_passes_with_valid_payload(tmp_path: Path) -> None:
+    """A38 policy registry should pass with valid schema/layers/make parity."""
+    module = _load_docs_contract_module()
+    repo_root = tmp_path / "repo"
+    docs_root = repo_root / "docs"
+    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
+    (repo_root / "Makefile").write_text(
+        "\n".join(
+            (
+                "gate-dev:",
+                "\t@echo dev",
+                "gate-commit:",
+                "\t@echo commit",
+                "gate-push:",
+                "\t@echo push",
+                "gate-task-close:",
+                "\t@echo close",
+                "gate-ci-pr:",
+                "\t@echo ci",
+                "gate-heavy-advisory:",
+                "\t@echo heavy",
+                "gate-release:",
+                "\t@echo release",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    layers = []
+    for layer_id, command in (
+        ("L0", "make gate-dev"),
+        ("L1", "make gate-commit"),
+        ("L2", "make gate-push"),
+        ("L3", "make gate-task-close"),
+        ("L4", "make gate-ci-pr"),
+        ("L5", "make gate-heavy-advisory"),
+        ("L6", "make gate-release TAG=vX.Y.Z"),
+    ):
+        layers.append(
+            {
+                "id": layer_id,
+                "name": layer_id,
+                "trigger": "t",
+                "command": command,
+                "included_checks": ["x"],
+                "mode": "blocking",
+                "artifacts": ["a"],
+                "duplicate_run_exclusions": ["d"],
+            }
+        )
+    (docs_root / "reference" / "gate_policy_registry.json").write_text(
+        module.json.dumps({"version": 1, "layers": layers}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    errors = module._validate_a38_gate_policy_registry(docs_root, repo_root)
+    assert errors == []

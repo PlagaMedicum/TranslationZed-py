@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "layers": [
+    {
+      "id": "L0",
+      "name": "Regular Dev Loop",
+      "trigger": "Frequent local iteration while coding.",
+      "command": "make gate-dev",
+      "included_checks": [
+        "fmt-check-changed",
+        "lint-check",
+        "typecheck",
+        "arch-check",
+        "locale-agnostic-check"
+      ],
+      "mode": "blocking",
+      "artifacts": [],
+      "duplicate_run_exclusions": [
+        "No deterministic test lanes.",
+        "No docs lane."
+      ]
+    },
+    {
+      "id": "L1",
+      "name": "Pre-Commit",
+      "trigger": "Automatically via git pre-commit hook and optional manual invocation.",
+      "command": "make gate-commit",
+      "included_checks": [
+        "gate-dev",
+        "test-ui-manual-contract"
+      ],
+      "mode": "blocking",
+      "artifacts": [],
+      "duplicate_run_exclusions": [
+        "No broad test suites.",
+        "No coverage lane."
+      ]
+    },
+    {
+      "id": "L2",
+      "name": "Pre-Push",
+      "trigger": "Automatically via git pre-push hook and manual pre-push verification.",
+      "command": "make gate-push",
+      "included_checks": [
+        "gate-commit",
+        "test-core-fast",
+        "test-routed-fast",
+        "test-readonly-clean"
+      ],
+      "mode": "blocking",
+      "artifacts": [
+        "artifacts/manual-ui/*.json (contract read checks only)"
+      ],
+      "duplicate_run_exclusions": [
+        "Runs fixed core baseline once.",
+        "Runs each routed packet lane at most once."
+      ]
+    },
+    {
+      "id": "L3",
+      "name": "Task/Docs Close",
+      "trigger": "Before marking implementation packet or docs packet complete.",
+      "command": "make gate-task-close",
+      "included_checks": [
+        "gate-push",
+        "test-cov",
+        "docs-check",
+        "test-perf-scale"
+      ],
+      "mode": "blocking",
+      "artifacts": [
+        "artifacts/coverage/coverage_summary.json",
+        "artifacts/docs/site/*"
+      ],
+      "duplicate_run_exclusions": [
+        "Single coverage lane invocation.",
+        "Single docs lane invocation."
+      ]
+    },
+    {
+      "id": "L4",
+      "name": "CI PR/Push Strict",
+      "trigger": "GitHub Actions push/pull_request strict validation path.",
+      "command": "make gate-ci-pr",
+      "included_checks": [
+        "fmt-check",
+        "lint-check",
+        "typecheck",
+        "arch-check",
+        "locale-agnostic-check",
+        "test-ui-manual-contract",
+        "test-core-fast",
+        "test-cov",
+        "test-readonly-clean",
+        "security",
+        "docs-check",
+        "test-perf-scale"
+      ],
+      "mode": "blocking",
+      "artifacts": [
+        "artifacts/**"
+      ],
+      "duplicate_run_exclusions": [
+        "No repeated coverage within a single run.",
+        "No routed packet lane duplication in strict CI path."
+      ]
+    },
+    {
+      "id": "L5",
+      "name": "Scheduled/Manual Heavy",
+      "trigger": "Scheduled or manual workflow-dispatch advisory heavy runs.",
+      "command": "make gate-heavy-advisory",
+      "included_checks": [
+        "test-prop-slow",
+        "test-perf-heavy",
+        "test-mutation-stage MUTATION_STAGE=soft"
+      ],
+      "mode": "advisory",
+      "artifacts": [
+        "artifacts/mutation/summary.json",
+        "artifacts/**"
+      ],
+      "duplicate_run_exclusions": [
+        "Heavy extras run once per invocation.",
+        "Failures are reported but do not block the lane."
+      ]
+    },
+    {
+      "id": "L6",
+      "name": "Release Tag Strict",
+      "trigger": "Release candidate/final tag preflight and release workflows.",
+      "command": "make gate-release TAG=vX.Y.Z",
+      "included_checks": [
+        "gate-ci-pr",
+        "bench-check (strict)",
+        "test-prop-slow",
+        "test-perf-heavy",
+        "test-mutation-stage MUTATION_STAGE=strict",
+        "release-check",
+        "release-evidence-check"
+      ],
+      "mode": "blocking",
+      "artifacts": [
+        "artifacts/bench/*",
+        "artifacts/mutation/summary.json",
+        "tests/manual_scenarios/release_evidence_manifest.json"
+      ],
+      "duplicate_run_exclusions": [
+        "Single release metadata check path.",
+        "Single release-evidence check path."
+      ]
+    }
+  ]
+}

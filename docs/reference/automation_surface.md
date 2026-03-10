@@ -3,94 +3,79 @@ _Last updated: 2026-03-09_
 
 ## 1) Purpose
 
-This page is a quick command-surface map for humans and LLM agents.
-Use it to choose the right make target without reading shell scripts first.
+This is the command-surface map for contributors and LLM agents.
+Use it to select the correct gate level and avoid duplicate test reruns.
 
-Canonical behavior still lives in:
-1. `docs/operations/checklists.md`
-2. `docs/quality/testing_strategy.md`
-3. `Makefile`
+Canonical policy owner:
+- `docs/quality/testing_strategy.md`
 
-## 2) Safe Default Profiles
+Tracked policy registry:
+- `docs/reference/gate_policy_registry.json`
 
-| Profile | Use when | Primary command | Blocking mode |
-|---|---|---|---|
-| Local full verify | typical pre-commit validation | `make verify` | advisory for perf/bench, strict for core/doc/security gates |
-| CI-equivalent strict | before PR or release candidate checks | `make verify-ci` | strict fail-on-drift |
-| Heavy lane | mutation + heavy perf evidence | `make verify-heavy` | strict base + heavy extras |
-| Fast strict | quick local strict sweep | `make verify-fast` | strict, minimal set |
+## 2) Layered Gate Commands (Normative)
 
-## 3) Release and Packaging Profiles
+| Layer | Trigger | Command | Blocking Mode | Duplicate-Run Exclusion |
+|---|---|---|---|---|
+| `L0` | regular local coding loop | `make gate-dev` | blocking | changed-file static checks; no test/cov/docs lanes |
+| `L1` | before commit (`pre-commit`) | `make gate-commit` | blocking | no broad deterministic suites |
+| `L2` | before push (`pre-push`) | `make gate-push` | blocking | fixed core once + routed packet dedupe |
+| `L3` | before task/docs closure | `make gate-task-close` | blocking | single `test-cov` + single `docs-check` |
+| `L4` | CI strict PR/push | `make gate-ci-pr` | blocking | full static checks + no routed-lane duplication |
+| `L5` | schedule/manual heavy lane | `make gate-heavy-advisory` | advisory | heavy extras once per run |
+| `L6` | release tag/RC strict | `make gate-release TAG=vX.Y.Z` | blocking | single release-check + release-evidence path |
 
-| Goal | Command(s) | Notes |
+Gate selection rule:
+1. Choose the gate that matches the current trigger.
+2. Do not stack lower layers manually in the same loop; higher layers already include them.
+
+## 3) Packet and Focused Test Lanes
+
+| Goal | Command | Notes |
 |---|---|---|
-| Tag alignment checks | `make release-check TAG=vX.Y.Z` | validates version/changelog/tag coherence |
-| RC dry-run chain | `make release-dry-run TAG=vX.Y.Z-rcN` | runs `verify` + release checks for RC |
-| Build executable bundle | `make pack` | platform-local packaging |
-| Windows packaging | `make pack-win` | PowerShell-based helper |
+| Fixed core deterministic baseline | `make test-core-fast` | cross-domain baseline used in `L2+` |
+| Changed-file routed packet lanes (fast) | `make test-routed-fast` | uses `scripts/select_test_targets.py` |
+| Full packet lane sweep | `make test-routed-full` | uses routing-map `full_targets` |
+| QA packet lane | `make test-qa-v09` | QA state/async/panel packet scope |
+| TM explainability packet lane | `make test-tmq-v09` | TM query/scoring/store contracts |
+| TM workflow packet lane | `make test-tmw-v09` | workflow grouping/apply integration |
+| Crash/session packet lane | `make test-cr-v09` | startup resume + crash recovery |
+| Source-reference packet lane | `make test-src-a29` | fallback policy + GUI state wiring |
+| TZP packet lane | `make test-tzp-a30` | optional write-back policy pipeline |
+| A35 search/replace packet lane | `make test-search-a35` | sidebar sync + all-scope confirmation |
+| A37 search/replace packet lane | `make test-search-a37` | impact-preview + checkbox-gated replace safety flow |
+| Status-triage packet lane | `make test-status-a34` | mixed selection status indicator |
+| A31 manual framework packet lane | `make test-a31-manual` | runner/runtime/checklist tests |
+| Manual workflow no-shrink contract | `make test-ui-manual-contract` | registry + workflow map checks |
+| Randomized fast profile | `make test-prop-fast` | `TZP_PROP_PROFILE=fast` |
+| Randomized slow profile | `make test-prop-slow` | `TZP_PROP_PROFILE=slow` |
 
-## 4) Docs and Contract Profiles
+## 4) Coverage, Docs, Release, Heavy
 
-| Goal | Command | Script entrypoint |
+| Goal | Command | Notes |
 |---|---|---|
-| Full docs gate | `make docs-check` | `scripts/docstyle.sh`, `scripts/docs_build.sh`, `scripts/docs_contract_check.py` |
-| Locale-agnostic copy guard | `make locale-agnostic-check` | `scripts/locale_agnostic_check.py` |
-| Docs build only | `make docs-build` | `scripts/docs_build.sh` |
-| Contract index drift | `make docs-index` | `scripts/generate_contract_index.py --check` |
-| Review queue schema | `make review-queue-check` | `scripts/review_queue_check.py` |
-| Doc triage gate | `make code-triage` | `scripts/code_quality_triage.py` |
+| Changed-file format check | `make fmt-check-changed` | local/static fast path used by `L0..L3` |
+| Full format check | `make fmt-check` | strict static path used by `L4/L6` |
+| Strict coverage floor lane | `make test-cov` | package/core floors remain `92/97` |
+| Docs contract lane | `make docs-check` | includes docs build + docs-contract checks |
+| Locale-agnostic copy guard | `make locale-agnostic-check` | production GUI/docs wording gate |
+| Release evidence guard | `make release-evidence-check` | validates tracked interactive evidence manifest |
+| Release metadata check | `make release-check TAG=vX.Y.Z` | tag/version/changelog alignment |
+| Release dry run | `make release-dry-run TAG=vX.Y.Z-rcN` | delegates to `gate-release` |
+| Heavy advisory extras | `make gate-heavy-advisory` | mutation/perf/property advisory path |
 
-## 5) Perf / Bench / Mutation Profiles
+## 5) Target-to-Script Mapping (High Value)
 
-| Goal | Command | Behavior |
-|---|---|---|
-| v0.9 QA packet lane | `make test-qa-v09` | targeted QA packet suite (`qa_service`, `qa_progress_model`, `qa_async`, `gui_qa_panel`) |
-| v0.9 TMQ packet lane | `make test-tmq-v09` | targeted TM quality/explainability suite (`tm_query_scoring`, `tm_store`, `tm_ranking_corpus`, `tm_query_perf_contract`) |
-| v0.9 TMW packet lane | `make test-tmw-v09` | targeted TM workflow UX suite (`tm_workflow_service`, `gui_tm_preferences`) |
-| v0.9 CR packet lane | `make test-cr-v09` | targeted crash-recovery + session-resume startup suite (`project_session`, `main_window_bootstrap_helpers`) |
-| A29 SRC packet lane | `make test-src-a29` | targeted source-reference policy + GUI wiring suite (`source_reference_service`, `source_reference_policy_model`, `source_reference_state`, `source_reference_ui`, source-reference-focused `gui_tm_preferences`) |
-| A30 TZP packet lane | `make test-tzp-a30` | targeted `TZP:` comment-policy + save/workflow/preferences integration suite (`tzp_comment_policy`, parser status-comment paths, saver/file-workflow write-back contracts, `gui_tm_preferences` TZP controls) |
-| A31 manual-framework contract lane | `make test-ui-manual-contract` | machine-check scenario registry + workflow no-shrink coverage contract |
-| A31 manual-framework packet lane | `make test-a31-manual` | focused scenario runtime/runner/contract + GUI checklist startup tests |
-| Randomized fast lane | `make test-prop-fast` | Hypothesis fast profile (`TZP_PROP_PROFILE=fast`) for property/stateful suites |
-| Randomized slow lane | `make test-prop-slow` | Hypothesis slow profile (`TZP_PROP_PROFILE=slow`) for deeper state-space sweeps |
-| A34 status-triage packet lane | `make test-status-a34` | targeted status-bar mixed-selection indicator and status-triage helper coverage |
-| A35 search/replace packet lane | `make test-search-a35` | targeted Search+Replace sidebar sync, replace-all confirmation, and dialog summary contracts |
-| Coverage strict lane | `make test-cov` | strict coverage gate (`translationzed_py>=92%`, `translationzed_py/core>=97%`) |
-| Coverage promotion contract lane | `make test-cov-promotion-contract` | checker regression suite for consecutive coverage-promotion evidence |
-| Coverage promotion readiness | `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='<run1.json> <run2.json>'` | machine-check two-run tail readiness at `92/97` |
-| Perf contract lane | `make test-perf-scale` | strict parser/search/TM perf-contract tests |
-| Perf scenarios | `make perf-scenarios` | fixture-backed scenario checks |
-| Benchmark compare | `make bench-check` | compares against `tests/benchmarks/baseline.json` |
-| Mutation advisory/strict | `make test-mutation` | controlled via `MUTATION_SCORE_MODE` and threshold vars |
-| Staged mutation profile | `make test-mutation-stage` | resolves stage via `scripts/mutation_stage.py` |
+1. `make test-routed-fast` -> `scripts/select_test_targets.py --mode fast`
+2. `make test-routed-full` -> `scripts/select_test_targets.py --mode full`
+3. `make test-core-fast` -> `scripts/test_core_fast.sh`
+4. `make gate-release TAG=...` -> strict L6 chain + `make release-check TAG=...`
+5. `make release-evidence-check` -> `scripts/release_evidence_check.py`
 
-## 6) Target-to-Script Mapping (High-Value)
+## 6) Selection Hints
 
-1. `make verify` -> `verify-core` + optional `release-check-if-tag`
-2. `make verify-core` -> fmt/lint/typecheck/arch/test/perf/doc/security umbrellas
-3. `make verify-ci` -> strict check-only `verify-ci-core` + bench gate
-4. `make docs-check` -> docstyle + docs-build + docs-index + docs-contract + locale-agnostic-check
-5. `make run` -> `scripts/run.sh` (`python -m translationzed_py` entrypoint)
-6. `make ui-manual-list` -> list declarative manual UI scenarios
-7. `make ui-manual-run SCENARIO=<id>` -> launch one scenario in checklist mode
-8. `make ui-manual-headless SCENARIO=<id> RESULT=passed|failed` -> write checklist artifact without launching Qt GUI (headless fallback)
-9. `make ui-manual-batch SCENARIOS=<id1,id2,...>` -> run multiple scenarios sequentially
-10. `make coverage-promotion-check` -> evaluate ordered coverage-summary artifacts for ratchet readiness
-11. `make test-prop-fast` -> run randomized/property fast profile (`TZP_PROP_PROFILE=fast`)
-12. `make test-prop-slow` -> run randomized/property slow profile (`TZP_PROP_PROFILE=slow`)
-13. `make test-status-a34` -> run status-triage mixed-selection packet suite
-14. `make test-search-a35` -> run Search+Replace sidebar and all-scope replace-all confirmation suite
-
-## 7) Command Selection Hints
-
-1. Prefer `make verify` for normal local workflow.
-2. Use `make verify-ci` when you need strict CI parity.
-3. Use `make verify-heavy` only for heavy evidence lanes.
-4. Use focused commands (`test-perf-scale`, `docs-check`, `bench-check`) when touching hot-path areas.
-
-## 8) Related Orientation Docs
-
-1. `docs/reference/quick_context.md`
-2. `docs/reference/test_surface.md`
-3. `docs/reference/module_map.md`
+1. Use `L0`/`L1` during inner-loop coding.
+2. Use `L2` before each push to avoid unnecessary full-suite reruns.
+3. Use `L3` when closing implementation packet/docs scope.
+4. Use `L4` for PR/push strict parity.
+5. Use `L5` for heavy advisory evidence (schedule/manual).
+6. Use `L6` only for release candidate/final tag strict gating.

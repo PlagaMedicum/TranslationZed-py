@@ -316,9 +316,122 @@ A35_SEARCH_REPLACE_SNIPPETS: dict[str, tuple[str, ...]] = {
     "reference/quick_context.md": ("make test-search-a35",),
 }
 
+A36_RELEASE_EVIDENCE_SNIPPETS: dict[str, tuple[str, ...]] = {
+    "quality/testing_strategy.md": (
+        "make release-evidence-check",
+        "tests/manual_scenarios/release_evidence_manifest.json",
+    ),
+    "operations/checklists.md": (
+        "make release-evidence-check",
+        "tests/manual_scenarios/release_evidence_manifest.json",
+    ),
+    "reference/automation_surface.md": (
+        "make release-evidence-check",
+        "make test-search-a37",
+    ),
+    "reference/test_surface.md": (
+        "tests/test_release_evidence_check.py",
+        "make test-search-a37",
+    ),
+    "reference/quick_context.md": (
+        "make release-evidence-check",
+        "`A37-SRX-2`",
+    ),
+    "plan/implementation_active.md": (
+        "`A36-REL-1`",
+        "`A37-SRX-2`",
+        "no sidebar scope selector",
+    ),
+}
+
+A37_SEARCH_PREVIEW_SNIPPETS: dict[str, tuple[str, ...]] = {
+    "quality/testing_strategy.md": (
+        "make test-search-a37",
+        "search-replace-impact-preview-safe-apply",
+    ),
+    "operations/checklists.md": (
+        "make test-search-a37",
+        "search-replace-impact-preview-safe-apply",
+    ),
+    "reference/automation_surface.md": (
+        "make test-search-a37",
+        "A37 search/replace packet lane",
+    ),
+    "reference/test_surface.md": (
+        "make test-search-a37",
+        "search-replace-impact-preview-safe-apply",
+    ),
+    "reference/quick_context.md": (
+        "make test-search-a37",
+        "search-replace-impact-preview-safe-apply",
+    ),
+    "plan/implementation_active.md": (
+        "`A37-SRX-2`",
+        "impact preview",
+        "no sidebar scope selector",
+    ),
+}
+
+A38_GATE_POLICY_SURFACE_SNIPPETS: dict[str, tuple[str, ...]] = {
+    "quality/testing_strategy.md": (
+        "L0",
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L5",
+        "L6",
+        "make gate-dev",
+        "make gate-commit",
+        "make gate-push",
+        "make gate-task-close",
+        "make gate-ci-pr",
+        "make gate-heavy-advisory",
+        "make gate-release TAG=",
+        "make fmt-check-changed",
+        "make fmt-check",
+    ),
+    "operations/checklists.md": (
+        "make gate-dev",
+        "make gate-commit",
+        "make gate-push",
+        "make gate-task-close",
+        "make gate-ci-pr",
+        "make gate-heavy-advisory",
+        "make gate-release TAG=",
+        "make fmt-check-changed",
+        "make fmt-check",
+        "docs/reference/gate_policy_registry.json",
+    ),
+    "reference/automation_surface.md": (
+        "make gate-dev",
+        "make gate-commit",
+        "make gate-push",
+        "make gate-task-close",
+        "make gate-ci-pr",
+        "make gate-heavy-advisory",
+        "make gate-release TAG=",
+        "make fmt-check-changed",
+        "make fmt-check",
+    ),
+}
+
+GATE_POLICY_REGISTRY_REL = "reference/gate_policy_registry.json"
+GATE_POLICY_REQUIRED_LAYER_IDS = ("L0", "L1", "L2", "L3", "L4", "L5", "L6")
+
 
 def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def _makefile_targets(makefile_path: Path) -> set[str]:
+    targets: set[str] = set()
+    if not makefile_path.is_file():
+        return targets
+    pattern = re.compile(r"^([A-Za-z0-9_.-]+):", flags=re.MULTILINE)
+    for match in pattern.finditer(_read_text(makefile_path)):
+        targets.add(match.group(1))
+    return targets
 
 
 def _validate_file_presence(docs_root: Path) -> list[str]:
@@ -637,6 +750,116 @@ def _validate_a35_search_replace_surface(docs_root: Path) -> list[str]:
     return errors
 
 
+def _validate_a36_release_evidence_surface(docs_root: Path) -> list[str]:
+    errors: list[str] = []
+    for rel, snippets in A36_RELEASE_EVIDENCE_SNIPPETS.items():
+        path = docs_root / rel
+        if not path.is_file():
+            errors.append(f"missing A36 release-evidence policy page: {path}")
+            continue
+        text = _read_text(path)
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(
+                    f"{path}: missing A36 release-evidence policy snippet: {snippet!r}"
+                )
+    return errors
+
+
+def _validate_a38_gate_policy_surface(docs_root: Path) -> list[str]:
+    errors: list[str] = []
+    for rel, snippets in A38_GATE_POLICY_SURFACE_SNIPPETS.items():
+        path = docs_root / rel
+        if not path.is_file():
+            errors.append(f"missing A38 gate-policy page: {path}")
+            continue
+        text = _read_text(path)
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(f"{path}: missing A38 gate-policy snippet: {snippet!r}")
+    return errors
+
+
+def _validate_a37_search_preview_surface(docs_root: Path) -> list[str]:
+    errors: list[str] = []
+    for rel, snippets in A37_SEARCH_PREVIEW_SNIPPETS.items():
+        path = docs_root / rel
+        if not path.is_file():
+            errors.append(f"missing A37 search-preview policy page: {path}")
+            continue
+        text = _read_text(path)
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(
+                    f"{path}: missing A37 search-preview policy snippet: {snippet!r}"
+                )
+    return errors
+
+
+def _validate_a38_gate_policy_registry(docs_root: Path, repo_root: Path) -> list[str]:
+    errors: list[str] = []
+    path = docs_root / GATE_POLICY_REGISTRY_REL
+    if not path.is_file():
+        return [f"missing A38 gate-policy registry: {path}"]
+    try:
+        payload = json.loads(_read_text(path))
+    except json.JSONDecodeError as exc:
+        return [f"invalid A38 gate-policy registry JSON: {path}: {exc}"]
+    if not isinstance(payload, dict):
+        return [f"{path}: gate-policy registry root must be an object"]
+    if payload.get("version") != 1:
+        errors.append(f"{path}: `version` must equal 1")
+
+    layers = payload.get("layers")
+    if not isinstance(layers, list):
+        return errors + [f"{path}: `layers` must be a list"]
+
+    layer_ids: list[str] = []
+    make_targets = _makefile_targets(repo_root / "Makefile")
+    for idx, row in enumerate(layers):
+        if not isinstance(row, dict):
+            errors.append(f"{path}: layers[{idx}] must be an object")
+            continue
+        layer_id = row.get("id")
+        if not isinstance(layer_id, str) or not layer_id.strip():
+            errors.append(f"{path}: layers[{idx}].id must be non-empty string")
+            continue
+        layer_ids.append(layer_id.strip())
+        for field_name in (
+            "name",
+            "trigger",
+            "command",
+            "mode",
+        ):
+            value = row.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(
+                    f"{path}: layers[{idx}].{field_name} must be non-empty string"
+                )
+        for field_name in ("included_checks", "artifacts", "duplicate_run_exclusions"):
+            value = row.get(field_name)
+            if not isinstance(value, list) or any(
+                not isinstance(item, str) or not item.strip() for item in value
+            ):
+                errors.append(f"{path}: layers[{idx}].{field_name} must be string list")
+
+        command = row.get("command")
+        if isinstance(command, str) and command.startswith("make "):
+            target = command.split()[1]
+            if make_targets and target not in make_targets:
+                errors.append(
+                    f"{path}: layers[{idx}].command target missing in Makefile: {target}"
+                )
+        else:
+            errors.append(f"{path}: layers[{idx}].command must start with 'make '")
+
+    if tuple(layer_ids) != GATE_POLICY_REQUIRED_LAYER_IDS:
+        errors.append(
+            f"{path}: layer id sequence must equal {list(GATE_POLICY_REQUIRED_LAYER_IDS)!r}"
+        )
+    return errors
+
+
 def _validate_active_plan_drift(docs_root: Path) -> list[str]:
     errors: list[str] = []
     active_path = docs_root / "plan/implementation_active.md"
@@ -853,6 +1076,10 @@ def main() -> int:
     errors.extend(_validate_quick_context_orientation_links(docs_root))
     errors.extend(_validate_randomized_policy_surface(docs_root))
     errors.extend(_validate_a35_search_replace_surface(docs_root))
+    errors.extend(_validate_a36_release_evidence_surface(docs_root))
+    errors.extend(_validate_a37_search_preview_surface(docs_root))
+    errors.extend(_validate_a38_gate_policy_surface(docs_root))
+    errors.extend(_validate_a38_gate_policy_registry(docs_root, Path.cwd()))
     errors.extend(_validate_active_plan_drift(docs_root))
     errors.extend(_validate_tm_long_variant_contract(docs_root))
     errors.extend(_validate_mkdocs_contract(Path.cwd()))

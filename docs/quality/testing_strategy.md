@@ -33,6 +33,45 @@ Quick lookup companion:
 
 ---
 
+## 1.2) Layered Gate Policy Matrix (Normative)
+
+Policy registry (machine-checked):
+- `docs/reference/gate_policy_registry.json`
+
+| Layer | Trigger | Command | Includes | Blocking/Advisory | Evidence | Duplicate-Run Exclusion |
+|---|---|---|---|---|---|---|
+| `L0` | regular coding loop | `make gate-dev` | changed-file fmt + lint/type/arch/locale guard | blocking | none | no deterministic test/doc lanes |
+| `L1` | pre-commit hook/manual | `make gate-commit` | `L0` + manual-contract guard | blocking | hook output | no broad deterministic suite |
+| `L2` | pre-push hook/manual | `make gate-push` | `L1` + fixed core + routed packets + readonly guard | blocking | routed lane logs | fixed core once + routed dedupe |
+| `L3` | task/docs closure | `make gate-task-close` | `L2` + `test-cov` + `docs-check` + perf-contract | blocking | coverage/docs artifacts | single `test-cov`, single `docs-check` |
+| `L4` | PR/push strict CI | `make gate-ci-pr` | full static + coverage + docs + security + perf + manual contract | blocking | `artifacts/**` | no routed packet duplication in strict CI |
+| `L5` | scheduled/manual heavy | `make gate-heavy-advisory` | `test-prop-slow`, heavy perf, staged mutation | advisory | heavy artifacts | heavy extras once per run |
+| `L6` | RC/final tag | `make gate-release TAG=vX.Y.Z` | `L4` + strict bench + strict heavy + release checks | blocking | release reports + evidence manifest | single release metadata/evidence path |
+
+Execution rule (normative):
+1. Run only the gate for the current trigger layer.
+2. Do not re-run lower layers separately (`L3` already contains `L2`, etc.).
+3. Use focused packet lanes only for local debugging or scoped verification, not as a replacement for required layer gates.
+4. Static formatting split is intentional:
+   `make fmt-check-changed` for `L0..L3`, `make fmt-check` for strict `L4/L6`.
+
+Policy families covered by this matrix:
+1. formatting/lint/type/architecture guards
+2. deterministic tests (fixed core + packet lanes)
+3. routed packet tests (`scripts/select_test_targets.py`)
+4. docs contracts (`make docs-check`)
+5. locale-agnostic production copy guard
+6. manual scenario contracts and UI evidence
+7. coverage floor enforcement (`92/97`)
+8. perf-contract enforcement
+9. staged mutation policy
+10. release evidence policy
+
+Release evidence policy references:
+1. `make release-evidence-check`
+2. `tests/manual_scenarios/release_evidence_manifest.json`
+3. UI scenario artifacts remain recorded under `artifacts/manual-ui/*.json`
+
 ## 2) Test Layers
 
 ### 2.1 Core Unit Tests (highest priority)
@@ -165,6 +204,11 @@ Quick lookup companion:
 - No-shrink workflow contract:
   - `tests/manual_scenarios/workflow_test_surface_contract.json`
   - machine-check target: `make test-ui-manual-contract`.
+- Release-evidence closure contract (A36):
+  - tracked manifest: `tests/manual_scenarios/release_evidence_manifest.json`,
+  - tracked evidence records: `tests/manual_scenarios/release_evidence/*.json`,
+  - machine-check target: `make release-evidence-check`,
+  - required scenarios are pass-only and interactive (`headless=false`, non-`auto-only` mode).
 
 ### 2.4 Crash‑Resilience Tests (manual)
 - Edit several translations (ensure cache writes occur).
@@ -226,11 +270,9 @@ Quick lookup companion:
     - cold-cache first-pass target (default
       `TZP_PERF_TM_COLD_SPEEDUP_20K_PERCENT=3`).
 - pytest always prints a **Performance** summary in terminal output,
-  including `make verify`, to keep regressions visible.
-- Local `make verify` treats perf-budget failures as advisory warnings;
-  strict perf blocking is enforced in `make verify-ci` / release gates.
-- Local `make verify` runs `test-perf-scale` in advisory mode once;
-  CI `verify-ci-core` runs `test-perf-scale` in strict mode.
+  including `make gate-task-close`, to keep regressions visible.
+- Strict perf blocking is enforced in `make gate-task-close`, `make gate-ci-pr`,
+  and `make gate-release TAG=...`.
 
 ### 2.7 Real‑data performance scenarios (scripted)
 - `make perf-scenarios` runs perf checks against fixture files in
@@ -256,14 +298,9 @@ Quick lookup companion:
   parser (`test_bench_parse_lazy_synthetic_20k`),
   search (`test_bench_search_translation_synthetic_20k`),
   TM query (`test_bench_tm_query_synthetic_20k`).
-- CI enforces benchmark regression in a dedicated Linux job (`BENCH_COMPARE_MODE=fail`);
-  matrix `verify-ci` jobs use `VERIFY_SKIP_BENCH=1` to avoid duplicate benchmark runs.
-- Scheduled CI heavy lane still runs strict benchmark regression once
-  (`make bench-check`, fail mode) because dedicated benchmark job is skipped on schedule.
-- Local verify runs benchmark compare in advisory mode (`BENCH_COMPARE_MODE=warn`).
-- Local `make verify` uses change-scoped formatter auto-fix (`make fmt-changed`)
-  to keep runtime practical; strict full-repo format enforcement remains in
-  `make fmt-check` (CI/release lanes).
+- Benchmark regression is a strict release-layer responsibility in
+  `make gate-release TAG=...` (`BENCH_COMPARE_MODE=fail`).
+- Routine development layers (`L0..L5`) avoid benchmark duplication by default.
 
 ### 2.9 Property and mutation testing
 - Randomized-profile contract (Hypothesis):
@@ -274,17 +311,23 @@ Quick lookup companion:
 - Dedicated randomized lanes:
     - `make test-prop-fast` runs profile-scoped randomized/property suites.
     - `make test-prop-slow` runs the same suites at higher example/step budgets.
-    - Heavy strict randomized sweep is enforced via `make verify-heavy-extra`
-      (includes `make test-prop-slow`).
+    - Heavy advisory randomized sweep is executed in `make gate-heavy-advisory`,
+      and strict randomized release sweep is executed in `make gate-release TAG=...`.
 - Packet-focused search/replace lane:
     - `make test-search-a35` runs Search+Replace sidebar sync and all-scope
       replace-all confirmation contracts.
+    - `make test-search-a37` runs A37 impact-preview and checkbox-gated replace safety
+      contracts.
 - Randomized/stateful stratum mapping is normative:
     - Core workflow/state-machine changes require deterministic tests plus
       randomized/stateful invariants on core/service boundaries.
     - UI-facing changes require automated tests plus at least one relevant manual
       scenario run artifact from the A31 framework (`artifacts/manual-ui/*.json`).
       For A35 work, use scenario `search-replace-sidebar-all-scopes`.
+      For A37 work, use scenario `search-replace-impact-preview-safe-apply`.
+    - Release closure for A34/A35 additionally requires tracked manifest evidence
+      (`tests/manual_scenarios/release_evidence_manifest.json`) validated by
+      `make release-evidence-check`.
 - Property-based tests (Hypothesis) are part of the default suite for:
     - parser/saver round-trip invariants,
     - encoding preservation invariants on save,
@@ -329,10 +372,8 @@ Quick lookup companion:
   checker exit `2` fails the workflow (invalid input/API/format).
 - `make mutation-promotion-check` remains available for explicit local/manual
   evaluation when operators already have ordered summary files.
-- Local tiered heavy entrypoint is `make verify-heavy`
-  (`verify-ci` + heavy TM stress-profile perf gate + staged mutation gate).
-- CI heavy lane uses `make verify-heavy-extra` after the verify job has already
-  completed, so strict base gates are not duplicated in the same workflow run.
+- Local/CI heavy advisory entrypoint is `make gate-heavy-advisory`.
+- Strict heavy blocking path is `make gate-release TAG=...`.
 - Criteria-gated mutation promotion policy:
   keep workflow-dispatch heavy runs defaulted to `soft`; promote default to
   `strict` only after two consecutive scheduled heavy runs pass strict-stage
@@ -342,10 +383,10 @@ Quick lookup companion:
 ### 2.10 Warning-safety gate
 - Default pytest-based gates run with `-W error::ResourceWarning` so
   unclosed resource warnings fail in the primary pass (no duplicate full-suite rerun).
-- Default verification runs the full pytest suite once via `make test-cov`;
+- `L3` and `L4` layers run the full pytest coverage suite once via `make test-cov`;
   the full encoding-integrity pytest suite remains available through
   `make test-encoding-integrity` as a targeted rerun command and is not
-  re-run by default verify umbrellas.
+  re-run by default layer umbrellas.
 - `make test-readonly-clean` is script-level (diagnostics + tracked-state check)
   so it does not duplicate pytest execution.
 - Optional `make test-warnings` remains available as a focused TM/SQLite warning check.
@@ -436,7 +477,7 @@ They include:
 - Subfolders with punctuation
 - `_TVRADIO_TRANSLATIONS` to ignore
 - Real-world edge cases should be represented by committed fixture slices only.
-- Do not require external repositories to run `make test` or `make verify`.
+- Do not require external repositories to run `make test` or `make gate-task-close`.
 - Manual conflict fixture: `tests/fixtures/conflict_manual/` (prebuilt cache + changed file)
   to exercise the conflict resolution UI.
 
@@ -507,7 +548,7 @@ They include:
   tags (`U/T/FR/P`); imported-origin matches have no status marker.
 - TM relevance acceptance corpus: deterministic fixture
   `tests/fixtures/tm_ranking/corpus.json` validated by `tests/test_tm_ranking_corpus.py`
-  in the default `make test` / `make verify` pipeline, with profile-level coverage
+  in the default `make test` / `make gate-task-close` pipeline, with profile-level coverage
   (`synthetic_core` + `pz_fixture_like`) enforced in CI.
   Corpus includes minimum-recall density checks at low thresholds to prevent
   exact-only collapse in fuzzy mode, plus diagnostics snapshot minima

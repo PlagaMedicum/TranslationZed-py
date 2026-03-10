@@ -184,6 +184,36 @@
       ],
       "risk_level": "P1",
       "status": "IN_REFACTOR"
+    },
+    {
+      "closed_at": null,
+      "closure_criteria": [
+        "Keep replace-all run-plan semantics unchanged for zero-match and parse-error abort paths",
+        "Keep deterministic impact-preview ordering with fixed cap/truncation contracts",
+        "Keep checkbox-gated replace safety semantics and all-or-cancel behavior green in packet lane",
+        "Keep docs-check and verify-fast green for A37 packet updates"
+      ],
+      "evidence": [
+        "A37-SRX-2 adds impact-preview DTOs and two-step confirmation safety wiring on top of existing replace-all orchestration",
+        "code-triage marked translationzed_py/core/search_replace_service.py as REVIEW_REQUIRED after A37 core surface expansion",
+        "Validation chain target: make test-search-a37 + make docs-check + make verify-fast"
+      ],
+      "module_path": "translationzed_py/core/search_replace_service.py",
+      "opened_at": "2026-03-09",
+      "owner": "core-maintainers",
+      "reason_codes": [
+        "COMPLEXITY",
+        "DOC_DRIFT"
+      ],
+      "refactor_scope": "stabilize new preview contracts while keeping deterministic replace/search behavior and bounded orchestration complexity",
+      "required_tests": [
+        "tests/test_search_replace_service.py",
+        "tests/test_main_window_replace_merge_clipboard.py",
+        "tests/test_gui_dialogs.py",
+        "tests/test_gui_service_adapters.py"
+      ],
+      "risk_level": "P1",
+      "status": "IN_REFACTOR"
     }
   ],
   "version": 1

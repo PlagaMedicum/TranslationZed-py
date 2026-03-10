@@ -49,8 +49,13 @@ Current/target framing:
 
 ## 5) Key Operational Commands
 
-- Local umbrella gate: `make verify`
-- Strict CI-equivalent gate: `make verify-ci`
+- `L0` regular dev gate: `make gate-dev`
+- `L1` pre-commit gate: `make gate-commit`
+- `L2` pre-push gate: `make gate-push`
+- `L3` task-close/docs-close gate: `make gate-task-close`
+- `L4` strict CI PR/push gate: `make gate-ci-pr`
+- `L5` heavy advisory gate: `make gate-heavy-advisory`
+- `L6` release strict gate: `make gate-release TAG=vX.Y.Z`
 - Docs quality gate: `make docs-check`
 - Locale-agnostic copy gate: `make locale-agnostic-check`
 - Strict docs build: `make docs-build`
@@ -65,16 +70,20 @@ Current/target framing:
 - Randomized/property slow lane: `make test-prop-slow` (`TZP_PROP_PROFILE=slow`)
 - A34 status-triage packet lane: `make test-status-a34`
 - A35 search/replace packet lane: `make test-search-a35`
+- Active A37 search/replace packet lane: `make test-search-a37`
+- Release-evidence guard: `make release-evidence-check`
 - Strict coverage lane: `make test-cov` (`translationzed_py>=92%`, `core>=97%`)
 - Coverage promotion readiness: `make coverage-promotion-check COVERAGE_PROMOTION_SUMMARIES='<run1.json> <run2.json>'`
 
 Command profile hint:
 
-1. Use `make verify` for normal local work.
-2. Use `make verify-ci` for strict CI parity.
+1. Use `make gate-dev` during regular coding loops.
+   - runs changed-file formatting checks + static guards only.
+2. Use `make gate-push` before each push.
 3. Use `make locale-agnostic-check` when touching production UI text or guidance docs.
-4. Use `make verify-heavy` only when heavy mutation/perf evidence is needed.
-5. Use `make test-prop-slow` before heavy merges that touch core orchestration/state machines.
+4. Use `make gate-task-close` before closing packet/docs tasks.
+5. Use `make gate-ci-pr` when you need full static + strict CI parity locally.
+6. Use `make gate-release TAG=...` for RC/final release strict checks.
 
 ## 6) Known High-Risk Areas
 
@@ -88,12 +97,16 @@ Command profile hint:
 
 1. `A33-TEST-1` is closed:
    - randomized/stateful policy lanes are active (`make test-prop-fast`, `make test-prop-slow`).
-2. `A34-UX-1` is staged complete:
-   - code/docs/tests are complete; one interactive manual artifact remains tracked as release-evidence debt.
-3. `A35-SRX-1` is staged complete:
+2. `A34-UX-1` is closed:
+   - interactive release evidence is now tracked in `tests/manual_scenarios/release_evidence_manifest.json`.
+3. `A35-SRX-1` is closed:
    - Search panel is upgraded to full Search+Replace controls,
    - replace-all confirmation is required for FILE/LOCALE/POOL when matches exist.
-4. Deferred stream sequencing handoff is active:
-   - next packet selection is pending after `A35` staged closure.
-5. UI-packet evidence rule remains active:
+4. Active deferred packet is `A37-SRX-2` (implementation in progress):
+   - richer replace-all impact preview and safer apply confirmation,
+   - replace scope remains Preferences-driven,
+   - no sidebar scope selector.
+   - manual scenario: `search-replace-impact-preview-safe-apply`.
+5. UI-packet evidence and release-evidence guard remain active:
    - attach at least one relevant manual scenario artifact under `artifacts/manual-ui/`.
+   - enforce tracked closure evidence with `make release-evidence-check`.

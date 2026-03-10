@@ -16,7 +16,7 @@ Implementation status snapshot on `dev` (2026-03-09):
 2. TM packets `V9-TMQ-1/2` and `V9-TMW-1/2` are implemented.
 3. Crash packets `V9-CR-1/2/3` are implemented.
 4. v0.9 closure/readiness audit (`A28`) is complete on `dev` (`docs-check`, `verify`, `verify-ci`, `release-check TAG=v0.9.0-rc1`).
-5. Deferred stream continuation on `dev` has `A32-CRX`, `A33-TEST-1`, staged `A34-UX-1` closure, and staged `A35-SRX-1` closure; deferred packet selection is now pending.
+5. Deferred stream continuation on `dev` has `A32-CRX`, `A33-TEST-1`, `A34-UX-1` closed, `A35-SRX-1` closed, and `A36-REL-1` closed; active packet is `A37-SRX-2` (no sidebar scope selector).
 
 ## 2) Release Goals
 
