@@ -11,6 +11,10 @@ pytest.importorskip("PySide6")
 from PySide6.QtWidgets import QCheckBox
 
 from translationzed_py.core.project_scanner import LocaleMeta
+from translationzed_py.core.search_replace_service import (
+    ReplaceAllImpactPreview,
+    ReplaceAllImpactPreviewRow,
+)
 from translationzed_py.gui.dialogs import (
     AboutDialog,
     ConflictChoiceDialog,
@@ -98,21 +102,58 @@ def test_tm_language_dialog_defaults_and_skip_all_flow(qtbot) -> None:
 
 def test_replace_files_dialog_renders_items_and_confirms(qtbot) -> None:
     """Verify replace-all dialog renders file rows and confirm state."""
+    preview = ReplaceAllImpactPreview(
+        scope_label="Pool (2)",
+        total_matches=4,
+        affected_files=2,
+        rows=(
+            ReplaceAllImpactPreviewRow(
+                file="one.txt",
+                row=2,
+                before="A" * 95,
+                after="B" * 95,
+            ),
+            ReplaceAllImpactPreviewRow(
+                file="two.txt",
+                row=4,
+                before="before",
+                after="after",
+            ),
+        ),
+        rendered_rows=2,
+        omitted_rows=3,
+        truncated=True,
+        row_cap=2,
+    )
     dialog = ReplaceFilesDialog(
         [("one.txt", 3), "two.txt"],
         "Pool (2)",
         total_matches=4,
         affected_files=2,
+        impact_preview=preview,
     )
     qtbot.addWidget(dialog)
-    from PySide6.QtWidgets import QLabel
+    from PySide6.QtWidgets import QLabel, QTableWidget
 
     labels = [widget.text() for widget in dialog.findChildren(QLabel)]
     assert any("Scope: Pool (2)" in text for text in labels)
     assert any("Total replacements: 4" in text for text in labels)
     assert any("Affected files: 2" in text for text in labels)
+    assert any("Preview truncated: 2 shown, 3 omitted." in text for text in labels)
+    table = dialog.findChild(QTableWidget)
+    assert table is not None
+    assert table.item(0, 2).text().endswith("...")
+    assert table.item(0, 3).text().endswith("...")
 
     assert dialog.confirmed() is False
+    assert dialog._replace_button.isEnabled() is False
+    dialog._confirm()
+    assert dialog.confirmed() is False
+    dialog._confirm_checkbox.setChecked(True)
+    assert dialog._replace_button.isEnabled() is True
+    dialog._confirm_checkbox.setChecked(False)
+    assert dialog._replace_button.isEnabled() is False
+    dialog._confirm_checkbox.setChecked(True)
     dialog._confirm()
     assert dialog.confirmed() is True
 

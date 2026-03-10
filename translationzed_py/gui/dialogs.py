@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPlainTextEdit,
     QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -25,6 +27,7 @@ from PySide6.QtWidgets import (
 
 from translationzed_py import __version__
 from translationzed_py.core.project_scanner import LocaleMeta
+from translationzed_py.core.search_replace_service import ReplaceAllImpactPreview
 
 
 class LocaleChooserDialog(QDialog):
@@ -270,6 +273,7 @@ class ReplaceFilesDialog(QDialog):
         *,
         total_matches: int,
         affected_files: int,
+        impact_preview: ReplaceAllImpactPreview | None = None,
         parent=None,
     ) -> None:
         """Initialize the instance."""
@@ -288,6 +292,7 @@ class ReplaceFilesDialog(QDialog):
         )
         main_layout.addWidget(summary)
 
+        main_layout.addWidget(QLabel("Per-file replacement counts:", self))
         list_widget = QListWidget(self)
         list_widget.setSelectionMode(QAbstractItemView.NoSelection)
         for item in files:
@@ -299,21 +304,81 @@ class ReplaceFilesDialog(QDialog):
         list_widget.setMaximumHeight(240)
         main_layout.addWidget(list_widget)
 
+        main_layout.addWidget(
+            QLabel("Impact preview (file, row, before, after):", self)
+        )
+        preview_rows = () if impact_preview is None else impact_preview.rows
+        preview_table = QTableWidget(len(preview_rows), 4, self)
+        preview_table.setHorizontalHeaderLabels(("File", "Row", "Before", "After"))
+        preview_table.setSelectionMode(QAbstractItemView.NoSelection)
+        preview_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        preview_table.verticalHeader().setVisible(False)
+        preview_table.horizontalHeader().setStretchLastSection(True)
+        for idx, row in enumerate(preview_rows):
+            preview_table.setItem(idx, 0, QTableWidgetItem(str(row.file)))
+            preview_table.setItem(idx, 1, QTableWidgetItem(str(max(1, int(row.row)))))
+            preview_table.setItem(
+                idx, 2, QTableWidgetItem(_clip_preview_text(str(row.before)))
+            )
+            preview_table.setItem(
+                idx, 3, QTableWidgetItem(_clip_preview_text(str(row.after)))
+            )
+        preview_table.setMinimumHeight(220)
+        preview_table.setMaximumHeight(360)
+        main_layout.addWidget(preview_table)
+
+        self._confirm_checkbox = QCheckBox(
+            "I reviewed the replacement list and impact preview.", self
+        )
+        self._confirm_checkbox.stateChanged.connect(
+            lambda _state: self._sync_replace_enabled()
+        )
+        main_layout.addWidget(self._confirm_checkbox)
+        if impact_preview is not None and impact_preview.truncated:
+            truncation = QLabel(
+                "Preview truncated: "
+                f"{impact_preview.rendered_rows} shown, {impact_preview.omitted_rows} omitted.",
+                self,
+            )
+            truncation.setWordWrap(True)
+            main_layout.addWidget(truncation)
+
         buttons = QDialogButtonBox(self)
-        btn_replace = buttons.addButton("Replace", QDialogButtonBox.AcceptRole)
+        self._replace_button = buttons.addButton(
+            "Replace", QDialogButtonBox.AcceptRole
+        )
         buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
-        btn_replace.clicked.connect(self._confirm)
+        self._replace_button.setEnabled(False)
+        self._replace_button.clicked.connect(self._confirm)
         buttons.rejected.connect(self.reject)
         main_layout.addWidget(buttons)
 
+    def _sync_replace_enabled(self) -> None:
+        """Enable Replace only after explicit checklist acknowledgement."""
+        self._replace_button.setEnabled(self._confirm_checkbox.isChecked())
+
     def _confirm(self) -> None:
         """Execute confirm."""
+        if not self._confirm_checkbox.isChecked():
+            return
         self._confirmed = True
         self.accept()
 
     def confirmed(self) -> bool:
         """Execute confirmed."""
         return self._confirmed
+
+
+def _clip_preview_text(text: str, *, limit: int = 80) -> str:
+    """Clip preview text for compact dialog rendering."""
+    if limit <= 0:
+        return ""
+    raw = str(text)
+    if len(raw) <= limit:
+        return raw
+    if limit <= 3:
+        return raw[:limit]
+    return raw[: limit - 3] + "..."
 
 
 class ConflictChoiceDialog(QDialog):

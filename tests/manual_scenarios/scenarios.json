@@ -206,6 +206,34 @@
         "tests/test_main_window_replace_merge_clipboard.py",
         "tests/test_gui_service_adapters.py"
       ]
+    },
+    {
+      "id": "search-replace-impact-preview-safe-apply",
+      "title": "Search+replace impact preview with checkbox-gated replace safety",
+      "fixture_root": "conflict_manual",
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open BE/ui.txt and switch to Search panel.",
+        "Set query and replacement so Replace All has positive matches.",
+        "Run Replace All and inspect summary plus row-level impact preview.",
+        "Press Cancel and verify no changes are applied.",
+        "Run Replace All again, tick the review checkbox, then press Replace."
+      ],
+      "expected_checks": [
+        "Confirmation modal shows scope, total replacements, affected files, and row-level preview rows.",
+        "Replace button is disabled until the review checkbox is checked.",
+        "Cancel path applies no changes.",
+        "Checkbox-gated Replace performs one all-or-cancel apply with no per-file toggle path."
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_search_replace_service.py",
+        "tests/test_gui_dialogs.py",
+        "tests/test_main_window_replace_merge_clipboard.py"
+      ]
     }
   ]
 }
