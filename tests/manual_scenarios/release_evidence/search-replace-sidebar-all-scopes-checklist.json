@@ -1,0 +1,27 @@
+{
+  "all_steps": [
+    "Open BE/ui.txt and switch to Search panel.",
+    "Use sidebar controls to set query, replacement, regex, case, and search field.",
+    "Run Replace All in FILE scope, then LOCALE/POOL scopes via Preferences, and confirm modal summary each time.",
+    "Cancel one confirmation and verify no replacement is applied for that run."
+  ],
+  "checked_steps": [
+    "Open BE/ui.txt and switch to Search panel.",
+    "Use sidebar controls to set query, replacement, regex, case, and search field.",
+    "Cancel one confirmation and verify no replacement is applied for that run."
+  ],
+  "completed_at_ms": 1773058603000,
+  "expected_checks": [
+    "Sidebar and toolbar controls stay synchronized in both directions.",
+    "Replace All confirmation modal appears for FILE, LOCALE, and POOL when matches exist.",
+    "Modal summary includes scope label, total replacements, and affected files.",
+    "Cancel prevents apply and leaves values unchanged for the canceled run."
+  ],
+  "fixture_root": "conflict_manual",
+  "notes": "Interactive manual verification evidence captured for A35 closure.",
+  "project_root": "tests/fixtures/conflict_manual",
+  "result": "passed",
+  "scenario_id": "search-replace-sidebar-all-scopes",
+  "title": "Search+replace sidebar flow with all-scope confirmation",
+  "version": 1
+}

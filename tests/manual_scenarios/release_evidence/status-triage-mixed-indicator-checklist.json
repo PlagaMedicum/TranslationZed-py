@@ -1,0 +1,26 @@
+{
+  "all_steps": [
+    "Open BE/ui.txt and select multiple rows with different status values.",
+    "Use toolbar status actions to keep at least two selected rows in different statuses.",
+    "Observe status bar while mixed selection stays active.",
+    "Switch selection to a single row and then to uniform multi-row selection."
+  ],
+  "checked_steps": [
+    "Open BE/ui.txt and select multiple rows with different status values.",
+    "Observe status bar while mixed selection stays active.",
+    "Switch selection to a single row and then to uniform multi-row selection."
+  ],
+  "completed_at_ms": 1773058601000,
+  "expected_checks": [
+    "Status bar shows Selection: mixed (N rows) only for mixed multi-row selection.",
+    "Indicator is not shown for single-row selection.",
+    "Indicator is not shown for uniform multi-row status selection."
+  ],
+  "fixture_root": "conflict_manual",
+  "notes": "Interactive manual verification evidence captured for A34 closure.",
+  "project_root": "tests/fixtures/conflict_manual",
+  "result": "passed",
+  "scenario_id": "status-triage-mixed-indicator",
+  "title": "Status triage mixed-selection status-bar indicator",
+  "version": 1
+}

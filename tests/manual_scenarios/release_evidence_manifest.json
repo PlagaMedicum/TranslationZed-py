@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "required_scenarios": [
+    "status-triage-mixed-indicator",
+    "search-replace-sidebar-all-scopes"
+  ],
+  "entries": [
+    {
+      "scenario_id": "status-triage-mixed-indicator",
+      "result": "passed",
+      "interactive": true,
+      "recorded_at_ms": 1773058601500,
+      "checklist_record": "tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-checklist.json",
+      "run_record": "tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-run.json",
+      "source_checklist_artifact": "artifacts/manual-ui/status-triage-mixed-indicator-1772974671458.json",
+      "source_run_artifact": "artifacts/manual-ui/status-triage-mixed-indicator-run-1773057059286.json",
+      "notes": "A34 interactive release-evidence closure record."
+    },
+    {
+      "scenario_id": "search-replace-sidebar-all-scopes",
+      "result": "passed",
+      "interactive": true,
+      "recorded_at_ms": 1773058603500,
+      "checklist_record": "tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-checklist.json",
+      "run_record": "tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-run.json",
+      "source_checklist_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-1773049605636.json",
+      "source_run_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-run-1773049605638.json",
+      "notes": "A35 interactive release-evidence closure record."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1773058603200,
+  "fixture_copy_root": "tests/fixtures/conflict_manual",
+  "manual_return_code": 0,
+  "mode": "manual",
+  "scenario": {
+    "id": "search-replace-sidebar-all-scopes"
+  },
+  "version": 1
+}
