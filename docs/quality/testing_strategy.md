@@ -743,9 +743,9 @@ They include:
     - two consecutive strict coverage summaries must qualify at `92/97`,
     - readiness is machine-checked with `make coverage-promotion-check`,
     - checker enforces both measured percentages and run-floor metadata.
-- Current strict baseline (2026-03-07):
-    - `make test-cov`: **92.3%** whole package.
-    - core-only strict run: **97.1%**.
-    - `translationzed_py/gui/main_window.py`: **83.4%** (informational, no per-file hard gate).
+- Current strict baseline (2026-06-23):
+    - `make test-cov`: **92.1%** whole package.
+    - core-only strict run: **97.4%**.
+    - `translationzed_py/gui/main_window.py`: **91.6%** (informational, no per-file hard gate).
 - GUI: smoke and integration coverage sufficient to validate wiring.
 - Cover **all known structure/encoding edge-cases** found in production files.
