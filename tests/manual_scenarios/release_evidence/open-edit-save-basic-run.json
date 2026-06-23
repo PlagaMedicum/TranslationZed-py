@@ -1,7 +1,7 @@
 {
   "auto_return_code": null,
-  "completed_at_ms": 1782236481849,
-  "fixture_copy_root": "/tmp/tzp-manual-open-edit-save-basic-1r9l5vqn/project",
+  "completed_at_ms": 1782241479761,
+  "fixture_copy_root": "/tmp/tzp-manual-open-edit-save-basic-9njulz31/project",
   "manual_all_steps": [
     "Open RU/ui.txt from the Project tree.",
     "Edit UI_HELLO in the table or detail editor and confirm the row becomes dirty.",
@@ -19,16 +19,16 @@
     "Use General -> Save. If a save/write prompt appears, choose Write to file for this scenario and record the prompt wording in Notes. Then open RU/menu.txt from the Project tree.",
     "Switch back to RU/ui.txt and verify the saved value persists."
   ],
-  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/open-edit-save-basic-open-edit-save-basic-1782236222540-1782236481665.json",
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/open-edit-save-basic-open-edit-save-basic-1782240613591-1782241479587.json",
   "manual_expected_checks": [
     "No startup or save error dialogs appear.",
     "Dirty and clean state changes follow edit then save.",
     "File switching does not break the saved value or active editing context."
   ],
-  "manual_notes": "it is not dirty, it is \"Translated\", as expected",
+  "manual_notes": "",
   "manual_outcome": "passed",
   "manual_return_code": 0,
-  "manual_run_token": "open-edit-save-basic-1782236222540",
+  "manual_run_token": "open-edit-save-basic-1782240613591",
   "mode": "manual",
   "scenario": {
     "automation_pytest_selectors": [
@@ -90,7 +90,7 @@
     },
     {
       "path": "translationzed_py/gui/main_window.py",
-      "sha256": "a6a633da5584974b08db0e58e1b9d72a13d952036051515e3227a7da827f60ba"
+      "sha256": "78036aac649438270987cc1498439e98cf65a86f2db20a181dc886e42f7170a1"
     }
   ],
   "version": 1

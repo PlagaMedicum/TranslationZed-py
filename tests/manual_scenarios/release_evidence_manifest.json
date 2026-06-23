@@ -4,12 +4,12 @@
       "checklist_record": "tests/manual_scenarios/release_evidence/open-edit-save-basic-checklist.json",
       "interactive": true,
       "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
-      "recorded_at_ms": 1782236481849,
+      "recorded_at_ms": 1782241479761,
       "result": "passed",
       "run_record": "tests/manual_scenarios/release_evidence/open-edit-save-basic-run.json",
       "scenario_id": "open-edit-save-basic",
-      "source_checklist_artifact": "artifacts/manual-ui/open-edit-save-basic-open-edit-save-basic-1782236222540-1782236481665.json",
-      "source_run_artifact": "artifacts/manual-ui/open-edit-save-basic-run-1782236481849.json"
+      "source_checklist_artifact": "artifacts/manual-ui/open-edit-save-basic-open-edit-save-basic-1782240613591-1782241479587.json",
+      "source_run_artifact": "artifacts/manual-ui/open-edit-save-basic-run-1782241479761.json"
     },
     {
       "checklist_record": "tests/manual_scenarios/release_evidence/conflict-resolution-flow-checklist.json",
