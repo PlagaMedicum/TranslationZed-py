@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from translationzed_py.core import project_session as project_session_module
+from translationzed_py.core import session_resume as session_resume_module
 from translationzed_py.core import status_cache
 from translationzed_py.core.model import Entry, Status
 from translationzed_py.core.project_session import (
@@ -58,6 +59,27 @@ from translationzed_py.core.project_session import (
 def _touch(path: Path, text: str = "x") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def _session_resume_payload(**updates: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "version": session_resume_module.SESSION_RESUME_VERSION,
+        "generated_at_ms": 1,
+        "selected_locales": ["BE"],
+        "active_file_relpath": "BE/a.txt",
+        "active_row": 0,
+        "left_panel_index": 0,
+        "detail_visible": True,
+        "search_text": "",
+        "replace_text": "",
+        "search_case_sensitive": False,
+        "tm_min_score": 50,
+        "tm_grouping_mode": "none",
+        "tm_origin_project": True,
+        "tm_origin_import": True,
+    }
+    payload.update(updates)
+    return payload
 
 
 def _entry(key: str, value: str, status: Status) -> Entry:
@@ -980,6 +1002,126 @@ def test_project_session_service_session_resume_snapshot_reader_ignores_invalid_
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
     assert svc.read_session_resume_snapshot(root=root) is None
+
+
+def test_session_resume_persistence_helpers_support_injected_io_and_fail_closed(
+    tmp_path: Path,
+) -> None:
+    """Verify snapshot persistence callbacks and deletion failures stay deterministic."""
+    root = tmp_path / "proj"
+    snapshot = session_resume_module.build_session_resume_snapshot(
+        generated_at_ms=123,
+        selected_locales=["BE"],
+        active_file_relpath="BE/a.txt",
+        active_row=2,
+        left_panel_index=1,
+        detail_visible=True,
+        search_text="źródło",
+        replace_text="target",
+        search_case_sensitive=False,
+        tm_min_score=80,
+        tm_grouping_mode="origin",
+        tm_origin_project=True,
+        tm_origin_import=False,
+    )
+    writes: list[tuple[Path, str]] = []
+    path = session_resume_module.write_session_resume_snapshot(
+        root=root,
+        cache_dir=".tzp/cache",
+        snapshot=snapshot,
+        write_text=lambda target, text: writes.append((target, text)),
+    )
+    assert writes == [
+        (path, json.dumps(snapshot.to_payload(), ensure_ascii=False, indent=2) + "\n")
+    ]
+
+    _touch(path)
+    assert session_resume_module.delete_session_resume_snapshot(
+        root=root,
+        cache_dir=".tzp/cache",
+    )
+    assert not path.exists()
+
+    deleted: list[Path] = []
+    assert session_resume_module.delete_session_resume_snapshot(
+        root=root,
+        cache_dir=".tzp/cache",
+        unlink_path=deleted.append,
+    )
+    assert deleted == [path]
+
+    def _fail_delete(_path: Path) -> None:
+        raise OSError("blocked")
+
+    assert not session_resume_module.delete_session_resume_snapshot(
+        root=root,
+        cache_dir=".tzp/cache",
+        unlink_path=_fail_delete,
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("generated_at_ms", True),
+        ("generated_at_ms", -1),
+        ("selected_locales", "BE"),
+        ("left_panel_index", -1),
+        ("detail_visible", 1),
+        ("search_text", None),
+        ("search_case_sensitive", 0),
+        ("tm_min_score", 4),
+        ("tm_grouping_mode", "invalid"),
+        ("tm_origin_project", 1),
+    ],
+)
+def test_session_resume_parser_rejects_invalid_required_fields(
+    field: str,
+    value: object,
+) -> None:
+    """Verify malformed required snapshot fields reject the whole resume record."""
+    payload = _session_resume_payload()
+    payload[field] = value
+    assert session_resume_module.parse_session_resume_snapshot(payload) is None
+
+
+@pytest.mark.parametrize(
+    ("active_file_relpath", "active_row"),
+    [
+        (None, None),
+        (123, True),
+        ("", -1),
+    ],
+)
+def test_session_resume_parser_normalizes_optional_fields(
+    active_file_relpath: object,
+    active_row: object,
+) -> None:
+    """Verify unusable optional location fields are normalized without losing the snapshot."""
+    payload = _session_resume_payload(
+        selected_locales=["BE", "", "BE"],
+        active_file_relpath=active_file_relpath,
+        active_row=active_row,
+    )
+    snapshot = session_resume_module.parse_session_resume_snapshot(payload)
+    assert snapshot is not None
+    assert snapshot.selected_locales == ("BE",)
+    assert snapshot.active_file_relpath is None
+    assert snapshot.active_row is None
+
+
+def test_session_resume_parser_rejects_invalid_payload_shape_and_locale_rows() -> None:
+    """Verify non-object snapshots and non-string locale rows are rejected."""
+    assert session_resume_module.parse_session_resume_snapshot([]) is None
+    payload = _session_resume_payload(selected_locales=["BE", 123])
+    assert session_resume_module.parse_session_resume_snapshot(payload) is None
+    assert (
+        session_resume_module.resolve_session_resume_active_path(
+            root=Path("/project"),
+            active_file_relpath="",
+        )
+        is None
+    )
 
 
 def test_normalize_selected_locales_filters_source_unknown_and_duplicates() -> None:
