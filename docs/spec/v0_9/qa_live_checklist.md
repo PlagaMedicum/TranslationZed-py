@@ -1,5 +1,5 @@
-# v0.9.0 QA Live Checklist Contract
-_Last updated: 2026-03-06_
+# QA Live Checklist Contract
+_Updated: 2026-06-23_
 
 ## 1) Purpose
 
@@ -7,9 +7,6 @@ Define deterministic QA scan-progress visibility in the left QA panel.
 
 The checklist must communicate exactly what is running and what already
 completed, without requiring users to infer progress from a spinner only.
-
-Implementation status on `dev` (2026-03-06):
-1. Core rule-state model, async snapshot emission, and panel checklist rendering are implemented (`V9-QA-1/2/3`).
 
 ## 2) UI Contract
 

@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 _TAG_RE = re.compile(r"^(?P<version>\d+\.\d+\.\d+)(?:-rc(?P<rc>\d+))?$", re.IGNORECASE)
 
@@ -66,24 +68,18 @@ def _resolve_tag(cli_tag: str | None) -> str:
     raise RuntimeError("No tag provided. Pass --tag vX.Y.Z or set TAG/GITHUB_REF_NAME.")
 
 
-def main() -> int:
-    """Run release metadata checks and return an exit status."""
-    parser = argparse.ArgumentParser(
-        description="Validate release tag against project versions/changelog."
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
     )
-    parser.add_argument(
-        "--tag",
-        default="",
-        help=(
-            "Release tag (for example v0.5.0 or v0.5.0-rc1). "
-            "If omitted, TAG/GITHUB_REF_NAME is used."
-        ),
-    )
-    args = parser.parse_args()
 
-    raw_tag = _resolve_tag(args.tag)
+
+def run_release_check(*, repo_root: Path, raw_tag: str) -> dict[str, Any]:
+    """Return structured release-check summary for the requested tag."""
     expected_version, rc_suffix = _normalize_tag(raw_tag)
-    root = _repo_root()
+    root = repo_root
 
     pyproject_path = root / "pyproject.toml"
     version_path = root / "translationzed_py" / "version.py"
@@ -108,18 +104,71 @@ def main() -> int:
             f"CHANGELOG.md has no section for [{expected_version}] with a release heading."
         )
 
-    if errors:
+    return {
+        "version": 1,
+        "tag": raw_tag,
+        "normalized_version": expected_version,
+        "rc_suffix": rc_suffix,
+        "pyproject_version": pyproject_version,
+        "module_version": module_version,
+        "changelog_has_version": expected_version in changelog_versions,
+        "status": "failed" if errors else "passed",
+        "errors": errors,
+    }
+
+
+def main() -> int:
+    """Run release metadata checks and return an exit status."""
+    parser = argparse.ArgumentParser(
+        description="Validate release tag against project versions/changelog."
+    )
+    parser.add_argument(
+        "--tag",
+        default="",
+        help=(
+            "Release tag (for example v0.5.0 or v0.5.0-rc1). "
+            "If omitted, TAG/GITHUB_REF_NAME is used."
+        ),
+    )
+    parser.add_argument(
+        "--repo-root",
+        default="",
+        help="Repository root. Defaults to the current repository.",
+    )
+    parser.add_argument(
+        "--json-out",
+        default="",
+        help="Optional JSON summary output path.",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print full structured summary after human-readable output.",
+    )
+    args = parser.parse_args()
+
+    raw_tag = _resolve_tag(args.tag)
+    repo_root = Path(args.repo_root).resolve() if args.repo_root else _repo_root()
+    summary = run_release_check(repo_root=repo_root, raw_tag=raw_tag)
+    if args.json_out:
+        _write_json(Path(args.json_out).resolve(), summary)
+
+    if summary["status"] == "failed":
         print("release-check failed:")
-        for item in errors:
+        for item in summary["errors"]:
             print(f"- {item}")
+        if args.verbose:
+            print(json.dumps(summary, indent=2, sort_keys=True))
         return 1
 
-    suffix = f"-rc{rc_suffix}" if rc_suffix else ""
+    suffix = f"-rc{summary['rc_suffix']}" if summary["rc_suffix"] else ""
     print(
         "release-check OK: "
-        f"tag={raw_tag} normalized={expected_version}{suffix} "
+        f"tag={raw_tag} normalized={summary['normalized_version']}{suffix} "
         "(pyproject/version.py/changelog aligned)"
     )
+    if args.verbose:
+        print(json.dumps(summary, indent=2, sort_keys=True))
     return 0
 
 

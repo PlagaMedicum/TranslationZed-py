@@ -1,5 +1,5 @@
 # TranslationZed-Py — Architecture Overview
-_Last updated: 2026-03-01_
+_Last updated: 2026-03-24_
 
 ## 1) Goals
 
@@ -80,3 +80,11 @@ flowchart LR
 See:
 - `docs/architecture/diagrams.md` for high-level architecture and flow diagrams.
 - `docs/architecture/code_architecture.md` for concrete classes/interfaces/controllers.
+
+## 9) Optional External Consumer Boundary
+
+- This repository is fully operable through terminal and Make alone.
+- Optional developer tooling may exist outside this repository and consume the same
+  public commands, scripts, and report artifacts.
+- Such tooling must remain an external consumer only; it must not be required for
+  normal development, CI, or release execution.

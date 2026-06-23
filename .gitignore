@@ -25,6 +25,7 @@ env/
 .coverage
 htmlcov/
 .mutmut-cache/
+mutants/
 artifacts/
 .tzp/
 .tzp-cache/
@@ -43,6 +44,7 @@ ProjectZomboidTranslations/
 .idea/
 .vscode/
 *.code-workspace
+.external/
 
 # ─── OS noise ──────────────────────────────────────────────────────────────────
 .DS_Store

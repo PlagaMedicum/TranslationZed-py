@@ -68,5 +68,5 @@ sequenceDiagram
 |---|---|
 | Goal | Switch Source-column reference locale without reloading project. |
 | Trigger | Source header dropdown locale selection. |
-| Success | Resolve locale with configured fallback policy + chain/preset overrides, refresh source column values, invalidate source-search row cache, rerun search/TM adapter refresh for current context. |
-| Persistence | `SOURCE_REFERENCE_MODE`, `SOURCE_REFERENCE_FALLBACK_POLICY`, `SOURCE_REFERENCE_FALLBACK_CHAIN`, and `SOURCE_REFERENCE_FALLBACK_PRESETS` in settings. |
+| Success | Keep the requested source locale selected, refresh source column values, invalidate source-search row cache, rerun search/TM adapter refresh for current context, and keep the Source column empty when the matching reference file is missing. |
+| Persistence | `SOURCE_REFERENCE_MODE` in settings. |

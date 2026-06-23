@@ -1,12 +1,9 @@
-# v0.9.0 TM Quality and Explainability Contract
-_Last updated: 2026-03-06_
+# TM Quality And Explainability Contract
+_Updated: 2026-06-23_
 
 ## 1) Purpose
 
 Define score explainability and deterministic ranking guarantees for TM suggestions.
-
-Implementation status on `dev` (2026-03-06):
-1. Explainability DTO payloads and determinism guards are implemented (`V9-TMQ-1/2`).
 
 ## 2) Preserved Scoring Core (Normative)
 

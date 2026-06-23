@@ -1,13 +1,10 @@
-# v0.9.0 TM Workflow UX Contract
-_Last updated: 2026-03-06_
+# TM Workflow UX Contract
+_Updated: 2026-06-23_
 
 ## 1) Purpose
 
 Define user-facing workflow upgrades for TM triage and application, in addition to
 quality/explainability internals.
-
-Implementation status on `dev` (2026-03-06):
-1. Grouped triage views, quick actions, and explanation panel behavior are implemented (`V9-TMW-1/2`).
 
 ## 2) Panel Interaction Contract
 

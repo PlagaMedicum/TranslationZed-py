@@ -1,16 +1,16 @@
-"""Unit coverage for docs contract checker regression guards."""
+"""Tests for mechanical documentation validation."""
 
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import ModuleType
 
 
-def _load_docs_contract_module() -> ModuleType:
-    repo_root = Path(__file__).resolve().parents[1]
-    script_path = repo_root / "scripts" / "docs_contract_check.py"
+def _load_module() -> ModuleType:
+    script_path = Path(__file__).resolve().parents[1] / "scripts/docs_contract_check.py"
     spec = importlib.util.spec_from_file_location("docs_contract_check", script_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -19,654 +19,143 @@ def _load_docs_contract_module() -> ModuleType:
     return module
 
 
-def test_pseudo_list_paragraph_detection() -> None:
-    """Pseudo-bullet paragraphs should be flagged as docs-shape violations."""
-    module = _load_docs_contract_module()
-    assert module._looks_like_pseudo_list_paragraph("- [✓] done item")
-    assert module._looks_like_pseudo_list_paragraph("Covered: - parser - tm - qa")
-    assert module._looks_like_pseudo_list_paragraph(
-        "| Trigger | General ▸ Save | | Flow | 1. write |"
-    )
-    assert not module._looks_like_pseudo_list_paragraph(
-        "Covered checks are listed in proper bullet items."
-    )
+def test_local_links_validate_files_and_anchors(tmp_path: Path) -> None:
+    """Local Markdown links should resolve to an existing file and heading."""
+    module = _load_module()
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "target.md").write_text("# Target Heading\n", encoding="utf-8")
+    source = docs / "source.md"
+    source.write_text("[ok](target.md#target-heading)\n", encoding="utf-8")
+    assert module.validate_local_links(docs) == []
+
+    source.write_text("[bad](target.md#missing)\n", encoding="utf-8")
+    errors = module.validate_local_links(docs)
+    assert any("missing anchor #missing" in error for error in errors)
 
 
-def test_math_source_sanity_detects_broken_tex(tmp_path: Path) -> None:
-    """Malformed TeX blocks should fail math source sanity validation."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    math_path = docs_root / "performance" / "math_appendix.md"
-    math_path.parent.mkdir(parents=True, exist_ok=True)
-    math_path.write_text(
-        "$$ G = 100\\cdot\\frac{a-b $$}}{a}\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_math_source_sanity(docs_root)
-    assert errors
-    assert any("malformed TeX block" in err for err in errors)
+def test_navigation_rejects_missing_paths(tmp_path: Path) -> None:
+    """Every Markdown page in navigation must exist."""
+    module = _load_module()
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    config = tmp_path / "mkdocs.yml"
+    config.write_text("nav:\n  - Missing: missing.md\n", encoding="utf-8")
+    errors = module.validate_navigation(docs, [config])
+    assert any("missing nav path missing.md" in error for error in errors)
 
 
-def test_rendered_html_shape_detects_pseudo_list_paragraphs(tmp_path: Path) -> None:
-    """Rendered canonical pages should reject pseudo-list paragraph content."""
-    module = _load_docs_contract_module()
-    site_root = tmp_path / "site"
-    for rel in module.RENDERED_HTML_SCAN_SCOPE:
-        html_rel = module._canonical_html_rel(rel)
-        html_path = site_root / html_rel
-        html_path.parent.mkdir(parents=True, exist_ok=True)
-        html_path.write_text(
-            "<html><body><p>All good.</p></body></html>", encoding="utf-8"
-        )
-    target = site_root / module._canonical_html_rel("plan/implementation_history.md")
-    target.write_text(
-        "<html><body><p>A10: - [✓] step one - [ ] step two</p></body></html>",
-        encoding="utf-8",
-    )
-    errors = module._validate_rendered_html_shape(site_root)
-    assert errors
-    assert any("pseudo-list paragraph detected" in err for err in errors)
-
-
-def test_review_queue_refs_require_flagged_marker(tmp_path: Path) -> None:
-    """Active queue entries should require FLAGGED_MODULE markers in code architecture."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
-    (docs_root / "architecture").mkdir(parents=True, exist_ok=True)
-    (docs_root / "reference" / "review_queue.json").write_text(
-        """
-{
-  "version": 1,
-  "entries": [
-    {
-      "module_path": "translationzed_py/core/preferences.py",
-      "status": "REVIEW_REQUIRED",
-      "risk_level": "P1",
-      "reason_codes": ["COMPLEXITY"],
-      "evidence": ["test"],
-      "refactor_scope": "split parser",
-      "required_tests": ["tests/test_preferences.py"],
-      "owner": "docs",
-      "opened_at": "2026-02-26",
-      "closure_criteria": ["split into helpers"],
-      "closed_at": null
-    }
-  ]
-}
-        """.strip(),
-        encoding="utf-8",
-    )
-    (docs_root / "architecture" / "code_architecture.md").write_text(
-        "# Code Architecture\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_review_queue_refs(docs_root)
-    assert errors
-    assert any("missing flagged-module marker" in err for err in errors)
-
-
-def test_review_queue_refs_require_api_warning_for_flagged_modules(
-    tmp_path: Path,
-) -> None:
-    """Active flagged modules should require API visibility + warning wording."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "reference" / "api").mkdir(parents=True, exist_ok=True)
-    (docs_root / "architecture").mkdir(parents=True, exist_ok=True)
-    (docs_root / "reference" / "review_queue.json").write_text(
-        """
-{
-  "version": 1,
-  "entries": [
-    {
-      "module_path": "translationzed_py/core/parser.py",
-      "status": "REVIEW_REQUIRED",
-      "risk_level": "P1",
-      "reason_codes": ["COMPLEXITY"],
-      "evidence": ["test"],
-      "refactor_scope": "split parser",
-      "required_tests": ["tests/test_parser_offset_map_invariants.py"],
-      "owner": "docs",
-      "opened_at": "2026-02-26",
-      "closure_criteria": ["reduce complexity"],
-      "closed_at": null
-    }
-  ]
-}
-        """.strip(),
-        encoding="utf-8",
-    )
-    (docs_root / "architecture" / "code_architecture.md").write_text(
-        "FLAGGED_MODULE: translationzed_py/core/parser.py\n",
-        encoding="utf-8",
-    )
-    (docs_root / "reference" / "api" / "core.md").write_text(
-        "::: translationzed_py.core.parser\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_review_queue_refs(docs_root)
-    assert errors
-    assert any("must include warning text" in err for err in errors)
-
-
-def test_tm_long_variant_contract_requires_formula_snippets(tmp_path: Path) -> None:
-    """TM ranking doc should require long-variant formula snippets."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "domain").mkdir(parents=True, exist_ok=True)
-    (docs_root / "architecture").mkdir(parents=True, exist_ok=True)
-    (docs_root / "domain" / "tm_ranking.md").write_text(
-        "# TM Ranking\n\n### TM Long-Variant Detection Contract\n",
-        encoding="utf-8",
-    )
-    (docs_root / "architecture" / "code_architecture.md").write_text(
-        "TM Long-Variant Detection Pipeline\n",
-        encoding="utf-8",
-    )
-    (docs_root / "architecture" / "diagrams.md").write_text(
-        "TM Long-Variant Detection Activity\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_tm_long_variant_contract(docs_root)
-    assert errors
-    assert any("missing TM long-variant contract snippet" in err for err in errors)
-
-
-def test_tm_long_variant_contract_requires_diagram_anchors(tmp_path: Path) -> None:
-    """TM long-variant contract should require architecture diagram anchors."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "domain").mkdir(parents=True, exist_ok=True)
-    (docs_root / "architecture").mkdir(parents=True, exist_ok=True)
-    (docs_root / "domain" / "tm_ranking.md").write_text(
-        """
-### 4.3 TM Long-Variant Detection Contract
-L_{\\text{min\\_base}} = \\max(1,\\lfloor 0.6 \\cdot L_q \\rfloor)
-is\\_long\\_multi := (k \\ge 8) \\land (L_q \\ge 80)
-\\lfloor 1.85 \\cdot L_q \\rfloor
-\\text{overlap} \\ge 0.55
-\\text{ratio} \\ge 0.70
-        """.strip(),
-        encoding="utf-8",
-    )
-    (docs_root / "architecture" / "code_architecture.md").write_text(
-        "Other heading\n",
-        encoding="utf-8",
-    )
-    (docs_root / "architecture" / "diagrams.md").write_text(
-        "Different heading\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_tm_long_variant_contract(docs_root)
-    assert errors
-    assert any("missing TM long-variant diagram anchor" in err for err in errors)
-
-
-def test_v09_spec_contract_requires_required_snippets(tmp_path: Path) -> None:
-    """v0.9 spec pages must include required headings/snippets."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "spec" / "v0_9").mkdir(parents=True, exist_ok=True)
-    (docs_root / "spec" / "v0_9" / "qa_live_checklist.md").write_text(
-        "# QA\n", encoding="utf-8"
-    )
-    (docs_root / "spec" / "v0_9" / "tm_quality_explainability.md").write_text(
-        "# TM\n", encoding="utf-8"
-    )
-    (docs_root / "spec" / "v0_9" / "crash_recovery_uc12.md").write_text(
-        "# CR\n", encoding="utf-8"
-    )
-    (docs_root / "spec" / "v0_9" / "implementation_subtasks.md").write_text(
-        "# Subtasks\n", encoding="utf-8"
-    )
-    errors = module._validate_v09_spec_contract(docs_root)
-    assert errors
-    assert any("missing required v0.9 spec contract snippet" in err for err in errors)
-
-
-def test_api_structure_contract_requires_standard_sections(tmp_path: Path) -> None:
-    """API pages must provide why/when-not/call-chain/dto/failure sections."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "reference" / "api").mkdir(parents=True, exist_ok=True)
-    for rel in module.API_STRUCTURE_PAGES:
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("# API\n", encoding="utf-8")
-    errors = module._validate_api_structure_contract(docs_root)
-    assert errors
-    assert any("missing required API structure section" in err for err in errors)
-
-
-def test_active_plan_drift_detects_stale_v08_pending_language(tmp_path: Path) -> None:
-    """Active docs must not present v0.8 as pending/in-progress release state."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "plan").mkdir(parents=True, exist_ok=True)
-    (docs_root / "operations").mkdir(parents=True, exist_ok=True)
-    (docs_root / "plan" / "implementation_active.md").write_text(
-        "v0.8.0 in progress\n",
-        encoding="utf-8",
-    )
-    (docs_root / "operations" / "checklists.md").write_text(
-        "v0.8.0 release gate (next target)\n",
-        encoding="utf-8",
-    )
-    (docs_root / "plan" / "implementation_history.md").write_text(
-        "Pending before final tag\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_active_plan_drift(docs_root)
-    assert errors
-    assert any("stale release-state wording" in err for err in errors)
-
-
-def test_module_map_coverage_detects_missing_entries(tmp_path: Path) -> None:
-    """Module map coverage should fail when repo modules are not listed."""
-    module = _load_docs_contract_module()
-    repo_root = tmp_path / "repo"
-    docs_root = repo_root / "docs"
-    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
-    (repo_root / "translationzed_py" / "core").mkdir(parents=True, exist_ok=True)
-    (repo_root / "translationzed_py" / "gui").mkdir(parents=True, exist_ok=True)
-    (repo_root / "translationzed_py" / "core" / "__init__.py").write_text(
-        "", encoding="utf-8"
-    )
-    (repo_root / "translationzed_py" / "gui" / "__init__.py").write_text(
-        "", encoding="utf-8"
-    )
-    (repo_root / "translationzed_py" / "core" / "alpha.py").write_text(
-        "x = 1\n", encoding="utf-8"
-    )
-    (repo_root / "translationzed_py" / "gui" / "beta.py").write_text(
-        "x = 1\n", encoding="utf-8"
-    )
-    (docs_root / "reference" / "module_map.md").write_text(
-        "| Module | Responsibility |\n|---|---|\n| `core.model` | sample |\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_module_map_coverage(docs_root, repo_root)
-    assert errors
-    assert any("core.alpha" in err for err in errors)
-    assert any("gui.beta" in err for err in errors)
-
-
-def test_module_map_coverage_passes_when_entries_exist(tmp_path: Path) -> None:
-    """Module map coverage should pass when all modules are represented."""
-    module = _load_docs_contract_module()
-    repo_root = tmp_path / "repo"
-    docs_root = repo_root / "docs"
-    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
-    (repo_root / "translationzed_py" / "core").mkdir(parents=True, exist_ok=True)
-    (repo_root / "translationzed_py" / "gui").mkdir(parents=True, exist_ok=True)
-    (repo_root / "translationzed_py" / "core" / "__init__.py").write_text(
-        "", encoding="utf-8"
-    )
-    (repo_root / "translationzed_py" / "gui" / "__init__.py").write_text(
-        "", encoding="utf-8"
-    )
-    (repo_root / "translationzed_py" / "core" / "alpha.py").write_text(
-        "x = 1\n", encoding="utf-8"
-    )
-    (repo_root / "translationzed_py" / "gui" / "beta.py").write_text(
-        "x = 1\n", encoding="utf-8"
-    )
-    (docs_root / "reference" / "module_map.md").write_text(
-        "| Module | Responsibility |\n"
-        "|---|---|\n"
-        "| `core.alpha` | sample |\n"
-        "| `gui.beta` | sample |\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_module_map_coverage(docs_root, repo_root)
-    assert errors == []
-
-
-def test_workflow_api_surface_detects_missing_coverage(tmp_path: Path) -> None:
-    """Workflow API surface should fail when critical modules are missing."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "reference" / "api").mkdir(parents=True, exist_ok=True)
-    (docs_root / "reference" / "api" / "core_workflows.md").write_text(
-        "# Core Workflows API\n::: translationzed_py.core.project_session\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_workflow_api_surface(docs_root)
-    assert errors
-    assert any("missing workflow module coverage" in err for err in errors)
-    assert any("missing mkdocstrings API block" in err for err in errors)
-
-
-def test_workflow_api_surface_passes_for_required_modules(tmp_path: Path) -> None:
-    """Workflow API surface should pass when all critical modules are present."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "reference" / "api").mkdir(parents=True, exist_ok=True)
-    lines = ["# Core Workflows API"]
-    for name in module.WORKFLOW_CRITICAL_MODULES:
-        lines.append(f"`{name}`")
-        lines.append(f"::: translationzed_py.core.{name}")
-    (docs_root / "reference" / "api" / "core_workflows.md").write_text(
-        "\n".join(lines) + "\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_workflow_api_surface(docs_root)
-    assert errors == []
-
-
-def test_quick_context_orientation_links_detect_missing_paths(tmp_path: Path) -> None:
-    """Quick context should include orientation surface links."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
-    (docs_root / "reference" / "quick_context.md").write_text(
-        "# Quick Context\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_quick_context_orientation_links(docs_root)
-    assert errors
-    assert any("missing orientation surface link" in err for err in errors)
-
-
-def test_quick_context_orientation_links_pass_with_paths(tmp_path: Path) -> None:
-    """Quick context should pass when orientation links are present."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
-    content = (
-        "# Quick Context\n"
-        "docs/reference/automation_surface.md\n"
-        "docs/reference/test_surface.md\n"
-    )
-    (docs_root / "reference" / "quick_context.md").write_text(
-        content,
-        encoding="utf-8",
-    )
-    errors = module._validate_quick_context_orientation_links(docs_root)
-    assert errors == []
-
-
-def test_randomized_policy_surface_detects_missing_snippets(tmp_path: Path) -> None:
-    """Randomized policy docs should fail when required snippets are absent."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel in module.RANDOMIZED_POLICY_SNIPPETS:
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("# Placeholder\n", encoding="utf-8")
-    errors = module._validate_randomized_policy_surface(docs_root)
-    assert errors
-    assert any("missing randomized/stateful policy snippet" in err for err in errors)
-
-
-def test_randomized_policy_surface_passes_with_required_snippets(
-    tmp_path: Path,
-) -> None:
-    """Randomized policy docs should pass when required snippets are present."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel, snippets in module.RANDOMIZED_POLICY_SNIPPETS.items():
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
-    errors = module._validate_randomized_policy_surface(docs_root)
-    assert errors == []
-
-
-def test_a35_search_replace_surface_detects_missing_snippets(tmp_path: Path) -> None:
-    """A35 docs surface should fail when required snippets are absent."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel in module.A35_SEARCH_REPLACE_SNIPPETS:
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("# Placeholder\n", encoding="utf-8")
-    errors = module._validate_a35_search_replace_surface(docs_root)
-    assert errors
-    assert any("missing A35 search/replace policy snippet" in err for err in errors)
-
-
-def test_a35_search_replace_surface_passes_with_required_snippets(
-    tmp_path: Path,
-) -> None:
-    """A35 docs surface should pass when required snippets are present."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel, snippets in module.A35_SEARCH_REPLACE_SNIPPETS.items():
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
-    errors = module._validate_a35_search_replace_surface(docs_root)
-    assert errors == []
-
-
-def test_a36_release_evidence_surface_detects_missing_snippets(tmp_path: Path) -> None:
-    """A36 docs surface should fail when required snippets are absent."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel in module.A36_RELEASE_EVIDENCE_SNIPPETS:
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("# Placeholder\n", encoding="utf-8")
-    errors = module._validate_a36_release_evidence_surface(docs_root)
-    assert errors
-    assert any("missing A36 release-evidence policy snippet" in err for err in errors)
-
-
-def test_a36_release_evidence_surface_passes_with_required_snippets(
-    tmp_path: Path,
-) -> None:
-    """A36 docs surface should pass when required snippets are present."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel, snippets in module.A36_RELEASE_EVIDENCE_SNIPPETS.items():
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
-    errors = module._validate_a36_release_evidence_surface(docs_root)
-    assert errors == []
-
-
-def test_a37_search_preview_surface_detects_missing_snippets(tmp_path: Path) -> None:
-    """A37 docs surface should fail when required snippets are absent."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel in module.A37_SEARCH_PREVIEW_SNIPPETS:
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("# Placeholder\n", encoding="utf-8")
-    errors = module._validate_a37_search_preview_surface(docs_root)
-    assert errors
-    assert any("missing A37 search-preview policy snippet" in err for err in errors)
-
-
-def test_a37_search_preview_surface_passes_with_required_snippets(
-    tmp_path: Path,
-) -> None:
-    """A37 docs surface should pass when required snippets are present."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel, snippets in module.A37_SEARCH_PREVIEW_SNIPPETS.items():
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
-    errors = module._validate_a37_search_preview_surface(docs_root)
-    assert errors == []
-
-
-def test_a38_gate_policy_surface_detects_missing_snippets(tmp_path: Path) -> None:
-    """A38 docs surface should fail when required snippets are absent."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel in module.A38_GATE_POLICY_SURFACE_SNIPPETS:
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("# Placeholder\n", encoding="utf-8")
-    errors = module._validate_a38_gate_policy_surface(docs_root)
-    assert errors
-    assert any("missing A38 gate-policy snippet" in err for err in errors)
-
-
-def test_a38_gate_policy_surface_passes_with_required_snippets(
-    tmp_path: Path,
-) -> None:
-    """A38 docs surface should pass when required snippets are present."""
-    module = _load_docs_contract_module()
-    docs_root = tmp_path / "docs"
-    for rel, snippets in module.A38_GATE_POLICY_SURFACE_SNIPPETS.items():
-        path = docs_root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("\n".join(("# Policy", *snippets)) + "\n", encoding="utf-8")
-    errors = module._validate_a38_gate_policy_surface(docs_root)
-    assert errors == []
-
-
-def test_a38_gate_policy_registry_detects_missing_make_target(tmp_path: Path) -> None:
-    """A38 policy registry should fail when command target is missing in Makefile."""
-    module = _load_docs_contract_module()
-    repo_root = tmp_path / "repo"
-    docs_root = repo_root / "docs"
-    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
-    (repo_root / "Makefile").write_text("gate-dev:\n\t@echo ok\n", encoding="utf-8")
-    (docs_root / "reference" / "gate_policy_registry.json").write_text(
-        """
-{
-  "version": 1,
-  "layers": [
-    {
-      "id": "L0",
-      "name": "Regular",
-      "trigger": "local",
-      "command": "make gate-dev",
-      "included_checks": ["fmt-check"],
-      "mode": "blocking",
-      "artifacts": ["none"],
-      "duplicate_run_exclusions": ["none"]
-    },
-    {
-      "id": "L1",
-      "name": "Commit",
-      "trigger": "hook",
-      "command": "make gate-missing",
-      "included_checks": ["gate-dev"],
-      "mode": "blocking",
-      "artifacts": ["none"],
-      "duplicate_run_exclusions": ["none"]
-    },
-    {
-      "id": "L2",
-      "name": "Push",
-      "trigger": "hook",
-      "command": "make gate-dev",
-      "included_checks": ["gate-dev"],
-      "mode": "blocking",
-      "artifacts": ["none"],
-      "duplicate_run_exclusions": ["none"]
-    },
-    {
-      "id": "L3",
-      "name": "Close",
-      "trigger": "manual",
-      "command": "make gate-dev",
-      "included_checks": ["gate-dev"],
-      "mode": "blocking",
-      "artifacts": ["none"],
-      "duplicate_run_exclusions": ["none"]
-    },
-    {
-      "id": "L4",
-      "name": "CI",
-      "trigger": "ci",
-      "command": "make gate-dev",
-      "included_checks": ["gate-dev"],
-      "mode": "blocking",
-      "artifacts": ["none"],
-      "duplicate_run_exclusions": ["none"]
-    },
-    {
-      "id": "L5",
-      "name": "Heavy",
-      "trigger": "schedule",
-      "command": "make gate-dev",
-      "included_checks": ["gate-dev"],
-      "mode": "advisory",
-      "artifacts": ["none"],
-      "duplicate_run_exclusions": ["none"]
-    },
-    {
-      "id": "L6",
-      "name": "Release",
-      "trigger": "tag",
-      "command": "make gate-dev",
-      "included_checks": ["gate-dev"],
-      "mode": "blocking",
-      "artifacts": ["none"],
-      "duplicate_run_exclusions": ["none"]
-    }
-  ]
-}
-        """.strip() + "\n",
-        encoding="utf-8",
-    )
-    errors = module._validate_a38_gate_policy_registry(docs_root, repo_root)
-    assert errors
-    assert any("target missing in Makefile" in err for err in errors)
-
-
-def test_a38_gate_policy_registry_passes_with_valid_payload(tmp_path: Path) -> None:
-    """A38 policy registry should pass with valid schema/layers/make parity."""
-    module = _load_docs_contract_module()
-    repo_root = tmp_path / "repo"
-    docs_root = repo_root / "docs"
-    (docs_root / "reference").mkdir(parents=True, exist_ok=True)
-    (repo_root / "Makefile").write_text(
-        "\n".join(
-            (
-                "gate-dev:",
-                "\t@echo dev",
-                "gate-commit:",
-                "\t@echo commit",
-                "gate-push:",
-                "\t@echo push",
-                "gate-task-close:",
-                "\t@echo close",
-                "gate-ci-pr:",
-                "\t@echo ci",
-                "gate-heavy-advisory:",
-                "\t@echo heavy",
-                "gate-release:",
-                "\t@echo release",
-            )
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    layers = []
-    for layer_id, command in (
-        ("L0", "make gate-dev"),
-        ("L1", "make gate-commit"),
-        ("L2", "make gate-push"),
-        ("L3", "make gate-task-close"),
-        ("L4", "make gate-ci-pr"),
-        ("L5", "make gate-heavy-advisory"),
-        ("L6", "make gate-release TAG=vX.Y.Z"),
-    ):
-        layers.append(
+def test_risk_register_validates_schema_and_repo_paths(tmp_path: Path) -> None:
+    """Active risks should reference existing modules and focused tests."""
+    module = _load_module()
+    repo = tmp_path / "repo"
+    docs = repo / "docs"
+    reference = docs / "reference"
+    reference.mkdir(parents=True)
+    source = repo / "translationzed_py/core/parser.py"
+    test = repo / "tests/test_parser.py"
+    source.parent.mkdir(parents=True)
+    test.parent.mkdir(parents=True)
+    source.write_text("", encoding="utf-8")
+    test.write_text("", encoding="utf-8")
+    payload = {
+        "version": 2,
+        "risks": [
             {
-                "id": layer_id,
-                "name": layer_id,
-                "trigger": "t",
-                "command": command,
-                "included_checks": ["x"],
-                "mode": "blocking",
-                "artifacts": ["a"],
-                "duplicate_run_exclusions": ["d"],
+                "module_path": "translationzed_py/core/parser.py",
+                "status": "monitoring",
+                "severity": "high",
+                "concern": "Span-sensitive parser.",
+                "evidence": ["Parser controls byte spans."],
+                "constraints": ["Preserve byte offsets."],
+                "closure_criteria": ["Keep roundtrip tests green."],
+                "relevant_tests": ["tests/test_parser.py"],
             }
-        )
-    (docs_root / "reference" / "gate_policy_registry.json").write_text(
-        module.json.dumps({"version": 1, "layers": layers}, indent=2) + "\n",
+        ],
+    }
+    (reference / "risk_register.json").write_text(
+        json.dumps(payload),
         encoding="utf-8",
     )
-    errors = module._validate_a38_gate_policy_registry(docs_root, repo_root)
-    assert errors == []
+    assert module.validate_risk_register(docs, repo) == []
+
+    payload["risks"][0]["relevant_tests"] = ["tests/missing.py"]
+    (reference / "risk_register.json").write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
+    errors = module.validate_risk_register(docs, repo)
+    assert any("relevant_tests missing" in error for error in errors)
+
+
+def test_active_plan_requires_only_structural_sections(tmp_path: Path) -> None:
+    """The active plan contract should require structure without exact prose."""
+    module = _load_module()
+    docs = tmp_path / "docs"
+    plan = docs / "plan/implementation_active.md"
+    plan.parent.mkdir(parents=True)
+    plan.write_text(
+        "\n".join(
+            [
+                "# Plan",
+                "## Current Objective",
+                "## Constraints",
+                "## Verified State",
+                "## Acceptance Criteria",
+                "## Open Follow-ups",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert module.validate_active_plan(docs) == []
+
+
+def test_retired_references_are_rejected(tmp_path: Path) -> None:
+    """Removed generated/history surfaces must not remain linked."""
+    module = _load_module()
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    page = docs / "page.md"
+    page.write_text("See docs/reference/review_queue.json\n", encoding="utf-8")
+    errors = module.validate_retired_references(docs, [])
+    assert any("references retired path" in error for error in errors)
+
+
+def test_command_parity_rejects_missing_documented_make_target(
+    tmp_path: Path,
+) -> None:
+    """Documented and workflow Make commands must exist."""
+    module = _load_module()
+    repo = tmp_path / "repo"
+    docs = repo / "docs"
+    docs.mkdir(parents=True)
+    (repo / "Makefile").write_text("check:\n\ttrue\n", encoding="utf-8")
+    (docs / "commands.md").write_text("Run `make missing`.\n", encoding="utf-8")
+    errors = module.validate_command_parity(repo, docs)
+    assert any("documented Make target missing: missing" in error for error in errors)
+
+
+def test_semantic_contracts_reject_missing_formula(tmp_path: Path) -> None:
+    """Focused semantic contracts should fail when a protected formula disappears."""
+    module = _load_module()
+    docs = tmp_path / "docs"
+    for relative, snippets in module.SEMANTIC_CONTRACTS.items():
+        path = docs / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(snippets), encoding="utf-8")
+    tm_path = docs / "domain/tm_ranking.md"
+    tm_path.write_text("TM Long-Variant Detection Contract\n", encoding="utf-8")
+    errors = module.validate_semantic_contracts(docs)
+    assert any("missing semantic contract" in error for error in errors)
+
+
+def test_stale_language_rejects_implemented_feature_as_future(
+    tmp_path: Path,
+) -> None:
+    """Current contract docs must not regress to future v0.9 wording."""
+    module = _load_module()
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "page.md").write_text("This is the v0.9 target.\n", encoding="utf-8")
+    errors = module.validate_stale_language(docs)
+    assert any("v0.9 is current" in error for error in errors)

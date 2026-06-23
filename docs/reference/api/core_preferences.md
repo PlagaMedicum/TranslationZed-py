@@ -84,9 +84,9 @@ sequenceDiagram
    2. return typed values for callers,
 3. avoid leaking raw env parser details.
 
-## 8) v0.9 Target Notes
+## 8) Current Extension Rules
 
-1. QA live checklist and TM workflow UX may add preferences, but parser/service contracts must remain backward-compatible.
+1. New QA or TM preferences must keep parser/service contracts backward-compatible.
 2. New keys must follow canonical normalization/backfill/deprecated-prune behavior.
 3. UI additions must route through service-level typed values, not raw env parsing.
 

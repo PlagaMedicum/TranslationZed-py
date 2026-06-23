@@ -1,5 +1,5 @@
 # TranslationZed-Py — Testing Strategy
-_Last updated: 2026-03-09_
+_Updated: 2026-06-23_
 
 ---
 
@@ -16,15 +16,14 @@ _Last updated: 2026-03-09_
 5. **GUI smoke + integration** second (Qt event wiring).
 6. Keep tests deterministic and runnable headless.
 
-## 1.1) v0.9 Target Verification Matrix (Planned)
+## 1.1) v0.9 Feature Verification Matrix
 
-This section is normative for upcoming `v0.9.0` implementation work and maps
-directly to `docs/spec/v0_9/*`.
+This section maps implemented v0.9 feature contracts to their primary regression surfaces.
 
 Quick lookup companion:
 - `docs/reference/test_surface.md`
 
-| Target area | Planned verification focus | Primary test modules (planned/extended) |
+| Area | Verification focus | Primary test modules |
 |---|---|---|
 | QA live checklist | rule-order invariants, state transitions, completion-ratio monotonicity, LT note semantics | `tests/test_qa_async.py`, `tests/test_gui_qa_panel.py`, new QA progress DTO tests |
 | TM explainability | payload correctness (`raw`, `ratio`, `bonus`, cap reasons), deterministic ordering unchanged | `tests/test_tm_query_scoring.py`, `tests/test_tm_store.py`, `tests/test_tm_ranking_corpus.py`, `tests/test_tm_query_perf_contract.py` |
@@ -52,8 +51,8 @@ Execution rule (normative):
 1. Run only the gate for the current trigger layer.
 2. Do not re-run lower layers separately (`L3` already contains `L2`, etc.).
 3. Use focused packet lanes only for local debugging or scoped verification, not as a replacement for required layer gates.
-4. Static formatting split is intentional:
-   `make fmt-check-changed` for `L0..L3`, `make fmt-check` for strict `L4/L6`.
+4. Static formatting split is internal:
+   changed-file formatting is used inside `L0..L3`, and full-tree formatting is used inside strict `L4/L6`.
 
 Policy families covered by this matrix:
 1. formatting/lint/type/architecture guards
@@ -111,6 +110,11 @@ Release evidence policy references:
 - Filename labels used for corpus temp paths sanitize Windows-invalid characters.
 - QA side panel adapter wiring: finding-list labels render correctly and click-to-row navigation opens target file/row.
 - QA checks integration: trailing/newline findings refresh via explicit **Run QA** action (manual mode by default), with optional background refresh when enabled.
+- QA panel compact feedback:
+    - checklist rows remain progressive only while scan is active,
+    - completion collapses to compact summary text in header,
+    - manual button-triggered run completion shows popup summary,
+    - background/auto scans report via status bar (no popup).
 - QA auto-mark guard:
     - `QA_AUTO_MARK_FOR_REVIEW=false` keeps statuses untouched.
     - `QA_AUTO_MARK_FOR_REVIEW=true` mutates affected **Untouched** rows to **For review**.
@@ -120,9 +124,9 @@ Release evidence policy references:
     - deprecated settings keys are auto-pruned from `settings.env` during bootstrap/save;
     missing required defaults are auto-backfilled.
 - `TZP:` write-back preference controls:
-    - Preferences -> View toggle/prefix roundtrip,
-    - runtime apply/persist behavior for `TZP_STATUS_COMMENT_WRITEBACK` and
-      `TZP_STATUS_COMMENT_PREFIX` extras.
+    - Preferences -> View toggle roundtrip,
+    - runtime apply/persist behavior for `TZP_STATUS_COMMENT_WRITEBACK`,
+    - legacy `TZP_STATUS_COMMENT_PREFIX` extras are ignored and pruned on save.
 - QA token-contract checks: placeholder/code marker detection (`<LINE>`, `[img=...]`, `%1`, escapes) is validated in core and UI-toggle integration tests.
 - QA same-as-source checks: opt-in `qa.same_source` findings and severity/group label rendering are validated in core + panel tests.
 - QA navigation checks: `F8`/`Shift+F8` next-prev traversal moves between findings with wrap and updates status-bar hint.
@@ -136,10 +140,10 @@ Release evidence policy references:
     - manual QA opt-in LT findings (`qa.languagetool`) with cap note behavior,
     - LT auto-mark participation gating via `QA_LANGUAGETOOL_AUTOMARK`.
 - Source-reference selector integration: Source-column header locale switch updates
-  Source column rendering for project locales, persists `SOURCE_REFERENCE_MODE`, and falls back to
-  `EN` when unavailable.
-- Source-reference preferences integration: fallback-policy updates runtime
-  state and persisted extras coherently.
+  Source column rendering for project locales, persists `SOURCE_REFERENCE_MODE`, and keeps the
+  requested locale visible even when the matching file is missing.
+- Source-reference missing-file integration: missing requested counterpart files keep the
+  Source column empty instead of resolving through fallback chains.
 - Source-reference search cache guard: switching source locale invalidates
   cached source rows so Source-column search results cannot reuse stale mode data.
 - Architecture guards enforce allowed GUI->core imports and
@@ -155,6 +159,7 @@ Release evidence policy references:
 - Status-bar text contract checks:
     - default fallback text is `Ready to edit`,
     - operational message text and scope indicators coexist with progress strip,
+    - current-file encoding is visible while a file is open,
     - mixed multi-row status selection appends
       `Selection: mixed (N rows)` only while selection contains at least two rows
       with more than one status value.
@@ -185,30 +190,95 @@ Release evidence policy references:
 - Table renders, basic editing works.
 
 ### 2.3b Manual UI Scenario Framework (A31)
+- Canonical framework doc: `docs/reference/manual_scenario_framework.md`
 - Declarative scenario registry: `tests/manual_scenarios/scenarios.json`
-  with versioned contracts (`id`, `title`, `fixture_root`, `selected_locales`,
-  `steps`, `expected_checks`, optional env/prefs/automation fields).
+  with versioned contracts:
+  - required identity and execution fields:
+    `id`, `title`, `workflow_family`, `manual_depth`, `goal`,
+    `start_context`, `fixture_root`, `focus_files`, `finish_condition`,
+    `selected_locales`, `steps`, `expected_checks`, `tracked_repo_files`,
+  - optional execution fields:
+    `env_overrides`, `prefs_extras`, `automation_pytest_selectors`,
+    `operator_hints`, `inspection_paths`.
+- Canonical scenario matrix owner: `docs/reference/test_surface.md`
+  (scenario ID -> workflow family -> goal -> focus files -> manual depth
+  -> finish condition -> release-required).
+- Scenario authoring policy is normative:
+  - scenarios must use real app actions only,
+  - scenario wording must be executable against current UI semantics,
+  - generic wording such as `Open a file` is banned for release-required scenarios,
+  - `close file` and `re-open file` wording is banned because the app uses
+    file switching, not per-file close semantics,
+  - every scenario must have a concrete `finish_condition`,
+  - save/write expectations must be explicit when the scenario depends on them,
+  - `inspection_paths` must name concrete fixture-relative files when the operator
+    needs to inspect saved output on disk,
+  - `focus_files` and `tracked_repo_files` are distinct:
+    `focus_files` are fixture files the developer must touch,
+    `tracked_repo_files` are repo files whose hashes gate evidence relevance.
+- Fixture policy is normative:
+  - generic fixture root is `tests/fixtures/manual_workflow/`,
+  - `manual_workflow` is locale-diverse and not BE-only,
+  - generic manual workflows use immutable `EN` source plus `RU` and `KO`
+    target locales,
+  - special-purpose fixtures remain separate only where the workflow is truly special:
+    `conflict_manual`, `qa_manual`, `prod_like`.
+- Scenario depth contract:
+  - `full_workflow` for normal end-to-end editing flows,
+  - `branch_check` for path-specific conflict/status branches,
+  - `same_file_diagnostic` for focused QA validation,
+  - `multi_file_roundtrip` for encoding/charset validation.
 - Runner surface:
   - `make ui-manual-list`
   - `make ui-manual-run SCENARIO=<id>`
-  - `make ui-manual-headless SCENARIO=<id> RESULT=passed|failed`
-  - `make ui-manual-batch SCENARIOS=<id1,id2,...>`
+  - `make clean-manual-artifacts`
+  - `make release-evidence-sync SCENARIO=<id>`
+  - `make release-evidence-sync-all`
 - Scenario-mode runtime contracts:
   - `TZP_MANUAL_SCENARIO_FILE=<path>`
   - `TZP_MANUAL_RESULTS_DIR=<path>`
+  - `TZP_MANUAL_RUN_TOKEN=<token>`
 - Checklist UX contract:
-  - in scenario mode, startup presents a modal step checklist with expected outcomes,
+  - in scenario mode, startup presents a separate modeless checklist window with expected outcomes,
+  - the dialog shows copyable project-root, focus-path, and inspection-path targets,
+  - expected outcomes are checkable acknowledgements (same as steps),
+  - `Mark Passed` stays disabled until all steps and expected outcomes are checked,
   - pass/fail + notes are persisted under `artifacts/manual-ui/*.json`.
-  - headless fallback (`ui-manual-headless`) writes checklist-style artifacts
-    without Qt GUI launch; treat this as non-interactive evidence only.
+- Manual runner contract:
+  - manual scenario result is `PASS` only when checklist artifact result is `passed`,
+  - failed/incomplete/invalid checklist evidence returns non-zero exit code,
+  - closing checklist without pass/fail is treated as incomplete evidence,
+  - terminal summary includes result + checked-step/expected counts + note preview,
+  - run JSON captures checked-step/expected snapshots, notes, and
+    deterministic `tracked_files` sha256 rows for `tracked_repo_files`.
 - No-shrink workflow contract:
   - `tests/manual_scenarios/workflow_test_surface_contract.json`
   - machine-check target: `make test-ui-manual-contract`.
+- Conflict resolution is one canonical detailed scenario:
+  - `conflict-resolution-flow` covers Drop cache,
+    Drop original, and Merge with mixed row choices plus one edited merge value.
+- Baseline high-value scenarios also include:
+  - `qa-checklist-manual-run` (deterministic QA findings/navigation fixture),
+  - `encoding-charsets-manual-roundtrip` (Cp1251/UTF-16/Cp1252 roundtrip smoke).
+- Release-required scenario IDs stay stable; authoring and fixture structure may evolve,
+  but scenario IDs remain the release-evidence contract key.
 - Release-evidence closure contract (A36):
   - tracked manifest: `tests/manual_scenarios/release_evidence_manifest.json`,
   - tracked evidence records: `tests/manual_scenarios/release_evidence/*.json`,
+  - required scenario coverage is aligned to all scenario IDs from
+    `tests/manual_scenarios/scenarios.json`,
   - machine-check target: `make release-evidence-check`,
+  - sync/update command: `make release-evidence-sync SCENARIO=<id>` or
+    `make release-evidence-sync-all`,
   - required scenarios are pass-only and interactive (`headless=false`, non-`auto-only` mode).
+  - tracked-file relevance is strict: if any `tracked_repo_files` hash drifts,
+    release evidence is stale and the scenario must be re-run then re-synced.
+- LLM/Developer Control Boundary (normative):
+  - LLM may prepare plans, run non-interactive gates, and produce draft command sequences.
+  - For LLM/agent shell execution, prefer `rtk <command>` when RTK is available.
+  - Raw commands remain the canonical human and CI workflow.
+  - Developer owns interactive manual execution, pass/fail judgment, and final evidence acceptance.
+  - Interactive release evidence must come from real interactive runs, not `headless` or `auto-only` artifacts.
 
 ### 2.4 Crash‑Resilience Tests (manual)
 - Edit several translations (ensure cache writes occur).
@@ -248,7 +318,7 @@ Release evidence policy references:
     - source-reference locale switching latency on large fixtures.
 - `tests/test_render_workflow_service.py` enforces adaptive prefetch-window policy:
   render-heavy paths must cap prefetch margins to reduce lazy decode spikes.
-- `make test-perf-scale` runs dual-scale strict contracts for parser/TM/search hot paths:
+- Internal perf-contract scripts run dual-scale strict contracts for parser/TM/search hot paths:
     - parser fast-path offset-map invariants:
     `tests/test_parser_offset_map_invariants.py`,
     - parser legacy-vs-optimized equivalence + 20k median speedup contract:
@@ -275,13 +345,12 @@ Release evidence policy references:
   and `make gate-release TAG=...`.
 
 ### 2.7 Real‑data performance scenarios (scripted)
-- `make perf-scenarios` runs perf checks against fixture files in
+- Internal perf scenario scripts run fixture-backed checks against files in
   `tests/fixtures/perf_root/BE/`:
     - `SurvivalGuide_BE.txt`
     - `Recorded_Media_BE.txt`
     - `News_BE.txt`
-- Budgets are env‑tunable (`TZP_PERF_SCEN_*`); pass a different root path as
-  `TZP_PERF_ROOT` or `make perf-scenarios ARGS="/path/to/root"`.
+- Budgets are env‑tunable (`TZP_PERF_SCEN_*`); the focused script layer may pass a different root path via `TZP_PERF_ROOT`.
 
 ### 2.8 Benchmark regression gate
 - `tests/benchmarks/test_core_benchmarks.py` provides benchmark-oriented perf
@@ -292,6 +361,9 @@ Release evidence policy references:
 - `make bench-check` compares current benchmark medians against committed
   baseline `tests/benchmarks/baseline.json` using threshold
   `BENCH_REGRESSION_THRESHOLD_PERCENT` (default 20%).
+- The normalized benchmark summary at `artifacts/bench/benchmark_summary.json`
+  is derived from the raw `bench.json` artifact and carries source
+  identity/timestamp metadata plus normalized sample rows.
 - Baseline file includes dedicated platform sections (`linux`, `macos`, `windows`)
   and benchmark checks resolve against the active platform key.
 - Baseline tracks synthetic 20k probes per platform for:
@@ -308,16 +380,9 @@ Release evidence policy references:
     - Shared profile helper: `tests/hypothesis_profile.py`.
     - `fast` profile is strict-and-practical for local iteration.
     - `slow` profile is deeper exploration for heavy/scheduled evidence lanes.
-- Dedicated randomized lanes:
-    - `make test-prop-fast` runs profile-scoped randomized/property suites.
-    - `make test-prop-slow` runs the same suites at higher example/step budgets.
-    - Heavy advisory randomized sweep is executed in `make gate-heavy-advisory`,
-      and strict randomized release sweep is executed in `make gate-release TAG=...`.
-- Packet-focused search/replace lane:
-    - `make test-search-a35` runs Search+Replace sidebar sync and all-scope
-      replace-all confirmation contracts.
-    - `make test-search-a37` runs A37 impact-preview and checkbox-gated replace safety
-      contracts.
+- Randomized/property scripts are routed through the gate layer:
+    - heavy advisory randomized sweep is executed in `make gate-heavy-advisory`,
+    - strict randomized release sweep is executed in `make gate-release TAG=...`.
 - Randomized/stateful stratum mapping is normative:
     - Core workflow/state-machine changes require deterministic tests plus
       randomized/stateful invariants on core/service boundaries.
@@ -384,12 +449,11 @@ Release evidence policy references:
 - Default pytest-based gates run with `-W error::ResourceWarning` so
   unclosed resource warnings fail in the primary pass (no duplicate full-suite rerun).
 - `L3` and `L4` layers run the full pytest coverage suite once via `make test-cov`;
-  the full encoding-integrity pytest suite remains available through
-  `make test-encoding-integrity` as a targeted rerun command and is not
-  re-run by default layer umbrellas.
-- `make test-readonly-clean` is script-level (diagnostics + tracked-state check)
+  focused encoding-integrity reruns remain available through the internal script layer
+  and are not re-run by default layer gates.
+- The read-only diagnostics guard is script-level (diagnostics + tracked-state check)
   so it does not duplicate pytest execution.
-- Optional `make test-warnings` remains available as a focused TM/SQLite warning check.
+- Focused warning checks also remain script-level and outside the stable public Make facade.
 
 ### 2.11 GUI runtime optimization policy
 - High-volume GUI adapter suites use autouse fixture startup shortcuts
@@ -411,28 +475,35 @@ Release evidence policy references:
 ### 2.13 Documentation coherency gates
 
 - `make docs-check` is the docs-lane contract:
-  - `make docstyle`
-  - `make docs-build` (strict full-stack; no implicit fallback)
-  - `make docs-index`
-  - `make review-queue-check`
-  - `make code-triage`
+  - docstyle and rendered portal build,
+  - navigation and local-link validation,
+  - authority-entrypoint and active-risk validation,
+  - documented Make command and CI workflow parity,
+  - gate registry and gate-script component parity,
+  - technical safety invariants, focused feature schemas, TM formulas, and performance proof obligations,
+  - module-map and rendered API source coverage,
+  - touched-module risk triage,
   - `make locale-agnostic-check`
-  - `scripts/docs_contract_check.py --site-root artifacts/docs/site`
+  - `scripts/docs_contract_check.py`
 - `make locale-agnostic-check` fails on production-path locale-biased guidance:
   - concrete locale-code chain examples in user-facing UI/doc text (use `<LOCALE_A>,<LOCALE_B>` placeholders instead),
   - concrete locale-map JSON examples in user-facing UI/doc text,
   - EN-centric source/fallback labels in production UI copy.
   - tests/fixtures are exempt by contract; narrow exception marker:
     `locale-agnostic: allow`.
-- `scripts/docs_contract_check.py` fails on:
-  - known stale terminology and missing canonical-doc presence checks,
-  - rendered canonical HTML pseudo-list paragraphs (paragraph text that must
-    be rendered as `<li>` list items),
-  - malformed TeX source patterns in `docs/performance/math_appendix.md`,
-  - review-queue/reference contract violations for flagged-module markers.
-- `make code-triage` enforces `Document-or-Flag` for touched module internals:
-  - `PASS` allows full internal docs updates,
-  - `REVIEW_REQUIRED` requires active queue entry and minimal factual docs only.
+- `scripts/docs_contract_check.py` checks mechanical integrity rather than prescribed prose:
+  - required authority entrypoints exist,
+  - MkDocs navigation paths exist,
+  - local Markdown links and anchors resolve,
+  - active-risk entries reference existing modules and tests,
+  - retired generated/history surfaces are not referenced,
+  - current-contract wording does not regress to stale planned/target states,
+  - documented commands and gate policy remain executable,
+  - selected formulas, state machines, safety invariants, and API boundaries remain represented.
+- Terminal/Make workflow is canonical.
+- An optional external developer console may consume the same public commands and
+  artifacts, but it is maintained outside this repository and is never required
+  for development, CI, or release.
 
 ---
 

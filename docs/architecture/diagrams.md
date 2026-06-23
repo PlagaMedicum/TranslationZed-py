@@ -161,12 +161,11 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  V[make verify] --> VC[verify-core]
-  VC --> P[perf advisory]
-  VC --> D[docstyle + docs-build]
-  C[make verify-ci] --> CC[verify-ci-core]
-  CC --> B[bench-check strict]
-  H[make verify-heavy] --> HE[verify-heavy-extra]
+  D[make gate-dev] --> S[static + architecture + locale checks]
+  P[make gate-push] --> T[core + routed + readonly checks]
+  C[make gate-ci-pr] --> CI[coverage + docs + security + perf contracts]
+  H[make gate-heavy-advisory] --> HE[property + heavy perf + mutation]
+  R[make gate-release] --> RE[CI + strict benchmark + heavy + release evidence]
 ```
 
 ## 12) Module Dependency Map
@@ -203,7 +202,7 @@ flowchart LR
 Dense source reference:
 - `docs/diagrams/src/module_dependency_dense.puml`
 
-## 13) v0.9 Target — QA Live Checklist Pipeline
+## 13) QA Live Checklist Pipeline
 
 ```mermaid
 flowchart LR
@@ -215,7 +214,7 @@ flowchart LR
   SNAP --> UI[Render checklist and summary]
 ```
 
-## 14) v0.9 Target — TM Explainability Delivery
+## 14) TM Explainability Delivery
 
 ```mermaid
 flowchart LR
@@ -225,7 +224,7 @@ flowchart LR
   ORDER --> PANEL[TM list and explanation panel]
 ```
 
-## 15) v0.9 Target — Crash Recovery Startup Decision
+## 15) Crash Recovery Startup Decision
 
 ```mermaid
 flowchart LR

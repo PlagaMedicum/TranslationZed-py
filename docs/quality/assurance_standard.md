@@ -1,77 +1,60 @@
-# TranslationZed-Py — Assurance Standard
-_Last updated: 2026-02-26_
+# Assurance Standard
 
-## 1) Purpose
+## Purpose
 
-This standard defines high-assurance documentation workflow for humans and LLMs.
+Keep changes reviewable and evidence-based without turning documentation into a second
+implementation.
 
-Primary rule: do not normalize questionable code through documentation.
+## Change Standard
 
-## 2) Document-or-Flag Gate (Mandatory)
+1. Identify the behavior, interface, invariant, or failure mode being changed.
+2. Read its canonical owner from `docs/meta/docs_structure.md`.
+3. Make the smallest coherent code and documentation change.
+4. Add or update tests for changed behavior and costly failure modes.
+5. Run focused verification first, then broaden according to risk.
+6. Report environment limitations and unresolved failures explicitly.
 
-1. Before documenting module internals, run `make code-triage`.
-2. Gate outcomes:
-   - `PASS`: full contract documentation is allowed.
-   - `REVIEW_REQUIRED`: deep internal documentation is blocked.
-3. For `REVIEW_REQUIRED` modules, docs must stay minimal and factual:
-   - current behavior,
-   - known limits,
-   - risk notes,
-   - refactor target,
-   - tests needed.
-4. Any `REVIEW_REQUIRED` module must be tracked in `docs/reference/review_queue.json`.
+Do not normalize questionable implementation through documentation. State current behavior and
+risk factually; do not claim that code is safe merely because it is documented.
 
-## 3) Prohibited Normalization Language
+## Active Risks
 
-Canonical docs must not use non-factual normalization claims for flagged modules.
+`docs/reference/risk_register.json` lists modules that require special care. Entries contain:
 
-Examples of prohibited wording:
+- the module path;
+- the concrete concern;
+- constraints that must survive changes;
+- focused regression tests;
+- severity.
 
-- "no issues found"
-- "nothing to refactor"
-- "fully robust"
-- "acceptable as-is"
-- "production-perfect"
+The register contains active risks only. Completed refactor history belongs in git; durable lessons
+belong in tests, code comments, architecture documents, or the decision ledger.
 
-## 4) Flagged Module Marker
+Changed application modules are triaged during `make docs-check`. Size, function length, and branch
+density are risk-discovery signals rather than refactoring commands. A changed module that crosses
+a high-risk threshold must have an active register entry with concrete constraints and tests.
 
-When architecture docs reference a flagged module, annotate it explicitly:
+## Documentation Standard
 
-`FLAGGED_MODULE: translationzed_py/<path>.py`
+- Document public interfaces, architecture boundaries, invariants, compatibility requirements,
+  failure modes, algorithms, and hard-won operational lessons.
+- Keep ordinary code self-explanatory.
+- Link to a canonical owner instead of copying normative detail.
+- Generated API and source indexes are navigation aids, not behavior authorities.
+- Documentation checks validate structure, links, navigation, buildability, documented command
+  existence, gate-policy parity, module/API coverage, current lifecycle wording, and preservation
+  of selected safety/formula contracts.
+- Semantic checks protect important ideas and interfaces; they must not prescribe ordinary prose
+  or require duplicated milestone narratives.
 
-This marker is validated against `docs/reference/review_queue.json`.
+## Completion Standard
 
-## 5) Deep-Review Queue Contract
+Before completion:
 
-Queue artifact: `docs/reference/review_queue.json`
+- run the narrowest tests covering changed behavior;
+- run formatting, lint, type, architecture, and documentation checks appropriate to the surface;
+- run `git diff --check`;
+- inspect the final diff for unrelated edits and accidental generated artifacts.
 
-Each entry must include:
-1. `module_path`
-2. `status` (`REVIEW_REQUIRED|IN_REFACTOR|CLOSED`)
-3. `risk_level` (`P0|P1|P2`)
-4. `reason_codes`
-5. `evidence`
-6. `refactor_scope`
-7. `required_tests`
-8. `owner`
-9. `opened_at`
-10. `closure_criteria`
-11. `closed_at` (nullable, required when `status=CLOSED`)
-
-## 6) API + Contract Index Policy
-
-1. Generated API docs use `mkdocstrings + griffe`.
-2. Scope is core-first, including private symbols.
-3. Machine-readable contract artifact:
-   `docs/reference/contract_index.json`
-4. Contract index is deterministic and checked via `make docs-index`.
-
-## 7) Required Command Chain
-
-- `make code-triage`
-- `make review-queue-check`
-- `make docs-index`
-- `make docs-build`
-- `make docs-check`
-
-These gates are strict in both local `make verify` and CI `make verify-ci`.
+Release, benchmark, and interactive manual evidence must come from their real workflows. Do not
+edit evidence merely to satisfy a gate.

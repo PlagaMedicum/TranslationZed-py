@@ -7,7 +7,7 @@
       "trigger": "Frequent local iteration while coding.",
       "command": "make gate-dev",
       "included_checks": [
-        "fmt-check-changed",
+        "changed-file format check",
         "lint-check",
         "typecheck",
         "arch-check",
@@ -30,9 +30,11 @@
         "test-ui-manual-contract"
       ],
       "mode": "blocking",
-      "artifacts": [],
+      "artifacts": [
+        "artifacts/manual-ui/manual_contract_check.json"
+      ],
       "duplicate_run_exclusions": [
-        "No broad test suites.",
+        "No broad deterministic suite.",
         "No coverage lane."
       ]
     },
@@ -44,8 +46,8 @@
       "included_checks": [
         "gate-commit",
         "test-core-fast",
-        "test-routed-fast",
-        "test-readonly-clean"
+        "routed packet scripts",
+        "read-only diagnostics guard"
       ],
       "mode": "blocking",
       "artifacts": [
@@ -53,7 +55,7 @@
       ],
       "duplicate_run_exclusions": [
         "Runs fixed core baseline once.",
-        "Runs each routed packet lane at most once."
+        "Runs each routed packet script at most once."
       ]
     },
     {
@@ -65,7 +67,7 @@
         "gate-push",
         "test-cov",
         "docs-check",
-        "test-perf-scale"
+        "perf-contract script"
       ],
       "mode": "blocking",
       "artifacts": [
@@ -83,7 +85,7 @@
       "trigger": "GitHub Actions push/pull_request strict validation path.",
       "command": "make gate-ci-pr",
       "included_checks": [
-        "fmt-check",
+        "full-tree format check",
         "lint-check",
         "typecheck",
         "arch-check",
@@ -91,10 +93,10 @@
         "test-ui-manual-contract",
         "test-core-fast",
         "test-cov",
-        "test-readonly-clean",
+        "read-only diagnostics guard",
         "security",
         "docs-check",
-        "test-perf-scale"
+        "perf-contract script"
       ],
       "mode": "blocking",
       "artifacts": [
@@ -102,7 +104,7 @@
       ],
       "duplicate_run_exclusions": [
         "No repeated coverage within a single run.",
-        "No routed packet lane duplication in strict CI path."
+        "No routed packet duplication in strict CI path."
       ]
     },
     {
@@ -111,9 +113,9 @@
       "trigger": "Scheduled or manual workflow-dispatch advisory heavy runs.",
       "command": "make gate-heavy-advisory",
       "included_checks": [
-        "test-prop-slow",
-        "test-perf-heavy",
-        "test-mutation-stage MUTATION_STAGE=soft"
+        "slow randomized/property scripts",
+        "heavy perf script",
+        "staged mutation script"
       ],
       "mode": "advisory",
       "artifacts": [
@@ -133,16 +135,17 @@
       "included_checks": [
         "gate-ci-pr",
         "bench-check (strict)",
-        "test-prop-slow",
-        "test-perf-heavy",
-        "test-mutation-stage MUTATION_STAGE=strict",
+        "slow randomized/property scripts",
+        "heavy perf script",
+        "staged mutation script",
         "release-check",
         "release-evidence-check"
       ],
       "mode": "blocking",
       "artifacts": [
-        "artifacts/bench/*",
-        "artifacts/mutation/summary.json",
+        "artifacts/bench/benchmark_summary.json",
+        "artifacts/release/release_check_summary.json",
+        "artifacts/release/release_evidence_check.json",
         "tests/manual_scenarios/release_evidence_manifest.json"
       ],
       "duplicate_run_exclusions": [

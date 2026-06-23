@@ -1,5 +1,5 @@
 # TranslationZed-Py — Test Surface
-_Last updated: 2026-03-09_
+_Last updated: 2026-03-24_
 
 ## 1) Purpose
 
@@ -108,7 +108,6 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 1. Docs integrity:
    - `tests/test_docs_contract_check.py`
    - `tests/test_generate_contract_index.py`
-   - `tests/test_review_queue_check.py`
 2. Release/tooling policy:
    - `tests/test_release_check.py`
    - `tests/test_release_evidence_check.py`
@@ -116,7 +115,6 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    - `tests/test_gate_layers_makefile.py`
    - `tests/test_ci_gate_workflows.py`
    - `tests/test_select_test_targets.py`
-   - `tests/test_code_quality_triage.py`
    - `tests/test_benchmark_regression_script.py`
    - `tests/test_coverage_promotion_check.py`
 
@@ -125,37 +123,48 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 1. Scenario runtime + registry contracts:
    - `tests/test_manual_scenario_runtime.py`
    - `tests/test_ui_manual_runner.py`
+   - `tests/test_clean_manual_artifacts.py`
+   - `tests/test_release_evidence_sync.py`
 2. No-shrink workflow coverage contract:
    - `tests/test_ui_manual_contract_check.py`
    - `scripts/ui_manual_contract_check.py`
 3. Scenario-mode GUI checklist/startup:
    - `tests/test_gui_manual_scenario_dialog.py`
    - `tests/test_manual_scenario_startup.py`
+4. Canonical manual scenario matrix (release-evidence scope):
+
+Framework owner:
+- `docs/reference/manual_scenario_framework.md`
+
+| Scenario ID | Workflow family | Goal | Focus files | Manual depth | Finish condition | Release-required |
+|---|---|---|---|---|---|---|
+| `open-edit-save-basic` | `open_save` | verify ordinary open/edit/save plus file switching on the locale-diverse generic fixture | `RU/ui.txt`, `RU/menu.txt` | `full_workflow` | leave `RU/ui.txt` active after save and file switching with the edited value still visible | yes |
+| `conflict-resolution-flow` | `conflict_resolution` | verify Drop cache, Drop original, and Merge paths in one canonical conflict-resolution run | `RU/conflict_drop_cache.txt`, `RU/conflict_drop_original.txt`, `RU/conflict_merge_mixed.txt`, `RU/ui.txt` | `full_workflow` | leave `RU/conflict_merge_mixed.txt` active after all three paths are resolved, saved, and rechecked through `RU/ui.txt` without repeated conflict prompts | yes |
+| `qa-checklist-manual-run` | `qa_checklist` | verify manual QA run order, finding navigation, stale-message path, and refresh after edit | `RU/ui.txt` | `same_file_diagnostic` | leave `RU/ui.txt` active after the second QA run with refreshed findings visible and no fake placeholder row | yes |
+| `encoding-charsets-manual-roundtrip` | `encoding_charsets` | verify mixed-script roundtrip edits across Cp1251, UTF-16, and Cp1252 fixtures | `RU/IG_UI_RU.txt`, `KO/IG_UI_KO.txt`, `PTBR/IG_UI_PTBR.txt` | `multi_file_roundtrip` | leave `PTBR/IG_UI_PTBR.txt` active after switching back through all edited files with readable native-script text | yes |
+| `tm-apply-triage-flow` | `tm_apply` | verify deterministic project TM suggestion, apply flow, and panel stability | `RU/ui.txt`, `RU/tm_memory.txt` | `full_workflow` | leave `RU/ui.txt` active on the applied row after switching away and back with TM still responsive | yes |
+| `source-reference-fallback-flow` | `source_reference` | verify KO source-reference display on matching files and empty Source cells on missing counterparts | `RU/ui.txt`, `RU/menu.txt` | `full_workflow` | leave `RU/menu.txt` active after confirming KO stays selected while the missing KO counterpart keeps the Source column empty | yes |
+| `tzp-writeback-opt-in` | `tzp_writeback` | verify opt-in `TZP:` write-back changes only namespaced status comments | `RU/tzp_status.txt`, `RU/ui.txt` | `full_workflow` | leave `RU/tzp_status.txt` active after save and switching with on-disk comments matching the opt-in policy | yes |
+| `status-triage-mixed-indicator` | `status_triage` | verify mixed multi-row selection indicator appears only for real mixed states | `RU/ui.txt` | `branch_check` | leave `RU/ui.txt` active after checking mixed, single-row, and uniform multi-row states with the indicator cleared | yes |
+| `search-replace-sidebar-all-scopes` | `search_replace` | verify toolbar/sidebar sync and FILE/LOCALE/POOL replace-all flows through Preferences-driven scope | `RU/search_scope.txt`, `RU/search_scope_extra.txt`, `KO/search_scope.txt` | `full_workflow` | leave `RU/search_scope.txt` active after one applied run and two canceled runs with only the intended scope changed | yes |
+| `search-replace-impact-preview-safe-apply` | `search_replace` | verify impact preview rows, cancel path, and checkbox-gated replace safety | `RU/search_scope.txt`, `RU/search_scope_extra.txt`, `KO/search_scope.txt` | `full_workflow` | leave `RU/search_scope.txt` active after a canceled run and a confirmed pool run with persisted replacements across expected files | yes |
 
 ## 8) Quick Execution Hints
 
 1. Full strict docs lane: `make docs-check`
-2. Focused docs checker tests: `pytest -q -o addopts='' tests/test_docs_contract_check.py`
-3. v0.9 QA packet suite: `make test-qa-v09`
-4. v0.9 TMQ packet suite: `make test-tmq-v09`
-5. v0.9 TMW packet suite: `make test-tmw-v09`
-6. v0.9 CR packet suite: `make test-cr-v09`
-7. A29 source-reference packet suite: `make test-src-a29` (core policy contracts + GUI state/UI wiring subset)
-8. A30 `TZP:` packet suite: `make test-tzp-a30` (`tzp_comment_policy`, parser status-comment paths, saver/file-workflow write-back contracts)
-9. `L0` regular gate: `make gate-dev`
-10. `L1` pre-commit gate: `make gate-commit`
-11. `L2` pre-push gate: `make gate-push`
-12. `L3` task/docs close gate: `make gate-task-close`
-13. `L4` CI strict gate: `make gate-ci-pr`
-14. `L5` heavy advisory gate: `make gate-heavy-advisory`
-15. `L6` release strict gate: `make gate-release TAG=vX.Y.Z`
-16. A31 no-shrink contract gate: `make test-ui-manual-contract`
-17. A31 focused manual-framework suite: `make test-a31-manual`
-18. Coverage promotion checker contract suite: `make test-cov-promotion-contract`
-19. Randomized/property fast profile: `make test-prop-fast`
-20. Randomized/property slow profile: `make test-prop-slow`
-21. A34 status-triage packet lane: `make test-status-a34`
-22. A35 search/replace packet lane: `make test-search-a35`
-23. A37 search/replace lane: `make test-search-a37`
-24. A37 manual scenario: `search-replace-impact-preview-safe-apply`
-24. Release evidence guard lane: `make release-evidence-check`
+2. Fixed deterministic baseline: `make test-core-fast`
+3. Coverage lane: `make test-cov`
+4. Manual contract lane: `make test-ui-manual-contract`
+5. `L0` regular gate: `make gate-dev`
+6. `L1` pre-commit gate: `make gate-commit`
+7. `L2` pre-push gate: `make gate-push`
+8. `L3` task/docs close gate: `make gate-task-close`
+9. `L4` CI strict gate: `make gate-ci-pr`
+10. `L5` heavy advisory gate: `make gate-heavy-advisory`
+11. `L6` release strict gate: `make gate-release TAG=vX.Y.Z`
+12. Manual scenario list: `make ui-manual-list`
+13. Manual scenario run: `make ui-manual-run SCENARIO=<id>`
+14. Release evidence guard: `make release-evidence-check`
+15. Release evidence sync (single): `make release-evidence-sync SCENARIO=<id>`
+16. Release evidence sync (all): `make release-evidence-sync-all`
+17. Internal packet-specific scripts remain under `scripts/` for focused repo debugging and are intentionally outside the stable public Make facade.

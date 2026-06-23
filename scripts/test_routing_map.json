@@ -2,35 +2,36 @@
   "version": 1,
   "default_fast_targets": [],
   "full_targets": [
-    "test-a31-manual",
-    "test-cr-v09",
-    "test-qa-v09",
-    "test-search-a37",
-    "test-src-a29",
-    "test-status-a34",
-    "test-tmq-v09",
-    "test-tmw-v09",
-    "test-tzp-a30",
-    "test-ui-manual-contract"
+    "scripts/test_a31_manual.sh",
+    "scripts/test_cr_v09.sh",
+    "scripts/test_qa_v09.sh",
+    "scripts/test_search_a37.sh",
+    "scripts/test_src_a29.sh",
+    "scripts/test_status_a34.sh",
+    "scripts/test_tmq_v09.sh",
+    "scripts/test_tmw_v09.sh",
+    "scripts/test_tzp_a30.sh"
   ],
   "rules": [
     {
       "id": "manual-framework",
       "description": "Manual scenario framework/runtime and contract files",
       "match_globs": [
+        "scripts/clean_manual_artifacts.py",
+        "scripts/release_evidence_*.py",
         "scripts/ui_manual_*",
         "tests/manual_scenarios/**",
+        "tests/test_clean_manual_artifacts.py",
         "tests/test_manual_scenario*.py",
+        "tests/test_release_evidence_*.py",
         "tests/test_ui_manual_*.py",
         "translationzed_py/gui/manual_scenario_*.py"
       ],
       "targets_fast": [
-        "test-a31-manual",
-        "test-ui-manual-contract"
+        "scripts/test_a31_manual.sh"
       ],
       "targets_full": [
-        "test-a31-manual",
-        "test-ui-manual-contract"
+        "scripts/test_a31_manual.sh"
       ]
     },
     {
@@ -43,10 +44,10 @@
         "tests/test_gui_qa_panel.py"
       ],
       "targets_fast": [
-        "test-qa-v09"
+        "scripts/test_qa_v09.sh"
       ],
       "targets_full": [
-        "test-qa-v09"
+        "scripts/test_qa_v09.sh"
       ]
     },
     {
@@ -60,10 +61,10 @@
         "tests/test_tm_ranking_corpus.py"
       ],
       "targets_fast": [
-        "test-tmq-v09"
+        "scripts/test_tmq_v09.sh"
       ],
       "targets_full": [
-        "test-tmq-v09"
+        "scripts/test_tmq_v09.sh"
       ]
     },
     {
@@ -75,10 +76,10 @@
         "tests/test_gui_tm_preferences.py"
       ],
       "targets_fast": [
-        "test-tmw-v09"
+        "scripts/test_tmw_v09.sh"
       ],
       "targets_full": [
-        "test-tmw-v09"
+        "scripts/test_tmw_v09.sh"
       ]
     },
     {
@@ -92,25 +93,25 @@
         "tests/test_main_window_bootstrap_helpers.py"
       ],
       "targets_fast": [
-        "test-cr-v09"
+        "scripts/test_cr_v09.sh"
       ],
       "targets_full": [
-        "test-cr-v09"
+        "scripts/test_cr_v09.sh"
       ]
     },
     {
       "id": "source-reference",
-      "description": "Source-reference fallback policy and GUI binding",
+      "description": "Source-reference direct-mode selection and GUI binding",
       "match_globs": [
         "translationzed_py/core/source_reference*.py",
         "translationzed_py/gui/source_reference*.py",
         "tests/test_source_reference*.py"
       ],
       "targets_fast": [
-        "test-src-a29"
+        "scripts/test_src_a29.sh"
       ],
       "targets_full": [
-        "test-src-a29"
+        "scripts/test_src_a29.sh"
       ]
     },
     {
@@ -127,10 +128,10 @@
         "tests/test_file_workflow.py"
       ],
       "targets_fast": [
-        "test-tzp-a30"
+        "scripts/test_tzp_a30.sh"
       ],
       "targets_full": [
-        "test-tzp-a30"
+        "scripts/test_tzp_a30.sh"
       ]
     },
     {
@@ -146,10 +147,10 @@
         "tests/test_gui_dialogs.py"
       ],
       "targets_fast": [
-        "test-search-a37"
+        "scripts/test_search_a37.sh"
       ],
       "targets_full": [
-        "test-search-a37"
+        "scripts/test_search_a37.sh"
       ]
     },
     {
@@ -160,10 +161,10 @@
         "tests/test_main_window_cache_replace_helpers.py"
       ],
       "targets_fast": [
-        "test-status-a34"
+        "scripts/test_status_a34.sh"
       ],
       "targets_full": [
-        "test-status-a34"
+        "scripts/test_status_a34.sh"
       ]
     }
   ]

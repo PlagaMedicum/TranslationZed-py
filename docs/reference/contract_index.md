@@ -1,18 +1,32 @@
-# Contract Index
-_Last updated: 2026-02-26_
+# On-Demand Contract Context
 
-Machine-readable contract artifact:
+The source tree and focused API pages are authoritative. A generated index is useful when an agent
+needs compact symbol context for a small set of modules, but a tracked full-core JSON file created
+frequent unrelated diffs and duplicated source docstrings.
 
-- `docs/reference/contract_index.json`
+Generate targeted JSON to stdout:
 
-Generation/check command:
+```bash
+python scripts/generate_contract_index.py \
+  --module translationzed_py.core.parser \
+  --module translationzed_py.core.saver
+```
 
-- `make docs-index`
+Generate public symbols only:
 
-Scope:
+```bash
+python scripts/generate_contract_index.py \
+  --module translationzed_py.core.file_workflow \
+  --public-only
+```
 
-- core modules (`translationzed_py/core/*`) in deterministic order.
+Write a disposable artifact:
 
-Workflow reference:
+```bash
+python scripts/generate_contract_index.py \
+  --module translationzed_py.core.tm_query_engine \
+  --out artifacts/context/tm-query.json
+```
 
-- `docs/quality/assurance_standard.md`
+Use `docs/reference/module_map.md` to choose modules before generating broader context. Generated
+artifacts are ignored work products and must not be treated as behavior specifications.

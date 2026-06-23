@@ -1,5 +1,5 @@
 # TranslationZed-Py — Use Cases and UX
-_Version 0.8.0 baseline, v0.9.0 target links · 2026-03-04_
+_Current 0.9.0 behavior · updated 2026-06-23_
 
 ## 1) Purpose
 
@@ -50,7 +50,7 @@ flowchart TB
 | `UC-10b` | Dirty indicator in file tree | [`use_cases_project_lifecycle.md#uc-10b-dirty-indicator-in-file-tree`](use_cases_project_lifecycle.md#uc-10b-dirty-indicator-in-file-tree) |
 | `UC-10c` | EN diff markers and NEW insertion | [`use_cases_project_lifecycle.md#uc-10c-en-diff-markers-and-new-insertion`](use_cases_project_lifecycle.md#uc-10c-en-diff-markers-and-new-insertion) |
 | `UC-11` | Exit application | [`use_cases_project_lifecycle.md#uc-11-exit-application`](use_cases_project_lifecycle.md#uc-11-exit-application) |
-| `UC-12` | Crash recovery (target: v0.9) | [`use_cases_project_lifecycle.md#uc-12-crash-recovery-deferred`](use_cases_project_lifecycle.md#uc-12-crash-recovery-deferred) |
+| `UC-12` | Crash recovery | [`use_cases_project_lifecycle.md#uc-12-crash-recovery`](use_cases_project_lifecycle.md#uc-12-crash-recovery) |
 
 ### 4.2 Editing, statuses, and preferences
 
@@ -106,4 +106,4 @@ flowchart TB
 2. `docs/architecture/code_architecture.md`
 3. `docs/architecture/flows.md`
 4. `docs/quality/testing_strategy.md`
-5. `docs/spec/v0_9/overview.md` (target behavior packets for upcoming implementation)
+5. `docs/spec/v0_9/overview.md` (focused contracts introduced for v0.9)

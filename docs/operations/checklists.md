@@ -1,76 +1,77 @@
-_Last updated: 2026-03-09_
+_Last updated: 2026-03-24_
 
 # Checklists
 
-This document is the operational trigger map for testing and release gates.
-Canonical registry source: `docs/reference/gate_policy_registry.json`.
+This document is the operational trigger map for the stable public automation surface.
+Canonical policy owner: `docs/quality/testing_strategy.md`.
+Command surface owner: `docs/reference/automation_surface.md`.
+Machine-checked layer registry: `docs/reference/gate_policy_registry.json`.
 
-Quick command-profile orientation:
-- `docs/reference/automation_surface.md`
+## 1) Layered Trigger Matrix
 
-## 1) Layered Trigger Matrix (Normative)
-
-| Layer | Trigger | Command | Blocking/Advisory | Expected Evidence | Duplicate-Run Exclusion |
-|---|---|---|---|---|---|
-| `L0` | regular coding loop | `make gate-dev` | blocking | none | changed-file static checks only; no deterministic test suite/docs lane |
-| `L1` | before commit (`pre-commit` hook) | `make gate-commit` | blocking | hook log | no broad suite duplication |
-| `L2` | before push (`pre-push` hook) | `make gate-push` | blocking | routed packet output | fixed core once + routed packet dedupe |
-| `L3` | before task/docs closure | `make gate-task-close` | blocking | `artifacts/coverage/*`, docs build artifacts | single `test-cov`, single `docs-check` |
-| `L4` | PR/push CI strict path | `make gate-ci-pr` | blocking | CI artifacts under `artifacts/**` | full static checks + no routed packet duplication |
-| `L5` | schedule/manual heavy | `make gate-heavy-advisory` | advisory | heavy artifacts (`mutation/perf/property`) | heavy extras once per run |
-| `L6` | RC/final release tag | `make gate-release TAG=vX.Y.Z` | blocking | release evidence + strict reports | single release metadata and evidence path |
+| Layer | Trigger | Command | Mode | Expected evidence |
+|---|---|---|---|---|
+| `L0` | regular coding loop | `make gate-dev` | blocking | terminal output only |
+| `L1` | before commit | `make gate-commit` | blocking | hook/terminal output |
+| `L2` | before push | `make gate-push` | blocking | routed lane logs + readonly checks |
+| `L3` | before task/docs closure | `make gate-task-close` | blocking | coverage + docs artifacts |
+| `L4` | PR/push CI strict path | `make gate-ci-pr` | blocking | CI artifacts under `artifacts/**` |
+| `L5` | scheduled/manual heavy | `make gate-heavy-advisory` | advisory | heavy mutation/perf/property artifacts |
+| `L6` | RC/final release tag | `make gate-release TAG=vX.Y.Z` | blocking | release summaries + release evidence |
 
 ## 2) Routine Workflow
 
-1. During development: run `make gate-dev`.
-2. Before commit: run `make gate-commit` (also enforced by `pre-commit`).
-3. Before push: run `make gate-push` (also enforced by `pre-push`).
-4. Before closing implementation/docs packet: run `make gate-task-close`.
-5. For CI parity locally: run `make gate-ci-pr`.
-6. Do not re-run lower layers separately after a higher layer; each higher layer already includes required lower checks.
+1. During coding: run `make gate-dev`.
+2. Before commit: run `make gate-commit`.
+3. Before push: run `make gate-push`.
+4. Before closing a task or docs packet: run `make gate-task-close`.
+5. For full local CI parity: run `make gate-ci-pr`.
+6. For release candidates/final tags: run `make gate-release TAG=vX.Y.Z`.
+7. Do not stack lower gates manually after a higher one; higher layers already include the lower required checks.
 
-## 3) Focused Lanes (Run Only When Touching Scope)
+## 3) Focused Stable Commands
 
-- `make test-routed-fast`: changed-file packet lane selection (`scripts/select_test_targets.py`).
-- `make test-core-fast`: fixed deterministic baseline for cross-domain regressions.
-- `make test-routed-full`: full packet-lane sweep.
-- `make test-qa-v09`: QA packet scope.
-- `make test-tmq-v09`: TM explainability/ranking packet scope.
-- `make test-tmw-v09`: TM workflow packet scope.
-- `make test-cr-v09`: crash/session-resume packet scope.
-- `make test-src-a29`: source-reference packet scope.
-- `make test-tzp-a30`: TZP write-back packet scope.
-- `make test-search-a35`: Search/Replace packet scope.
-- `make test-search-a37`: A37 impact-preview + two-step apply safety lane.
-- `make test-status-a34`: status triage packet scope.
-- `make test-a31-manual`: manual framework runtime/runner packet scope.
-- `make test-ui-manual-contract`: manual scenario/workflow no-shrink contract.
-- `make test-prop-fast`: randomized fast profile (`TZP_PROP_PROFILE=fast`).
-- `make test-prop-slow`: randomized slow profile (`TZP_PROP_PROFILE=slow`).
+Use these when you need one specific public lane without running a whole higher gate:
 
-## 4) Manual UI Evidence Policy
+- `make test-core-fast`
+- `make test-cov`
+- `make test-ui-manual-contract`
+- `make locale-agnostic-check`
+- `make docs-check`
+- `make bench`
+- `make bench-check`
+- `make security`
+- `make ui-manual-list`
+- `make ui-manual-run SCENARIO=<id>`
+- `make release-evidence-check`
+- `make release-evidence-sync SCENARIO=<id>`
+- `make release-evidence-sync-all`
+- `make clean-manual-artifacts`
 
-- For UI-facing packets, attach at least one relevant scenario artifact under `artifacts/manual-ui/*.json`.
-- Scenario registry and no-shrink workflow map are mandatory via `make test-ui-manual-contract`.
-- Search/replace UI packet scenario: `search-replace-sidebar-all-scopes`.
-- A37 search/replace UI packet scenario: `search-replace-impact-preview-safe-apply`.
-- Release evidence guard command: `make release-evidence-check`.
-- Tracked release evidence manifest:
-  `tests/manual_scenarios/release_evidence_manifest.json`.
+Packet-specific test scripts remain under `scripts/` and are intentionally outside the stable public Make surface.
 
-## 5) Release Checklist (Strict)
+## 4) Manual Evidence Policy
+
+1. Interactive manual evidence is human-owned.
+2. The canonical scenario matrix lives in `docs/reference/test_surface.md`.
+3. The normative policy lives in `docs/quality/testing_strategy.md`.
+4. Run scenarios with `make ui-manual-run SCENARIO=<id>`.
+5. Sync fresh passed evidence with `make release-evidence-sync SCENARIO=<id>` or `make release-evidence-sync-all`.
+6. Validate tracked evidence with `make release-evidence-check`.
+7. Release evidence is relevance-locked by scenario `tracked_repo_files` hashes.
+8. Manual artifacts live under `artifacts/manual-ui/*.json`.
+9. Developers own interactive pass/fail judgment; LLMs may prepare commands and run only non-interactive checks.
+
+## 5) Release Checklist
 
 1. Run `make gate-release TAG=vX.Y.Z`.
-2. Confirm `make release-evidence-check` pass with tracked manifest.
-3. Confirm `make release-check TAG=vX.Y.Z` pass.
-4. Ensure changelog and version fields are aligned.
-5. Ensure release workflows run against the tag commit.
+2. If `make release-evidence-check` reports stale or missing evidence, rerun only the listed scenarios with `make ui-manual-run SCENARIO=<id>`.
+3. Sync updated evidence with `make release-evidence-sync SCENARIO=<id>` or `make release-evidence-sync-all`.
+4. Re-run `make release-evidence-check`.
+5. Confirm `make release-check TAG=vX.Y.Z` passes.
+6. Confirm changelog and version fields are aligned on the tagged commit.
 
-## 6) Additional Policy Commands
+## 6) Optional External Consumer Note
 
-- `make fmt-check-changed`: changed-file formatter check (local trigger path).
-- `make fmt-check`: full formatter check (strict CI/release path).
-- `make docs-check`: docs build + docs-contract strict lane.
-- `make locale-agnostic-check`: production copy locale-agnostic hard guard.
-- `make test-cov`: strict coverage floors (`92/97`).
-- `make bench-check BENCH_COMPARE_MODE=fail BENCH_REGRESSION_THRESHOLD_PERCENT=20`: strict benchmark regression check (L6 path).
+The terminal/Make workflow above is canonical.
+An optional external developer console may consume the same public commands and artifacts, but it is maintained outside this repository and is never required for normal development or release work.

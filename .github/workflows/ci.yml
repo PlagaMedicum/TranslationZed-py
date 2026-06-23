@@ -46,7 +46,7 @@ jobs:
       - name: Coverage strict lane
         run: make test-cov
       - name: Read-only diagnostics guard
-        run: make test-readonly-clean
+        run: bash scripts/test_readonly_clean.sh
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -108,7 +108,7 @@ jobs:
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
       - name: Performance contract lane
-        run: make test-perf-scale
+        run: bash scripts/test_perf_scale.sh
 
   manual-contract:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.8.0 · 2026-03-01**\
+**Version 0.9.0 · updated 2026-06-23**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -23,7 +23,7 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 
 ---
 
-## 2  Functional Scope (Current v0.8.0)
+## 2  Functional Scope
 
 - Open an existing `ProjectZomboidTranslations` folder.
 - Detect locale sub‑folders in the repo root, ignoring `_TVRADIO_TRANSLATIONS`.
@@ -44,10 +44,9 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 - Source column supports reference‑locale switching across **opened locales**
   without reloading UI (`EN` default).
   Locale switching is exposed from the **Source column header dropdown** (header label
-  indicates current mode). Global mode is persisted, and fallback policy
-  is configurable (`EN → Target` or `Target → EN`) when selected locale is unavailable.
-  Advanced fallback chain and per-locale preset policy overrides are also supported
-  from Preferences -> View.
+  indicates current mode). Global mode is persisted. When the requested
+  reference locale file is missing for the current target file, the Source
+  column stays empty instead of using fallback-chain behavior.
 - On startup, check EN hash cache; if changed, show a confirmation dialog to
   reset the cache to the new EN version.
 - Atomic multi‑file save; save/exit flows use explicit write prompts
@@ -85,6 +84,13 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
   fast, CI-core, and docs lanes.
 - Narrow exception marker for technical/non-user-facing literals:
   `locale-agnostic: allow` in the same or previous line comment.
+
+### 3.2 Core Safety Invariants
+
+- Saving is byte-preserving outside translation literals.
+- Opening, switching, and inspecting files preserve no-write-on-open behavior.
+- Reads and writes preserve locale-specific encoding fidelity.
+- Atomic multi-file save semantics apply to user-approved writes.
 
 ---
 
@@ -158,7 +164,7 @@ Component diagram:
    project_scanner       saver  ←------+
 ```
 
-Layering (target):
+Layering:
 - **Core (domain)**: data model + use cases; no Qt dependencies.
 - **Infrastructure**: parser/saver/cache implementations behind interfaces.
 - **GUI adapters**: Qt widgets + models binding to core use cases.
@@ -260,8 +266,7 @@ Parse algorithm:
      token boundaries.
 5. Return `ParsedFile` containing `entries`, `raw_bytes`. `entries`, `raw_bytes`.
 6. Status comments are **not** written into localization files by default.
-   Optional write-back is gated by preferences extras
-   (`TZP_STATUS_COMMENT_WRITEBACK`, `TZP_STATUS_COMMENT_PREFIX`).
+   Optional write-back is gated by `TZP_STATUS_COMMENT_WRITEBACK`.
    Program-generated status markers use explicit namespacing (`TZP:`) and
    deterministic parse/format/write-plan contracts in `core.tzp_comment_policy`;
    only those namespaced program comments are writable.
@@ -380,6 +385,7 @@ Algorithm:
   - `QA_CHECK_LANGUAGETOOL=true|false` (default `false`)
   - `QA_LANGUAGETOOL_MAX_ROWS=<int>` (default `500`)
   - `QA_LANGUAGETOOL_AUTOMARK=true|false` (default `false`)
+  - `QA_PANEL_RESULT_LIMIT=<int>` (default `2000`; minimum `1`)
   - `LAST_ROOT=<path>`
   - `LAST_LOCALES=LOCALE1,LOCALE2`
   - `DEFAULT_ROOT=<path>` (default project root in Preferences)
@@ -388,11 +394,7 @@ Algorithm:
   - `REPLACE_SCOPE=FILE|LOCALE|POOL`
   - `UI_THEME_MODE=SYSTEM|LIGHT|DARK` (optional extra key; absent means `SYSTEM`)
   - `SOURCE_REFERENCE_MODE=EN|<LOCALE_CODE>` (active extra key for source-column reference locale mode)
-  - `SOURCE_REFERENCE_FALLBACK_POLICY=EN_THEN_TARGET|TARGET_THEN_EN` (optional source-reference fallback order)
-  - `SOURCE_REFERENCE_FALLBACK_CHAIN=<locale1,locale2,...>` (optional ordered fallback-chain extension)
-  - `SOURCE_REFERENCE_FALLBACK_PRESETS=<json>` (optional per-locale fallback-chain JSON map, for example `{"<TARGET_LOCALE>":["<SOURCE_LOCALE>","<FALLBACK_LOCALE>"]}`)
   - `TZP_STATUS_COMMENT_WRITEBACK=true|false` (optional extra key; default `false`)
-  - `TZP_STATUS_COMMENT_PREFIX=<comment-prefix>` (optional extra key; default app `comment_prefix`, usually `--`)
 - LanguageTool endpoint policy:
   - allow `https://*` endpoints
   - allow `http://` only for localhost (`localhost`, `127.0.0.1`, `::1`)
@@ -407,6 +409,9 @@ Algorithm:
 - `core.preferences_service` owns Qt-free preference policy helpers:
   startup-root resolution (CLI/default-root/picker decision), loaded-preference
   normalization, scope normalization, and persist-payload construction.
+- Preferences dialog keeps top-level tabs (`General`, `Search and Replace`, `QA`,
+  `LanguageTool`, `TM`, `View`) and uses collapsed-by-default Advanced sections in
+  `QA`, `LanguageTool`, `TM`, and `View` to reduce default UI clutter.
 - Related UCs: UC-07, UC-08, UC-11.
 
 #### 5.6.1  Search & Replace preferences
@@ -470,9 +475,8 @@ Algorithm:
 #### 5.6.5  Optional `TZP:` status-comment write-back controls
 
 - Preferences -> View exposes optional write-back controls:
-  - `TZP_STATUS_COMMENT_WRITEBACK` toggle (default disabled),
-  - `TZP_STATUS_COMMENT_PREFIX` text field.
-- Blank prefix input falls back to app `comment_prefix` contract (`--` by default).
+  - `TZP_STATUS_COMMENT_WRITEBACK` toggle (default disabled).
+- Generated `TZP:` comments use the fixed `--` prefix in this release scope.
 - Controls only affect namespaced `TZP:` comments; user comments remain immutable.
 
 #### 5.6.6  Save/exit orchestration boundary
@@ -638,6 +642,8 @@ if dirty_files and not prompt_save():
   Optional LanguageTool findings (`qa.languagetool`) may be added during manual QA runs
   when `QA_CHECK_LANGUAGETOOL=true`; scan depth is capped by
   `QA_LANGUAGETOOL_MAX_ROWS`, and cap/offline/fallback notes are shown in panel status.
+  QA finding collection/list rendering is capped by `QA_PANEL_RESULT_LIMIT` with
+  default `2000` and minimum `1`.
   QA panel includes a quick Preferences shortcut to open the QA tab.
   QA row labels include severity/group tags (`warning/format`, `warning/content`)
   alongside code labels for compact triage.
@@ -946,107 +952,84 @@ Boundary rule:
 
 ---
 
-## 6  Implementation Plan (LLM‑Friendly)
+## 6  Implementation Guidance
 
-Detailed, step‑by‑step plan (with current status, acceptance checks, diagrams) lives in:
-`docs/plan/implementation_active.md`. The list below is a high‑level phase summary.
-
-Instead of sprint dates, the project is broken into **six sequential phases**.  Each phase can be executed once the previous one is functionally complete; timeboxing is left to the integrator.
-
-1. **Bootstrap** – initialise repo, add `pyproject.toml`, pre‑commit hooks, baseline docs.
-2. **Backend Core (clean)** – implement `project_scanner`, `parser`, `model` as
-   Qt‑free domain objects; add production‑like fixtures (non‑2‑letter locales,
-   UTF‑16, cp1251, punctuation in subfolders).
-3. **Encoding + Metadata** – parse `language.txt` for `charset` + `text`; ignore
-   `credits.txt` and `language.txt` in translatable lists. Apply per‑locale
-   encoding for all reads/writes.
-4. **Parser Fidelity** – preserve concat chains and trivia on save. Store
-   per‑segment spans so edited values re‑serialize without collapsing `..`.
-5. **GUI Skeleton** – QMainWindow with multi‑locale checkbox chooser and a
-   tree with **multiple roots** (one per selected locale); EN excluded from
-   tree but used as Source.
-6. **Editing Capabilities** – cell editing + undo/redo; status coloring and
-   toolbar **Status ▼** label reflects the selected row.
-7. **Cache & EN Hashes** – per‑file draft cache at
-   `<root>/.tzp/cache/<locale>/<relative>.bin`, auto‑written on edit
-   (status + draft values) and on save (status only); EN hash cache as a single index file
-   `<root>/.tzp/cache/en.hashes.bin` (raw bytes).
-8. **Persistence & Safety** – atomic multi‑file save, prompt only when writing
-   originals (“Write / Cache only / Cancel”). Crash‑recovery cache is planned,
-   not required in initial builds.
-9. **Search & Polish** – live search, keyboard navigation, wrap‑text, view
-   toggles, and user preferences.
-
-*(Phase boundaries are purely logical; the orchestrating LLM may pipeline or parallelise tasks as appropriate.)*
+Current work and acceptance criteria live in `docs/plan/implementation_active.md`.
+Implementation changes must preserve the contracts in this specification and the relevant UX,
+domain, architecture, and testing owners. Completed bootstrap and feature-delivery phases are
+historical and remain available through git history rather than this current technical contract.
 
 ## 7  Quality & Tooling
 
-- **Coding style**:
-  - local autofix path: `make fmt` + `make lint`,
-  - local verify path uses `make fmt-changed` (changed Python files only) to
-    keep runtime practical while preserving autofix behavior,
-  - strict check-only path: `make fmt-check` + `make lint-check`,
-  - ruff target version aligned to project minimum Python support (`>=3.10`).
-- **Type safety**: `mypy --strict` on `translationzed_py` (`make typecheck`).
+- **Canonical workflow surface**:
+  - this repo is terminal-first and fully usable without any external tool,
+  - the stable public automation surface is defined by:
+    `make gate-dev`,
+    `make gate-commit`,
+    `make gate-push`,
+    `make gate-task-close`,
+    `make gate-ci-pr`,
+    `make gate-heavy-advisory`,
+    `make gate-release TAG=vX.Y.Z`,
+    plus focused public checks:
+    `make test-core-fast`,
+    `make test-cov`,
+    `make test-ui-manual-contract`,
+    `make docs-check`,
+    `make locale-agnostic-check`,
+    `make bench`,
+    `make bench-check`,
+    `make security`.
+- **Static checks**:
+  - formatting/lint/type/architecture checks are enforced through the gate layer,
+  - changed-file formatting is used in local gates,
+  - full-tree formatting is used in strict CI/release gates.
 - **Testing**:
   - `pytest` + `pytest-qt`,
-  - coverage gates via `make test-cov`:
-    - whole package: **>=90%**,
-    - `translationzed_py/core`: **>=95%**.
-  - default verify umbrellas execute the pytest suite once via `make test-cov`;
-    full encoding-integrity suite is available as opt-in targeted
-    `make test-encoding-integrity`.
-  - warning safety: pytest-based test gates run with
-    `-W error::ResourceWarning` by default (single-pass strictness, no duplicate rerun).
+  - coverage gate via `make test-cov`:
+    - whole package: **>=92%**,
+    - `translationzed_py/core`: **>=97%**,
+  - warning safety: pytest-based gates run with `-W error::ResourceWarning`.
 - **Performance**:
-  - deterministic perf budget tests (`make test-perf`),
-  - dual-scale perf-contract tests (`make test-perf-scale`) for parser/TM
-    legacy-vs-optimized equivalence and 20k median speedup gates,
-  - TM speed contracts are split into:
-    - warm-cache contract (`TZP_PERF_TM_SPEEDUP_20K_PERCENT`, default `35`),
-    - cold-cache first-pass contract (`TZP_PERF_TM_COLD_SPEEDUP_20K_PERCENT`,
-      default `3`),
-  - fixture-backed scenario smoke (`make perf-scenarios`),
-  - non-mutating statistical profiler/reporter (`scripts/perf_analyze.py`)
-    with robust summary stats (median/MAD/CI) and parser Amdahl guidance output,
-  - benchmark suite (`pytest-benchmark`) with committed baseline and
-    regression threshold gate (`make bench-check`, default fail over +20% in CI),
+  - benchmark regression gate: `make bench-check`,
   - benchmark baseline is versioned per platform (`linux`, `macos`, `windows`),
-    including synthetic 20k parse/search/TM probes,
-  - performance dependency evaluation path is explicit and offline:
-    `scripts/perf_dependency_eval.py` (trust gates + measured gain/equivalence report),
-  - local `make verify` runs `make bench-check BENCH_COMPARE_MODE=warn` (advisory),
-  - local `make verify` treats perf budget/scenario failures as advisory warnings;
-    strict blocking is enforced in `make verify-ci` and release workflows.
-- **Architecture guardrails**: GUI adapter tests + import/size architecture checks
-  (`make arch-check`) ensure `main_window` delegates workflow decisions to Qt-free services.
-- **Security/doc quality**:
-  - `make security`: bandit report artifact for all findings across `translationzed_py`, `tests`, and `scripts`,
-    plus medium/high severity+confidence gate on shipped code (`translationzed_py` + `scripts`)
-    with `B608` suppressed for known parameterized SQLite query patterns,
-  - `make docstyle`: repo-wide pydocstyle with strict PEP257 checks (no local ignore overrides).
-- **Documentation build**: `make docs-build` runs the Zensical builder against `mkdocs.yml` in strict docs-check lanes.
-- **Gate contract**:
-  - local umbrella gate: `make verify` (auto-fix allowed; warns on tracked-file changes),
-  - CI/release strict gate: `make verify-ci` (non-mutating, fail-on-drift),
-  - manual UI scenario contract gate: `make test-ui-manual-contract`
-    (registry + workflow no-shrink validation),
-  - manual UI scenario packet lane: `make test-a31-manual`,
-  - manual UI scenario runner surface:
+  - strict perf-contract scripts run inside `make gate-task-close`,
+    `make gate-ci-pr`, and `make gate-release TAG=...`,
+  - benchmark summary artifact:
+    `artifacts/bench/benchmark_summary.json`,
+    normalized from the raw `bench.json` artifact with source identity/timestamp metadata.
+- **Manual evidence**:
+  - scenario runner surface:
     `make ui-manual-list`,
     `make ui-manual-run SCENARIO=<id>`,
-    `make ui-manual-batch SCENARIOS=<id1,id2,...>`,
+  - framework reference:
+    `docs/reference/manual_scenario_framework.md`,
+  - release-evidence surface:
+    `make release-evidence-check`,
+    `make release-evidence-sync SCENARIO=<id>`,
+    `make release-evidence-sync-all`,
   - scenario-mode runtime env contracts:
     `TZP_MANUAL_SCENARIO_FILE=<payload.json>`,
     `TZP_MANUAL_RESULTS_DIR=<output-dir>`,
-  - CI matrix may set `VERIFY_SKIP_BENCH=1` in `verify-ci` when benchmark compare is
-    enforced by a dedicated strict benchmark job to avoid duplicate benchmark execution,
-  - local heavy tier gate: `make verify-heavy`
-    (`verify-ci` + staged mutation/perf extras),
-  - CI heavy lane uses `make verify-heavy-extra` after verify passes to avoid
-    duplicate strict-base reruns in the same workflow,
-  - mutation artifacts include machine-readable gate summary
-    (`artifacts/mutation/summary.json`) and human log (`summary.txt`);
+    `TZP_MANUAL_RUN_TOKEN=<token>`,
+  - for LLM/agent shell execution, prefer `rtk <command>` when RTK is available,
+  - raw commands remain the canonical human and CI workflow,
+  - interactive pass/fail judgment remains human-owned.
+- **Security/doc quality**:
+  - `make security` checks shipped code and writes security artifacts,
+  - `make docs-check` runs the full docs lane and docs-contract guards,
+  - locale-biased production guidance is blocked by `make locale-agnostic-check`.
+- **Structured reports**:
+  - coverage summary: `artifacts/coverage/coverage_summary.json`,
+  - benchmark summary: `artifacts/bench/benchmark_summary.json`,
+  - manual contract summary: `artifacts/manual-ui/manual_contract_check.json`,
+  - release evidence summary: `artifacts/release/release_evidence_check.json`,
+  - release metadata summary: `artifacts/release/release_check_summary.json`.
+- **Optional external consumer note**:
+  - an optional external developer console may consume the same public commands
+    and artifacts,
+  - it is maintained outside this repository and is not required for
+    development, CI, or release.
     optional staged ratchet is available through
     `MUTATION_SCORE_MODE={warn|fail|off}` and
     `MUTATION_MIN_KILLED_PERCENT=<threshold>` (staged rollout uses explicit profiles:
@@ -1107,7 +1090,7 @@ Current builds use cache-root startup recovery + session resume:
 - **Executables**: PyInstaller is the baseline packager. Builds must be produced on each target OS
   (Linux/Windows/macOS) and bundle LICENSE + README.
 - **CI**:
-  - matrix verify job (Linux/Windows/macOS) runs strict `make verify-ci` gates;
+  - strict CI validation is driven through `make gate-ci-pr`;
     Linux uses Qt offscreen for headless GUI checks,
   - dedicated Linux benchmark-regression job runs strict `make bench-check`
     (`BENCH_COMPARE_MODE=fail`, 20% threshold),
@@ -1168,10 +1151,9 @@ The stack is **per-file** and cleared on successful save or file reload.
 
 - Keep module responsibility coverage synchronized with
   `docs/reference/module_map.md` when adding/moving modules.
-- Keep derived docs (`architecture/flows`, `operations/checklists`) synchronized
-  with canonical technical + UX contracts.
+- Update derived flow or operations docs only when a behavior change makes them inaccurate.
 - Treat any stale or contradictory statement in canonical docs as a defect.
 
 ---
 
-*Last updated: 2026-03-01 (v0.8.0 + A13/A15 docs alignment)*
+*Updated: 2026-06-23*

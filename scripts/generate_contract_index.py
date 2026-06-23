@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Generate/check machine-readable core contract index for LLM/doc workflows."""
+"""Generate compact source-contract context for explicitly selected modules."""
 
 from __future__ import annotations
 
 import argparse
 import ast
 import json
-from dataclasses import dataclass
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -22,211 +22,172 @@ CONTRACT_SECTIONS = (
 )
 
 
-@dataclass(frozen=True)
-class SymbolRecord:
-    """Serializable symbol contract row."""
-
-    name: str
-    kind: str
-    lineno: int
-    signature: str
-    short_context: str
-    medium_context: str
-    full_context: str
-    sections: dict[str, str]
-
-
 def _first_sentence(text: str) -> str:
     clean = " ".join(text.strip().split())
     if not clean:
         return ""
-    for sep in (". ", "? ", "! "):
-        idx = clean.find(sep)
-        if idx > 0:
-            return clean[: idx + 1]
+    for separator in (". ", "? ", "! "):
+        index = clean.find(separator)
+        if index > 0:
+            return clean[: index + 1]
     return clean[:240]
 
 
 def _extract_sections(doc: str) -> dict[str, str]:
-    values = dict.fromkeys(CONTRACT_SECTIONS, "")
-    if not doc.strip():
-        return values
-    lines = doc.splitlines()
+    buckets = {name: [] for name in CONTRACT_SECTIONS}
     current: str | None = None
-    bucket: dict[str, list[str]] = {section: [] for section in CONTRACT_SECTIONS}
-    section_set = set(CONTRACT_SECTIONS)
-    for raw in lines:
-        line = raw.strip()
-        if line.endswith(":") and line[:-1] in section_set:
-            current = line[:-1]
+    for raw_line in doc.splitlines():
+        line = raw_line.strip()
+        heading = line[:-1] if line.endswith(":") else ""
+        if heading in buckets:
+            current = heading
             continue
-        if current is not None:
-            if line:
-                bucket[current].append(line)
-            elif bucket[current]:
-                bucket[current].append("")
-    for section in CONTRACT_SECTIONS:
-        values[section] = "\n".join(bucket[section]).strip()
-    return values
+        if current and line:
+            buckets[current].append(line)
+    return {name: "\n".join(lines) for name, lines in buckets.items() if lines}
 
 
-def _safe_unparse_signature(node: ast.AST) -> str:
-    if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        return ""
+def _signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     try:
         return ast.unparse(node.args)
-    except Exception:
+    except (AttributeError, ValueError):
         return ""
 
 
-def _symbol_from_node(node: ast.AST, *, prefix: str = "") -> SymbolRecord | None:
-    if isinstance(node, ast.ClassDef):
-        doc = ast.get_docstring(node) or ""
-        name = f"{prefix}{node.name}" if prefix else node.name
-        return SymbolRecord(
-            name=name,
-            kind="class",
-            lineno=node.lineno,
-            signature="",
-            short_context=_first_sentence(doc),
-            medium_context=doc[:480],
-            full_context=doc,
-            sections=_extract_sections(doc),
-        )
-    if isinstance(node, ast.FunctionDef):
-        doc = ast.get_docstring(node) or ""
-        name = f"{prefix}{node.name}" if prefix else node.name
-        return SymbolRecord(
-            name=name,
-            kind="function",
-            lineno=node.lineno,
-            signature=_safe_unparse_signature(node),
-            short_context=_first_sentence(doc),
-            medium_context=doc[:480],
-            full_context=doc,
-            sections=_extract_sections(doc),
-        )
+def _symbol_record(
+    node: ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef,
+    *,
+    prefix: str = "",
+) -> dict[str, Any]:
+    doc = ast.get_docstring(node) or ""
+    name = f"{prefix}{node.name}"
+    kind = "class"
+    signature = ""
     if isinstance(node, ast.AsyncFunctionDef):
-        doc = ast.get_docstring(node) or ""
-        name = f"{prefix}{node.name}" if prefix else node.name
-        return SymbolRecord(
-            name=name,
-            kind="async_function",
-            lineno=node.lineno,
-            signature=_safe_unparse_signature(node),
-            short_context=_first_sentence(doc),
-            medium_context=doc[:480],
-            full_context=doc,
-            sections=_extract_sections(doc),
-        )
-    return None
+        kind = "async_function"
+        signature = _signature(node)
+    elif isinstance(node, ast.FunctionDef):
+        kind = "function"
+        signature = _signature(node)
+    return {
+        "name": name,
+        "kind": kind,
+        "lineno": node.lineno,
+        "signature": signature,
+        "summary": _first_sentence(doc),
+        "contracts": _extract_sections(doc),
+    }
 
 
-def _module_records(module_path: Path, repo_root: Path) -> dict[str, Any]:
-    source = module_path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    module_doc = ast.get_docstring(tree) or ""
-    rel = module_path.relative_to(repo_root).as_posix()
-    dotted = rel.removesuffix(".py").replace("/", ".")
-    symbols: list[SymbolRecord] = []
+def _is_public(name: str) -> bool:
+    return all(not part.startswith("_") for part in name.split("."))
+
+
+def _module_record(
+    module_path: Path,
+    *,
+    repo_root: Path,
+    public_only: bool,
+) -> dict[str, Any]:
+    tree = ast.parse(module_path.read_text(encoding="utf-8"), filename=str(module_path))
+    relative = module_path.relative_to(repo_root).as_posix()
+    symbols: list[dict[str, Any]] = []
     for node in tree.body:
-        top = _symbol_from_node(node)
-        if top is None:
+        if not isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        symbols.append(top)
+        top = _symbol_record(node)
+        if not public_only or _is_public(top["name"]):
+            symbols.append(top)
         if isinstance(node, ast.ClassDef):
             for child in node.body:
-                sub = _symbol_from_node(child, prefix=f"{node.name}.")
-                if sub is not None:
-                    symbols.append(sub)
-    symbols = sorted(symbols, key=lambda item: (item.name, item.lineno))
+                if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                member = _symbol_record(child, prefix=f"{node.name}.")
+                if not public_only or _is_public(member["name"]):
+                    symbols.append(member)
     return {
-        "module": dotted,
-        "module_path": rel,
-        "short_context": _first_sentence(module_doc),
-        "medium_context": module_doc[:480],
-        "full_context": module_doc,
-        "symbols": [
-            {
-                "name": row.name,
-                "kind": row.kind,
-                "lineno": row.lineno,
-                "signature": row.signature,
-                "short_context": row.short_context,
-                "medium_context": row.medium_context,
-                "full_context": row.full_context,
-                "contracts": row.sections,
-            }
-            for row in symbols
+        "module": relative.removesuffix(".py").replace("/", "."),
+        "module_path": relative,
+        "summary": _first_sentence(ast.get_docstring(tree) or ""),
+        "symbols": sorted(symbols, key=lambda item: (item["lineno"], item["name"])),
+    }
+
+
+def resolve_module_path(repo_root: Path, value: str) -> Path:
+    """Resolve one dotted module or repository-relative Python path."""
+    raw = value.strip()
+    if not raw:
+        raise ValueError("module value must not be empty")
+    relative = Path(raw) if raw.endswith(".py") or "/" in raw else Path(*raw.split("."))
+    if relative.suffix != ".py":
+        relative = relative.with_suffix(".py")
+    path = (repo_root / relative).resolve()
+    try:
+        path.relative_to(repo_root)
+    except ValueError as exc:
+        raise ValueError(f"module escapes repository root: {value}") from exc
+    if not path.is_file():
+        raise ValueError(f"module does not exist: {value}")
+    return path
+
+
+def build_contract_index(
+    *,
+    repo_root: Path,
+    module_paths: Iterable[Path],
+    public_only: bool = False,
+) -> dict[str, Any]:
+    """Build deterministic context for selected module paths."""
+    unique_paths = sorted({path.resolve() for path in module_paths})
+    return {
+        "schema_version": 2,
+        "modules": [
+            _module_record(path, repo_root=repo_root, public_only=public_only)
+            for path in unique_paths
         ],
     }
 
 
-def build_contract_index(*, repo_root: Path, scope_dir: Path) -> dict[str, Any]:
-    """Build deterministic contract index payload for the configured scope."""
-    modules = []
-    for module_path in sorted(scope_dir.rglob("*.py")):
-        if module_path.name == "__init__.py":
-            continue
-        modules.append(_module_records(module_path, repo_root))
-    return {
-        "schema_version": 1,
-        "scope": scope_dir.relative_to(repo_root).as_posix(),
-        "modules": modules,
-    }
-
-
-def _canonical_json(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-
-
 def main() -> int:
-    """Generate or check the contract index file."""
+    """Run the targeted context generator."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--repo-root",
-        default=".",
-        help="Repository root path",
+        "--module",
+        action="append",
+        required=True,
+        help="Dotted module or repository-relative .py path; repeat as needed.",
     )
+    parser.add_argument("--repo-root", default=".", help="Repository root.")
     parser.add_argument(
-        "--scope",
-        default="translationzed_py/core",
-        help="Python module scope directory for index generation",
+        "--public-only",
+        action="store_true",
+        help="Exclude private modules, functions, classes, and class members.",
     )
     parser.add_argument(
         "--out",
-        default="docs/reference/contract_index.json",
-        help="Contract index output path",
+        default="",
+        help="Write JSON to this path instead of stdout.",
     )
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--check", action="store_true", help="Check output is up to date")
-    mode.add_argument("--write", action="store_true", help="Write generated output")
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
-    scope = (repo_root / args.scope).resolve()
-    out_path = (repo_root / args.out).resolve()
-    payload = build_contract_index(repo_root=repo_root, scope_dir=scope)
-    canonical = _canonical_json(payload)
-
-    if args.write:
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(canonical, encoding="utf-8")
-        print(f"contract-index: wrote {out_path}")
-        return 0
-
-    if not out_path.is_file():
-        print(f"contract-index: FAIL missing output file: {out_path}")
-        print("contract-index: run with --write to bootstrap the artifact")
-        return 1
-    current = out_path.read_text(encoding="utf-8")
-    if current != canonical:
-        print("contract-index: FAIL drift detected")
-        print(f"contract-index: expected {out_path} to match generated payload")
-        print("contract-index: run with --write to refresh committed artifact")
-        return 1
-    print("contract-index: PASS")
-    print(f"validated: {out_path}")
+    try:
+        module_paths = [resolve_module_path(repo_root, value) for value in args.module]
+    except ValueError as exc:
+        parser.error(str(exc))
+    payload = build_contract_index(
+        repo_root=repo_root,
+        module_paths=module_paths,
+        public_only=args.public_only,
+    )
+    rendered = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if args.out:
+        output = (repo_root / args.out).resolve()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered, encoding="utf-8")
+        print(f"contract-context: wrote {output}")
+    else:
+        print(rendered, end="")
     return 0
 
 

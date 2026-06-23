@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate documentation coherency and stale-terminology contracts."""
+"""Validate documentation structure, semantics, and automation coherence."""
 
 from __future__ import annotations
 
@@ -7,250 +7,126 @@ import argparse
 import html
 import json
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
-
-@dataclass(frozen=True)
-class PatternRule:
-    """One banned-pattern rule scoped to canonical docs."""
-
-    pattern: re.Pattern[str]
-    reason: str
-
-
-CANONICAL_DOCS = [
+REQUIRED_ENTRYPOINTS = (
     "index.md",
     "meta/docs_structure.md",
     "reference/quick_context.md",
     "reference/automation_surface.md",
     "reference/test_surface.md",
     "reference/module_map.md",
-    "reference/contract_index.md",
-    "reference/review_queue.md",
+    "reference/risk_register.md",
+    "reference/risk_register.json",
     "spec/technical.md",
-    "spec/v0_9/overview.md",
-    "spec/v0_9/qa_live_checklist.md",
-    "spec/v0_9/tm_quality_explainability.md",
-    "spec/v0_9/tm_workflow_ux.md",
-    "spec/v0_9/crash_recovery_uc12.md",
-    "spec/v0_9/implementation_subtasks.md",
     "ux/use_cases.md",
-    "ux/use_cases_project_lifecycle.md",
-    "ux/use_cases_editing_status.md",
-    "ux/use_cases_search_qa.md",
-    "ux/use_cases_tm.md",
     "architecture/overview.md",
-    "architecture/code_architecture.md",
-    "architecture/flows.md",
-    "architecture/diagrams.md",
-    "domain/tm_ranking.md",
-    "quality/assurance_standard.md",
     "quality/testing_strategy.md",
-    "operations/checklists.md",
-    "performance/math_appendix.md",
-    "plan/implementation_active.md",
-    "plan/implementation_history.md",
-    "reference/api/index.md",
-    "reference/api/core_workflows.md",
-    "reference/api/core_data_io.md",
-    "reference/api/core_preferences.md",
-]
-
-CANONICAL_SCAN_SCOPE = [
-    "index.md",
-    "meta/docs_structure.md",
-    "reference/quick_context.md",
-    "reference/automation_surface.md",
-    "reference/test_surface.md",
-    "reference/module_map.md",
-    "reference/contract_index.md",
-    "reference/review_queue.md",
-    "spec/technical.md",
-    "spec/v0_9/overview.md",
-    "spec/v0_9/qa_live_checklist.md",
-    "spec/v0_9/tm_quality_explainability.md",
-    "spec/v0_9/tm_workflow_ux.md",
-    "spec/v0_9/crash_recovery_uc12.md",
-    "spec/v0_9/implementation_subtasks.md",
-    "ux/use_cases.md",
-    "ux/use_cases_project_lifecycle.md",
-    "ux/use_cases_editing_status.md",
-    "ux/use_cases_search_qa.md",
-    "ux/use_cases_tm.md",
-    "architecture/overview.md",
-    "architecture/code_architecture.md",
-    "architecture/flows.md",
-    "architecture/diagrams.md",
-    "domain/tm_ranking.md",
-    "quality/assurance_standard.md",
-    "quality/testing_strategy.md",
-    "operations/checklists.md",
-    "performance/math_appendix.md",
-    "plan/implementation_active.md",
-    "reference/api/index.md",
-    "reference/api/core_workflows.md",
-    "reference/api/core_data_io.md",
-    "reference/api/core_preferences.md",
-]
-
-RENDERED_HTML_SCAN_SCOPE = [
-    "reference/quick_context.md",
-    "reference/automation_surface.md",
-    "reference/test_surface.md",
-    "quality/testing_strategy.md",
-    "quality/assurance_standard.md",
     "operations/checklists.md",
     "plan/implementation_active.md",
     "plan/implementation_history.md",
-    "ux/use_cases.md",
-    "ux/use_cases_project_lifecycle.md",
-    "ux/use_cases_editing_status.md",
-    "ux/use_cases_search_qa.md",
-    "ux/use_cases_tm.md",
-    "spec/v0_9/qa_live_checklist.md",
-    "spec/v0_9/tm_quality_explainability.md",
-    "spec/v0_9/crash_recovery_uc12.md",
+)
+
+REQUIRED_ACTIVE_PLAN_SECTIONS = (
+    "current-objective",
+    "constraints",
+    "verified-state",
+    "acceptance-criteria",
+    "open-follow-ups",
+)
+
+RETIRED_REFERENCES = (
+    "docs/reference/contract_index.json",
+    "docs/reference/review_queue.json",
+    "docs/reference/review_queue.md",
+    "docs/spec/v0_9/implementation_subtasks.md",
+    "reference/review_queue.json",
+    "reference/review_queue.md",
     "spec/v0_9/implementation_subtasks.md",
-]
-
-BANNED_RULES = [
-    PatternRule(
-        pattern=re.compile(
-            r"LanguageTool integration \(explicitly deferred\)", re.IGNORECASE
-        ),
-        reason="LanguageTool is implemented; deferred wording is stale.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"Project\s*▸\s*Open", re.IGNORECASE),
-        reason="Menu wording must match current UI label: General -> Open.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"Project\s*▸\s*Switch\s*Locale", re.IGNORECASE),
-        reason="Menu wording must match current UI label: General -> Switch Locale(s).",
-    ),
-    PatternRule(
-        pattern=re.compile(r"Click\s*\*\*Files\*\*", re.IGNORECASE),
-        reason="Left tab is Project, not Files.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"technical_notes_current_state", re.IGNORECASE),
-        reason="Retired notes doc must not be referenced from canonical docs.",
-    ),
-    PatternRule(
-        pattern=re.compile(
-            r"translation_zed_py_technical_specification\.md", re.IGNORECASE
-        ),
-        reason="Legacy technical spec path detected.",
-    ),
-    PatternRule(
-        pattern=re.compile(
-            r"translation_zed_py_use_case_ux_specification\.md", re.IGNORECASE
-        ),
-        reason="Legacy UX spec path detected.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"docs/implementation_plan\.md", re.IGNORECASE),
-        reason="Legacy implementation plan path detected.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"docs/testing_strategy\.md", re.IGNORECASE),
-        reason="Legacy testing strategy path detected.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"docs/checklists\.md", re.IGNORECASE),
-        reason="Legacy checklists path detected.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"docs/tm_ranking_algorithm\.md", re.IGNORECASE),
-        reason="Legacy TM ranking path detected.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"docs/performance_math_appendix\.md", re.IGNORECASE),
-        reason="Legacy performance appendix path detected.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"Static fallback", re.IGNORECASE),
-        reason="Fallback diagram sections are disallowed in canonical docs.",
-    ),
-    PatternRule(
-        pattern=re.compile(r"!\[[^\]]*\]\(\.\./diagrams/static/[^)]+\)"),
-        reason="Inline fallback image embeds are disallowed in canonical docs.",
-    ),
-]
-
-PROHIBITED_NORMALIZATION_PATTERNS = [
-    re.compile(r"\bno issues found\b", re.IGNORECASE),
-    re.compile(r"\bnothing to refactor\b", re.IGNORECASE),
-    re.compile(r"\bfully robust\b", re.IGNORECASE),
-    re.compile(r"\bacceptable as[- ]is\b", re.IGNORECASE),
-    re.compile(r"\bproduction-perfect\b", re.IGNORECASE),
-]
-
-TM_LONG_VARIANT_FORMULA_SNIPPETS = (
-    "TM Long-Variant Detection Contract",
-    r"L_{\min b} = \max(1,\lfloor 0.6 \cdot L_q \rfloor)",
-    r"I_{\mathrm{long}} := (k \ge 8) \land (L_q \ge 80)",
-    r"\lfloor 1.85 \cdot L_q \rfloor",
-    r"\text{overlap} \ge 0.55",
-    r"\text{ratio} \ge 0.70",
 )
 
-TM_LONG_VARIANT_DIAGRAM_ANCHORS = (
-    ("architecture/code_architecture.md", "TM Long-Variant Detection Pipeline"),
-    ("architecture/diagrams.md", "TM Long-Variant Detection Activity"),
+STALE_PATTERNS = (
+    (re.compile(r"\bv0\.9(?:\.0)?\s+target\b", re.IGNORECASE), "v0.9 is current"),
+    (
+        re.compile(r"\b(?:planned|upcoming)\s+(?:for|in)?\s*`?v0\.9", re.IGNORECASE),
+        "implemented v0.9 behavior must not be described as future work",
+    ),
+    (
+        re.compile(r"LanguageTool integration \(explicitly deferred\)", re.IGNORECASE),
+        "LanguageTool is implemented",
+    ),
+    (
+        re.compile(r"Project\s*▸\s*(?:Open|Switch\s*Locale)", re.IGNORECASE),
+        "menu labels use General, not Project",
+    ),
 )
 
-V09_REQUIRED_SNIPPETS: dict[str, tuple[str, ...]] = {
+SEMANTIC_CONTRACTS: dict[str, tuple[str, ...]] = {
+    "spec/technical.md": (
+        "byte-preserving",
+        "no-write-on-open",
+        "locale-specific encoding fidelity",
+        "Atomic multi-file save",
+        "Security Considerations",
+    ),
     "spec/v0_9/qa_live_checklist.md": (
         "Rule State Machine",
         "Formal Progress Model",
         "C(t) =",
+        "LanguageTool Failure Semantics",
     ),
     "spec/v0_9/tm_quality_explainability.md": (
         "Preserved Scoring Core (Normative)",
         "Explainability Payload Schema",
-        "raw = \\operatorname{round}(100 \\cdot ratio)",
+        r"raw = \operatorname{round}(100 \cdot ratio)",
+        r"L_{\min\_base} = \max(1, \lfloor 0.6 L_q \rfloor)",
+        r"\lfloor 1.85 L_q \rfloor",
+        r"overlap \ge 0.55",
+        r"ratio \ge 0.70",
+        "Determinism Guarantees",
     ),
     "spec/v0_9/crash_recovery_uc12.md": (
         "Dialog Contract (Required Actions)",
         "`Restore`",
         "`Discard`",
         "`Cancel`",
+        "No-write-on-open",
     ),
-    "spec/v0_9/implementation_subtasks.md": (
-        "Packet Template (Mandatory)",
-        "Packet Catalog",
-        "Goal",
-        "Required tests",
-        "Acceptance criteria",
+    "domain/tm_ranking.md": (
+        "TM Long-Variant Detection Contract",
+        r"L_{\min b} = \max(1,\lfloor 0.6 \cdot L_q \rfloor)",
+        r"I_{\mathrm{long}} := (k \ge 8) \land (L_q \ge 80)",
+        r"\lfloor 1.85 \cdot L_q \rfloor",
+        r"\text{overlap} \ge 0.55",
+        r"\text{ratio} \ge 0.70",
+        "Ordering (Tie-Break)",
+    ),
+    "performance/math_appendix.md": (
+        "Parser Model",
+        "TM Query Cost Model",
+        "Cache-Cap Invariants",
+        "Statistical Measurement Contract",
+        "Equivalence Proof Obligations",
+        r"T_{\text{tm}} =",
+        r"\operatorname{MAD}",
     ),
 }
 
-API_STRUCTURE_PAGES: dict[str, tuple[str, ...]] = {
-    "reference/api/core_workflows.md": (
-        "Why This Layer Exists",
-        "When Not To Use",
-        "Call-Chain Examples",
-        "DTO Boundaries",
-        "Failure Modes",
-    ),
-    "reference/api/core_data_io.md": (
-        "Why This Layer Exists",
-        "When Not To Use",
-        "Call-Chain Examples",
-        "DTO Boundaries",
-        "Failure Modes",
-    ),
-    "reference/api/core_preferences.md": (
-        "Why This Layer Exists",
-        "When Not To Use",
-        "Call-Chain Examples",
-        "DTO Boundaries",
-        "Failure Modes",
-    ),
-}
+API_STRUCTURE_PAGES = (
+    "reference/api/core_workflows.md",
+    "reference/api/core_data_io.md",
+    "reference/api/core_preferences.md",
+)
+
+API_REQUIRED_SECTIONS = (
+    "Why This Layer Exists",
+    "When Not To Use",
+    "Call-Chain Examples",
+    "DTO Boundaries",
+    "Failure Modes",
+)
 
 WORKFLOW_CRITICAL_MODULES = (
     "project_session",
@@ -263,256 +139,293 @@ WORKFLOW_CRITICAL_MODULES = (
     "source_reference_service",
 )
 
-ORIENTATION_SURFACE_DOCS = (
-    "docs/reference/automation_surface.md",
-    "docs/reference/test_surface.md",
+GATE_POLICY_DOCS = (
+    "quality/testing_strategy.md",
+    "operations/checklists.md",
+    "reference/automation_surface.md",
 )
 
-RANDOMIZED_POLICY_SNIPPETS: dict[str, tuple[str, ...]] = {
-    "quality/testing_strategy.md": (
-        "TZP_PROP_PROFILE=fast|slow",
-        "make test-prop-fast",
-        "make test-prop-slow",
-        "artifacts/manual-ui/*.json",
-    ),
-    "operations/checklists.md": (
-        "make test-prop-fast",
-        "make test-prop-slow",
-        "artifacts/manual-ui/*.json",
-    ),
-    "reference/automation_surface.md": (
-        "make test-prop-fast",
-        "make test-prop-slow",
-        "TZP_PROP_PROFILE=fast",
-        "TZP_PROP_PROFILE=slow",
-    ),
-    "reference/test_surface.md": (
-        "make test-prop-fast",
-        "make test-prop-slow",
-        "tests/test_property_project_session_stateful.py",
-        "tests/test_property_qa_progress_stateful.py",
-        "tests/test_property_tm_invariants.py",
-    ),
-}
+RENDERED_HTML_SCAN_SCOPE = (
+    "reference/quick_context.md",
+    "reference/automation_surface.md",
+    "reference/test_surface.md",
+    "quality/testing_strategy.md",
+    "quality/assurance_standard.md",
+    "operations/checklists.md",
+    "plan/implementation_active.md",
+    "ux/use_cases.md",
+    "ux/use_cases_project_lifecycle.md",
+    "ux/use_cases_editing_status.md",
+    "ux/use_cases_search_qa.md",
+    "ux/use_cases_tm.md",
+)
 
-A35_SEARCH_REPLACE_SNIPPETS: dict[str, tuple[str, ...]] = {
-    "quality/testing_strategy.md": (
-        "make test-search-a35",
-        "search-replace-sidebar-all-scopes",
-    ),
-    "operations/checklists.md": (
-        "make test-search-a35",
-        "search-replace-sidebar-all-scopes",
-    ),
-    "reference/automation_surface.md": (
-        "make test-search-a35",
-        "A35 search/replace packet lane",
-    ),
-    "reference/test_surface.md": (
-        "make test-search-a35",
-        "tests/test_main_window_replace_merge_clipboard.py",
-        "tests/test_search_replace_service.py",
-    ),
-    "reference/quick_context.md": ("make test-search-a35",),
-}
-
-A36_RELEASE_EVIDENCE_SNIPPETS: dict[str, tuple[str, ...]] = {
-    "quality/testing_strategy.md": (
-        "make release-evidence-check",
-        "tests/manual_scenarios/release_evidence_manifest.json",
-    ),
-    "operations/checklists.md": (
-        "make release-evidence-check",
-        "tests/manual_scenarios/release_evidence_manifest.json",
-    ),
-    "reference/automation_surface.md": (
-        "make release-evidence-check",
-        "make test-search-a37",
-    ),
-    "reference/test_surface.md": (
-        "tests/test_release_evidence_check.py",
-        "make test-search-a37",
-    ),
-    "reference/quick_context.md": (
-        "make release-evidence-check",
-        "`A37-SRX-2`",
-    ),
-    "plan/implementation_active.md": (
-        "`A36-REL-1`",
-        "`A37-SRX-2`",
-        "no sidebar scope selector",
-    ),
-}
-
-A37_SEARCH_PREVIEW_SNIPPETS: dict[str, tuple[str, ...]] = {
-    "quality/testing_strategy.md": (
-        "make test-search-a37",
-        "search-replace-impact-preview-safe-apply",
-    ),
-    "operations/checklists.md": (
-        "make test-search-a37",
-        "search-replace-impact-preview-safe-apply",
-    ),
-    "reference/automation_surface.md": (
-        "make test-search-a37",
-        "A37 search/replace packet lane",
-    ),
-    "reference/test_surface.md": (
-        "make test-search-a37",
-        "search-replace-impact-preview-safe-apply",
-    ),
-    "reference/quick_context.md": (
-        "make test-search-a37",
-        "search-replace-impact-preview-safe-apply",
-    ),
-    "plan/implementation_active.md": (
-        "`A37-SRX-2`",
-        "impact preview",
-        "no sidebar scope selector",
-    ),
-}
-
-A38_GATE_POLICY_SURFACE_SNIPPETS: dict[str, tuple[str, ...]] = {
-    "quality/testing_strategy.md": (
-        "L0",
-        "L1",
-        "L2",
-        "L3",
-        "L4",
-        "L5",
-        "L6",
-        "make gate-dev",
-        "make gate-commit",
-        "make gate-push",
-        "make gate-task-close",
-        "make gate-ci-pr",
-        "make gate-heavy-advisory",
-        "make gate-release TAG=",
-        "make fmt-check-changed",
-        "make fmt-check",
-    ),
-    "operations/checklists.md": (
-        "make gate-dev",
-        "make gate-commit",
-        "make gate-push",
-        "make gate-task-close",
-        "make gate-ci-pr",
-        "make gate-heavy-advisory",
-        "make gate-release TAG=",
-        "make fmt-check-changed",
-        "make fmt-check",
-        "docs/reference/gate_policy_registry.json",
-    ),
-    "reference/automation_surface.md": (
-        "make gate-dev",
-        "make gate-commit",
-        "make gate-push",
-        "make gate-task-close",
-        "make gate-ci-pr",
-        "make gate-heavy-advisory",
-        "make gate-release TAG=",
-        "make fmt-check-changed",
-        "make fmt-check",
-    ),
-}
-
-GATE_POLICY_REGISTRY_REL = "reference/gate_policy_registry.json"
-GATE_POLICY_REQUIRED_LAYER_IDS = ("L0", "L1", "L2", "L3", "L4", "L5", "L6")
+LINK_RE = re.compile(r"!?\[[^\]]*]\(([^)]+)\)")
+NAV_PATH_RE = re.compile(r":\s+([A-Za-z0-9_./-]+\.md)\s*$")
+HEADING_RE = re.compile(r"^#{1,6}\s+(.+?)\s*$")
+MAKE_TARGET_RE = re.compile(r"^([A-Za-z0-9_.-]+):", re.MULTILINE)
+INLINE_MAKE_RE = re.compile(r"`make\s+([A-Za-z0-9_.-]+)")
+LINE_MAKE_RE = re.compile(r"^\s*(?:run:\s*)?make\s+([A-Za-z0-9_.-]+)", re.MULTILINE)
+MKDOCSTRINGS_RE = re.compile(
+    r"^:::\s+(translationzed_py(?:\.[A-Za-z0-9_]+)+)", re.MULTILINE
+)
+WORKFLOW_SCRIPT_RE = re.compile(r"\b(?:bash|sh)\s+(scripts/[A-Za-z0-9_./-]+)")
 
 
-def _read_text(path: Path) -> str:
+def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _makefile_targets(makefile_path: Path) -> set[str]:
-    targets: set[str] = set()
-    if not makefile_path.is_file():
-        return targets
-    pattern = re.compile(r"^([A-Za-z0-9_.-]+):", flags=re.MULTILINE)
-    for match in pattern.finditer(_read_text(makefile_path)):
-        targets.add(match.group(1))
-    return targets
+def _slugify(value: str) -> str:
+    text = re.sub(r"<[^>]+>", "", value)
+    text = re.sub(r"[`*_~]", "", text).strip().lower()
+    text = re.sub(r"[^\w\s-]", "", text, flags=re.UNICODE)
+    return re.sub(r"[-\s]+", "-", text).strip("-")
 
 
-def _validate_file_presence(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    for rel in CANONICAL_DOCS:
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing canonical doc: {path}")
-    return errors
-
-
-def _validate_patterns(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    for rel in CANONICAL_SCAN_SCOPE:
-        path = docs_root / rel
-        if not path.is_file():
+def _headings(path: Path) -> set[str]:
+    anchors: set[str] = set()
+    counts: dict[str, int] = {}
+    for line in _read(path).splitlines():
+        match = HEADING_RE.match(line)
+        if not match:
             continue
-        text = _read_text(path)
-        for rule in BANNED_RULES:
-            if rule.pattern.search(text):
-                errors.append(f"{path}: {rule.reason}")
-    return errors
+        base = _slugify(match.group(1))
+        if not base:
+            continue
+        count = counts.get(base, 0)
+        counts[base] = count + 1
+        anchors.add(base if count == 0 else f"{base}_{count}")
+    return anchors
 
 
-def _validate_normalization_phrasing(docs_root: Path) -> list[str]:
+def _make_targets(path: Path) -> set[str]:
+    return set(MAKE_TARGET_RE.findall(_read(path))) if path.is_file() else set()
+
+
+def validate_entrypoints(docs_root: Path) -> list[str]:
+    """Return missing canonical documentation entrypoints."""
+    return [
+        f"missing documentation entrypoint: {relative}"
+        for relative in REQUIRED_ENTRYPOINTS
+        if not (docs_root / relative).is_file()
+    ]
+
+
+def validate_navigation(docs_root: Path, config_paths: list[Path]) -> list[str]:
+    """Return missing Markdown paths referenced by portal navigation."""
     errors: list[str] = []
-    exempt = {"quality/assurance_standard.md"}
-    for rel in CANONICAL_SCAN_SCOPE:
-        if rel in exempt:
+    for config in config_paths:
+        if not config.is_file():
+            errors.append(f"missing documentation config: {config}")
             continue
-        path = docs_root / rel
-        if not path.is_file():
-            continue
-        text = _read_text(path)
-        for pattern in PROHIBITED_NORMALIZATION_PATTERNS:
-            if pattern.search(text):
+        for line_number, line in enumerate(_read(config).splitlines(), start=1):
+            match = NAV_PATH_RE.search(line)
+            if match and not (docs_root / match.group(1)).is_file():
                 errors.append(
-                    f"{path}: normalization language is disallowed ({pattern.pattern})"
+                    f"{config}:{line_number}: missing nav path {match.group(1)}"
                 )
     return errors
 
 
-def _validate_mathjax_markers(docs_root: Path) -> list[str]:
+def _split_link(raw: str) -> tuple[str, str]:
+    target = raw.strip().split(maxsplit=1)[0].strip("<>")
+    path, separator, fragment = target.partition("#")
+    return unquote(path), unquote(fragment) if separator else ""
+
+
+def validate_local_links(docs_root: Path) -> list[str]:
+    """Return broken local Markdown file and anchor links."""
     errors: list[str] = []
-    math_doc = docs_root / "performance/math_appendix.md"
-    if not math_doc.is_file():
-        return errors
-    text = _read_text(math_doc)
-    if "$$" not in text and "$" not in text:
-        errors.append(
-            f"{math_doc}: expected TeX markers ($...$ or $$...$$) for MathJax rendering"
-        )
+    anchors: dict[Path, set[str]] = {}
+    root = docs_root.resolve()
+    for source in sorted(docs_root.rglob("*.md")):
+        for line_number, line in enumerate(_read(source).splitlines(), start=1):
+            for raw in LINK_RE.findall(line):
+                path_text, fragment = _split_link(raw)
+                if path_text.startswith(("http://", "https://", "mailto:")):
+                    continue
+                target = (
+                    source if not path_text else (source.parent / path_text).resolve()
+                )
+                try:
+                    target.relative_to(root)
+                except ValueError:
+                    errors.append(
+                        f"{source}:{line_number}: local link escapes docs root: {raw}"
+                    )
+                    continue
+                if not target.is_file():
+                    errors.append(
+                        f"{source}:{line_number}: missing local link target: {raw}"
+                    )
+                    continue
+                if (
+                    fragment
+                    and target.suffix.lower() == ".md"
+                    and fragment not in anchors.setdefault(target, _headings(target))
+                ):
+                    errors.append(
+                        f"{source}:{line_number}: missing anchor #{fragment} in "
+                        f"{target.relative_to(docs_root)}"
+                    )
     return errors
 
 
-def _validate_math_source_sanity(docs_root: Path) -> list[str]:
+def validate_active_plan(docs_root: Path) -> list[str]:
+    """Return missing structural sections in the active plan."""
+    path = docs_root / "plan/implementation_active.md"
+    if not path.is_file():
+        return [f"missing active plan: {path}"]
+    headings = _headings(path)
+    return [
+        f"{path}: missing required section #{section}"
+        for section in REQUIRED_ACTIVE_PLAN_SECTIONS
+        if section not in headings
+    ]
+
+
+def _nonempty_strings(value: Any) -> bool:
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(item, str) and item.strip() for item in value)
+    )
+
+
+def validate_risk_register(docs_root: Path, repo_root: Path) -> list[str]:
+    """Return active-risk schema and referenced-path errors."""
+    path = docs_root / "reference/risk_register.json"
+    if not path.is_file():
+        return [f"missing active-risk register: {path}"]
+    try:
+        payload = json.loads(_read(path))
+    except json.JSONDecodeError as exc:
+        return [f"{path}: invalid JSON: {exc}"]
     errors: list[str] = []
-    math_doc = docs_root / "performance/math_appendix.md"
-    if not math_doc.is_file():
-        return errors
-    text = _read_text(math_doc)
-    if text.count("$$") % 2 != 0:
-        errors.append(
-            f"{math_doc}: unmatched display-math delimiters ('$$' count must be even)"
-        )
-    broken_patterns = [
+    if payload.get("version") != 2:
+        errors.append(f"{path}: version must be 2")
+    risks = payload.get("risks")
+    if not isinstance(risks, list):
+        return errors + [f"{path}: risks must be a list"]
+    required = {
+        "module_path",
+        "status",
+        "severity",
+        "concern",
+        "evidence",
+        "constraints",
+        "closure_criteria",
+        "relevant_tests",
+    }
+    seen: set[str] = set()
+    for index, risk in enumerate(risks):
+        prefix = f"{path}: risks[{index}]"
+        if not isinstance(risk, dict):
+            errors.append(f"{prefix} must be an object")
+            continue
+        missing = sorted(required - set(risk))
+        if missing:
+            errors.append(f"{prefix} missing fields: {', '.join(missing)}")
+            continue
+        module_path = risk["module_path"]
+        if not isinstance(module_path, str) or not module_path.endswith(".py"):
+            errors.append(f"{prefix}.module_path must be a Python path")
+        elif module_path in seen:
+            errors.append(f"{prefix}.module_path duplicates {module_path}")
+        else:
+            seen.add(module_path)
+            if not (repo_root / module_path).is_file():
+                errors.append(f"{prefix}.module_path does not exist: {module_path}")
+        if risk["status"] not in {"monitoring", "refactor_candidate"}:
+            errors.append(f"{prefix}.status is invalid")
+        if risk["severity"] not in {"medium", "high"}:
+            errors.append(f"{prefix}.severity is invalid")
+        if not isinstance(risk["concern"], str) or not risk["concern"].strip():
+            errors.append(f"{prefix}.concern must be non-empty")
+        for field in ("evidence", "constraints", "closure_criteria", "relevant_tests"):
+            if not _nonempty_strings(risk[field]):
+                errors.append(f"{prefix}.{field} must be non-empty strings")
+        if _nonempty_strings(risk["relevant_tests"]):
+            for test_path in risk["relevant_tests"]:
+                if not (repo_root / test_path).is_file():
+                    errors.append(f"{prefix}.relevant_tests missing: {test_path}")
+    return errors
+
+
+def validate_retired_references(docs_root: Path, extra_paths: list[Path]) -> list[str]:
+    """Return references to retired documentation artifacts."""
+    errors: list[str] = []
+    for path in [*sorted(docs_root.rglob("*.md")), *extra_paths]:
+        if not path.is_file():
+            continue
+        text = _read(path)
+        for reference in RETIRED_REFERENCES:
+            if reference in text:
+                errors.append(f"{path}: references retired path {reference}")
+    return errors
+
+
+def validate_stale_language(docs_root: Path) -> list[str]:
+    """Return stale lifecycle or implemented-as-future wording."""
+    errors: list[str] = []
+    excluded = {docs_root / "plan/implementation_history.md"}
+    for path in sorted(docs_root.rglob("*.md")):
+        if path in excluded:
+            continue
+        text = _read(path)
+        for pattern, reason in STALE_PATTERNS:
+            if pattern.search(text):
+                errors.append(f"{path}: stale language ({reason})")
+    return errors
+
+
+def validate_semantic_contracts(docs_root: Path) -> list[str]:
+    """Return missing safety, formula, state-machine, and API contracts."""
+    errors: list[str] = []
+    for relative, snippets in SEMANTIC_CONTRACTS.items():
+        path = docs_root / relative
+        if not path.is_file():
+            errors.append(f"missing semantic contract page: {path}")
+            continue
+        text = _read(path)
+        for snippet in snippets:
+            if snippet not in text:
+                errors.append(f"{path}: missing semantic contract: {snippet!r}")
+    for relative in API_STRUCTURE_PAGES:
+        path = docs_root / relative
+        if not path.is_file():
+            errors.append(f"missing API contract page: {path}")
+            continue
+        text = _read(path)
+        for section in API_REQUIRED_SECTIONS:
+            if section not in text:
+                errors.append(f"{path}: missing API section: {section!r}")
+    return errors
+
+
+def validate_math_source(docs_root: Path) -> list[str]:
+    """Return malformed source-level TeX errors."""
+    path = docs_root / "performance/math_appendix.md"
+    if not path.is_file():
+        return [f"missing performance math contract: {path}"]
+    text = _read(path)
+    errors: list[str] = []
+    if text.count("$$") % 2:
+        errors.append(f"{path}: unmatched display-math delimiters")
+    broken = (
         re.compile(r"\$\$[^$\n]*\$\$[}\]]"),
         re.compile(r"\\frac\{[^}\n]*\$\$"),
-        re.compile(r"\$\$[^$\n]*\{\\text\{legacy\}\}[^$\n]*\$\$\}"),
-    ]
-    for pattern in broken_patterns:
+    )
+    for pattern in broken:
         if pattern.search(text):
-            errors.append(
-                f"{math_doc}: malformed TeX block detected ({pattern.pattern})"
-            )
+            errors.append(f"{path}: malformed TeX block ({pattern.pattern})")
     return errors
 
 
-def _validate_diagram_assets(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    required = [
+def validate_diagram_assets(docs_root: Path) -> list[str]:
+    """Return missing maintained diagram sources and static assets."""
+    required = (
         "diagrams/static/system-context.svg",
         "diagrams/static/layered-architecture.svg",
         "diagrams/static/save-flow.svg",
@@ -522,577 +435,269 @@ def _validate_diagram_assets(docs_root: Path) -> list[str]:
         "diagrams/src/module_dependency_dense.puml",
         "diagrams/src/core_service_contracts_dense.puml",
         "diagrams/src/gui_controller_adapters_dense.puml",
+    )
+    return [
+        f"missing diagram artifact/source: {docs_root / relative}"
+        for relative in required
+        if not (docs_root / relative).is_file()
     ]
-    for rel in required:
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing diagram artifact/source: {path}")
-    return errors
 
 
-def _load_review_queue(docs_root: Path) -> tuple[dict[str, Any] | None, list[str]]:
-    errors: list[str] = []
-    queue_path = docs_root / "reference/review_queue.json"
-    if not queue_path.is_file():
-        return None, [f"missing review queue artifact: {queue_path}"]
-    try:
-        payload = json.loads(_read_text(queue_path))
-    except json.JSONDecodeError as exc:
-        return None, [f"invalid review queue JSON: {queue_path}: {exc}"]
-    if not isinstance(payload, dict):
-        return None, [f"review queue root must be object: {queue_path}"]
-    if not isinstance(payload.get("version"), int):
-        errors.append(f"{queue_path}: `version` must be integer")
-    entries = payload.get("entries")
-    if not isinstance(entries, list):
-        errors.append(f"{queue_path}: `entries` must be a list")
-    return payload, errors
-
-
-def _validate_review_queue_refs(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    payload, queue_errors = _load_review_queue(docs_root)
-    errors.extend(queue_errors)
-    if payload is None or not isinstance(payload.get("entries"), list):
-        return errors
-
-    active_statuses = {"REVIEW_REQUIRED", "IN_REFACTOR"}
-    active_paths: set[str] = set()
-    for idx, entry in enumerate(payload["entries"]):
-        if not isinstance(entry, dict):
-            errors.append(f"review_queue entry[{idx}] must be object")
-            continue
-        module_path = entry.get("module_path")
-        status = entry.get("status")
-        if not isinstance(module_path, str):
-            errors.append(f"review_queue entry[{idx}] missing string module_path")
-            continue
-        if status in active_statuses:
-            active_paths.add(module_path)
-
-    if not active_paths:
-        return errors
-
-    code_arch = docs_root / "architecture/code_architecture.md"
-    if not code_arch.is_file():
-        errors.append(f"missing code architecture doc: {code_arch}")
-        return errors
-    arch_text = _read_text(code_arch)
-    for module_path in sorted(active_paths):
-        marker = f"FLAGGED_MODULE: {module_path}"
-        if marker not in arch_text:
-            errors.append(
-                f"{code_arch}: missing flagged-module marker for active queue entry: {marker}"
-            )
-
-    api_docs = sorted((docs_root / "reference" / "api").glob("*.md"))
-    for module_path in sorted(active_paths):
-        dotted = module_path.removesuffix(".py").replace("/", ".")
-        matching = [path for path in api_docs if dotted in _read_text(path)]
-        if not matching:
-            errors.append(
-                "flagged module must remain visible in API docs with warning: "
-                f"{module_path}"
-            )
-            continue
-        warning_found = any(
-            re.search(r"flagged for deep review", _read_text(path), re.IGNORECASE)
-            for path in matching
-        )
-        if not warning_found:
-            errors.append(
-                "flagged module API docs must include warning text "
-                f"'flagged for deep review': {module_path}"
-            )
-    return errors
-
-
-def _validate_contract_index_artifacts(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    index_json = docs_root / "reference/contract_index.json"
-    index_md = docs_root / "reference/contract_index.md"
-    if not index_json.is_file():
-        errors.append(f"missing contract index artifact: {index_json}")
-    if not index_md.is_file():
-        errors.append(f"missing contract index wrapper doc: {index_md}")
-    elif "contract_index.json" not in _read_text(index_md):
-        errors.append(f"{index_md}: must reference contract_index.json")
-    return errors
-
-
-def _validate_required_headings(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    technical = docs_root / "spec/technical.md"
-    if technical.is_file():
-        text = _read_text(technical)
-        if not re.search(
-            r"^###?\s+(?:\d+(?:\.\d+)*\s+)?Programming Paradigm and Architectural Style\s*$",
-            text,
-            flags=re.MULTILINE,
-        ):
-            errors.append(
-                f"{technical}: missing required heading "
-                "'Programming Paradigm and Architectural Style'"
-            )
-    return errors
-
-
-def _validate_v09_spec_contract(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    for rel, snippets in V09_REQUIRED_SNIPPETS.items():
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing v0.9 spec contract page: {path}")
-            continue
-        text = _read_text(path)
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(
-                    f"{path}: missing required v0.9 spec contract snippet: {snippet!r}"
-                )
-    return errors
-
-
-def _validate_api_structure_contract(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    for rel, snippets in API_STRUCTURE_PAGES.items():
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing API structure page: {path}")
-            continue
-        text = _read_text(path)
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(
-                    f"{path}: missing required API structure section: {snippet!r}"
-                )
-    return errors
-
-
-def _validate_module_map_coverage(docs_root: Path, repo_root: Path) -> list[str]:
-    errors: list[str] = []
+def validate_module_map(docs_root: Path, repo_root: Path) -> list[str]:
+    """Return application modules missing from the ownership map."""
     path = docs_root / "reference/module_map.md"
     if not path.is_file():
-        return [f"missing module map doc: {path}"]
-    text = _read_text(path)
+        return [f"missing module map: {path}"]
+    text = _read(path)
+    errors: list[str] = []
     for layer in ("core", "gui"):
-        scope = repo_root / "translationzed_py" / layer
-        if not scope.is_dir():
-            errors.append(f"missing module scope for coverage check: {scope}")
-            continue
-        for module_path in sorted(scope.glob("*.py")):
-            if module_path.name == "__init__.py":
+        for module in sorted((repo_root / "translationzed_py" / layer).glob("*.py")):
+            if module.name == "__init__.py":
                 continue
-            token = f"{layer}.{module_path.stem}"
+            token = f"{layer}.{module.stem}"
             if token not in text:
-                errors.append(f"{path}: missing module coverage entry for {token}")
+                errors.append(f"{path}: missing module ownership for {token}")
     return errors
 
 
-def _validate_workflow_api_surface(docs_root: Path) -> list[str]:
+def validate_source_api_refs(docs_root: Path, repo_root: Path) -> list[str]:
+    """Return rendered API references that do not resolve to source modules."""
     errors: list[str] = []
-    path = docs_root / "reference/api/core_workflows.md"
-    if not path.is_file():
-        return [f"missing workflow API surface doc: {path}"]
-    text = _read_text(path)
+    for path in sorted((docs_root / "reference/api").glob("*.md")):
+        for dotted in MKDOCSTRINGS_RE.findall(_read(path)):
+            module_path = repo_root / (dotted.replace(".", "/") + ".py")
+            if not module_path.is_file():
+                errors.append(f"{path}: mkdocstrings module does not exist: {dotted}")
+    workflow = docs_root / "reference/api/core_workflows.md"
+    text = _read(workflow) if workflow.is_file() else ""
     for module in WORKFLOW_CRITICAL_MODULES:
-        if f"`{module}`" not in text and f"translationzed_py.core.{module}" not in text:
-            errors.append(f"{path}: missing workflow module coverage for `{module}`")
-        block = f"::: translationzed_py.core.{module}"
-        if block not in text:
-            errors.append(
-                f"{path}: missing mkdocstrings API block for workflow module `{module}`"
+        if f"::: translationzed_py.core.{module}" not in text:
+            errors.append(f"{workflow}: missing workflow API block for {module}")
+    return errors
+
+
+def _documented_make_targets(paths: list[Path]) -> dict[str, set[Path]]:
+    references: dict[str, set[Path]] = {}
+    for path in paths:
+        if not path.is_file():
+            continue
+        text = _read(path)
+        for target in {*INLINE_MAKE_RE.findall(text), *LINE_MAKE_RE.findall(text)}:
+            references.setdefault(target, set()).add(path)
+    return references
+
+
+def validate_command_parity(repo_root: Path, docs_root: Path) -> list[str]:
+    """Return documented or workflow commands that are not executable."""
+    makefile = repo_root / "Makefile"
+    targets = _make_targets(makefile)
+    paths = [
+        repo_root / "README.md",
+        *sorted(docs_root.rglob("*.md")),
+        *sorted((repo_root / ".github/workflows").glob("*.yml")),
+    ]
+    errors: list[str] = []
+    for target, sources in sorted(_documented_make_targets(paths).items()):
+        if target not in targets:
+            source_list = ", ".join(
+                str(path.relative_to(repo_root)) for path in sorted(sources)
             )
+            errors.append(f"documented Make target missing: {target} ({source_list})")
+    for workflow in sorted((repo_root / ".github/workflows").glob("*.yml")):
+        for script in WORKFLOW_SCRIPT_RE.findall(_read(workflow)):
+            if not (repo_root / script).is_file():
+                errors.append(f"{workflow}: referenced script does not exist: {script}")
     return errors
 
 
-def _validate_quick_context_orientation_links(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    path = docs_root / "reference/quick_context.md"
+def validate_gate_policy(repo_root: Path, docs_root: Path) -> list[str]:
+    """Return gate registry, documentation, and script-component drift."""
+    path = docs_root / "reference/gate_policy_registry.json"
     if not path.is_file():
-        return [f"missing quick context doc: {path}"]
-    text = _read_text(path)
-    for doc_path in ORIENTATION_SURFACE_DOCS:
-        if doc_path not in text:
-            errors.append(f"{path}: missing orientation surface link: {doc_path}")
-    return errors
-
-
-def _validate_randomized_policy_surface(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    for rel, snippets in RANDOMIZED_POLICY_SNIPPETS.items():
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing randomized policy page: {path}")
-            continue
-        text = _read_text(path)
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(
-                    f"{path}: missing randomized/stateful policy snippet: {snippet!r}"
-                )
-    return errors
-
-
-def _validate_a35_search_replace_surface(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    for rel, snippets in A35_SEARCH_REPLACE_SNIPPETS.items():
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing A35 search/replace policy page: {path}")
-            continue
-        text = _read_text(path)
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(
-                    f"{path}: missing A35 search/replace policy snippet: {snippet!r}"
-                )
-    return errors
-
-
-def _validate_a36_release_evidence_surface(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    for rel, snippets in A36_RELEASE_EVIDENCE_SNIPPETS.items():
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing A36 release-evidence policy page: {path}")
-            continue
-        text = _read_text(path)
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(
-                    f"{path}: missing A36 release-evidence policy snippet: {snippet!r}"
-                )
-    return errors
-
-
-def _validate_a38_gate_policy_surface(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    for rel, snippets in A38_GATE_POLICY_SURFACE_SNIPPETS.items():
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing A38 gate-policy page: {path}")
-            continue
-        text = _read_text(path)
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(f"{path}: missing A38 gate-policy snippet: {snippet!r}")
-    return errors
-
-
-def _validate_a37_search_preview_surface(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    for rel, snippets in A37_SEARCH_PREVIEW_SNIPPETS.items():
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing A37 search-preview policy page: {path}")
-            continue
-        text = _read_text(path)
-        for snippet in snippets:
-            if snippet not in text:
-                errors.append(
-                    f"{path}: missing A37 search-preview policy snippet: {snippet!r}"
-                )
-    return errors
-
-
-def _validate_a38_gate_policy_registry(docs_root: Path, repo_root: Path) -> list[str]:
-    errors: list[str] = []
-    path = docs_root / GATE_POLICY_REGISTRY_REL
-    if not path.is_file():
-        return [f"missing A38 gate-policy registry: {path}"]
+        return [f"missing gate policy registry: {path}"]
     try:
-        payload = json.loads(_read_text(path))
+        payload = json.loads(_read(path))
     except json.JSONDecodeError as exc:
-        return [f"invalid A38 gate-policy registry JSON: {path}: {exc}"]
-    if not isinstance(payload, dict):
-        return [f"{path}: gate-policy registry root must be an object"]
-    if payload.get("version") != 1:
-        errors.append(f"{path}: `version` must equal 1")
-
+        return [f"{path}: invalid JSON: {exc}"]
+    errors: list[str] = []
     layers = payload.get("layers")
-    if not isinstance(layers, list):
-        return errors + [f"{path}: `layers` must be a list"]
-
-    layer_ids: list[str] = []
-    make_targets = _makefile_targets(repo_root / "Makefile")
-    for idx, row in enumerate(layers):
+    if payload.get("version") != 1 or not isinstance(layers, list):
+        return [f"{path}: expected version 1 with layer list"]
+    expected_ids = ("L0", "L1", "L2", "L3", "L4", "L5", "L6")
+    ids = tuple(row.get("id") for row in layers if isinstance(row, dict))
+    if ids != expected_ids:
+        errors.append(f"{path}: layer IDs must be {expected_ids!r}")
+    make_targets = _make_targets(repo_root / "Makefile")
+    policy_texts = [_read(docs_root / relative) for relative in GATE_POLICY_DOCS]
+    for index, row in enumerate(layers):
         if not isinstance(row, dict):
-            errors.append(f"{path}: layers[{idx}] must be an object")
+            errors.append(f"{path}: layers[{index}] must be an object")
             continue
-        layer_id = row.get("id")
-        if not isinstance(layer_id, str) or not layer_id.strip():
-            errors.append(f"{path}: layers[{idx}].id must be non-empty string")
-            continue
-        layer_ids.append(layer_id.strip())
-        for field_name in (
-            "name",
-            "trigger",
-            "command",
-            "mode",
-        ):
-            value = row.get(field_name)
-            if not isinstance(value, str) or not value.strip():
-                errors.append(
-                    f"{path}: layers[{idx}].{field_name} must be non-empty string"
-                )
-        for field_name in ("included_checks", "artifacts", "duplicate_run_exclusions"):
-            value = row.get(field_name)
-            if not isinstance(value, list) or any(
-                not isinstance(item, str) or not item.strip() for item in value
-            ):
-                errors.append(f"{path}: layers[{idx}].{field_name} must be string list")
-
         command = row.get("command")
-        if isinstance(command, str) and command.startswith("make "):
-            target = command.split()[1]
-            if make_targets and target not in make_targets:
-                errors.append(
-                    f"{path}: layers[{idx}].command target missing in Makefile: {target}"
-                )
-        else:
-            errors.append(f"{path}: layers[{idx}].command must start with 'make '")
-
-    if tuple(layer_ids) != GATE_POLICY_REQUIRED_LAYER_IDS:
-        errors.append(
-            f"{path}: layer id sequence must equal {list(GATE_POLICY_REQUIRED_LAYER_IDS)!r}"
-        )
-    return errors
-
-
-def _validate_active_plan_drift(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    active_path = docs_root / "plan/implementation_active.md"
-    checklists_path = docs_root / "operations/checklists.md"
-    history_path = docs_root / "plan/implementation_history.md"
-
-    if active_path.is_file():
-        text = _read_text(active_path)
-        if not re.search(
-            r"target\s+milestone.*`v0\.9\.0`",
-            text,
-            flags=re.IGNORECASE,
-        ):
-            errors.append(f"{active_path}: active plan must explicitly target v0.9.0")
-        stale_patterns = (
-            r"v0\.8\.0\s+in\s+progress",
-            r"pending\s+tag",
-            r"next\s+target:\s*v0\.8\.0",
-        )
-        for pattern in stale_patterns:
-            if re.search(pattern, text, flags=re.IGNORECASE):
-                errors.append(
-                    f"{active_path}: stale release-state wording detected ({pattern})"
-                )
-
-    if checklists_path.is_file():
-        text = _read_text(checklists_path)
-        if re.search(
-            r"v0\.8\.0\s+release\s+gate\s+\(next\s+target\)",
-            text,
-            flags=re.IGNORECASE,
-        ):
-            errors.append(
-                f"{checklists_path}: v0.8.0 must be historical; v0.9.0 is next target"
-            )
-
-    if history_path.is_file():
-        text = _read_text(history_path)
-        if re.search(r"pending\s+before\s+final\s+tag", text, flags=re.IGNORECASE):
-            errors.append(
-                f"{history_path}: stale pending-tag phrasing detected in history log"
-            )
-    return errors
-
-
-def _validate_tm_long_variant_contract(docs_root: Path) -> list[str]:
-    errors: list[str] = []
-    tm_doc = docs_root / "domain/tm_ranking.md"
-    if not tm_doc.is_file():
-        return errors
-    tm_text = _read_text(tm_doc)
-    for snippet in TM_LONG_VARIANT_FORMULA_SNIPPETS:
-        if snippet not in tm_text:
-            errors.append(
-                f"{tm_doc}: missing TM long-variant contract snippet: {snippet!r}"
-            )
-
-    for rel, anchor in TM_LONG_VARIANT_DIAGRAM_ANCHORS:
-        path = docs_root / rel
-        if not path.is_file():
-            errors.append(f"missing TM long-variant diagram doc: {path}")
+        if not isinstance(command, str) or not command.startswith("make "):
+            errors.append(f"{path}: layers[{index}].command must start with make")
             continue
-        text = _read_text(path)
-        if anchor not in text:
-            errors.append(f"{path}: missing TM long-variant diagram anchor: {anchor!r}")
+        target = command.split()[1]
+        if target not in make_targets:
+            errors.append(f"{path}: command target missing from Makefile: {target}")
+        for relative, text in zip(GATE_POLICY_DOCS, policy_texts, strict=True):
+            if command not in text:
+                errors.append(f"{docs_root / relative}: missing gate command {command}")
+    required_gate_tokens = {
+        "scripts/gates/gate_ci_pr.sh": (
+            "test_cov.sh",
+            "security.sh",
+            "docs_check.sh",
+            "test_perf_scale.sh",
+        ),
+        "scripts/gates/gate_release.sh": (
+            "bench_check.sh",
+            "test_perf_heavy.sh",
+            "test_mutation_stage_internal.sh",
+            "release_evidence_check.py",
+        ),
+    }
+    for relative, tokens in required_gate_tokens.items():
+        gate = repo_root / relative
+        if not gate.is_file():
+            errors.append(f"missing gate script: {gate}")
+            continue
+        text = _read(gate)
+        for token in tokens:
+            if token not in text:
+                errors.append(f"{gate}: missing required gate component {token}")
     return errors
 
 
-def _validate_mkdocs_contract(repo_root: Path) -> list[str]:
-    errors: list[str] = []
-    configs = [repo_root / "mkdocs.yml", repo_root / "mkdocs.fallback.yml"]
-    for mkdocs_path in configs:
-        if not mkdocs_path.is_file():
-            errors.append(f"missing mkdocs config: {mkdocs_path}")
+def validate_mkdocs(repo_root: Path, docs_root: Path, configs: list[Path]) -> list[str]:
+    """Return missing portal navigation and renderer contracts."""
+    errors = validate_navigation(docs_root, configs)
+    required = (
+        "use_directory_urls: false",
+        "reference/automation_surface.md",
+        "reference/test_surface.md",
+        "reference/risk_register.md",
+        "architecture/code_architecture.md",
+        "quality/assurance_standard.md",
+        "reference/api/index.md",
+        "mermaid.min.js",
+        "tex-mml-chtml.js",
+    )
+    for config in configs:
+        if not config.is_file():
             continue
-        text = _read_text(mkdocs_path)
-        required_snippets = [
-            "use_directory_urls: false",
-            "Automation Surface: reference/automation_surface.md",
-            "Test Surface: reference/test_surface.md",
-            "Code Architecture: architecture/code_architecture.md",
-            "Assurance Standard: quality/assurance_standard.md",
-            "API Overview: reference/api/index.md",
-            "v0.9 Target Specification",
-            "Crash Recovery UC-12: spec/v0_9/crash_recovery_uc12.md",
-            "mermaid.min.js",
-            "tex-mml-chtml.js",
-        ]
-        for snippet in required_snippets:
+        text = _read(config)
+        for snippet in required:
             if snippet not in text:
-                errors.append(
-                    f"{mkdocs_path}: missing required docs-rendering contract snippet: {snippet!r}"
-                )
-    main_mkdocs_path = repo_root / "mkdocs.yml"
-    if main_mkdocs_path.is_file():
-        main_text = _read_text(main_mkdocs_path)
+                errors.append(f"{config}: missing docs portal contract {snippet!r}")
+    main = repo_root / "mkdocs.yml"
+    if main.is_file():
         for snippet in (
             "name: material",
             "pymdownx.superfences",
-            "name: mermaid",
             "pymdownx.arithmatex",
             "mkdocstrings",
         ):
-            if snippet not in main_text:
-                errors.append(
-                    f"{main_mkdocs_path}: missing required docs-rendering "
-                    f"contract snippet: {snippet!r}"
-                )
-    docs_build_script = repo_root / "scripts" / "docs_build.sh"
-    if not docs_build_script.is_file():
-        errors.append(f"missing docs build script: {docs_build_script}")
-    else:
-        script_text = _read_text(docs_build_script)
-        if "-m zensical build" not in script_text:
-            errors.append(
-                f"{docs_build_script}: docs builder must use zensical build command"
-            )
-        if "-m mkdocs build" in script_text:
-            errors.append(
-                f"{docs_build_script}: direct mkdocs build command is no longer allowed"
-            )
+            if snippet not in _read(main):
+                errors.append(f"{main}: missing renderer configuration {snippet!r}")
     return errors
 
 
 def _canonical_html_rel(markdown_rel: str) -> str:
-    if markdown_rel == "index.md":
-        return "index.html"
-    return markdown_rel.removesuffix(".md") + ".html"
+    return (
+        "index.html"
+        if markdown_rel == "index.md"
+        else markdown_rel.removesuffix(".md") + ".html"
+    )
 
 
-def _paragraph_texts_from_html(raw_html: str) -> list[str]:
-    texts: list[str] = []
-    for block in re.findall(
-        r"<p\b[^>]*>(.*?)</p>", raw_html, flags=re.DOTALL | re.IGNORECASE
-    ):
-        without_tags = re.sub(r"<[^>]+>", "", block)
-        normalized = " ".join(html.unescape(without_tags).split())
-        if normalized:
-            texts.append(normalized)
-    return texts
-
-
-def _looks_like_pseudo_list_paragraph(text: str) -> bool:
-    if text.startswith(("- ", "* ", "- [", "* [")):
-        return True
-    if re.search(r"(?:^|\s)-\s\[[^\]]+\]", text):
-        return True
-    if ": - " in text and text.count(" - ") >= 2:
-        return True
-    # Detect markdown-table rows that were rendered as plain paragraph text.
+def _looks_like_pseudo_list(text: str) -> bool:
     return bool(
-        text.count("|") >= 3
-        and re.search(
-            r"\|\s*(Field|Value|Trigger|Flow|Goal|Post-condition)\s*\|",
-            text,
-            flags=re.IGNORECASE,
+        text.startswith(("- ", "* ", "- [", "* ["))
+        or re.search(r"(?:^|\s)-\s\[[^\]]+]", text)
+        or (": - " in text and text.count(" - ") >= 2)
+        or (
+            text.count("|") >= 3
+            and re.search(
+                r"\|\s*(Field|Value|Trigger|Flow|Goal|Post-condition)\s*\|", text, re.I
+            )
         )
     )
 
 
-def _validate_rendered_html_shape(site_root: Path) -> list[str]:
-    errors: list[str] = []
+def validate_rendered_html(site_root: Path) -> list[str]:
+    """Return missing rendered pages and malformed pseudo-list paragraphs."""
     if not site_root.is_dir():
         return [f"rendered site root not found: {site_root}"]
-    for rel in RENDERED_HTML_SCAN_SCOPE:
-        html_rel = _canonical_html_rel(rel)
-        html_path = site_root / html_rel
-        if not html_path.is_file():
-            errors.append(f"missing rendered canonical page: {html_path}")
+    errors: list[str] = []
+    for relative in RENDERED_HTML_SCAN_SCOPE:
+        path = site_root / _canonical_html_rel(relative)
+        if not path.is_file():
+            errors.append(f"missing rendered canonical page: {path}")
             continue
-        page = _read_text(html_path)
-        for paragraph in _paragraph_texts_from_html(page):
-            if _looks_like_pseudo_list_paragraph(paragraph):
-                preview = paragraph[:120]
-                errors.append(
-                    f"{html_path}: pseudo-list paragraph detected "
-                    f"(expected <li>): {preview}"
-                )
+        for block in re.findall(r"<p\b[^>]*>(.*?)</p>", _read(path), re.S | re.I):
+            text = " ".join(html.unescape(re.sub(r"<[^>]+>", "", block)).split())
+            if text and _looks_like_pseudo_list(text):
+                errors.append(f"{path}: pseudo-list paragraph detected: {text[:120]}")
                 break
     return errors
 
 
+def validate_docs(
+    *,
+    repo_root: Path,
+    docs_root: Path,
+    config_paths: list[Path],
+    site_root: Path | None = None,
+) -> list[str]:
+    """Run the complete focused documentation assurance suite."""
+    errors = [
+        *validate_entrypoints(docs_root),
+        *validate_local_links(docs_root),
+        *validate_active_plan(docs_root),
+        *validate_risk_register(docs_root, repo_root),
+        *validate_retired_references(docs_root, config_paths),
+        *validate_stale_language(docs_root),
+        *validate_semantic_contracts(docs_root),
+        *validate_math_source(docs_root),
+        *validate_diagram_assets(docs_root),
+        *validate_module_map(docs_root, repo_root),
+        *validate_source_api_refs(docs_root, repo_root),
+        *validate_command_parity(repo_root, docs_root),
+        *validate_gate_policy(repo_root, docs_root),
+        *validate_mkdocs(repo_root, docs_root, config_paths),
+    ]
+    if site_root is not None:
+        errors.extend(validate_rendered_html(site_root))
+    return errors
+
+
 def main() -> int:
-    """Run documentation contract checks and return process exit code."""
+    """Run documentation assurance and return a process exit status."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--docs-root", default="docs", help="Documentation root path")
-    parser.add_argument(
-        "--site-root",
-        default="artifacts/docs/site",
-        help="Rendered docs site root for HTML structure checks",
-    )
+    parser.add_argument("--repo-root", default=".")
+    parser.add_argument("--docs-root", default="docs")
+    parser.add_argument("--site-root", default="artifacts/docs/site")
+    parser.add_argument("--config", action="append", default=[])
     args = parser.parse_args()
 
-    docs_root = Path(args.docs_root)
-    site_root = Path(args.site_root)
-    if not docs_root.is_dir():
-        print(f"error: docs root not found: {docs_root}")
-        return 2
-
-    errors: list[str] = []
-    errors.extend(_validate_file_presence(docs_root))
-    errors.extend(_validate_patterns(docs_root))
-    errors.extend(_validate_normalization_phrasing(docs_root))
-    errors.extend(_validate_mathjax_markers(docs_root))
-    errors.extend(_validate_math_source_sanity(docs_root))
-    errors.extend(_validate_diagram_assets(docs_root))
-    errors.extend(_validate_review_queue_refs(docs_root))
-    errors.extend(_validate_contract_index_artifacts(docs_root))
-    errors.extend(_validate_required_headings(docs_root))
-    errors.extend(_validate_v09_spec_contract(docs_root))
-    errors.extend(_validate_api_structure_contract(docs_root))
-    errors.extend(_validate_module_map_coverage(docs_root, Path.cwd()))
-    errors.extend(_validate_workflow_api_surface(docs_root))
-    errors.extend(_validate_quick_context_orientation_links(docs_root))
-    errors.extend(_validate_randomized_policy_surface(docs_root))
-    errors.extend(_validate_a35_search_replace_surface(docs_root))
-    errors.extend(_validate_a36_release_evidence_surface(docs_root))
-    errors.extend(_validate_a37_search_preview_surface(docs_root))
-    errors.extend(_validate_a38_gate_policy_surface(docs_root))
-    errors.extend(_validate_a38_gate_policy_registry(docs_root, Path.cwd()))
-    errors.extend(_validate_active_plan_drift(docs_root))
-    errors.extend(_validate_tm_long_variant_contract(docs_root))
-    errors.extend(_validate_mkdocs_contract(Path.cwd()))
-    errors.extend(_validate_rendered_html_shape(site_root))
-
+    repo_root = Path(args.repo_root).resolve()
+    docs_root = (repo_root / args.docs_root).resolve()
+    site_root = (repo_root / args.site_root).resolve()
+    configs = args.config or ["mkdocs.yml", "mkdocs.fallback.yml"]
+    config_paths = [(repo_root / value).resolve() for value in configs]
+    errors = validate_docs(
+        repo_root=repo_root,
+        docs_root=docs_root,
+        config_paths=config_paths,
+        site_root=site_root,
+    )
     if errors:
         print("docs-contract-check: FAIL")
-        for err in errors:
-            print(f" - {err}")
+        for error in errors:
+            print(f" - {error}")
         return 1
-
     print("docs-contract-check: PASS")
-    print(f"checked canonical docs under: {docs_root}")
     return 0
 
 

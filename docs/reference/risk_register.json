@@ -1,0 +1,203 @@
+{
+  "version": 2,
+  "risks": [
+    {
+      "closure_criteria": [
+        "Separate session concerns only where ownership becomes clearer.",
+        "Keep recovery, resume, cache migration, and locale-switch tests green."
+      ],
+      "concern": "Large session service combines locale selection, cache migration, recovery, and resume planning.",
+      "constraints": [
+        "Keep restore, discard, and cancel semantics deterministic.",
+        "Preserve no-write-on-open and snapshot-first startup ordering.",
+        "Prefer reducing ownership overlap before introducing another service layer."
+      ],
+      "evidence": [
+        "Module exceeds the 1200-line triage threshold.",
+        "Several persistence-sensitive startup workflows share this service."
+      ],
+      "module_path": "translationzed_py/core/project_session.py",
+      "relevant_tests": [
+        "tests/test_project_session.py",
+        "tests/test_main_window_bootstrap_helpers.py",
+        "tests/test_fs_model.py"
+      ],
+      "severity": "high",
+      "status": "refactor_candidate"
+    },
+    {
+      "closure_criteria": [
+        "Reduce branch density without changing accepted inputs or byte spans.",
+        "Keep parser equivalence and benchmark contracts green."
+      ],
+      "concern": "Parser hot paths have dense branching and changes can corrupt byte spans or encoding behavior.",
+      "constraints": [
+        "Preserve token, entry, segment, and byte-offset equivalence.",
+        "Keep malformed-but-supported inputs and UTF-16 no-BOM behavior stable.",
+        "Measure performance changes against parser contracts and benchmarks."
+      ],
+      "evidence": [
+        "Maximum function branch count exceeds the triage threshold.",
+        "Parser output directly controls byte-preserving saves."
+      ],
+      "module_path": "translationzed_py/core/parser.py",
+      "relevant_tests": [
+        "tests/test_parser_features.py",
+        "tests/test_parser_offset_map_invariants.py",
+        "tests/test_parser_perf_contract.py",
+        "tests/benchmarks/test_core_benchmarks.py"
+      ],
+      "severity": "high",
+      "status": "refactor_candidate"
+    },
+    {
+      "closure_criteria": [
+        "Keep default saving byte-identical outside edited literals.",
+        "Keep optional TZP comment write-back isolated and deterministic."
+      ],
+      "concern": "Saver changes affect irreversible user-file writes and optional namespaced comment mutation.",
+      "constraints": [
+        "Preserve atomic replacement and abort on span mismatch.",
+        "Never mutate non-TZP user comments.",
+        "Keep write-back disabled unless explicitly enabled."
+      ],
+      "evidence": [
+        "The main save function exceeds the function-length triage threshold.",
+        "A saver regression can damage original locale files."
+      ],
+      "module_path": "translationzed_py/core/saver.py",
+      "relevant_tests": [
+        "tests/test_saver.py",
+        "tests/test_saver_structure.py",
+        "tests/test_roundtrip.py",
+        "tests/test_tzp_comment_policy.py"
+      ],
+      "severity": "high",
+      "status": "monitoring"
+    },
+    {
+      "closure_criteria": [
+        "Reduce ownership overlap without changing scope, ordering, or cancellation semantics.",
+        "Keep equivalence, performance, preview, and GUI adapter tests green."
+      ],
+      "concern": "Search and replace orchestration is large and mixes planning, cache policy, preview, and apply paths.",
+      "constraints": [
+        "Keep match ordering and scope semantics deterministic.",
+        "Preserve all-or-cancel behavior and bounded impact previews.",
+        "Avoid moving workflow policy into GUI adapters."
+      ],
+      "evidence": [
+        "Module exceeds the 1200-line triage threshold.",
+        "Replace-all crosses multiple files and must not partially apply after cancellation."
+      ],
+      "module_path": "translationzed_py/core/search_replace_service.py",
+      "relevant_tests": [
+        "tests/test_search_replace_service.py",
+        "tests/test_search_wave2_equivalence.py",
+        "tests/test_search_perf_contract.py",
+        "tests/test_main_window_replace_merge_clipboard.py"
+      ],
+      "severity": "high",
+      "status": "refactor_candidate"
+    },
+    {
+      "closure_criteria": [
+        "Split long query orchestration only behind existing ranking contracts.",
+        "Keep corpus ordering, explainability, and performance tests green."
+      ],
+      "concern": "TM query orchestration is ranking-sensitive and contains one very long function.",
+      "constraints": [
+        "Do not change score values, filtering, caps, or tie-break ordering.",
+        "Keep explainability diagnostic-only.",
+        "Keep candidate pools and caches bounded."
+      ],
+      "evidence": [
+        "Maximum function length exceeds the triage threshold.",
+        "Small control-flow changes can silently alter TM ranking."
+      ],
+      "module_path": "translationzed_py/core/tm_query_engine.py",
+      "relevant_tests": [
+        "tests/test_tm_query_scoring.py",
+        "tests/test_tm_ranking_corpus.py",
+        "tests/test_tm_query_perf_contract.py",
+        "tests/test_tm_store.py"
+      ],
+      "severity": "high",
+      "status": "refactor_candidate"
+    },
+    {
+      "closure_criteria": [
+        "Reduce adapter size through coherent ownership changes, not file shuffling.",
+        "Keep integration, bootstrap, search, QA, TM, and save workflows green."
+      ],
+      "concern": "The main window is a very large integration adapter with high regression and merge-conflict risk.",
+      "constraints": [
+        "Keep widgets and event wiring in the GUI layer.",
+        "Move only coherent non-UI policy to Qt-free core services.",
+        "Prefer local duplication removal over broad helper reshuffles."
+      ],
+      "evidence": [
+        "Module exceeds 5000 lines and contains functions over 1000 lines.",
+        "It coordinates most user-visible workflows."
+      ],
+      "module_path": "translationzed_py/gui/main_window.py",
+      "relevant_tests": [
+        "tests/test_gui_service_adapters.py",
+        "tests/test_main_window_bootstrap_helpers.py",
+        "tests/test_main_window_cache_replace_helpers.py",
+        "tests/test_gui_smoke.py"
+      ],
+      "severity": "high",
+      "status": "refactor_candidate"
+    },
+    {
+      "closure_criteria": [
+        "Reduce helper ownership overlap while keeping sidebar behavior unchanged.",
+        "Keep panel-specific adapter and workflow tests green."
+      ],
+      "concern": "Panel helper module centralizes many unrelated sidebar integration paths.",
+      "constraints": [
+        "Keep GUI-only state and rendering in the GUI layer.",
+        "Do not duplicate core policy in panel callbacks.",
+        "Avoid broad method moves without reducing coupling."
+      ],
+      "evidence": [
+        "Module exceeds the 1200-line triage threshold.",
+        "Changes can affect TM, QA, search, progress, and status surfaces together."
+      ],
+      "module_path": "translationzed_py/gui/main_window_panel_helpers.py",
+      "relevant_tests": [
+        "tests/test_gui_service_adapters.py",
+        "tests/test_gui_qa_panel.py",
+        "tests/test_gui_tm_preferences.py",
+        "tests/test_main_window_progress.py"
+      ],
+      "severity": "high",
+      "status": "refactor_candidate"
+    },
+    {
+      "closure_criteria": [
+        "Shorten async scan control flow without weakening stale-result suppression.",
+        "Keep per-rule progress and LanguageTool failure isolation tests green."
+      ],
+      "concern": "QA asynchronous orchestration has a long control-flow function and race-sensitive state.",
+      "constraints": [
+        "Discard stale snapshots and findings.",
+        "Keep terminal rule states monotonic.",
+        "Keep LanguageTool failures isolated from local QA rules."
+      ],
+      "evidence": [
+        "Maximum function length exceeds the triage threshold.",
+        "Incorrect run identifiers can apply findings to the wrong file."
+      ],
+      "module_path": "translationzed_py/gui/qa_async.py",
+      "relevant_tests": [
+        "tests/test_qa_async.py",
+        "tests/test_gui_qa_panel.py",
+        "tests/test_property_qa_progress_stateful.py"
+      ],
+      "severity": "high",
+      "status": "monitoring"
+    }
+  ]
+}

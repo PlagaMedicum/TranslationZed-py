@@ -1,81 +1,110 @@
 # TranslationZed-Py — Automation Surface
-_Last updated: 2026-03-09_
+_Last updated: 2026-04-09_
 
 ## 1) Purpose
 
-This is the command-surface map for contributors and LLM agents.
-Use it to select the correct gate level and avoid duplicate test reruns.
+This page defines the stable terminal-facing automation surface for this repo.
+Use these commands directly from shell, CI, or optional external consumers.
+The canonical testing policy lives in `docs/quality/testing_strategy.md`.
 
-Canonical policy owner:
-- `docs/quality/testing_strategy.md`
-
-Tracked policy registry:
+Machine-checked layer registry:
 - `docs/reference/gate_policy_registry.json`
 
-## 2) Layered Gate Commands (Normative)
+## 2) Stable Public Make Facade
 
-| Layer | Trigger | Command | Blocking Mode | Duplicate-Run Exclusion |
-|---|---|---|---|---|
-| `L0` | regular local coding loop | `make gate-dev` | blocking | changed-file static checks; no test/cov/docs lanes |
-| `L1` | before commit (`pre-commit`) | `make gate-commit` | blocking | no broad deterministic suites |
-| `L2` | before push (`pre-push`) | `make gate-push` | blocking | fixed core once + routed packet dedupe |
-| `L3` | before task/docs closure | `make gate-task-close` | blocking | single `test-cov` + single `docs-check` |
-| `L4` | CI strict PR/push | `make gate-ci-pr` | blocking | full static checks + no routed-lane duplication |
-| `L5` | schedule/manual heavy lane | `make gate-heavy-advisory` | advisory | heavy extras once per run |
-| `L6` | release tag/RC strict | `make gate-release TAG=vX.Y.Z` | blocking | single release-check + release-evidence path |
+### 2.1 Layered gates
 
-Gate selection rule:
-1. Choose the gate that matches the current trigger.
-2. Do not stack lower layers manually in the same loop; higher layers already include them.
+| Layer | Trigger | Command | Notes |
+|---|---|---|---|
+| `L0` | regular local coding loop | `make gate-dev` | changed-file static checks only |
+| `L1` | before commit | `make gate-commit` | `L0` + manual contract guard |
+| `L2` | before push | `make gate-push` | `L1` + fixed core + routed packet scripts + readonly guard |
+| `L3` | before task/docs close | `make gate-task-close` | `L2` + coverage + docs + perf-contract |
+| `L4` | PR/push strict CI | `make gate-ci-pr` | full static + coverage + docs + security + perf-contract |
+| `L5` | scheduled/manual heavy | `make gate-heavy-advisory` | advisory heavy randomized/perf/mutation extras |
+| `L6` | RC/final release | `make gate-release TAG=vX.Y.Z` | strict release path |
 
-## 3) Packet and Focused Test Lanes
+### 2.2 Public focused checks
 
-| Goal | Command | Notes |
-|---|---|---|
-| Fixed core deterministic baseline | `make test-core-fast` | cross-domain baseline used in `L2+` |
-| Changed-file routed packet lanes (fast) | `make test-routed-fast` | uses `scripts/select_test_targets.py` |
-| Full packet lane sweep | `make test-routed-full` | uses routing-map `full_targets` |
-| QA packet lane | `make test-qa-v09` | QA state/async/panel packet scope |
-| TM explainability packet lane | `make test-tmq-v09` | TM query/scoring/store contracts |
-| TM workflow packet lane | `make test-tmw-v09` | workflow grouping/apply integration |
-| Crash/session packet lane | `make test-cr-v09` | startup resume + crash recovery |
-| Source-reference packet lane | `make test-src-a29` | fallback policy + GUI state wiring |
-| TZP packet lane | `make test-tzp-a30` | optional write-back policy pipeline |
-| A35 search/replace packet lane | `make test-search-a35` | sidebar sync + all-scope confirmation |
-| A37 search/replace packet lane | `make test-search-a37` | impact-preview + checkbox-gated replace safety flow |
-| Status-triage packet lane | `make test-status-a34` | mixed selection status indicator |
-| A31 manual framework packet lane | `make test-a31-manual` | runner/runtime/checklist tests |
-| Manual workflow no-shrink contract | `make test-ui-manual-contract` | registry + workflow map checks |
-| Randomized fast profile | `make test-prop-fast` | `TZP_PROP_PROFILE=fast` |
-| Randomized slow profile | `make test-prop-slow` | `TZP_PROP_PROFILE=slow` |
+| Goal | Command |
+|---|---|
+| fixed deterministic baseline | `make test-core-fast` |
+| strict coverage gate | `make test-cov` |
+| manual scenario/workflow contract | `make test-ui-manual-contract` |
+| locale-agnostic production copy guard | `make locale-agnostic-check` |
+| docs build + docs contracts | `make docs-check` |
+| benchmark run | `make bench` |
+| benchmark regression check | `make bench-check` |
+| security lane | `make security` |
 
-## 4) Coverage, Docs, Release, Heavy
+### 2.3 Manual and release flows
 
-| Goal | Command | Notes |
-|---|---|---|
-| Changed-file format check | `make fmt-check-changed` | local/static fast path used by `L0..L3` |
-| Full format check | `make fmt-check` | strict static path used by `L4/L6` |
-| Strict coverage floor lane | `make test-cov` | package/core floors remain `92/97` |
-| Docs contract lane | `make docs-check` | includes docs build + docs-contract checks |
-| Locale-agnostic copy guard | `make locale-agnostic-check` | production GUI/docs wording gate |
-| Release evidence guard | `make release-evidence-check` | validates tracked interactive evidence manifest |
-| Release metadata check | `make release-check TAG=vX.Y.Z` | tag/version/changelog alignment |
-| Release dry run | `make release-dry-run TAG=vX.Y.Z-rcN` | delegates to `gate-release` |
-| Heavy advisory extras | `make gate-heavy-advisory` | mutation/perf/property advisory path |
+| Goal | Command |
+|---|---|
+| list manual scenarios | `make ui-manual-list` |
+| run one interactive manual scenario | `make ui-manual-run SCENARIO=<id>` |
+| validate tracked release evidence | `make release-evidence-check` |
+| sync one scenario into tracked release evidence | `make release-evidence-sync SCENARIO=<id>` |
+| sync all available passed scenarios | `make release-evidence-sync-all` |
+| validate tag/version/changelog alignment | `make release-check TAG=vX.Y.Z` |
+| run release dry-run gate chain | `make release-dry-run TAG=vX.Y.Z-rcN` |
 
-## 5) Target-to-Script Mapping (High Value)
+Manual-framework reference:
+- `docs/reference/manual_scenario_framework.md`
 
-1. `make test-routed-fast` -> `scripts/select_test_targets.py --mode fast`
-2. `make test-routed-full` -> `scripts/select_test_targets.py --mode full`
-3. `make test-core-fast` -> `scripts/test_core_fast.sh`
-4. `make gate-release TAG=...` -> strict L6 chain + `make release-check TAG=...`
-5. `make release-evidence-check` -> `scripts/release_evidence_check.py`
+### 2.4 Build and maintenance
 
-## 6) Selection Hints
+| Goal | Command |
+|---|---|
+| create virtualenv | `make venv` |
+| install editable package | `make install` |
+| install git hooks | `make precommit` |
+| run app | `make run` |
+| package current platform | `make pack` |
+| package Windows bundle | `make pack-win` |
+| build distribution artifacts | `make dist` |
+| install Linux CI deps | `make ci-deps` |
+| clean build outputs | `make clean` |
+| clean runtime caches | `make clean-cache` |
+| clean local config state | `make clean-config` |
+| remove deprecated manual artifacts | `make clean-manual-artifacts` |
 
-1. Use `L0`/`L1` during inner-loop coding.
-2. Use `L2` before each push to avoid unnecessary full-suite reruns.
-3. Use `L3` when closing implementation packet/docs scope.
-4. Use `L4` for PR/push strict parity.
-5. Use `L5` for heavy advisory evidence (schedule/manual).
-6. Use `L6` only for release candidate/final tag strict gating.
+## 3) Stable Artifacts and Reports
+
+These paths are public and intentionally useful from plain terminal workflows:
+
+- coverage summary: `artifacts/coverage/coverage_summary.json`
+- benchmark raw data: `artifacts/bench/bench.json`
+- benchmark summary: `artifacts/bench/benchmark_summary.json`
+  - normalized from the raw `bench.json`
+  - includes source identity/timestamp metadata and normalized sample rows
+- manual contract summary: `artifacts/manual-ui/manual_contract_check.json`
+- manual run artifacts: `artifacts/manual-ui/*.json`
+- release evidence summary: `artifacts/release/release_evidence_check.json`
+- release metadata summary: `artifacts/release/release_check_summary.json`
+- tracked release evidence manifest: `tests/manual_scenarios/release_evidence_manifest.json`
+
+Public checker scripts also support structured output for direct terminal/CI use:
+
+- `scripts/ui_manual_contract_check.py --json-out ... --verbose`
+- `scripts/release_evidence_check.py --json-out ... --verbose`
+- `scripts/check_benchmark_regression.py --json-out ... --verbose`
+- `scripts/release_check.py --json-out ... --verbose`
+
+## 4) LLM / RTK Note
+
+- For LLM/agent shell execution, prefer `rtk <command>` when RTK is available.
+- Raw commands remain the canonical human and CI workflow.
+- Interactive manual evidence remains human-owned.
+
+## 5) Internal Orchestration Boundary
+
+- Packet-specific test scripts remain under `scripts/` and are used by routed gate orchestration.
+- They are intentionally not part of the stable public Make facade.
+- Use the public gates unless you are doing focused internal debugging on a known area.
+
+## 6) Optional External Consumer Note
+
+This repo is fully supported through terminal and Make alone.
+An optional external developer console may consume the same public commands and artifacts,
+but it is maintained outside this repository and is not required for development, CI, or release.

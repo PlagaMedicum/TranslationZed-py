@@ -1,4 +1,4 @@
-"""Regression tests for contract index generation."""
+"""Regression tests for targeted contract-context generation."""
 
 from __future__ import annotations
 
@@ -7,10 +7,13 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 
 def _load_module() -> ModuleType:
-    repo_root = Path(__file__).resolve().parents[1]
-    script_path = repo_root / "scripts" / "generate_contract_index.py"
+    script_path = (
+        Path(__file__).resolve().parents[1] / "scripts/generate_contract_index.py"
+    )
     spec = importlib.util.spec_from_file_location(
         "generate_contract_index", script_path
     )
@@ -21,31 +24,78 @@ def _load_module() -> ModuleType:
     return module
 
 
-def test_build_contract_index_collects_module_and_symbol(tmp_path: Path) -> None:
-    """Contract index builder should collect core module and symbol metadata."""
-    module = _load_module()
+def _sample_repo(tmp_path: Path) -> tuple[Path, Path]:
     repo = tmp_path / "repo"
-    scope = repo / "translationzed_py" / "core"
-    scope.mkdir(parents=True, exist_ok=True)
-    sample = scope / "sample.py"
-    sample.write_text(
-        '''
-"""Sample module doc."""
+    module_path = repo / "translationzed_py/core/sample.py"
+    module_path.parent.mkdir(parents=True)
+    module_path.write_text(
+        '''"""Sample module."""
 
 def run(value: int) -> int:
-    """Run sample function.
+    """Return a value.
 
     Preconditions:
     value is non-negative.
     """
-    return value + 1
-'''.strip() + "\n",
+    return value
+
+def _private() -> None:
+    """Internal helper."""
+
+class Worker:
+    """Public worker."""
+
+    def execute(self) -> None:
+        """Execute work."""
+
+    def _reset(self) -> None:
+        """Reset work."""
+''',
         encoding="utf-8",
     )
-    payload = module.build_contract_index(repo_root=repo, scope_dir=scope)
-    assert payload["schema_version"] == 1
-    assert payload["modules"]
-    first = payload["modules"][0]
-    assert first["module"] == "translationzed_py.core.sample"
-    assert first["symbols"]
-    assert first["symbols"][0]["name"] == "run"
+    return repo, module_path
+
+
+def test_build_contract_index_is_targeted_and_deterministic(tmp_path: Path) -> None:
+    """Only selected modules should appear in stable source order."""
+    module = _load_module()
+    repo, module_path = _sample_repo(tmp_path)
+    payload = module.build_contract_index(
+        repo_root=repo,
+        module_paths=[module_path, module_path],
+    )
+    assert payload["schema_version"] == 2
+    assert [row["module"] for row in payload["modules"]] == [
+        "translationzed_py.core.sample"
+    ]
+    names = [row["name"] for row in payload["modules"][0]["symbols"]]
+    assert names == ["run", "_private", "Worker", "Worker.execute", "Worker._reset"]
+    assert payload["modules"][0]["symbols"][0]["contracts"] == {
+        "Preconditions": "value is non-negative."
+    }
+
+
+def test_public_only_excludes_private_symbols(tmp_path: Path) -> None:
+    """Public-only mode should omit private functions and members."""
+    module = _load_module()
+    repo, module_path = _sample_repo(tmp_path)
+    payload = module.build_contract_index(
+        repo_root=repo,
+        module_paths=[module_path],
+        public_only=True,
+    )
+    names = [row["name"] for row in payload["modules"][0]["symbols"]]
+    assert names == ["run", "Worker", "Worker.execute"]
+
+
+def test_resolve_module_path_accepts_dotted_name_and_rejects_escape(
+    tmp_path: Path,
+) -> None:
+    """Module selection must remain explicit and inside the repository."""
+    module = _load_module()
+    repo, module_path = _sample_repo(tmp_path)
+    assert (
+        module.resolve_module_path(repo, "translationzed_py.core.sample") == module_path
+    )
+    with pytest.raises(ValueError, match="escapes repository root"):
+        module.resolve_module_path(repo, "../outside.py")

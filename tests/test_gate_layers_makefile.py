@@ -1,10 +1,13 @@
-"""Regression contracts for layered gate composition in Makefile."""
+"""Regression contracts for the reduced public Makefile facade."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-REQUIRED_GATES = (
+REQUIRED_PUBLIC_TARGETS = (
+    "venv",
+    "install",
+    "precommit",
     "gate-dev",
     "gate-commit",
     "gate-push",
@@ -12,18 +15,84 @@ REQUIRED_GATES = (
     "gate-ci-pr",
     "gate-heavy-advisory",
     "gate-release",
+    "test",
+    "test-core-fast",
+    "test-cov",
+    "test-ui-manual-contract",
+    "arch-check",
+    "locale-agnostic-check",
+    "docs-check",
+    "bench",
+    "bench-check",
+    "security",
+    "test-mutation",
+    "test-mutation-stage",
+    "mutation-promotion-check",
+    "mutation-promotion-readiness",
+    "coverage-promotion-check",
+    "ui-manual-list",
+    "ui-manual-run",
+    "release-evidence-check",
+    "release-evidence-sync",
+    "release-evidence-sync-all",
+    "run",
+    "pack",
+    "pack-win",
+    "dist",
+    "ci-deps",
+    "clean",
+    "clean-cache",
+    "clean-config",
+    "clean-manual-artifacts",
+    "release-check",
+    "release-dry-run",
 )
 
-LEGACY_UMBRELLA_TARGETS = (
-    "check",
-    "check-local",
-    "verify",
-    "verify-core",
-    "verify-ci",
-    "verify-ci-core",
-    "verify-heavy",
-    "verify-heavy-extra",
-    "verify-fast",
+REMOVED_PUBLIC_TARGETS = (
+    "fmt",
+    "fmt-check",
+    "fmt-check-changed",
+    "lint",
+    "lint-check",
+    "typecheck",
+    "test-routed-fast",
+    "test-routed-full",
+    "test-prop-fast",
+    "test-prop-slow",
+    "test-search-a35",
+    "test-search-a37",
+    "test-status-a34",
+    "test-cov-promotion-contract",
+    "test-qa-v09",
+    "test-tmq-v09",
+    "test-tmw-v09",
+    "test-cr-v09",
+    "test-src-a29",
+    "test-tzp-a30",
+    "test-a31-manual",
+    "test-perf",
+    "test-perf-scale",
+    "test-perf-heavy",
+    "docstyle",
+    "docs-build",
+    "docs-build-lite",
+    "docs-index",
+    "docs-index-write",
+    "docs-api",
+    "review-queue-check",
+    "code-triage",
+    "docs-contract",
+    "test-encoding-integrity",
+    "diagnose-encoding",
+    "test-readonly-clean",
+    "test-warnings",
+    "perf-scenarios",
+    "perf-dependency-eval",
+    "ui-manual-headless",
+    "ui-manual-batch",
+    "ui-manual-conflict-flow",
+    "ui-manual-conflict-triad",
+    "release-evidence-sync-conflict",
 )
 
 
@@ -33,72 +102,69 @@ def _makefile_text() -> str:
     )
 
 
-def _target_dependencies(makefile_text: str, target: str) -> list[str]:
+def _target_recipe(makefile_text: str, target: str) -> str:
     lines = makefile_text.splitlines()
     for idx, line in enumerate(lines):
         if not line.startswith(f"{target}:"):
             continue
-        payload = line.split(":", 1)[1].rstrip()
-        chunks = [payload]
+        body: list[str] = []
         next_idx = idx + 1
-        while chunks[-1].endswith("\\") and next_idx < len(lines):
-            chunks[-1] = chunks[-1][:-1].rstrip()
-            continuation = lines[next_idx].strip()
-            chunks.append(continuation)
-            next_idx += 1
-        deps = " ".join(chunks).split()
-        return deps
-    return []
+        while next_idx < len(lines):
+            candidate = lines[next_idx]
+            if candidate.startswith("\t"):
+                body.append(candidate)
+                next_idx += 1
+                continue
+            if not candidate.strip():
+                next_idx += 1
+                continue
+            break
+        return "\n".join(body)
+    return ""
 
 
-def test_required_layered_gate_targets_exist() -> None:
-    """Layered gate targets should be defined in Makefile."""
+def test_required_public_targets_exist() -> None:
+    """The root Makefile should expose only the stable public facade."""
     text = _makefile_text()
-    for target in REQUIRED_GATES:
-        assert f"{target}:" in text
+    for target in REQUIRED_PUBLIC_TARGETS:
+        assert f"\n{target}:" in f"\n{text}"
 
 
-def test_legacy_umbrella_targets_removed() -> None:
-    """Legacy umbrella targets should not remain after layered gate migration."""
+def test_internal_and_packet_specific_targets_are_not_public() -> None:
+    """Packet lanes and helper checks should stay behind script-level orchestration."""
     text = _makefile_text()
-    for target in LEGACY_UMBRELLA_TARGETS:
-        assert f"\n{target}:" not in text
+    for target in REMOVED_PUBLIC_TARGETS:
+        assert f"\n{target}:" not in f"\n{text}"
 
 
-def test_gate_dependencies_match_layered_contract() -> None:
-    """Layered gates should compose through explicit non-overlapping dependencies."""
+def test_gate_targets_delegate_to_grouped_gate_scripts() -> None:
+    """Layer gates should delegate to scripts/gates instead of Make dependencies."""
     text = _makefile_text()
+    assert "bash scripts/gates/gate_dev.sh" in _target_recipe(text, "gate-dev")
+    assert "bash scripts/gates/gate_commit.sh" in _target_recipe(text, "gate-commit")
+    assert "bash scripts/gates/gate_push.sh" in _target_recipe(text, "gate-push")
+    assert "bash scripts/gates/gate_task_close.sh" in _target_recipe(
+        text, "gate-task-close"
+    )
+    assert "bash scripts/gates/gate_ci_pr.sh" in _target_recipe(text, "gate-ci-pr")
+    assert "bash scripts/gates/gate_heavy_advisory.sh" in _target_recipe(
+        text, "gate-heavy-advisory"
+    )
+    assert "bash scripts/gates/gate_release.sh" in _target_recipe(text, "gate-release")
 
-    assert _target_dependencies(text, "gate-dev") == [
-        "fmt-check-changed",
-        "lint-check",
-        "typecheck",
-        "arch-check",
-        "locale-agnostic-check",
-    ]
-    assert _target_dependencies(text, "gate-commit") == [
-        "gate-dev",
-        "test-ui-manual-contract",
-    ]
-    assert _target_dependencies(text, "gate-push") == [
-        "gate-commit",
-        "test-core-fast",
-        "test-routed-fast",
-        "test-readonly-clean",
-    ]
-    assert _target_dependencies(text, "gate-task-close") == [
-        "gate-push",
-        "test-cov",
-        "docs-check",
-        "test-perf-scale",
-    ]
 
-    ci_pr_deps = _target_dependencies(text, "gate-ci-pr")
-    assert "fmt-check" in ci_pr_deps
-    assert "lint-check" in ci_pr_deps
-    assert "typecheck" in ci_pr_deps
-    assert "arch-check" in ci_pr_deps
-    assert "locale-agnostic-check" in ci_pr_deps
-    assert "test-cov" in ci_pr_deps
-    assert "docs-check" in ci_pr_deps
-    assert "test-perf-scale" in ci_pr_deps
+def test_public_checker_targets_emit_neutral_summary_outputs() -> None:
+    """Public checkers should write stable JSON summaries useful from terminal/CI."""
+    text = _makefile_text()
+    manual_contract = _target_recipe(text, "test-ui-manual-contract")
+    assert (
+        "--json-out $(ARTIFACTS)/manual-ui/manual_contract_check.json"
+        in manual_contract
+    )
+    release_evidence = _target_recipe(text, "release-evidence-check")
+    assert (
+        "--json-out $(ARTIFACTS)/release/release_evidence_check.json"
+        in release_evidence
+    )
+    docs_check = _target_recipe(text, "docs-check")
+    assert "bash scripts/gates/docs_check.sh" in docs_check

@@ -33,3 +33,27 @@ def test_normalize_tag_rejects_non_release_tags() -> None:
         module._normalize_tag("v0.6")
     with pytest.raises(RuntimeError):
         module._normalize_tag("v0.6.0-beta1")
+
+
+def test_run_release_check_returns_structured_summary(tmp_path: Path) -> None:
+    """Release-check summary should include aligned version details."""
+    module = _load_release_check_module()
+    repo_root = tmp_path / "repo"
+    (repo_root / "translationzed_py").mkdir(parents=True)
+    (repo_root / "pyproject.toml").write_text(
+        '[project]\nname = "translationzed-py"\nversion = "0.9.0"\n',
+        encoding="utf-8",
+    )
+    (repo_root / "translationzed_py" / "version.py").write_text(
+        '__version__ = "0.9.0"\n',
+        encoding="utf-8",
+    )
+    (repo_root / "CHANGELOG.md").write_text(
+        "## [0.9.0] - 2026-03-24\n",
+        encoding="utf-8",
+    )
+
+    summary = module.run_release_check(repo_root=repo_root, raw_tag="v0.9.0")
+    assert summary["status"] == "passed"
+    assert summary["normalized_version"] == "0.9.0"
+    assert summary["errors"] == []

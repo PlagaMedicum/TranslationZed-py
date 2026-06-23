@@ -106,7 +106,7 @@ stateDiagram-v2
 |---|---|
 | Goal | Configure behavior without overloading top toolbar. |
 | Trigger | `General -> Preferences...` |
-| Success | Grouped tabs: `General`, `Search and Replace`, `QA`, `LanguageTool`, `TM`, `View`; apply persists to `.tzp/config/settings.env`. |
+| Success | Grouped tabs: `General`, `Search and Replace`, `QA`, `LanguageTool`, `TM`, `View`; advanced sections in `QA`/`LanguageTool`/`TM`/`View` are collapsed by default; apply persists to `.tzp/config/settings.env`. |
 | Note | QA-side LT settings remain in `QA` tab; editor LT settings remain in `LanguageTool` tab. |
 
 ## UC-09 Copy, Cut, Paste

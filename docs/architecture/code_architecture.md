@@ -1,5 +1,5 @@
 # TranslationZed-Py — Code Architecture
-_Last updated: 2026-03-07_
+_Last updated: 2026-03-24_
 
 This document is the concrete code-level architecture reference.
 It complements:
@@ -153,6 +153,11 @@ classDiagram
 
 Dense source reference:
 - `docs/diagrams/src/core_service_contracts_dense.puml`
+
+External tooling boundary:
+- optional developer tooling may consume the repo's public terminal surface,
+- no repo-internal adapter/config files are required for that tooling,
+- TranslationZed-Py remains terminal-first and self-sufficient without it.
 
 ### 3.3 Workflow Internals (Code-Level UML)
 
@@ -425,7 +430,7 @@ sequenceDiagram
   UI->>SNAP: persist new snapshot after successful save
 ```
 
-## 7) QA + LanguageTool Integration Sequence (Current v0.8.0)
+## 7) QA + LanguageTool Integration Sequence
 
 ```mermaid
 sequenceDiagram
@@ -446,7 +451,7 @@ sequenceDiagram
   LTAD-->>UI: underline spans + hint window actions
 ```
 
-### 7.1 v0.9 target: QA live checklist call chain
+### 7.1 QA live checklist call chain
 
 ```mermaid
 sequenceDiagram
@@ -467,9 +472,6 @@ sequenceDiagram
 ```
 
 ## 8) TM Orchestration + Ranking Pipeline
-
-- Module review status: `translationzed_py/core/tm_store.py` closed in A15-TM-RF1
-  (`docs/reference/review_queue.json`, `status=CLOSED`, `closed_at=2026-03-01`).
 
 ```mermaid
 flowchart LR
@@ -522,7 +524,7 @@ flowchart TB
   WF_VIEW --> UI_ROWS[TMSuggestionsView rows]
 ```
 
-### 8.2 v0.9 target: TM explainability call chain
+### 8.2 TM explainability call chain
 
 ```mermaid
 sequenceDiagram
@@ -542,7 +544,7 @@ sequenceDiagram
   WF-->>UI: rows + why-matched metadata
 ```
 
-## 9) v0.9 target: Startup crash recovery call chain
+## 9) Startup crash recovery call chain
 
 ```mermaid
 sequenceDiagram
@@ -603,22 +605,8 @@ flowchart TB
 4. If adding GUI behavior, wire through helper adapters before growing `main_window.py`.
 5. Update this document and `docs/reference/module_map.md` when adding or moving ownership.
 
-## 12) Document-or-Flag Status
+## 12) Active Risks
 
-Current queue state:
-1. Active queue entries:
-   - `FLAGGED_MODULE: translationzed_py/core/project_session.py`
-   - status: `IN_REFACTOR` (`A26`, crash-recovery decision application + safety guards)
-   - `FLAGGED_MODULE: translationzed_py/core/tm_query_engine.py`
-   - status: `IN_REFACTOR` (`A21`, TM explainability determinism guards)
-   - `FLAGGED_MODULE: translationzed_py/core/saver.py`
-   - status: `IN_REFACTOR` (`A30-TZP-2`, optional `TZP:` write-back integration in save path)
-   - `FLAGGED_MODULE: translationzed_py/core/search_replace_service.py`
-   - status: `IN_REFACTOR` (`A37-SRX-2`, impact-preview + safer replace-all apply flow)
-2. Previous P1 entries (`preferences.py`, `tm_store.py`) are closed and retained
-   as historical evidence.
-
-Rule when new risk is detected:
-1. Add `FLAGGED_MODULE: translationzed_py/<path>.py` in this document.
-2. Add queue entry in `docs/reference/review_queue.json` with closure criteria.
-3. Keep only factual internals for flagged modules until closure.
+`docs/reference/risk_register.md` lists modules that currently require special care and their
+focused regression tests. Keep this architecture document about boundaries and current structure;
+do not duplicate risk status or completed refactor history here.

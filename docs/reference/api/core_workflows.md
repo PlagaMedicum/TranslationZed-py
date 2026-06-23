@@ -40,7 +40,7 @@ flowchart LR
 | `tm_workflow_service` | TM query/apply/refresh orchestration and adapter-safe DTO shaping | `build_*query*`, `build_*filter*`, `accept_*result`, `build_*plan` |
 | `save_exit_flow` | save/exit prompt policy and deterministic multi-file write intent shaping | `build_*prompt*`, `build_*plan`, `apply_*decision` |
 | `conflict_service` | cache-vs-original conflict decision orchestration and persist planning | `build_*plan`, `execute_*resolution`, `execute_*persist` |
-| `source_reference_service` | source-locale mode normalization, fallback, and file-path resolution policy | `resolve_*`, `normalize_*`, `build_*policy` |
+| `source_reference_service` | source-locale mode normalization and target/reference file-path resolution policy | `resolve_*`, `normalize_*` |
 
 ## 4) Module Contracts: Why and When Not To Use
 
@@ -119,13 +119,13 @@ When not to use:
 ### 4.7 `source_reference_service`
 
 Why use:
-1. normalize source-reference mode plus fallback policy/chain/preset contracts in one Qt-free boundary,
+1. normalize source-reference mode and path resolution in one Qt-free boundary,
 2. keep file-path resolution deterministic for target/reference locale pairing,
 3. prevent stale source-search behavior through explicit mode-aware lookup rules.
 
 When not to use:
 1. do not perform path rewrite logic in GUI widgets,
-2. do not parse fallback policy/chain/preset strings directly in adapters,
+2. do not reintroduce fallback-chain behavior in GUI adapters,
 3. do not add mode-specific search/TM hacks outside this service.
 
 ### 4.8 `session_resume`
@@ -287,14 +287,14 @@ sequenceDiagram
 6. Save/exit decision failures must preserve cache-first safety (no partial write-intent mutation).
 7. Conflict resolution failures must surface explicit retry/abort paths; no silent merge fallback is allowed.
 
-## 9) v0.9 Target Notes
+## 9) Current v0.9 Contracts
 
-1. QA workflow orchestration will gain rule-progress snapshots and checklist state transitions.
-2. TM workflow orchestration will gain explainability payload delivery to UI adapters.
+1. QA workflow orchestration emits rule-progress snapshots and checklist state transitions.
+2. TM workflow orchestration delivers explainability payloads to UI adapters.
 3. Startup/open orchestration includes crash-recovery decision routing (`Restore`/`Discard`/`Cancel`).
 4. Startup post-locale flow applies session-resume snapshot first, then falls back to last-opened auto-open.
 5. Discard path removes recovery cache entries and the project session-resume snapshot.
-6. These additions must preserve current `v0.8` deterministic ordering, no-write-on-open, and explicit error-surface contracts.
+6. These additions preserve deterministic ordering, no-write-on-open, and explicit error surfaces.
 
 ## 10) Project Session API
 
@@ -323,10 +323,10 @@ sequenceDiagram
 ## 12) Search/Replace Workflow API
 
 Current status:
-1. `translationzed_py.core.search_replace_service` is currently flagged for deep review in
-   `docs/reference/review_queue.json` during `A37-SRX-2`.
-2. strict benchmark and equivalence contracts remain required in current baseline.
-3. keep impact-preview and checkbox-gated replace flow changes tightly scoped until closure criteria pass.
+1. `translationzed_py.core.search_replace_service` is listed in
+   `docs/reference/risk_register.json`.
+2. Strict benchmark and equivalence contracts remain required.
+3. Keep impact-preview and checkbox-gated replace changes tightly scoped.
 
 ::: translationzed_py.core.search_replace_service
     options:
@@ -352,11 +352,9 @@ Current status:
 
 ## 14) TM Workflow API
 
-Warning:
-1. `translationzed_py.core.tm_query_engine` is currently flagged for deep review in
-   `docs/reference/review_queue.json` during `V9-TMQ-2`/`A21`.
-2. Keep changes in this module tightly scoped to determinism guards and explainability
-   metadata contracts until queue closure criteria are met.
+Keep TM query changes tightly scoped to deterministic ranking, bounded retrieval, and
+explainability metadata contracts. Consult the active risk register before changing modules listed
+there.
 
 ::: translationzed_py.core.tm_workflow_service
     options:

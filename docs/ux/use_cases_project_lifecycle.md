@@ -132,6 +132,5 @@ sequenceDiagram
 | Field | Value |
 |---|---|
 | Goal | Ensure startup recovery decisions are explicit and deterministic. |
-| Shipped baseline (v0.8) | Recovery is cache-based only (`.tzp/cache`); dedicated restore/discard startup dialog is not active in released v0.8 builds. |
-| Current `dev` behavior (v0.9 implementation) | Startup dialog with `Restore`, `Discard`, `Cancel`, plaintext details, and deterministic decision application guards. |
+| Current behavior | Startup dialog with `Restore`, `Discard`, `Cancel`, plaintext details, and deterministic decision application guards. |
 | Normative spec | `docs/spec/v0_9/crash_recovery_uc12.md` |

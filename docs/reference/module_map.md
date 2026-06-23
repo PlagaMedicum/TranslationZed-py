@@ -20,7 +20,7 @@ _Last updated: 2026-03-07_
 | `core.search` / `core.search_replace_service` | Search/replace matching and orchestration plans. |
 | `core.qa_rules` / `core.qa_service` | QA primitives, findings generation, panel/navigation planning. |
 | `core.languagetool` | LT endpoint policy, level semantics, picky fallback behavior. |
-| `core.source_reference_service` | Source-locale switching and fallback logic. |
+| `core.source_reference_service` | Source-locale switching and deterministic target/reference path resolution. |
 | `core.preferences` / `core.preferences_service` | Settings IO normalization, defaults, and persist payloads. |
 | `core.app_config` | Static app config parsing (`config/app.toml`). |
 | `core.tm_store` / `core.tm_query` / `core.tm_query_engine` / `core.tm_query_policy` / `core.tm_query_scoring` / `core.tm_query_contracts` / `core.tm_query_text` / `core.tm_store_support` / `core.tmx_io` | TM storage, query/ranking internals, deterministic tie-break helpers, and TMX import/export mechanics. |
@@ -42,7 +42,7 @@ _Last updated: 2026-03-07_
 | `gui.fs_model` | Project tree model with locale/file nodes. |
 | `gui.status_header` / `gui.table_header` | Header interactions (status sort/filter, source header tools). |
 | `gui.source_reference_header` / `gui.source_reference_ui` / `gui.source_reference_state` / `gui.source_lookup` | Source-reference UI and local runtime state. |
-| `gui.preferences_dialog` | Preferences UI for General/Search/QA/LanguageTool/TM/View. |
+| `gui.preferences_dialog` | Preferences UI for General/Search/QA/LanguageTool/TM/View with collapsed-by-default Advanced sections in crowded tabs. |
 | `gui.dialogs` | Shared dialogs (locale chooser, save selection, conflict/about, etc.). |
 | `gui.languagetool_adapter` | Editor underline spans/hints integration layer. |
 | `gui.qa_async` | Async QA run management and callback wiring. |
@@ -61,9 +61,9 @@ _Last updated: 2026-03-07_
    responsible only for rendering and user interaction.
 4. Any new module must be added to this map and referenced by canonical spec docs.
 
-## 4) v0.9 Target Mapping
+## 4) v0.9 Feature Mapping
 
-Planned `v0.9.0` feature specs map to modules as follows:
+Detailed v0.9 feature contracts map to modules as follows:
 1. QA live checklist: `gui.qa_async`, `gui.main_window_panel_helpers`, `core.qa_service`.
 2. TM explainability: `core.tm_query_engine`, `core.tm_query_scoring`, `core.tm_workflow_service`, TM panel adapters.
 3. TM workflow UX: `gui.main_window_panel_helpers`, `gui.tm_preview`, `core.tm_workflow_service`.

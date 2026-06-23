@@ -1,24 +1,15 @@
-# v0.9.0 Target Specification — Overview
-_Last updated: 2026-03-09_
+# v0.9.0 Feature Contracts
+_Updated: 2026-06-23_
 
 ## 1) Purpose
 
-This document defines the locked target scope for `v0.9.0`.
-It is normative for upcoming implementation work and is designed for direct
-human/LLM execution handoff.
+This document indexes detailed contracts introduced for v0.9.0. The features below are implemented;
+their focused documents remain because they contain useful schemas, state machines, formulas,
+failure semantics, and acceptance scenarios.
 
-Current/target framing:
-- Current shipped baseline: `v0.8.0`
-- Target scope: `v0.9.0`
+Current project version: `0.9.0`.
 
-Implementation status snapshot on `dev` (2026-03-09):
-1. QA packets `V9-QA-1/2/3` are implemented.
-2. TM packets `V9-TMQ-1/2` and `V9-TMW-1/2` are implemented.
-3. Crash packets `V9-CR-1/2/3` are implemented.
-4. v0.9 closure/readiness audit (`A28`) is complete on `dev` (`docs-check`, `verify`, `verify-ci`, `release-check TAG=v0.9.0-rc1`).
-5. Deferred stream continuation on `dev` has `A32-CRX`, `A33-TEST-1`, `A34-UX-1` closed, `A35-SRX-1` closed, and `A36-REL-1` closed; active packet is `A37-SRX-2` (no sidebar scope selector).
-
-## 2) Release Goals
+## 2) Delivered Goals
 
 1. Improve QA transparency with a rule-by-rule live checklist in the QA panel.
 2. Upgrade TM quality and operator trust through explainable scoring decisions.
@@ -26,7 +17,7 @@ Implementation status snapshot on `dev` (2026-03-09):
 4. Activate crash recovery (`UC-12`) with explicit recovery decisions at startup.
 5. Keep deterministic behavior and safety invariants unchanged where not explicitly expanded.
 
-## 3) Feature Lock
+## 3) Contract Set
 
 1. QA live checklist (multi-line checklist, per-rule states, final summary).
 2. TM quality/explainability contracts and payloads.
@@ -57,18 +48,9 @@ Implementation status snapshot on `dev` (2026-03-09):
 | TM workflow UX | `docs/ux/use_cases_tm.md` | `docs/spec/v0_9/tm_workflow_ux.md` | `docs/quality/testing_strategy.md` | `docs/architecture/diagrams.md`, `docs/reference/api/core_workflows.md` |
 | Crash recovery UC-12 | `docs/ux/use_cases_project_lifecycle.md` | `docs/spec/v0_9/crash_recovery_uc12.md` | `docs/quality/testing_strategy.md` | `docs/architecture/code_architecture.md`, `docs/reference/api/core_workflows.md` |
 
-## 7) Delivery Structure
+## 7) Maintenance
 
-Implementation packets are defined in:
-- `docs/spec/v0_9/implementation_subtasks.md`
-
-These packets are decision-complete and ordered by dependency. Code
-implementation should follow packet IDs exactly.
-
-## 8) Docs Baseline and Post-Code Sync
-
-1. All v0.9 target spec files exist and are linked in docs navigation.
-2. Required formulas/schemas/decision tables are present.
-3. Architecture and API docs contain concrete call chains and boundaries.
-4. Docs quality gates pass (`make docs-check`).
-5. Post-code packet history and active plan references are coherent with implemented packets.
+1. Keep formulas, schemas, state transitions, and failure semantics aligned with code.
+2. Update the canonical UX or domain owner when observable behavior changes.
+3. Keep architecture and API pages focused on current call chains and boundaries.
+4. Run `make docs-check` after contract changes.

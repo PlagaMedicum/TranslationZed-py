@@ -8,6 +8,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,19 @@ class BenchSample:
 
     name: str
     median_ms: float
+
+
+@dataclass(frozen=True)
+class BenchSourceMetadata:
+    """Identity metadata carried over from the raw benchmark artifact."""
+
+    path: str
+    generated_at: str | None
+    version: Any
+    machine_info: dict[str, Any] | None
+    commit_info: dict[str, Any] | None
+    sample_count: int
+    sample_names: list[str]
 
 
 def _load_json(path: Path) -> dict[str, object]:
@@ -50,6 +64,27 @@ def _samples_from_pytest_benchmark(
     if not out:
         raise RuntimeError("No benchmark medians found in current benchmark JSON.")
     return out
+
+
+def _source_metadata_from_pytest_benchmark(
+    payload: dict[str, object],
+    *,
+    path: Path,
+    samples: dict[str, BenchSample],
+) -> BenchSourceMetadata:
+    generated_at = payload.get("datetime")
+    machine_info = payload.get("machine_info")
+    commit_info = payload.get("commit_info")
+    version = payload.get("version")
+    return BenchSourceMetadata(
+        path=str(path),
+        generated_at=generated_at if isinstance(generated_at, str) else None,
+        version=version,
+        machine_info=machine_info if isinstance(machine_info, dict) else None,
+        commit_info=commit_info if isinstance(commit_info, dict) else None,
+        sample_count=len(samples),
+        sample_names=sorted(samples),
+    )
 
 
 def _samples_from_baseline(
@@ -107,7 +142,82 @@ def _parse_args() -> argparse.Namespace:
         default="linux",
         help="Platform key to read from baseline 'platforms' map.",
     )
+    parser.add_argument(
+        "--json-out",
+        default="",
+        help="Optional JSON summary output path.",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print full structured summary after human-readable output.",
+    )
     return parser.parse_args()
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _build_summary(
+    *,
+    baseline_path: Path,
+    current_path: Path,
+    current_source: BenchSourceMetadata,
+    current_samples: dict[str, BenchSample],
+    threshold_percent: float,
+    mode: str,
+    platform: str,
+    missing: list[str],
+    regressions: list[tuple[str, float, float, float]],
+    status: str,
+    skipped_reason: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "version": 2,
+        "baseline": {
+            "path": str(baseline_path),
+            "platform": platform,
+            "threshold_percent": float(threshold_percent),
+            "mode": mode,
+        },
+        "current": {
+            "path": str(current_path),
+            "source": {
+                "path": current_source.path,
+                "generated_at": current_source.generated_at,
+                "version": current_source.version,
+                "machine_info": current_source.machine_info,
+                "commit_info": current_source.commit_info,
+                "sample_count": current_source.sample_count,
+                "sample_names": current_source.sample_names,
+            },
+            "samples": [
+                {
+                    "name": sample.name,
+                    "median_ms": round(sample.median_ms, 6),
+                }
+                for name in sorted(current_samples)
+                for sample in (current_samples[name],)
+            ],
+        },
+        "status": status,
+        "skipped_reason": skipped_reason,
+        "missing_benchmarks": missing,
+        "regressions": [
+            {
+                "name": name,
+                "baseline_ms": round(base_ms, 6),
+                "current_ms": round(current_ms, 6),
+                "growth_percent": round((ratio - 1.0) * 100.0, 6),
+            }
+            for name, base_ms, current_ms, ratio in regressions
+        ],
+    }
 
 
 def main() -> int:
@@ -120,14 +230,37 @@ def main() -> int:
     current_payload = _load_json(current_path)
 
     baseline = _samples_from_baseline(baseline_payload, platform_key=args.platform)
+    current = _samples_from_pytest_benchmark(current_payload)
+    current_source = _source_metadata_from_pytest_benchmark(
+        current_payload,
+        path=current_path,
+        samples=current,
+    )
     if not baseline:
+        summary = _build_summary(
+            baseline_path=baseline_path,
+            current_path=current_path,
+            current_source=current_source,
+            current_samples=current,
+            threshold_percent=args.threshold_percent,
+            mode=args.mode,
+            platform=args.platform,
+            missing=[],
+            regressions=[],
+            status="skipped",
+            skipped_reason=(
+                f"Benchmark baseline has no '{args.platform}' section; skipping regression check."
+            ),
+        )
+        if args.json_out:
+            _write_json(Path(args.json_out).resolve(), summary)
         print(
             f"Benchmark baseline has no '{args.platform}' section; skipping regression check.",
             file=sys.stderr,
         )
+        if args.verbose:
+            print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
-
-    current = _samples_from_pytest_benchmark(current_payload)
 
     missing = sorted(name for name in baseline if name not in current)
     regressions: list[tuple[str, float, float, float]] = []
@@ -158,15 +291,50 @@ def main() -> int:
             )
 
     if not missing and not regressions:
+        summary = _build_summary(
+            baseline_path=baseline_path,
+            current_path=current_path,
+            current_source=current_source,
+            current_samples=current,
+            threshold_percent=args.threshold_percent,
+            mode=args.mode,
+            platform=args.platform,
+            missing=missing,
+            regressions=regressions,
+            status="passed",
+        )
+        if args.json_out:
+            _write_json(Path(args.json_out).resolve(), summary)
         print(
             f"Benchmark regression check passed for platform={args.platform}"
             f" (threshold={args.threshold_percent:.1f}%)."
         )
+        if args.verbose:
+            print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
 
+    status = "warn" if args.mode == "warn" else "failed"
+    summary = _build_summary(
+        baseline_path=baseline_path,
+        current_path=current_path,
+        current_source=current_source,
+        current_samples=current,
+        threshold_percent=args.threshold_percent,
+        mode=args.mode,
+        platform=args.platform,
+        missing=missing,
+        regressions=regressions,
+        status=status,
+    )
+    if args.json_out:
+        _write_json(Path(args.json_out).resolve(), summary)
     if args.mode == "warn":
         print("Benchmark regression check is advisory (mode=warn).", file=sys.stderr)
+        if args.verbose:
+            print(json.dumps(summary, indent=2, sort_keys=True))
         return 0
+    if args.verbose:
+        print(json.dumps(summary, indent=2, sort_keys=True))
     return 1
 
 

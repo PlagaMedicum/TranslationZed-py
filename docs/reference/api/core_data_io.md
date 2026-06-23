@@ -106,9 +106,9 @@ sequenceDiagram
 4. Snapshot or insertion planning conflict: save-time insertion prompt must fail safe (`Skip`/`Cancel` paths).
 5. SQLite TM store errors: query/import paths degrade with explicit warning; editing workflow remains functional.
 
-## 8) v0.9 Target Notes
+## 8) Current v0.9 Contracts
 
-1. TM explainability payload emission is planned in `v0.9` without score/order drift.
+1. TM explainability payload emission must not change scores or ordering.
 2. Crash-recovery/session-resume startup data surfaces must preserve no-write-on-open behavior.
 3. Session-resume snapshot payload (`session.resume.json`) is project cache scoped and versioned.
 4. Any new data payload must remain deterministic and explicitly schema-documented in canonical specs.
@@ -123,6 +123,11 @@ When touching this layer, preserve these priorities in order:
 
 ## 10) Parser API
 
+Current status:
+1. `translationzed_py.core.parser` is listed in `docs/reference/risk_register.json`.
+2. Treat parser internals as stability-sensitive; preserve parse equivalence,
+   spans, and benchmark contracts when changing this module.
+
 ::: translationzed_py.core.parser
     options:
       show_root_heading: true
@@ -136,9 +141,7 @@ When touching this layer, preserve these priorities in order:
 ## 11) Saver API
 
 Current status:
-1. `translationzed_py.core.saver` is currently flagged for deep review in
-   `docs/reference/review_queue.json` (`IN_REFACTOR`, `A30-TZP-2`).
-2. Optional `TZP:` write-back remains opt-in and must preserve default byte-fidelity
+1. Optional `TZP:` write-back remains opt-in and must preserve default byte-fidelity
    invariants when disabled.
 
 ::: translationzed_py.core.saver
@@ -187,7 +190,8 @@ Current status:
 
 ## 14) TM Store API
 
-TM store/query internals are currently in closed review state and treated as stable baseline for `v0.8.0`.
+TM store/query internals are treated as a stable compatibility surface and remain protected by
+ranking, equivalence, and performance contracts.
 
 ::: translationzed_py.core.tm_store
     options:

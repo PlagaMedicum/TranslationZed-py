@@ -11,6 +11,7 @@ BASELINE="${BENCH_BASELINE:-tests/benchmarks/baseline.json}"
 CURRENT="${BENCH_CURRENT:-$ARTIFACTS_ROOT/bench.json}"
 THRESHOLD="${BENCH_REGRESSION_THRESHOLD_PERCENT:-20}"
 MODE="${BENCH_COMPARE_MODE:-fail}"
+SUMMARY_OUT="${BENCH_SUMMARY_OUT:-$ARTIFACTS_ROOT/benchmark_summary.json}"
 PLATFORM_KEY="${BENCH_PLATFORM:-$($VENV_PY - <<'PY'
 import platform
 name = platform.system().lower()
@@ -30,4 +31,5 @@ bash "$(dirname "${BASH_SOURCE[0]}")/bench.sh" "$CURRENT"
   --current "$CURRENT" \
   --threshold-percent "$THRESHOLD" \
   --mode "$MODE" \
-  --platform "$PLATFORM_KEY"
+  --platform "$PLATFORM_KEY" \
+  --json-out "$SUMMARY_OUT"
