@@ -1442,7 +1442,9 @@ def _show_manual_scenario_dialog(win) -> None:
     dialog = ManualScenarioChecklistDialog(
         runtime,
         results_dir=_manual_scenario_results_dir(),
-        parent=win,
+        # Keep the checklist as an independent helper window. Workflow dialogs may
+        # block the main window, but operators still need to read and scroll steps.
+        parent=None,
     )
     win._manual_scenario_dialog = dialog
     dialog.setModal(False)

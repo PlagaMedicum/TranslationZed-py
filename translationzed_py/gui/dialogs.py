@@ -386,7 +386,7 @@ class ConflictChoiceDialog(QDialog):
         """Initialize the instance."""
         super().__init__(parent)
         self.setWindowTitle("Translation conflict")
-        self.setModal(True)
+        self.setWindowModality(Qt.WindowModality.WindowModal)
         self._choice: str | None = None
 
         layout = QVBoxLayout(self)

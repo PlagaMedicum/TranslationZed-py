@@ -142,6 +142,26 @@ def test_manual_scenario_dialog_keeps_details_in_scroll_area(
     assert scroll.maximumHeight() == 190
 
 
+def test_manual_scenario_dialog_wraps_checklist_rows_without_horizontal_scroll(
+    qtbot, tmp_path: Path
+) -> None:
+    """Long checklist rows should wrap instead of requiring horizontal scrolling."""
+    dialog = ManualScenarioChecklistDialog(
+        _runtime(tmp_path),
+        results_dir=tmp_path / "results",
+    )
+    qtbot.addWidget(dialog)
+    for widget in (dialog._steps_list, dialog._expected_list):
+        assert widget.wordWrap() is True
+        assert widget.textElideMode() == Qt.TextElideMode.ElideNone
+        assert (
+            widget.horizontalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        first = widget.item(0)
+        assert first is not None
+        assert first.toolTip() == first.text()
+
+
 def test_manual_scenario_dialog_copy_buttons_export_project_and_path_targets(
     qtbot, tmp_path: Path
 ) -> None:

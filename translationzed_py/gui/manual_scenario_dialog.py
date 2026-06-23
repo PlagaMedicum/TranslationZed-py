@@ -147,19 +147,23 @@ class ManualScenarioChecklistDialog(QDialog):
         steps_label = QLabel("Manual steps (tick as you complete):", self)
         layout.addWidget(steps_label)
         self._steps_list = QListWidget(self)
+        self._configure_checklist(self._steps_list)
         for step in runtime.scenario.steps:
             item = QListWidgetItem(step, self._steps_list)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Unchecked)
+            item.setToolTip(step)
         layout.addWidget(self._steps_list, 4)
 
         expected_label = QLabel("Expected outcomes:", self)
         layout.addWidget(expected_label)
         self._expected_list = QListWidget(self)
+        self._configure_checklist(self._expected_list)
         for check in runtime.scenario.expected_checks:
             item = QListWidgetItem(check, self._expected_list)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Unchecked)
+            item.setToolTip(check)
         layout.addWidget(self._expected_list, 4)
 
         notes_label = QLabel("Notes:", self)
@@ -185,6 +189,13 @@ class ManualScenarioChecklistDialog(QDialog):
         self._expected_list.itemChanged.connect(lambda _item: self._sync_pass_enabled())
         layout.addWidget(buttons)
         self._sync_pass_enabled()
+
+    def _configure_checklist(self, widget: QListWidget) -> None:
+        """Keep long scenario rows readable while modal workflow prompts are open."""
+        widget.setWordWrap(True)
+        widget.setTextElideMode(Qt.TextElideMode.ElideNone)
+        widget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        widget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
     def _add_plain_section(self, layout: QVBoxLayout, title: str, body: str) -> None:
         header = QLabel(f"{title}:", self)

@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QListWidgetItem
+from PySide6.QtWidgets import QDialog, QListWidgetItem
 
 from translationzed_py.core.conflict_service import (
     ConflictMergeExecution,
@@ -1525,6 +1525,65 @@ def test_prompt_conflicts_dialog_path_delegates_choice_execution(
     monkeypatch.setattr(win, "_resolve_conflicts_merge", lambda _path: True)
     assert win._prompt_conflicts(target) is True
     assert calls == ["merge"]
+
+
+def test_conflict_choice_dialog_manual_scenario_path_preserves_helper_interaction(
+    qtbot, tmp_path, monkeypatch
+):
+    """Manual scenario conflict prompts should be window-modal instead of app-modal."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._manual_scenario_runtime = object()
+
+    class _Signal:
+        def __init__(self) -> None:
+            self._callback = None
+
+        def connect(self, callback):
+            self._callback = callback
+
+        def emit(self, code: int) -> None:
+            assert self._callback is not None
+            self._callback(code)
+
+    class _FakeLoop:
+        instances: list["_FakeLoop"] = []
+
+        def __init__(self) -> None:
+            self.exec_called = False
+            self.quit_called = False
+            _FakeLoop.instances.append(self)
+
+        def exec(self) -> None:
+            self.exec_called = True
+
+        def quit(self) -> None:
+            self.quit_called = True
+
+    class _FakeDialog:
+        def __init__(self) -> None:
+            self.finished = _Signal()
+            self.modality = None
+            self.opened = False
+
+        def setWindowModality(self, modality) -> None:
+            self.modality = modality
+
+        def open(self) -> None:
+            self.opened = True
+            self.finished.emit(int(QDialog.DialogCode.Accepted))
+
+    monkeypatch.setattr(mw, "QEventLoop", _FakeLoop)
+    dialog = _FakeDialog()
+    result = win._exec_conflict_choice_dialog(dialog)
+
+    assert result == int(QDialog.DialogCode.Accepted)
+    assert dialog.modality == Qt.WindowModality.WindowModal
+    assert dialog.opened is True
+    assert len(_FakeLoop.instances) == 1
+    assert _FakeLoop.instances[0].exec_called is True
+    assert _FakeLoop.instances[0].quit_called is True
 
 
 def test_resolve_conflicts_drop_cache_delegates_persist_execution(

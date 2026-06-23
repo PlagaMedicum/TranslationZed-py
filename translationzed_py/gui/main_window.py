@@ -4553,13 +4553,30 @@ class MainWindow(QMainWindow):
         assert prompt_plan.require_dialog
         rel = str(path.relative_to(self._root))
         dialog = ConflictChoiceDialog(rel, len(self._conflict_files[path]), self)
-        dialog.exec()
+        self._exec_conflict_choice_dialog(dialog)
         return self._conflict_workflow_service.execute_choice(
             dialog.choice(),
             on_drop_cache=lambda: self._resolve_conflicts_drop_cache(path),
             on_drop_original=lambda: self._resolve_conflicts_drop_original(path),
             on_merge=lambda: self._resolve_conflicts_merge(path),
         )
+
+    def _exec_conflict_choice_dialog(self, dialog: ConflictChoiceDialog) -> int:
+        """Run conflict choice UI while preserving manual checklist interaction."""
+        if getattr(self, "_manual_scenario_runtime", None) is None:
+            return int(dialog.exec())
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        result = {"code": int(QDialog.DialogCode.Rejected)}
+        loop = QEventLoop()
+
+        def _finish(code: int) -> None:
+            result["code"] = int(code)
+            loop.quit()
+
+        dialog.finished.connect(_finish)
+        dialog.open()
+        loop.exec()
+        return result["code"]
 
     def _ensure_conflicts_resolved(self, path: Path) -> bool:
         if not self._has_conflicts(path):

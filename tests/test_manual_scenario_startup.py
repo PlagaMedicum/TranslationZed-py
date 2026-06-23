@@ -224,6 +224,7 @@ def test_show_manual_scenario_dialog_is_modeless_and_reports_result(
     assert len(_FakeDialog.instances) == 1
     dialog = _FakeDialog.instances[0]
     assert win._manual_scenario_dialog is dialog
+    assert dialog.parent is None
     assert dialog.modal is False
     assert dialog.modality == Qt.WindowModality.NonModal
     assert (Qt.WidgetAttribute.WA_DeleteOnClose, True) in dialog.attributes

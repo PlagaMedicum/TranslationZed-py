@@ -8,6 +8,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox
 
 from translationzed_py.core.project_scanner import LocaleMeta
@@ -162,6 +163,7 @@ def test_conflict_choice_dialog_close_guard_and_choice(qtbot) -> None:
     """Verify conflict dialog blocks close without explicit choice."""
     dialog = ConflictChoiceDialog("ui.txt", 2)
     qtbot.addWidget(dialog)
+    assert dialog.windowModality() == Qt.WindowModality.WindowModal
 
     class _Event:
         """Minimal close event stub with ignore tracking."""
