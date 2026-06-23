@@ -1,44 +1,46 @@
 {
   "auto_return_code": null,
-  "completed_at_ms": 1774374020826,
-  "fixture_copy_root": "/tmp/tzp-manual-conflict-resolution-flow-_b0cvwn9/project",
+  "completed_at_ms": 1782240428132,
+  "fixture_copy_root": "/tmp/tzp-manual-conflict-resolution-flow-t9preugk/project",
   "manual_all_steps": [
     "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
-    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+    "Use General -> Save. In Write original files, do not write later conflict files. If RU/conflict_drop_cache.txt is not listed and only later conflict files are listed, choose Cache only. If RU/conflict_drop_cache.txt is listed, leave only RU/conflict_drop_cache.txt checked and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
     "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
-    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+    "Use General -> Save. In Write original files, leave only RU/conflict_drop_original.txt checked, uncheck RU/conflict_merge_mixed.txt if present, and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
     "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
     "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
-    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
+    "Use General -> Save. In Write original files, leave only RU/conflict_merge_mixed.txt checked and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
   ],
   "manual_checked_expected_checks": [
     "Conflict dialog appears immediately for RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and RU/conflict_merge_mixed.txt.",
     "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
     "Drop original applies cached values for RU/conflict_drop_original.txt.",
     "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+    "Save decisions do not write later unresolved conflict files before their own steps.",
     "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
   ],
   "manual_checked_steps": [
     "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
-    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+    "Use General -> Save. In Write original files, do not write later conflict files. If RU/conflict_drop_cache.txt is not listed and only later conflict files are listed, choose Cache only. If RU/conflict_drop_cache.txt is listed, leave only RU/conflict_drop_cache.txt checked and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
     "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
-    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+    "Use General -> Save. In Write original files, leave only RU/conflict_drop_original.txt checked, uncheck RU/conflict_merge_mixed.txt if present, and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
     "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
     "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
-    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
+    "Use General -> Save. In Write original files, leave only RU/conflict_merge_mixed.txt checked and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
   ],
-  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/conflict-resolution-flow-conflict-resolution-flow-1774373905739-1774374020492.json",
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/conflict-resolution-flow-conflict-resolution-flow-1782240211831-1782240427904.json",
   "manual_expected_checks": [
     "Conflict dialog appears immediately for RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and RU/conflict_merge_mixed.txt.",
     "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
     "Drop original applies cached values for RU/conflict_drop_original.txt.",
     "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+    "Save decisions do not write later unresolved conflict files before their own steps.",
     "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
   ],
   "manual_notes": "",
   "manual_outcome": "passed",
   "manual_return_code": 0,
-  "manual_run_token": "conflict-resolution-flow-1774373905739",
+  "manual_run_token": "conflict-resolution-flow-1782240211831",
   "mode": "manual",
   "scenario": {
     "automation_pytest_selectors": [
@@ -51,6 +53,7 @@
       "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
       "Drop original applies cached values for RU/conflict_drop_original.txt.",
       "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+      "Save decisions do not write later unresolved conflict files before their own steps.",
       "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
     ],
     "finish_condition": "Leave RU/conflict_merge_mixed.txt active after completing all three conflict paths, saving after each apply step, and switching through neutral RU/ui.txt without any repeated conflict prompt.",
@@ -63,7 +66,13 @@
     ],
     "goal": "Verify the full conflict-resolution workflow in one coherent run: Drop cache on RU/conflict_drop_cache.txt, Drop original on RU/conflict_drop_original.txt, then Merge mixed choices plus one edited value on RU/conflict_merge_mixed.txt.",
     "id": "conflict-resolution-flow",
+    "inspection_paths": [],
     "manual_depth": "full_workflow",
+    "operator_hints": [
+      "In this scenario, General -> Save opens the Write original files dialog for cached drafts.",
+      "Do not write later conflict files early. If the dialog lists future conflict files, uncheck them or choose Cache only according to the current step.",
+      "After Drop cache, RU/conflict_drop_cache.txt is expected to keep file-side values. If it is not listed in Write original files and only later conflict files are listed, choose Cache only."
+    ],
     "prefs_extras": {},
     "selected_locales": [
       "RU"
@@ -71,12 +80,12 @@
     "start_context": "Launch with RU selected. Use the Project tree to move between RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, RU/conflict_merge_mixed.txt, and RU/ui.txt. RU/ui.txt is only a neutral switch target in this scenario and should not open a conflict dialog.",
     "steps": [
       "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
-      "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+      "Use General -> Save. In Write original files, do not write later conflict files. If RU/conflict_drop_cache.txt is not listed and only later conflict files are listed, choose Cache only. If RU/conflict_drop_cache.txt is listed, leave only RU/conflict_drop_cache.txt checked and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
       "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
-      "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+      "Use General -> Save. In Write original files, leave only RU/conflict_drop_original.txt checked, uncheck RU/conflict_merge_mixed.txt if present, and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
       "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
       "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
-      "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
+      "Use General -> Save. In Write original files, leave only RU/conflict_merge_mixed.txt checked and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
     ],
     "title": "Conflict resolution flow: drop cache, drop original, and merge",
     "tracked_repo_files": [
@@ -137,7 +146,7 @@
     },
     {
       "path": "translationzed_py/gui/main_window.py",
-      "sha256": "0c8fcc046d01dcaba8888013d0f19e14ec42b766d17e106571aad7bec376908f"
+      "sha256": "78036aac649438270987cc1498439e98cf65a86f2db20a181dc886e42f7170a1"
     }
   ],
   "version": 1

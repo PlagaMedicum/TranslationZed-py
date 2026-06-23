@@ -15,12 +15,12 @@
       "checklist_record": "tests/manual_scenarios/release_evidence/conflict-resolution-flow-checklist.json",
       "interactive": true,
       "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
-      "recorded_at_ms": 1774374020826,
+      "recorded_at_ms": 1782240428132,
       "result": "passed",
       "run_record": "tests/manual_scenarios/release_evidence/conflict-resolution-flow-run.json",
       "scenario_id": "conflict-resolution-flow",
-      "source_checklist_artifact": "artifacts/manual-ui/conflict-resolution-flow-conflict-resolution-flow-1774373905739-1774374020492.json",
-      "source_run_artifact": "artifacts/manual-ui/conflict-resolution-flow-run-1774374020826.json"
+      "source_checklist_artifact": "artifacts/manual-ui/conflict-resolution-flow-conflict-resolution-flow-1782240211831-1782240427904.json",
+      "source_run_artifact": "artifacts/manual-ui/conflict-resolution-flow-run-1782240428132.json"
     },
     {
       "checklist_record": "tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-checklist.json",
