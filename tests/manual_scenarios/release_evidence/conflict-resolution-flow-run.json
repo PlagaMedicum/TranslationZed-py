@@ -1,0 +1,144 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1774374020826,
+  "fixture_copy_root": "/tmp/tzp-manual-conflict-resolution-flow-_b0cvwn9/project",
+  "manual_all_steps": [
+    "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+    "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+    "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
+    "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
+  ],
+  "manual_checked_expected_checks": [
+    "Conflict dialog appears immediately for RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and RU/conflict_merge_mixed.txt.",
+    "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
+    "Drop original applies cached values for RU/conflict_drop_original.txt.",
+    "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+    "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
+  ],
+  "manual_checked_steps": [
+    "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+    "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+    "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
+    "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/conflict-resolution-flow-conflict-resolution-flow-1774373905739-1774374020492.json",
+  "manual_expected_checks": [
+    "Conflict dialog appears immediately for RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and RU/conflict_merge_mixed.txt.",
+    "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
+    "Drop original applies cached values for RU/conflict_drop_original.txt.",
+    "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+    "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
+  ],
+  "manual_notes": "",
+  "manual_outcome": "passed",
+  "manual_return_code": 0,
+  "manual_run_token": "conflict-resolution-flow-1774373905739",
+  "mode": "manual",
+  "scenario": {
+    "automation_pytest_selectors": [
+      "tests/test_gui_conflicts.py",
+      "tests/test_conflict_service.py"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "Conflict dialog appears immediately for RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and RU/conflict_merge_mixed.txt.",
+      "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
+      "Drop original applies cached values for RU/conflict_drop_original.txt.",
+      "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+      "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
+    ],
+    "finish_condition": "Leave RU/conflict_merge_mixed.txt active after completing all three conflict paths, saving after each apply step, and switching through neutral RU/ui.txt without any repeated conflict prompt.",
+    "fixture_root": "conflict_manual",
+    "focus_files": [
+      "RU/conflict_drop_cache.txt",
+      "RU/conflict_drop_original.txt",
+      "RU/conflict_merge_mixed.txt",
+      "RU/ui.txt"
+    ],
+    "goal": "Verify the full conflict-resolution workflow in one coherent run: Drop cache on RU/conflict_drop_cache.txt, Drop original on RU/conflict_drop_original.txt, then Merge mixed choices plus one edited value on RU/conflict_merge_mixed.txt.",
+    "id": "conflict-resolution-flow",
+    "manual_depth": "full_workflow",
+    "prefs_extras": {},
+    "selected_locales": [
+      "RU"
+    ],
+    "start_context": "Launch with RU selected. Use the Project tree to move between RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, RU/conflict_merge_mixed.txt, and RU/ui.txt. RU/ui.txt is only a neutral switch target in this scenario and should not open a conflict dialog.",
+    "steps": [
+      "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
+      "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+      "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
+      "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+      "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
+      "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
+      "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
+    ],
+    "title": "Conflict resolution flow: drop cache, drop original, and merge",
+    "tracked_repo_files": [
+      "translationzed_py/gui/main_window.py",
+      "translationzed_py/core/conflict_service.py",
+      "tests/fixtures/conflict_manual/EN/conflict_drop_cache.txt",
+      "tests/fixtures/conflict_manual/EN/conflict_drop_original.txt",
+      "tests/fixtures/conflict_manual/EN/conflict_merge_mixed.txt",
+      "tests/fixtures/conflict_manual/RU/conflict_drop_cache.txt",
+      "tests/fixtures/conflict_manual/RU/conflict_drop_original.txt",
+      "tests/fixtures/conflict_manual/RU/conflict_merge_mixed.txt",
+      "tests/fixtures/conflict_manual/.tzp/cache/RU/conflict_drop_cache.bin",
+      "tests/fixtures/conflict_manual/.tzp/cache/RU/conflict_drop_original.bin",
+      "tests/fixtures/conflict_manual/.tzp/cache/RU/conflict_merge_mixed.bin"
+    ],
+    "workflow_family": "conflict_resolution"
+  },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/conflict_manual/.tzp/cache/RU/conflict_drop_cache.bin",
+      "sha256": "89b45aac59b2b0f6beedcafc3611ce3ac29f8b6058b6edb8f78f6efcc4179318"
+    },
+    {
+      "path": "tests/fixtures/conflict_manual/.tzp/cache/RU/conflict_drop_original.bin",
+      "sha256": "d4a3f2ddb31e8496a7dea8cf4797902a34a6b73a46b4f5a602cab4d2fed018eb"
+    },
+    {
+      "path": "tests/fixtures/conflict_manual/.tzp/cache/RU/conflict_merge_mixed.bin",
+      "sha256": "dbc4a1da370e0fc956958f4fb26c352acbd6df65b0d00aa67cea78174491e372"
+    },
+    {
+      "path": "tests/fixtures/conflict_manual/EN/conflict_drop_cache.txt",
+      "sha256": "b0683612c075ec63d244843ed090081f6e390d53d3ef16d177ee2c86346e6083"
+    },
+    {
+      "path": "tests/fixtures/conflict_manual/EN/conflict_drop_original.txt",
+      "sha256": "b3389e61c83272441fb701d2c1e7868a1d5265be6db2d91e019c21157257fca5"
+    },
+    {
+      "path": "tests/fixtures/conflict_manual/EN/conflict_merge_mixed.txt",
+      "sha256": "1753270dac674d6f16cd451c14ff987bc82fcb92646205ca28bbaa793d51d29d"
+    },
+    {
+      "path": "tests/fixtures/conflict_manual/RU/conflict_drop_cache.txt",
+      "sha256": "eeee11dca7f96b071b00da4a65a792b162968ee4df4d142c82798acc039aa282"
+    },
+    {
+      "path": "tests/fixtures/conflict_manual/RU/conflict_drop_original.txt",
+      "sha256": "fcbe68333750d50fcfaa371925e434177626ac502a61372f87b82d5b6ace10c0"
+    },
+    {
+      "path": "tests/fixtures/conflict_manual/RU/conflict_merge_mixed.txt",
+      "sha256": "919d3da1a59000c2966903394d8d5ed72ea3b8b729e09f81072d3e57d519a74f"
+    },
+    {
+      "path": "translationzed_py/core/conflict_service.py",
+      "sha256": "49e82613f5977c961d8cf73333ad0e17ea3031a1aeba74882fdb0442892306d9"
+    },
+    {
+      "path": "translationzed_py/gui/main_window.py",
+      "sha256": "0c8fcc046d01dcaba8888013d0f19e14ec42b766d17e106571aad7bec376908f"
+    }
+  ],
+  "version": 1
+}

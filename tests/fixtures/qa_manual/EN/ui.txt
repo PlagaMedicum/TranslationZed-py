@@ -1,0 +1,4 @@
+HELLO = "Hello!"
+NEWLINES = "Line one\\nLine two."
+TOKENS = "Press <LINE> to continue."
+SAME = "Exact text."

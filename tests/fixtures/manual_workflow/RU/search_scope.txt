@@ -1,0 +1,2 @@
+SEARCH_ONE = "Заменить target word здесь."
+SEARCH_TWO = "Заменить target word дважды: target word."

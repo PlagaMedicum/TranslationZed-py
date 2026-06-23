@@ -1,0 +1,2 @@
+SEARCH_ONE = "target word를 여기서 바꾸세요."
+SEARCH_TWO = "pool target word sample."

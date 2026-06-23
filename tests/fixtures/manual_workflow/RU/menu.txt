@@ -1,0 +1,2 @@
+MENU_PLAY = "Играть"
+MENU_OPTIONS = "Параметры"

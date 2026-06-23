@@ -7,5 +7,19 @@
   "scenario": {
     "id": "status-triage-mixed-indicator"
   },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/conflict_manual/BE/ui.txt",
+      "sha256": "e00ece2b65e0104839bb9a545b3bed7234d726ed1428d4aa86dbae6d58b2eaaa"
+    },
+    {
+      "path": "translationzed_py/gui/main_window.py",
+      "sha256": "46f94bd8c064e8024e02badb007ae88689373e1452c87df9118ec86ba43f6277"
+    },
+    {
+      "path": "translationzed_py/gui/main_window_panel_helpers.py",
+      "sha256": "d1121953158891f18a9a5ac7475b4febca608211c39a8c6d4e3730e7ea4b6e34"
+    }
+  ],
   "version": 1
 }

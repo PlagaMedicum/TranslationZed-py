@@ -10,6 +10,9 @@
     },
     "conflict_resolution": {
       "description": "Conflict detection and resolution flow must remain covered.",
+      "required_scenario_ids": [
+        "conflict-resolution-flow"
+      ],
       "selectors": [
         "tests/test_gui_conflicts.py",
         "tests/test_conflict_service.py"
@@ -22,6 +25,13 @@
         "tests/test_gui_qa_panel.py"
       ]
     },
+    "encoding_charsets": {
+      "description": "Encoding and charset preservation workflows must remain covered.",
+      "selectors": [
+        "tests/test_gui_save_encoding.py",
+        "tests/test_encoding_diagnostics.py"
+      ]
+    },
     "tm_apply": {
       "description": "TM suggestion and apply coverage must remain.",
       "selectors": [
@@ -30,7 +40,7 @@
       ]
     },
     "source_reference": {
-      "description": "Source-reference mode/fallback coverage must remain.",
+      "description": "Source-reference direct-mode and empty-source coverage must remain.",
       "selectors": [
         "tests/test_source_reference_state.py",
         "tests/test_source_reference_ui.py"
@@ -42,6 +52,13 @@
         "tests/test_search_replace_service.py",
         "tests/test_main_window_replace_merge_clipboard.py",
         "tests/test_gui_dialogs.py::test_replace_files_dialog_renders_items_and_confirms",
+        "tests/test_gui_service_adapters.py"
+      ]
+    },
+    "status_triage": {
+      "description": "Status-triage selection and status-bar behavior must remain covered.",
+      "selectors": [
+        "tests/test_main_window_cache_replace_helpers.py",
         "tests/test_gui_service_adapters.py"
       ]
     },

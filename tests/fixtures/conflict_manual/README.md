@@ -1,4 +1,4 @@
-# Manual conflict-merge fixture
+# Manual conflict fixture set
 
 Purpose: open this fixture in TranslationZed-Py to trigger the cache/original
 conflict flow immediately.
@@ -8,19 +8,28 @@ conflict flow immediately.
 1) Launch the app with this fixture root:
    `make run ARGS="tests/fixtures/conflict_manual"`
 
-2) Select the **BE** locale and open `ui.txt`.
+2) For current manual evidence, select the **RU** locale and work through these files in order for manual scenario `conflict-resolution-flow`:
+   - `conflict_drop_cache.txt`
+   - `conflict_drop_original.txt`
+   - `conflict_merge_mixed.txt`
+   - use `ui.txt` only as a neutral switch target between those files; it should not open a conflict dialog
 
-3) A conflict dialog should appear (no deferral).
-   - `HELLO`: original snapshot = "Привет"; file now has "Привет!!"; cache draft = "Здравствуйте".
-   - `BYE`: original snapshot = "Пока"; file now has "Пока..."; cache draft = "До свидания".
+3) A conflict dialog should appear immediately (no deferral).
 
-4) Choose **Merge** to verify the merge table, or use **Drop cache** / **Drop original**.
-   - If you keep **Cache**, status comes from the cached entry.
-   - If you keep **Original**, the entry is marked **For review**.
+4) For `conflict_merge_mixed.txt`, the merge table should contain:
+   - `MERGE_A`: file = "Файл merge A!!", original snapshot = "Файл merge A", cache = "Кэш merge A"
+   - `MERGE_B`: file = "Файл merge B...", original snapshot = "Файл merge B", cache = "Кэш merge B"
+
+5) Apply the canonical manual checks in one run:
+   - on `conflict_drop_cache.txt`: choose `Drop cache`,
+   - on `conflict_drop_original.txt`: choose `Drop original`,
+   - on `conflict_merge_mixed.txt`: choose `Merge…`, pick Original for one row and Cache for another, edit one value before `Apply`.
 
 Notes:
-- Cache file is pre-generated at `.tzp/cache/BE/ui.bin`.
-- This fixture is UTF‑8 only.
+- Current manual scenarios use `.tzp/cache/RU/*.bin`.
+- `RU/ui.txt` and `BE/ui.txt` are intentionally non-conflicting in this fixture so manual testers can switch context without triggering an unrelated dialog.
+- Legacy BE copies remain in the fixture for older targeted checks.
+- This fixture is UTF-8 only.
 
 ## Additional encoding fixtures
 

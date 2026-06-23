@@ -1,0 +1,4 @@
+UI_HELLO = "Добро пожаловать в ручной сценарий."
+UI_CAMERA = ""
+UI_REPLACE = "Заменить target word."
+UI_STATUS = "Пример индикатора статуса."

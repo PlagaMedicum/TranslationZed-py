@@ -1,0 +1,2 @@
+DC_A = "Drop cache source A"
+DC_B = "Drop cache source B"

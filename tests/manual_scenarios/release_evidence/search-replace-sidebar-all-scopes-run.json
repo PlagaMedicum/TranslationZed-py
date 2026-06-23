@@ -7,5 +7,19 @@
   "scenario": {
     "id": "search-replace-sidebar-all-scopes"
   },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/conflict_manual/BE/ui.txt",
+      "sha256": "e00ece2b65e0104839bb9a545b3bed7234d726ed1428d4aa86dbae6d58b2eaaa"
+    },
+    {
+      "path": "translationzed_py/core/search_replace_service.py",
+      "sha256": "2f5694780b4cfa429b555d112b397843d3cdf13b574d81b67ee72d8a12566c47"
+    },
+    {
+      "path": "translationzed_py/gui/main_window.py",
+      "sha256": "46f94bd8c064e8024e02badb007ae88689373e1452c87df9118ec86ba43f6277"
+    }
+  ],
   "version": 1
 }

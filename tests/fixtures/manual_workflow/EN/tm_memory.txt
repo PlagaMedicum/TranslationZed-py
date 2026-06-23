@@ -1,0 +1,2 @@
+TM_CAMERA = "Camera"
+TM_TOOLBOX = "Toolbox"

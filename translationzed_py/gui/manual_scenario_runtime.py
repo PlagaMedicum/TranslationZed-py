@@ -2,15 +2,34 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 SCENARIO_ENV_FILE = "TZP_MANUAL_SCENARIO_FILE"
 SCENARIO_ENV_RESULTS_DIR = "TZP_MANUAL_RESULTS_DIR"
+SCENARIO_ENV_RUN_TOKEN = "TZP_MANUAL_RUN_TOKEN"
 SCENARIO_REGISTRY_DEFAULT = "tests/manual_scenarios/scenarios.json"
 SCENARIO_REGISTRY_VERSION = 1
+VALID_WORKFLOW_FAMILIES = (
+    "open_save",
+    "conflict_resolution",
+    "qa_checklist",
+    "encoding_charsets",
+    "tm_apply",
+    "source_reference",
+    "tzp_writeback",
+    "status_triage",
+    "search_replace",
+)
+VALID_MANUAL_DEPTHS = (
+    "full_workflow",
+    "branch_check",
+    "same_file_diagnostic",
+    "multi_file_roundtrip",
+)
 
 
 class ManualScenarioError(ValueError):
@@ -23,17 +42,45 @@ class ManualScenario:
 
     id: str
     title: str
+    workflow_family: str
+    manual_depth: str
+    goal: str
+    start_context: str
     fixture_root: str
+    focus_files: tuple[str, ...]
+    finish_condition: str
     selected_locales: tuple[str, ...]
     steps: tuple[str, ...]
     expected_checks: tuple[str, ...]
+    tracked_repo_files: tuple[str, ...]
     env_overrides: dict[str, str]
     prefs_extras: dict[str, str]
     automation_pytest_selectors: tuple[str, ...]
+    operator_hints: tuple[str, ...] = ()
+    inspection_paths: tuple[str, ...] = ()
 
     def to_payload(self) -> dict[str, Any]:
         """Return a JSON-serializable scenario payload."""
-        return asdict(self)
+        return {
+            "id": self.id,
+            "title": self.title,
+            "workflow_family": self.workflow_family,
+            "manual_depth": self.manual_depth,
+            "goal": self.goal,
+            "start_context": self.start_context,
+            "fixture_root": self.fixture_root,
+            "focus_files": list(self.focus_files),
+            "finish_condition": self.finish_condition,
+            "selected_locales": list(self.selected_locales),
+            "steps": list(self.steps),
+            "expected_checks": list(self.expected_checks),
+            "tracked_repo_files": list(self.tracked_repo_files),
+            "env_overrides": dict(self.env_overrides),
+            "prefs_extras": dict(self.prefs_extras),
+            "automation_pytest_selectors": list(self.automation_pytest_selectors),
+            "operator_hints": list(self.operator_hints),
+            "inspection_paths": list(self.inspection_paths),
+        }
 
 
 @dataclass(frozen=True)
@@ -98,6 +145,97 @@ def _optional_string_map(value: Any, *, name: str) -> dict[str, str]:
     return parsed
 
 
+def _enum_string(value: Any, *, name: str, allowed: tuple[str, ...]) -> str:
+    text = _require_non_empty_string(value, name=name)
+    if text not in allowed:
+        allowed_text = ", ".join(allowed)
+        raise ManualScenarioError(f"{name} must be one of: {allowed_text}")
+    return text
+
+
+def _fixture_relative_paths(value: Any, *, name: str) -> tuple[str, ...]:
+    items = _string_list(value, name=name)
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for idx, item in enumerate(items):
+        if "\\" in item:
+            raise ManualScenarioError(
+                f"{name}[{idx}] must use POSIX-style fixture-relative paths"
+            )
+        path = Path(item)
+        if path.is_absolute():
+            raise ManualScenarioError(f"{name}[{idx}] must be fixture-relative")
+        if any(part in {"", ".", ".."} for part in path.parts):
+            raise ManualScenarioError(
+                f"{name}[{idx}] must not contain empty, '.' or '..' segments"
+            )
+        normalized_item = path.as_posix()
+        if normalized_item in seen:
+            raise ManualScenarioError(f"{name} has duplicate path: {normalized_item}")
+        seen.add(normalized_item)
+        normalized.append(normalized_item)
+    return tuple(normalized)
+
+
+def _optional_fixture_relative_paths(value: Any, *, name: str) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ManualScenarioError(f"{name} must be a list of fixture-relative paths")
+    if not value:
+        return ()
+    return _fixture_relative_paths(value, name=name)
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(8192)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def compute_tracked_file_hashes(
+    *, repo_root: Path, tracked_repo_files: tuple[str, ...]
+) -> list[dict[str, str]]:
+    """Return deterministic repo-relative tracked file hash rows."""
+    root = repo_root.resolve()
+    rows: list[dict[str, str]] = []
+    seen_paths: set[str] = set()
+    for idx, raw in enumerate(tracked_repo_files):
+        rel_path = str(raw).strip()
+        if not rel_path:
+            raise ManualScenarioError(
+                f"tracked_repo_files[{idx}] must be a non-empty string"
+            )
+        if Path(rel_path).is_absolute():
+            raise ManualScenarioError(
+                f"tracked_repo_files[{idx}] must be repo-relative: {rel_path!r}"
+            )
+        candidate = (root / rel_path).resolve()
+        try:
+            normalized = candidate.relative_to(root).as_posix()
+        except ValueError as exc:
+            raise ManualScenarioError(
+                f"tracked_repo_files[{idx}] escapes repo root: {rel_path!r}"
+            ) from exc
+        if normalized in seen_paths:
+            raise ManualScenarioError(
+                f"tracked_repo_files has duplicate path: {normalized}"
+            )
+        if not candidate.is_file():
+            raise ManualScenarioError(
+                f"tracked_repo_files[{idx}] must reference an existing file: {normalized}"
+            )
+        seen_paths.add(normalized)
+        rows.append({"path": normalized, "sha256": _sha256_file(candidate)})
+    rows.sort(key=lambda item: item["path"])
+    return rows
+
+
 def parse_manual_scenario(payload: Any) -> ManualScenario:
     """Parse and validate a single scenario payload object."""
     if not isinstance(payload, dict):
@@ -105,8 +243,28 @@ def parse_manual_scenario(payload: Any) -> ManualScenario:
     return ManualScenario(
         id=_require_non_empty_string(payload.get("id"), name="id"),
         title=_require_non_empty_string(payload.get("title"), name="title"),
+        workflow_family=_enum_string(
+            payload.get("workflow_family"),
+            name="workflow_family",
+            allowed=VALID_WORKFLOW_FAMILIES,
+        ),
+        manual_depth=_enum_string(
+            payload.get("manual_depth"),
+            name="manual_depth",
+            allowed=VALID_MANUAL_DEPTHS,
+        ),
+        goal=_require_non_empty_string(payload.get("goal"), name="goal"),
+        start_context=_require_non_empty_string(
+            payload.get("start_context"), name="start_context"
+        ),
         fixture_root=_require_non_empty_string(
             payload.get("fixture_root"), name="fixture_root"
+        ),
+        focus_files=_fixture_relative_paths(
+            payload.get("focus_files"), name="focus_files"
+        ),
+        finish_condition=_require_non_empty_string(
+            payload.get("finish_condition"), name="finish_condition"
         ),
         selected_locales=_string_list(
             payload.get("selected_locales"), name="selected_locales"
@@ -114,6 +272,9 @@ def parse_manual_scenario(payload: Any) -> ManualScenario:
         steps=_string_list(payload.get("steps"), name="steps"),
         expected_checks=_string_list(
             payload.get("expected_checks"), name="expected_checks"
+        ),
+        tracked_repo_files=_string_list(
+            payload.get("tracked_repo_files"), name="tracked_repo_files"
         ),
         env_overrides=_optional_string_map(
             payload.get("env_overrides"), name="env_overrides"
@@ -124,6 +285,14 @@ def parse_manual_scenario(payload: Any) -> ManualScenario:
         automation_pytest_selectors=_optional_string_list(
             payload.get("automation_pytest_selectors"),
             name="automation_pytest_selectors",
+        ),
+        operator_hints=_optional_string_list(
+            payload.get("operator_hints"),
+            name="operator_hints",
+        ),
+        inspection_paths=_optional_fixture_relative_paths(
+            payload.get("inspection_paths"),
+            name="inspection_paths",
         ),
     )
 

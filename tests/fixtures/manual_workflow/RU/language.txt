@@ -1,0 +1,2 @@
+text = Russian,
+charset = UTF-8,

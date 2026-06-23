@@ -1,0 +1,2 @@
+MERGE_A = "Merge source A"
+MERGE_B = "Merge source B"

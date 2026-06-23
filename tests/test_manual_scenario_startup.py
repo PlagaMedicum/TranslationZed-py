@@ -27,10 +27,17 @@ def _runtime_payload(tmp_path: Path) -> Path:
         "scenario": {
             "id": "demo",
             "title": "Demo",
-            "fixture_root": "conflict_manual",
-            "selected_locales": ["BE"],
+            "workflow_family": "open_save",
+            "manual_depth": "full_workflow",
+            "goal": "Verify manual startup payload application.",
+            "start_context": "Launch with RU selected and keep RU/ui.txt active.",
+            "fixture_root": "manual_workflow",
+            "focus_files": ["RU/ui.txt"],
+            "finish_condition": "Leave RU/ui.txt active with the applied scenario preferences.",
+            "selected_locales": ["RU"],
             "steps": ["one"],
             "expected_checks": ["ok"],
+            "tracked_repo_files": ["translationzed_py/gui/main_window.py"],
             "prefs_extras": {"TZP_STATUS_COMMENT_WRITEBACK": "true"},
             "env_overrides": {},
             "automation_pytest_selectors": ["tests/test_gui_smoke.py"],
@@ -50,7 +57,7 @@ def test_prepare_manual_scenario_applies_runtime_locales_and_extras(
     monkeypatch.setenv(SCENARIO_ENV_FILE, str(runtime_path))
     win = SimpleNamespace(_prefs_extras={})
     selected = helpers._prepare_manual_scenario(win, None)
-    assert selected == ["BE"]
+    assert selected == ["RU"]
     assert win._prefs_extras["TZP_STATUS_COMMENT_WRITEBACK"] == "true"
     assert win._manual_scenario_dialog_shown is False
     assert win._manual_scenario_dialog is None
@@ -83,10 +90,17 @@ def test_schedule_post_startup_hooks_schedules_dialog_only_for_runtime(
         scenario=ManualScenario(
             id="demo",
             title="Demo",
-            fixture_root="conflict_manual",
-            selected_locales=("BE",),
+            workflow_family="open_save",
+            manual_depth="full_workflow",
+            goal="Verify startup hook scheduling.",
+            start_context="Launch with RU selected.",
+            fixture_root="manual_workflow",
+            focus_files=("RU/ui.txt",),
+            finish_condition="Leave RU/ui.txt active.",
+            selected_locales=("RU",),
             steps=("one",),
             expected_checks=("ok",),
+            tracked_repo_files=("translationzed_py/gui/main_window.py",),
             env_overrides={},
             prefs_extras={},
             automation_pytest_selectors=("tests/test_gui_smoke.py",),
@@ -122,7 +136,7 @@ def test_show_manual_scenario_dialog_is_modeless_and_reports_result(
                 cb(value)
 
     class _FakeDialog:
-        instances: list["_FakeDialog"] = []
+        instances: list[_FakeDialog] = []
 
         def __init__(self, runtime, *, results_dir: Path, parent) -> None:
             self.runtime = runtime
@@ -160,16 +174,30 @@ def test_show_manual_scenario_dialog_is_modeless_and_reports_result(
             return self.shown
 
     status_messages: list[tuple[str, int]] = []
+    close_calls: list[str] = []
+
+    def _single_shot(ms: int, cb) -> None:  # type: ignore[no-untyped-def]
+        assert ms == 0
+        cb()
+
+    monkeypatch.setattr(helpers.QTimer, "singleShot", staticmethod(_single_shot))
     runtime = ManualScenarioRuntime(
         version=1,
         project_root=str((tmp_path / "project").resolve()),
         scenario=ManualScenario(
             id="demo",
             title="Demo",
-            fixture_root="conflict_manual",
-            selected_locales=("BE",),
+            workflow_family="open_save",
+            manual_depth="full_workflow",
+            goal="Verify checklist dialog startup handling.",
+            start_context="Launch with RU selected.",
+            fixture_root="manual_workflow",
+            focus_files=("RU/ui.txt",),
+            finish_condition="Leave RU/ui.txt active.",
+            selected_locales=("RU",),
             steps=("one",),
             expected_checks=("ok",),
+            tracked_repo_files=("translationzed_py/gui/main_window.py",),
             env_overrides={},
             prefs_extras={},
             automation_pytest_selectors=("tests/test_gui_smoke.py",),
@@ -179,6 +207,8 @@ def test_show_manual_scenario_dialog_is_modeless_and_reports_result(
         _manual_scenario_runtime=runtime,
         _manual_scenario_dialog_shown=False,
         _manual_scenario_dialog=None,
+        _manual_scenario_force_exit=False,
+        close=lambda: close_calls.append("closed"),
         statusBar=lambda: SimpleNamespace(
             showMessage=lambda text, timeout: status_messages.append((text, timeout))
         ),
@@ -210,3 +240,5 @@ def test_show_manual_scenario_dialog_is_modeless_and_reports_result(
     dialog.finished.emit(0)
     assert win._manual_scenario_dialog is None
     assert status_messages == [("Manual scenario 'demo' marked passed.", 8000)]
+    assert win._manual_scenario_force_exit is True
+    assert close_calls == ["closed"]

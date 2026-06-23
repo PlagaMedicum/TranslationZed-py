@@ -1,1 +1,2 @@
-UI_OK = "OK"
+UI_OK = "Ação rápida"
+UI_HINT = "Salvar alterações"

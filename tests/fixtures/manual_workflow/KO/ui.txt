@@ -1,0 +1,4 @@
+UI_HELLO = "수동 시나리오에 오신 것을 환영합니다."
+UI_CAMERA = "카메라"
+UI_REPLACE = "target word를 바꾸세요."
+UI_STATUS = "상태 표시 예시입니다."

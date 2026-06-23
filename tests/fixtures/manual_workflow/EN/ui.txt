@@ -1,0 +1,4 @@
+UI_HELLO = "Welcome to the manual workflow."
+UI_CAMERA = "Camera"
+UI_REPLACE = "Replace target word."
+UI_STATUS = "Status indicator sample."

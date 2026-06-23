@@ -1,0 +1,1 @@
+SEARCH_EXTRA = "Locale scope extra target word."

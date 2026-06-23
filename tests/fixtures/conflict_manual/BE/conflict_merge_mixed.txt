@@ -1,0 +1,2 @@
+MERGE_A = "Файл merge A!!"
+MERGE_B = "Файл merge B..."

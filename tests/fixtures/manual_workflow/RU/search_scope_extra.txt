@@ -1,0 +1,1 @@
+SEARCH_EXTRA = "Дополнительный target word для области locale."

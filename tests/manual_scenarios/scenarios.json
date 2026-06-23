@@ -3,21 +3,40 @@
   "scenarios": [
     {
       "id": "open-edit-save-basic",
-      "title": "Open, edit, and save one locale file",
-      "fixture_root": "conflict_manual",
+      "title": "Open, edit, save, and switch files on a generic locale fixture",
+      "workflow_family": "open_save",
+      "manual_depth": "full_workflow",
+      "goal": "Verify the ordinary open/edit/save flow on a locale-diverse manual fixture without relying on fake file-close semantics.",
+      "start_context": "Launch the scenario project with RU selected. This is a file-write scenario. Use Project tree file switching because the app does not expose a close-file action.",
+      "fixture_root": "manual_workflow",
+      "focus_files": [
+        "RU/ui.txt",
+        "RU/menu.txt"
+      ],
+      "finish_condition": "Leave RU/ui.txt active after saving, switching to RU/menu.txt, and switching back, with the edited value still visible and the row clean after save.",
+      "operator_hints": [
+        "This scenario verifies writing the copied fixture to disk, not cache-only save.",
+        "If Save prompts for a write or cache decision, choose Write to file and record the exact prompt wording in Notes. If no prompt appears, record that too."
+      ],
       "selected_locales": [
-        "BE"
+        "RU"
       ],
       "steps": [
-        "Open BE/ui.txt from the Project tree.",
-        "Edit one translation value in the table or detail editor.",
-        "Use General -> Save and confirm write action.",
-        "Re-open the same file and verify the edited value persists."
+        "Open RU/ui.txt from the Project tree.",
+        "Edit UI_HELLO in the table or detail editor and confirm the row becomes dirty.",
+        "Use General -> Save. If a save/write prompt appears, choose Write to file for this scenario and record the prompt wording in Notes. Then open RU/menu.txt from the Project tree.",
+        "Switch back to RU/ui.txt and verify the saved value persists."
       ],
       "expected_checks": [
-        "No startup errors are shown.",
-        "Edited row is marked dirty before save and clean after save.",
-        "Saved value remains after re-open."
+        "No startup or save error dialogs appear.",
+        "Dirty and clean state changes follow edit then save.",
+        "File switching does not break the saved value or active editing context."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/gui/main_window.py",
+        "translationzed_py/core/file_workflow.py",
+        "tests/fixtures/manual_workflow/RU/ui.txt",
+        "tests/fixtures/manual_workflow/RU/menu.txt"
       ],
       "env_overrides": {},
       "prefs_extras": {},
@@ -28,21 +47,50 @@
     },
     {
       "id": "conflict-resolution-flow",
-      "title": "Conflict detection and resolution prompt flow",
+      "title": "Conflict resolution flow: drop cache, drop original, and merge",
+      "workflow_family": "conflict_resolution",
+      "manual_depth": "full_workflow",
+      "goal": "Verify the full conflict-resolution workflow in one coherent run: Drop cache on RU/conflict_drop_cache.txt, Drop original on RU/conflict_drop_original.txt, then Merge mixed choices plus one edited value on RU/conflict_merge_mixed.txt.",
+      "start_context": "Launch with RU selected. Use the Project tree to move between RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, RU/conflict_merge_mixed.txt, and RU/ui.txt. RU/ui.txt is only a neutral switch target in this scenario and should not open a conflict dialog.",
       "fixture_root": "conflict_manual",
+      "focus_files": [
+        "RU/conflict_drop_cache.txt",
+        "RU/conflict_drop_original.txt",
+        "RU/conflict_merge_mixed.txt",
+        "RU/ui.txt"
+      ],
+      "finish_condition": "Leave RU/conflict_merge_mixed.txt active after completing all three conflict paths, saving after each apply step, and switching through neutral RU/ui.txt without any repeated conflict prompt.",
       "selected_locales": [
-        "BE"
+        "RU"
       ],
       "steps": [
-        "Open BE/ui.txt and apply edits to create draft/cache state.",
-        "Trigger conflict handling path from save/open workflow.",
-        "Choose merge or keep-disk path in conflict dialog.",
-        "Verify table content and status reflect selected resolution."
+        "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
+        "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+        "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
+        "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+        "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
+        "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
+        "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
       ],
       "expected_checks": [
-        "Conflict dialog appears with deterministic choices.",
-        "Selected conflict action is applied consistently.",
-        "No crash occurs and file remains operable after resolution."
+        "Conflict dialog appears immediately for RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and RU/conflict_merge_mixed.txt.",
+        "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
+        "Drop original applies cached values for RU/conflict_drop_original.txt.",
+        "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+        "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/gui/main_window.py",
+        "translationzed_py/core/conflict_service.py",
+        "tests/fixtures/conflict_manual/EN/conflict_drop_cache.txt",
+        "tests/fixtures/conflict_manual/EN/conflict_drop_original.txt",
+        "tests/fixtures/conflict_manual/EN/conflict_merge_mixed.txt",
+        "tests/fixtures/conflict_manual/RU/conflict_drop_cache.txt",
+        "tests/fixtures/conflict_manual/RU/conflict_drop_original.txt",
+        "tests/fixtures/conflict_manual/RU/conflict_merge_mixed.txt",
+        "tests/fixtures/conflict_manual/.tzp/cache/RU/conflict_drop_cache.bin",
+        "tests/fixtures/conflict_manual/.tzp/cache/RU/conflict_drop_original.bin",
+        "tests/fixtures/conflict_manual/.tzp/cache/RU/conflict_merge_mixed.bin"
       ],
       "env_overrides": {},
       "prefs_extras": {},
@@ -53,46 +101,142 @@
     },
     {
       "id": "qa-checklist-manual-run",
-      "title": "Manual QA run and checklist update flow",
-      "fixture_root": "perf_root",
+      "title": "Manual QA run, navigation, and stale-message refresh flow",
+      "workflow_family": "qa_checklist",
+      "manual_depth": "same_file_diagnostic",
+      "goal": "Verify manual QA run progression, finding navigation, stale-message rendering, and findings refresh on a deterministic QA file.",
+      "start_context": "Launch with RU selected and keep the QA side panel visible. Scenario preferences disable QA auto-refresh and QA auto-mark paths.",
+      "fixture_root": "qa_manual",
+      "focus_files": [
+        "RU/ui.txt"
+      ],
+      "finish_condition": "Leave RU/ui.txt active after the second manual QA run, with refreshed findings visible for the edited file and no fake placeholder row in the findings list.",
       "selected_locales": [
-        "BE"
+        "RU"
       ],
       "steps": [
-        "Open one BE file from perf fixtures.",
-        "Switch to QA side panel and trigger Run QA.",
-        "Observe checklist state transitions in fixed order.",
-        "Navigate at least one finding via list action."
+        "Open RU/ui.txt from the Project tree and confirm the QA panel shows the pre-run manual message.",
+        "Press Run QA and observe rule-state progress in fixed order until the run completes.",
+        "Activate one finding from the list and confirm the table navigates to the matching row.",
+        "Edit one translation in RU/ui.txt and confirm the stale QA message is plain text rather than a fake findings row.",
+        "Press Run QA again and confirm the findings list refreshes for the edited file."
       ],
       "expected_checks": [
-        "QA panel message indicates manual mode before run.",
-        "Checklist rows move through Queued/Running/Completed states.",
-        "Findings list updates and supports navigation."
+        "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
+        "Rule-state progress follows the queued, running, and completed sequence during the run.",
+        "Findings list is non-empty and supports row navigation.",
+        "Source column shows EN source text rather than empty placeholders.",
+        "After editing, stale-message text is plain panel text and the second run replaces it with refreshed findings."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/gui/main_window_panel_helpers.py",
+        "translationzed_py/gui/qa_async.py",
+        "tests/fixtures/qa_manual/EN/ui.txt",
+        "tests/fixtures/qa_manual/RU/ui.txt"
       ],
       "env_overrides": {},
-      "prefs_extras": {},
+      "prefs_extras": {
+        "QA_CHECK_TRAILING": "true",
+        "QA_CHECK_NEWLINES": "true",
+        "QA_CHECK_ESCAPES": "true",
+        "QA_CHECK_SAME_AS_SOURCE": "true",
+        "QA_CHECK_LANGUAGETOOL": "false",
+        "QA_AUTO_REFRESH": "false",
+        "QA_AUTO_MARK_FOR_REVIEW": "false",
+        "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW": "false",
+        "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW": "false",
+        "QA_PANEL_RESULT_LIMIT": "2000"
+      },
       "automation_pytest_selectors": [
         "tests/test_qa_async.py",
         "tests/test_gui_qa_panel.py"
       ]
     },
     {
-      "id": "tm-apply-triage-flow",
-      "title": "TM triage list and apply flow",
+      "id": "encoding-charsets-manual-roundtrip",
+      "title": "Manual encoding and charset roundtrip verification",
+      "workflow_family": "encoding_charsets",
+      "manual_depth": "multi_file_roundtrip",
+      "goal": "Verify mixed-charset roundtrip editing across Cp1251, UTF-16, and Cp1252 files without mojibake.",
+      "start_context": "Launch with RU, KO, and PTBR selected. Use Project tree file switching between the three target files.",
       "fixture_root": "prod_like",
+      "focus_files": [
+        "RU/IG_UI_RU.txt",
+        "KO/IG_UI_KO.txt",
+        "PTBR/IG_UI_PTBR.txt"
+      ],
+      "finish_condition": "Leave PTBR/IG_UI_PTBR.txt active after switching back through all edited files, with each saved value still readable in its native script.",
+      "operator_hints": [
+        "This is a file-write scenario. If Save offers cache-only versus writing the file, choose Write to file.",
+        "If the write flow explains that new lines will be inserted for missing translation rows, record the exact prompt text and continue with the normal file write for this scenario.",
+        "Use the status bar to confirm the current file encoding before each save."
+      ],
       "selected_locales": [
-        "BE"
+        "RU",
+        "KO",
+        "PTBR"
       ],
       "steps": [
-        "Open a BE translation file with EN source available.",
-        "Switch to TM panel and run suggestion lookup.",
-        "Apply one suggestion and verify translation updates.",
-        "Confirm grouping/filter controls still respond."
+        "Open RU/IG_UI_RU.txt and confirm the status bar shows the current file encoding before editing.",
+        "Replace one RU value with a real Cyrillic phrase such as `Сохранить игру`, use General -> Save, and choose Write to file if prompted.",
+        "Open KO/IG_UI_KO.txt, confirm the status bar shows the current file encoding, replace one KO value with a real Korean phrase such as `설정을 저장`, then save with Write to file if prompted.",
+        "Open PTBR/IG_UI_PTBR.txt, confirm the status bar shows the current file encoding, replace one PT-BR value with a real Cp1252-safe phrase such as `Salvar alterações`, then save with Write to file if prompted.",
+        "Switch back through RU/IG_UI_RU.txt, KO/IG_UI_KO.txt, and PTBR/IG_UI_PTBR.txt.",
+        "Confirm each edited value remains readable with no mojibake after the roundtrip."
       ],
       "expected_checks": [
-        "TM panel renders suggestions without UI freeze.",
-        "Applied suggestion updates current row value.",
-        "TM controls remain interactive after apply."
+        "No parse or decode error dialogs appear while opening mixed encodings.",
+        "Status bar shows the current file encoding for each opened file.",
+        "Edits in Cp1251, UTF-16, and Cp1252 files persist after save.",
+        "Returning to the edited files does not show mojibake or broken open-save behavior."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/core/parser.py",
+        "translationzed_py/core/saver.py",
+        "tests/fixtures/prod_like/RU/IG_UI_RU.txt",
+        "tests/fixtures/prod_like/KO/IG_UI_KO.txt",
+        "tests/fixtures/prod_like/PTBR/IG_UI_PTBR.txt"
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_gui_save_encoding.py",
+        "tests/test_encoding_diagnostics.py"
+      ]
+    },
+    {
+      "id": "tm-apply-triage-flow",
+      "title": "TM lookup, apply, and panel-stability flow",
+      "workflow_family": "tm_apply",
+      "manual_depth": "full_workflow",
+      "goal": "Verify deterministic project TM lookup and apply behavior on a locale-diverse generic fixture.",
+      "start_context": "Launch with RU selected. RU/tm_memory.txt provides the project-TM match source while RU/ui.txt is the active editing file.",
+      "fixture_root": "manual_workflow",
+      "focus_files": [
+        "RU/ui.txt",
+        "RU/tm_memory.txt"
+      ],
+      "finish_condition": "Leave RU/ui.txt active on the applied row after switching away and back, with the applied translation still visible and the TM panel responsive.",
+      "selected_locales": [
+        "RU"
+      ],
+      "steps": [
+        "Open RU/ui.txt, switch to the TM side panel, and select the UI_CAMERA row.",
+        "Wait for TM suggestions and confirm a project-origin suggestion derived from RU/tm_memory.txt appears.",
+        "Apply the suggestion and confirm the translation cell updates under the normal edit pipeline.",
+        "Switch to RU/tm_memory.txt or a different row, then return to the applied row in RU/ui.txt.",
+        "Verify the applied value persists and the TM panel remains responsive."
+      ],
+      "expected_checks": [
+        "TM panel shows at least one project suggestion for the UI_CAMERA row.",
+        "Applying the suggestion updates the translation cell without freezing the UI.",
+        "The row remains editable and the TM panel still responds after the apply action."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/core/tm_workflow_service.py",
+        "translationzed_py/gui/main_window.py",
+        "tests/fixtures/manual_workflow/RU/ui.txt",
+        "tests/fixtures/manual_workflow/RU/tm_memory.txt"
       ],
       "env_overrides": {},
       "prefs_extras": {},
@@ -103,21 +247,47 @@
     },
     {
       "id": "source-reference-fallback-flow",
-      "title": "Source-reference mode and fallback behavior",
-      "fixture_root": "prod_like",
+      "title": "Source-reference mode with empty source when counterpart is missing",
+      "workflow_family": "source_reference",
+      "manual_depth": "full_workflow",
+      "goal": "Verify source-reference locale switching on files with and without KO counterparts, using empty Source cells when the requested counterpart file is missing.",
+      "start_context": "Launch with RU and KO selected. Keep KO selected as the source-reference locale for the whole scenario. RU/ui.txt has a KO counterpart; RU/menu.txt does not.",
+      "fixture_root": "manual_workflow",
+      "focus_files": [
+        "RU/ui.txt",
+        "RU/menu.txt"
+      ],
+      "finish_condition": "Leave RU/menu.txt active after selecting KO as the source-reference locale and confirming the Source column stays empty for the missing counterpart without changing the selected source-reference mode.",
+      "operator_hints": [
+        "Do not treat an empty Source cell on RU/menu.txt as a failure in this scenario; the empty state is the intended result when KO/menu.txt is missing.",
+        "This scenario verifies `requested source or empty`, not fallback chains. Do not open Preferences or look for automatic fallback behavior here."
+      ],
       "selected_locales": [
-        "BE"
+        "RU",
+        "KO"
       ],
       "steps": [
-        "Open BE file and focus source column header controls.",
-        "Change source-reference mode and fallback settings.",
-        "Navigate several rows and inspect source content updates.",
-        "Re-open preferences and confirm persistence."
+        "Open RU/ui.txt and use the Source column header control to select KO as the source-reference locale.",
+        "Confirm the Source column now shows KO text for RU/ui.txt.",
+        "Open RU/menu.txt and keep KO selected as the source-reference locale.",
+        "Confirm the Source column on RU/menu.txt stays empty because no KO/menu.txt exists.",
+        "Change the selected row inside RU/menu.txt and confirm the Source column stays empty there as well.",
+        "Switch back to RU/ui.txt and then return to RU/menu.txt to confirm the selected source-reference locale remains stable while the missing counterpart still produces an empty Source column."
       ],
       "expected_checks": [
-        "Source-reference selector responds without errors.",
-        "Fallback mode changes update source text deterministically.",
-        "Preferences values round-trip across reopen."
+        "Source-reference control responds without errors.",
+        "KO source is shown on RU/ui.txt because a KO counterpart exists.",
+        "RU/menu.txt keeps an empty Source column rather than showing fallback text when KO/menu.txt is missing.",
+        "Switching files does not silently replace the requested KO source-reference mode with another locale."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/core/source_reference_service.py",
+        "translationzed_py/gui/source_reference_state.py",
+        "translationzed_py/gui/source_reference_ui.py",
+        "translationzed_py/gui/preferences_dialog.py",
+        "tests/fixtures/manual_workflow/RU/ui.txt",
+        "tests/fixtures/manual_workflow/RU/menu.txt",
+        "tests/fixtures/manual_workflow/KO/ui.txt"
       ],
       "env_overrides": {},
       "prefs_extras": {
@@ -130,25 +300,51 @@
     },
     {
       "id": "tzp-writeback-opt-in",
-      "title": "Optional TZP status-comment writeback",
-      "fixture_root": "conflict_manual",
+      "title": "Status-comment writeback (opt-in)",
+      "workflow_family": "tzp_writeback",
+      "manual_depth": "full_workflow",
+      "goal": "Verify opt-in TZP status-comment write-back changes only namespaced TZP comments and keeps user comments intact.",
+      "start_context": "Launch with RU selected. Scenario preferences already enable TZP write-back for this copied project. You should not need to change Preferences manually unless you are diagnosing a failure.",
+      "fixture_root": "manual_workflow",
+      "focus_files": [
+        "RU/tzp_status.txt",
+        "RU/ui.txt"
+      ],
+      "finish_condition": "Leave RU/tzp_status.txt active after saving and switching through RU/ui.txt, with on-disk comments matching the opt-in TZP policy.",
+      "operator_hints": [
+        "Use the dialog copy buttons to copy the project root or inspection paths before checking the file on disk.",
+        "This scenario verifies an on-disk file write, not cache-only save. If Save offers both, choose Write to file.",
+        "Record exactly which comment lines changed if the on-disk result differs from expectation."
+      ],
+      "inspection_paths": [
+        "RU/tzp_status.txt"
+      ],
       "selected_locales": [
-        "BE"
+        "RU"
       ],
       "steps": [
-        "Open BE/ui.txt and edit value and status for one key.",
-        "Save file with TZP writeback opt-in enabled in scenario extras.",
-        "Inspect saved file comments and confirm namespaced TZP marker behavior."
+        "Open RU/tzp_status.txt. In row `TZP_KEEP`, change the translation to `Готово к выпуску` and change the row status from For Review to Translated.",
+        "Use General -> Save. If Save offers both cache-only and file-write options, choose Write to file for this scenario.",
+        "Use the dialog copy buttons to copy the project root or inspection path, then open the copied inspection file RU/tzp_status.txt under the scenario project root.",
+        "Confirm `TZP_KEEP` now ends with the namespaced comment `-- TZP:TRANSLATED` on disk.",
+        "Confirm `TZP_EDIT` still keeps only the user-authored comment `-- заметка переводчика` and did not gain a new TZP comment.",
+        "Switch to RU/ui.txt and back to RU/tzp_status.txt to confirm normal editing flow still works."
       ],
       "expected_checks": [
-        "Writeback is opt-in and active only for this scenario.",
-        "Only namespaced TZP comments are added/updated/removed.",
-        "Non-namespaced user comments are not mutated."
+        "Scenario-injected TZP write-back is active for this copied project without extra preference edits.",
+        "`TZP_KEEP` updates its namespaced TZP comment from FOR_REVIEW to TRANSLATED.",
+        "`TZP_EDIT` keeps the user-authored non-TZP comment unchanged."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/core/tzp_comment_policy.py",
+        "translationzed_py/core/saver.py",
+        "translationzed_py/gui/main_window_panel_helpers.py",
+        "tests/fixtures/manual_workflow/RU/tzp_status.txt",
+        "tests/fixtures/manual_workflow/RU/ui.txt"
       ],
       "env_overrides": {},
       "prefs_extras": {
-        "TZP_STATUS_COMMENT_WRITEBACK": "true",
-        "TZP_STATUS_COMMENT_PREFIX": "--"
+        "TZP_STATUS_COMMENT_WRITEBACK": "true"
       },
       "automation_pytest_selectors": [
         "tests/test_tzp_comment_policy.py",
@@ -158,20 +354,33 @@
     {
       "id": "status-triage-mixed-indicator",
       "title": "Status triage mixed-selection status-bar indicator",
-      "fixture_root": "conflict_manual",
+      "workflow_family": "status_triage",
+      "manual_depth": "branch_check",
+      "goal": "Verify the status bar shows the mixed-selection indicator only for real mixed multi-row selection states.",
+      "start_context": "Launch with RU selected. Use RU/ui.txt and the normal toolbar status actions to create mixed and uniform selections.",
+      "fixture_root": "manual_workflow",
+      "focus_files": [
+        "RU/ui.txt"
+      ],
+      "finish_condition": "Leave RU/ui.txt active after checking mixed, single-row, and uniform multi-row selection states, with the status bar back in a non-mixed state.",
       "selected_locales": [
-        "BE"
+        "RU"
       ],
       "steps": [
-        "Open BE/ui.txt and select multiple rows with different status values.",
-        "Use toolbar status actions to keep at least two selected rows in different statuses.",
-        "Observe status bar while mixed selection stays active.",
-        "Switch selection to a single row and then to uniform multi-row selection."
+        "Open RU/ui.txt and select multiple rows.",
+        "Use toolbar status actions to keep at least two selected rows in different statuses at the same time.",
+        "Observe the status bar while the mixed selection stays active.",
+        "Reduce the selection to one row and then to a uniform multi-row status selection."
       ],
       "expected_checks": [
         "Status bar shows Selection: mixed (N rows) only for mixed multi-row selection.",
-        "Indicator is not shown for single-row selection.",
-        "Indicator is not shown for uniform multi-row status selection."
+        "The indicator is not shown for a single selected row.",
+        "The indicator is not shown for uniform multi-row status selection."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/gui/main_window_panel_helpers.py",
+        "translationzed_py/gui/main_window.py",
+        "tests/fixtures/manual_workflow/RU/ui.txt"
       ],
       "env_overrides": {},
       "prefs_extras": {},
@@ -182,25 +391,47 @@
     },
     {
       "id": "search-replace-sidebar-all-scopes",
-      "title": "Search+replace sidebar flow with all-scope confirmation",
-      "fixture_root": "conflict_manual",
+      "title": "Search+replace sidebar flow with all replace scopes",
+      "workflow_family": "search_replace",
+      "manual_depth": "full_workflow",
+      "goal": "Verify Search sidebar controls stay synchronized with the toolbar while File, Locale, and Locale Pool replace scopes run through their real Preferences-driven workflow.",
+      "start_context": "Launch with RU and KO selected. Replace scope is configured through General -> Preferences -> Search / Replace, not from the Search sidebar.",
+      "fixture_root": "manual_workflow",
+      "focus_files": [
+        "RU/search_scope.txt",
+        "RU/search_scope_extra.txt",
+        "KO/search_scope.txt"
+      ],
+      "finish_condition": "Leave RU/search_scope.txt active after one real replace-all apply and two canceled runs, with only the intended scope changed.",
       "selected_locales": [
-        "BE"
+        "RU",
+        "KO"
       ],
       "steps": [
-        "Open BE/ui.txt and switch to Search panel.",
-        "Use sidebar controls to set query, replacement, regex, case, and search field.",
-        "Run Replace All in FILE scope, then LOCALE/POOL scopes via Preferences, and confirm modal summary each time.",
-        "Cancel one confirmation and verify no replacement is applied for that run."
+        "Open RU/search_scope.txt, switch to the Search panel, and enter a query plus replacement with positive matches.",
+        "Confirm toolbar and sidebar controls stay synchronized, then open General -> Preferences -> Search / Replace and set Replace scope to File.",
+        "Run Replace All in File scope, review the confirmation dialog, and cancel it.",
+        "Change Replace scope to Locale, run Replace All again, review the confirmation dialog, and cancel it.",
+        "Change Replace scope to Locale Pool, run Replace All again, tick the review checkbox, and apply the replacement.",
+        "Open RU/search_scope_extra.txt and KO/search_scope.txt to confirm only the intended pool run changed files."
       ],
       "expected_checks": [
-        "Sidebar and toolbar controls stay synchronized in both directions.",
-        "Replace All confirmation modal appears for FILE, LOCALE, and POOL when matches exist.",
-        "Modal summary includes scope label, total replacements, and affected files.",
-        "Cancel prevents apply and leaves values unchanged for the canceled run."
+        "Toolbar and sidebar search controls remain synchronized in both directions.",
+        "Replace All confirmation appears for File, Locale, and Locale Pool when matches exist.",
+        "Canceled runs make no edits.",
+        "One applied run changes only the files inside the selected replace scope."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/core/search_replace_service.py",
+        "translationzed_py/gui/main_window.py",
+        "tests/fixtures/manual_workflow/RU/search_scope.txt",
+        "tests/fixtures/manual_workflow/RU/search_scope_extra.txt",
+        "tests/fixtures/manual_workflow/KO/search_scope.txt"
       ],
       "env_overrides": {},
-      "prefs_extras": {},
+      "prefs_extras": {
+        "replace_scope": "FILE"
+      },
       "automation_pytest_selectors": [
         "tests/test_search_replace_service.py",
         "tests/test_main_window_replace_merge_clipboard.py",
@@ -210,25 +441,46 @@
     {
       "id": "search-replace-impact-preview-safe-apply",
       "title": "Search+replace impact preview with checkbox-gated replace safety",
-      "fixture_root": "conflict_manual",
+      "workflow_family": "search_replace",
+      "manual_depth": "full_workflow",
+      "goal": "Verify the replace-all impact preview, row ordering, cancel path, and checkbox-gated apply flow with a real multi-file pool scope.",
+      "start_context": "Launch with RU and KO selected. Set Replace scope through General -> Preferences -> Search / Replace before running Replace All.",
+      "fixture_root": "manual_workflow",
+      "focus_files": [
+        "RU/search_scope.txt",
+        "RU/search_scope_extra.txt",
+        "KO/search_scope.txt"
+      ],
+      "finish_condition": "Leave RU/search_scope.txt active after a canceled run and a confirmed pool run, with the replacement persisted across the expected files.",
       "selected_locales": [
-        "BE"
+        "RU",
+        "KO"
       ],
       "steps": [
-        "Open BE/ui.txt and switch to Search panel.",
-        "Set query and replacement so Replace All has positive matches.",
-        "Run Replace All and inspect summary plus row-level impact preview.",
-        "Press Cancel and verify no changes are applied.",
-        "Run Replace All again, tick the review checkbox, then press Replace."
+        "Open RU/search_scope.txt, switch to the Search panel, and set query target word plus replacement target phrase.",
+        "Open General -> Preferences -> Search / Replace, set Replace scope to Locale Pool, apply the dialog, and run Replace All.",
+        "Inspect the confirmation summary and row-level impact preview, then cancel and confirm no values change.",
+        "Run Replace All again, verify the Replace button stays disabled until the review checkbox is checked, then tick it and apply the replacement.",
+        "Switch between RU/search_scope.txt, RU/search_scope_extra.txt, and KO/search_scope.txt to confirm the replacement persisted across the expected files."
       ],
       "expected_checks": [
-        "Confirmation modal shows scope, total replacements, affected files, and row-level preview rows.",
-        "Replace button is disabled until the review checkbox is checked.",
-        "Cancel path applies no changes.",
-        "Checkbox-gated Replace performs one all-or-cancel apply with no per-file toggle path."
+        "Confirmation dialog shows scope label, total replacements, affected files, and row-level preview rows.",
+        "Replace stays disabled until the review checkbox is checked.",
+        "The cancel path leaves files unchanged.",
+        "The confirmed pool replace persists across all expected files after file switching."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/core/search_replace_service.py",
+        "translationzed_py/gui/main_window.py",
+        "translationzed_py/gui/dialogs.py",
+        "tests/fixtures/manual_workflow/RU/search_scope.txt",
+        "tests/fixtures/manual_workflow/RU/search_scope_extra.txt",
+        "tests/fixtures/manual_workflow/KO/search_scope.txt"
       ],
       "env_overrides": {},
-      "prefs_extras": {},
+      "prefs_extras": {
+        "replace_scope": "POOL"
+      },
       "automation_pytest_selectors": [
         "tests/test_search_replace_service.py",
         "tests/test_gui_dialogs.py",

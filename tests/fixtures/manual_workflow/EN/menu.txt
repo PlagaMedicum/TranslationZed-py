@@ -1,0 +1,2 @@
+MENU_PLAY = "Play"
+MENU_OPTIONS = "Options"

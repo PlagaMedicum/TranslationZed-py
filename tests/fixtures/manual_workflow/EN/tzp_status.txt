@@ -1,0 +1,2 @@
+TZP_EDIT = "Draft status line" -- translator note
+TZP_KEEP = "Needs review" -- TZP:FOR_REVIEW

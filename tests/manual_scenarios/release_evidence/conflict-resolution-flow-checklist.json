@@ -1,0 +1,43 @@
+{
+  "all_steps": [
+    "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+    "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+    "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
+    "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
+  ],
+  "checked_expected_checks": [
+    "Conflict dialog appears immediately for RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and RU/conflict_merge_mixed.txt.",
+    "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
+    "Drop original applies cached values for RU/conflict_drop_original.txt.",
+    "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+    "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
+  ],
+  "checked_steps": [
+    "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+    "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+    "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
+    "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
+    "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
+  ],
+  "completed_at_ms": 1774374020492,
+  "expected_checks": [
+    "Conflict dialog appears immediately for RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and RU/conflict_merge_mixed.txt.",
+    "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
+    "Drop original applies cached values for RU/conflict_drop_original.txt.",
+    "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+    "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
+  ],
+  "fixture_root": "conflict_manual",
+  "notes": "",
+  "project_root": "/tmp/tzp-manual-conflict-resolution-flow-_b0cvwn9/project",
+  "result": "passed",
+  "run_token": "conflict-resolution-flow-1774373905739",
+  "scenario_id": "conflict-resolution-flow",
+  "title": "Conflict resolution flow: drop cache, drop original, and merge",
+  "version": 1
+}

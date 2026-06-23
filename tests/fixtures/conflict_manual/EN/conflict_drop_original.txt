@@ -1,0 +1,2 @@
+DO_A = "Drop original source A"
+DO_B = "Drop original source B"

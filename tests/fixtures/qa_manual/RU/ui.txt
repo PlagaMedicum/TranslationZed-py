@@ -1,0 +1,4 @@
+HELLO = "Привет"
+NEWLINES = "Строка один."
+TOKENS = "Нажмите, чтобы продолжить."
+SAME = "Exact text."
