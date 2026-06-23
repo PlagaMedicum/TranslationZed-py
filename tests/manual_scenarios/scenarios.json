@@ -63,20 +63,26 @@
       "selected_locales": [
         "RU"
       ],
+      "operator_hints": [
+        "In this scenario, General -> Save opens the Write original files dialog for cached drafts.",
+        "Do not write later conflict files early. If the dialog lists future conflict files, uncheck them or choose Cache only according to the current step.",
+        "After Drop cache, RU/conflict_drop_cache.txt is expected to keep file-side values. If it is not listed in Write original files and only later conflict files are listed, choose Cache only."
+      ],
       "steps": [
         "Open RU/conflict_drop_cache.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop cache.",
-        "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
+        "Use General -> Save. In Write original files, do not write later conflict files. If RU/conflict_drop_cache.txt is not listed and only later conflict files are listed, choose Cache only. If RU/conflict_drop_cache.txt is listed, leave only RU/conflict_drop_cache.txt checked and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_cache.txt, and verify file-side values remain visible with no second conflict prompt.",
         "Open RU/conflict_drop_original.txt from the Project tree, wait for the conflict dialog, confirm both rows are present, and choose Drop original.",
-        "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
+        "Use General -> Save. In Write original files, leave only RU/conflict_drop_original.txt checked, uncheck RU/conflict_merge_mixed.txt if present, and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_drop_original.txt, and verify cached values remain visible with no second conflict prompt.",
         "Open RU/conflict_merge_mixed.txt from the Project tree, wait for the conflict dialog, choose Merge, and confirm both MERGE_A and MERGE_B rows are visible.",
         "Select Original for MERGE_A, Cache for MERGE_B, edit one merge value cell before Apply, and then press Apply.",
-        "Use General -> Save, open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
+        "Use General -> Save. In Write original files, leave only RU/conflict_merge_mixed.txt checked and choose Write. Then open neutral RU/ui.txt, verify it opens without a conflict dialog, switch back to RU/conflict_merge_mixed.txt, and verify the mixed choices plus edited merge value remain visible with no second conflict prompt."
       ],
       "expected_checks": [
         "Conflict dialog appears immediately for RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and RU/conflict_merge_mixed.txt.",
         "Drop cache clears cached draft data and leaves file-side values visible for RU/conflict_drop_cache.txt.",
         "Drop original applies cached values for RU/conflict_drop_original.txt.",
         "Merge requires per-row decisions, allows one edited merge value, and applies the mixed result for RU/conflict_merge_mixed.txt.",
+        "Save decisions do not write later unresolved conflict files before their own steps.",
         "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
       ],
       "tracked_repo_files": [

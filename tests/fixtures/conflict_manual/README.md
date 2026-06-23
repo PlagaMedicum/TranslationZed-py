@@ -25,6 +25,11 @@ conflict flow immediately.
    - on `conflict_drop_original.txt`: choose `Drop original`,
    - on `conflict_merge_mixed.txt`: choose `Merge…`, pick Original for one row and Cache for another, edit one value before `Apply`.
 
+6) When the scenario says `General -> Save`, use the `Write original files` dialog carefully:
+   - after `Drop cache`, do not write future conflict files; if only later files are listed, choose `Cache only`,
+   - after `Drop original`, write only `RU/conflict_drop_original.txt`,
+   - after `Merge`, write only `RU/conflict_merge_mixed.txt`.
+
 Notes:
 - Current manual scenarios use `.tzp/cache/RU/*.bin`.
 - `RU/ui.txt` and `BE/ui.txt` are intentionally non-conflicting in this fixture so manual testers can switch context without triggering an unrelated dialog.

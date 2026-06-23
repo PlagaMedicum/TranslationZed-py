@@ -68,6 +68,24 @@ CONFLICT_NEUTRAL_SWITCH_CACHE_PATHS: tuple[str, ...] = (
     "tests/fixtures/conflict_manual/.tzp/cache/BE/ui.bin",
     "tests/fixtures/conflict_manual/.tzp/cache/RU/ui.bin",
 )
+CONFLICT_SAVE_DECISION_SNIPPETS: tuple[tuple[str, str], ...] = (
+    (
+        "cache only",
+        "conflict flow must explain when Drop cache should choose Cache only",
+    ),
+    (
+        "do not write later conflict files",
+        "conflict flow must warn not to write unresolved future conflict files",
+    ),
+    (
+        "only ru/conflict_drop_original.txt",
+        "conflict flow must name the exact Drop original write target",
+    ),
+    (
+        "only ru/conflict_merge_mixed.txt",
+        "conflict flow must name the exact Merge write target",
+    ),
+)
 SAVE_EXPLICIT_WORKFLOWS = frozenset(
     {"open_save", "conflict_resolution", "encoding_charsets", "tzp_writeback"}
 )
@@ -259,6 +277,9 @@ def validate_manual_scenario_contracts(
                         f"scenario {scenario.id!r}: neutral switch file must not keep "
                         f"conflict cache artifact: {relpath}"
                     )
+            for snippet, message in CONFLICT_SAVE_DECISION_SNIPPETS:
+                if snippet not in lowered_text:
+                    errors.append(f"scenario {scenario.id!r}: {message}")
 
     try:
         contract_payload = _load_json(workflow_contract_path)

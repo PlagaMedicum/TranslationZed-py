@@ -278,11 +278,19 @@ def _scenario_rows() -> list[dict[str, object]]:
                 "switching through RU/ui.txt, and completing all three conflict paths."
             ),
             "selected_locales": ["RU"],
+            "operator_hints": [
+                "After Drop cache, choose Cache only if only later conflict files are listed.",
+                "Do not write later conflict files before their own steps.",
+            ],
             "steps": [
                 "Open RU/conflict_drop_cache.txt from the Project tree.",
                 "Open RU/conflict_drop_original.txt from the Project tree.",
                 "Open RU/conflict_merge_mixed.txt from the Project tree.",
-                "Save each resolved file and switch through RU/ui.txt after each conflict path.",
+                (
+                    "Save each resolved file and switch through RU/ui.txt after each "
+                    "conflict path. Write only RU/conflict_drop_original.txt for Drop "
+                    "original and only RU/conflict_merge_mixed.txt for Merge."
+                ),
             ],
             "expected_checks": [
                 "RU/conflict_drop_cache.txt, RU/conflict_drop_original.txt, and "
@@ -902,6 +910,38 @@ def test_contract_check_rejects_conflict_cache_on_neutral_switch_file(
         "neutral switch file must not keep conflict cache artifact" in item
         for item in errors
     )
+
+
+def test_contract_check_requires_precise_conflict_save_decisions(
+    tmp_path: Path,
+) -> None:
+    """Conflict flow must explain cache-only and exact write-file decisions."""
+    module = _load_module()
+    repo = tmp_path / "repo"
+    _seed_repo_paths(repo)
+    registry = repo / "tests" / "manual_scenarios" / "scenarios.json"
+    contract = repo / "tests" / "manual_scenarios" / "workflow.json"
+    _write_registry(registry)
+    payload = json.loads(registry.read_text(encoding="utf-8"))
+    payload["scenarios"][1]["operator_hints"] = []
+    payload["scenarios"][1]["steps"] = [
+        "Open RU/conflict_drop_cache.txt from the Project tree.",
+        "Save each resolved file and switch through RU/ui.txt after each conflict path.",
+    ]
+    registry.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    _write_contract(contract)
+    errors = module.validate_manual_scenario_contracts(
+        repo_root=repo,
+        registry_path=registry,
+        workflow_contract_path=contract,
+        collect_selectors=False,
+    )
+    assert any("Drop cache should choose Cache only" in item for item in errors)
+    assert any(
+        "not to write unresolved future conflict files" in item for item in errors
+    )
+    assert any("exact Drop original write target" in item for item in errors)
+    assert any("exact Merge write target" in item for item in errors)
 
 
 def test_contract_check_requires_workflow_family_coverage(tmp_path: Path) -> None:
