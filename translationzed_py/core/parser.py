@@ -151,6 +151,33 @@ def _ensure_offset_map(
 
 
 def _read_string_token(text: str, pos: int) -> int:
+    # Common fast path: simple one-segment quoted string with no escapes.
+    quick_end = text.find('"', pos + 1)
+    if quick_end > pos and "\\" not in text[pos + 1 : quick_end]:
+        j = quick_end + 1
+        while j < len(text) and text[j] in {" ", "\t"}:
+            j += 1
+        if j >= len(text):
+            return quick_end + 1
+        if text[j] in {",", "}", "\r", "\n"}:
+            k = j + 1
+            while k < len(text) and text[k] in {" ", "\t"}:
+                k += 1
+            if k >= len(text) or text[k] in {"\r", "\n"}:
+                return quick_end + 1
+            if (
+                text.startswith("--", k)
+                or text.startswith("//", k)
+                or text.startswith("/*", k)
+            ):
+                return quick_end + 1
+        elif text[j] == "." and j + 1 < len(text) and text[j + 1] == ".":
+            k = j + 2
+            while k < len(text) and text[k] in {" ", "\t", "\r", "\n"}:
+                k += 1
+            if k < len(text) and text[k] == '"':
+                return quick_end + 1
+
     i = pos + 1
     while i < len(text):
         ch = text[i]
@@ -215,7 +242,12 @@ def _read_string_token(text: str, pos: int) -> int:
 
 
 # ── The generator the test asked about ────────────────────────────────────────
-def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
+def _tokenise(
+    data: bytes,
+    *,
+    encoding: str = "utf-8",
+    include_trivia: bool = True,
+) -> Iterable[Tok]:
     enc_for_text, bom_len = _resolve_encoding(encoding, data)
     text = _decode_text(data, enc_for_text)
     expected_len = len(data) - bom_len
@@ -275,8 +307,10 @@ def _tokenise(data: bytes, *, encoding: str = "utf-8") -> Iterable[Tok]:
             offsets[m.start()] + bom_len,
             offsets[m.end()] + bom_len,
         )
-        yield Tok(kind, span, m.group())
         pos = m.end()
+        if kind is Kind.TRIVIA and not include_trivia:
+            continue
+        yield Tok(kind, span, m.group())
         if kind is Kind.NEWLINE:
             last_sig = None
         elif kind is not Kind.TRIVIA:
@@ -290,6 +324,19 @@ def _segment_text(raw_text: str) -> str:
             return _unescape(raw_text[1:-1])
         return _unescape(raw_text[1:])
     return raw_text.rstrip()
+
+
+def _segment_length(raw_text: str) -> int:
+    """Return the decoded segment length without allocating when the text is simple."""
+    if raw_text.startswith('"'):
+        if raw_text.endswith('"'):
+            if "\\" not in raw_text:
+                return max(0, len(raw_text) - 2)
+            return len(_unescape(raw_text[1:-1]))
+        if "\\" not in raw_text:
+            return max(0, len(raw_text) - 1)
+        return len(_unescape(raw_text[1:]))
+    return len(raw_text.rstrip())
 
 
 @overload
@@ -352,7 +399,9 @@ def _parse_entries_stream(
             status = Status.UNTOUCHED
             parts = []
             return
-        key_text = current_key.text.strip()
+        key_text = current_key.text
+        if key_text[:1].isspace() or key_text[-1:].isspace():
+            key_text = key_text.strip()
         if not key_text:
             current_key = None
             collecting = False
@@ -364,9 +413,14 @@ def _parse_entries_stream(
             status = Status.UNTOUCHED
             parts = []
             return
-        gaps: list[bytes] = []
-        for prev, nxt in zip(seg_spans, seg_spans[1:], strict=False):
-            gaps.append(raw[prev[1] : nxt[0]])
+        gaps: tuple[bytes, ...]
+        if len(seg_spans) <= 1:
+            gaps = ()
+        else:
+            gaps = tuple(
+                raw[prev[1] : nxt[0]]
+                for prev, nxt in zip(seg_spans, seg_spans[1:], strict=False)
+            )
         key_hash = _hash_key_u64(key_text)
         if lazy_values:
             assert entries_meta is not None
@@ -376,7 +430,7 @@ def _parse_entries_stream(
                     status,
                     (span_start, span_end or span_start),
                     tuple(seg_lens) if seg_lens else (0,),
-                    tuple(gaps),
+                    gaps,
                     False,
                     tuple(seg_spans),
                     key_hash,
@@ -392,7 +446,7 @@ def _parse_entries_stream(
                     status,
                     (span_start, span_end or span_start),
                     tuple(seg_lens) if seg_lens else (len(value),),
-                    tuple(gaps),
+                    gaps,
                     False,
                     key_hash,
                 )
@@ -407,7 +461,7 @@ def _parse_entries_stream(
         status = Status.UNTOUCHED
         parts = []
 
-    for tok in _tokenise(raw, encoding=encoding):
+    for tok in _tokenise(raw, encoding=encoding, include_trivia=False):
         if tok.kind is Kind.KEY and not collecting:
             current_key = tok
             continue
@@ -425,14 +479,18 @@ def _parse_entries_stream(
             parts = []
             continue
         if collecting and tok.kind is Kind.STRING:
-            seg_text = _segment_text(tok.text)
-            seg_lens.append(len(seg_text))
+            seg_text: str | None = None
+            if lazy_values:
+                seg_lens.append(_segment_length(tok.text))
+            else:
+                seg_text = _segment_text(tok.text)
+                seg_lens.append(len(seg_text))
             seg_spans.append(tok.span)
             if span_start is None:
                 span_start = tok.span[0]
             span_end = tok.span[1]
             concat_pending = False
-            if not lazy_values:
+            if seg_text is not None:
                 parts.append(seg_text)
             continue
         if collecting and tok.kind is Kind.CONCAT:

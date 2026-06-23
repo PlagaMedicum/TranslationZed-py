@@ -21,6 +21,8 @@ _VALID_SCOPES = {"FILE", "LOCALE", "POOL"}
 _QA_LT_MAX_ROWS_DEFAULT = 500
 _QA_LT_MAX_ROWS_MIN = 1
 _QA_LT_MAX_ROWS_MAX = 5000
+_QA_PANEL_RESULT_LIMIT_DEFAULT = 2000
+_QA_PANEL_RESULT_LIMIT_MIN = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +52,7 @@ class LoadedPreferences:
     qa_check_languagetool: bool
     qa_languagetool_max_rows: int
     qa_languagetool_automark: bool
+    qa_panel_result_limit: int
     default_root: str
     search_scope: str
     replace_scope: str
@@ -146,6 +149,7 @@ class PreferencesService:
         qa_check_languagetool: bool = False,
         qa_languagetool_max_rows: int = _QA_LT_MAX_ROWS_DEFAULT,
         qa_languagetool_automark: bool = False,
+        qa_panel_result_limit: int = _QA_PANEL_RESULT_LIMIT_DEFAULT,
         lt_editor_mode: str = "auto",
         lt_server_url: str = "",
         lt_timeout_ms: int = 1200,
@@ -168,6 +172,7 @@ class PreferencesService:
             qa_check_languagetool=qa_check_languagetool,
             qa_languagetool_max_rows=qa_languagetool_max_rows,
             qa_languagetool_automark=qa_languagetool_automark,
+            qa_panel_result_limit=qa_panel_result_limit,
             last_root=last_root,
             last_locales=last_locales,
             window_geometry=window_geometry,
@@ -222,6 +227,15 @@ def normalize_qa_languagetool_max_rows(value: object) -> int:
     except (TypeError, ValueError):
         parsed = _QA_LT_MAX_ROWS_DEFAULT
     return max(_QA_LT_MAX_ROWS_MIN, min(_QA_LT_MAX_ROWS_MAX, parsed))
+
+
+def normalize_qa_panel_result_limit(value: object) -> int:
+    """Normalize QA findings cap for panel/scan result volume."""
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        parsed = _QA_PANEL_RESULT_LIMIT_DEFAULT
+    return max(_QA_PANEL_RESULT_LIMIT_MIN, parsed)
 
 
 def resolve_qa_preferences(
@@ -283,12 +297,23 @@ def normalize_loaded_preferences(
         raw.get("qa_languagetool_max_rows", _QA_LT_MAX_ROWS_DEFAULT)
     )
     qa_languagetool_automark = bool(raw.get("qa_languagetool_automark", False))
+    qa_panel_result_limit = normalize_qa_panel_result_limit(
+        raw.get("qa_panel_result_limit", _QA_PANEL_RESULT_LIMIT_DEFAULT)
+    )
     default_root = str(raw.get("default_root", "") or fallback_default_root)
     search_scope = normalize_scope(raw.get("search_scope", "FILE"), default="FILE")
     replace_scope = normalize_scope(raw.get("replace_scope", "FILE"), default="FILE")
     last_locales = list(raw.get("last_locales", []) or [])
     last_root = str(raw.get("last_root", "") or fallback_last_root)
     extras = dict(raw.get("__extras__", {}))
+    if test_mode:
+        # Keep GUI save-path tests deterministic regardless of persisted local
+        # opt-in writeback settings in user config.
+        extras.pop("TZP_STATUS_COMMENT_WRITEBACK", None)
+    extras_changed = False
+    if "TZP_STATUS_COMMENT_PREFIX" in extras:
+        extras.pop("TZP_STATUS_COMMENT_PREFIX", None)
+        extras_changed = True
     tm_import_dir = str(raw.get("tm_import_dir", "")).strip() or default_tm_import_dir
     lt_editor_mode = _normalize_lt_editor_mode(raw.get("lt_editor_mode", "auto"))
     lt_server_url = (
@@ -316,6 +341,9 @@ def normalize_loaded_preferences(
         patched_raw = dict(raw)
         patched_raw["window_geometry"] = ""
         patched_raw["__extras__"] = dict(extras)
+    elif extras_changed:
+        patched_raw = dict(raw)
+        patched_raw["__extras__"] = dict(extras)
 
     return LoadedPreferences(
         prompt_write_on_exit=prompt_write_on_exit,
@@ -332,6 +360,7 @@ def normalize_loaded_preferences(
         qa_check_languagetool=qa_check_languagetool,
         qa_languagetool_max_rows=qa_languagetool_max_rows,
         qa_languagetool_automark=qa_languagetool_automark,
+        qa_panel_result_limit=qa_panel_result_limit,
         default_root=default_root,
         search_scope=search_scope,
         replace_scope=replace_scope,
@@ -373,6 +402,7 @@ def build_persist_payload(
     qa_check_languagetool: bool = False,
     qa_languagetool_max_rows: int = _QA_LT_MAX_ROWS_DEFAULT,
     qa_languagetool_automark: bool = False,
+    qa_panel_result_limit: int = _QA_PANEL_RESULT_LIMIT_DEFAULT,
     lt_editor_mode: str = "auto",
     lt_server_url: str = "",
     lt_timeout_ms: int = 1200,
@@ -380,6 +410,8 @@ def build_persist_payload(
     lt_locale_map: str = "{}",
 ) -> dict[str, Any]:
     """Build persist payload."""
+    sanitized_extras = dict(extras)
+    sanitized_extras.pop("TZP_STATUS_COMMENT_PREFIX", None)
     qa_auto_mark_translated_for_review = bool(
         qa_auto_mark_for_review and qa_auto_mark_translated_for_review
     )
@@ -403,6 +435,7 @@ def build_persist_payload(
             qa_languagetool_max_rows
         ),
         "qa_languagetool_automark": bool(qa_languagetool_automark),
+        "qa_panel_result_limit": normalize_qa_panel_result_limit(qa_panel_result_limit),
         "last_root": str(last_root),
         "last_locales": list(last_locales),
         "window_geometry": str(window_geometry),
@@ -417,5 +450,5 @@ def build_persist_payload(
         ),
         "search_scope": normalize_scope(search_scope, default="FILE"),
         "replace_scope": normalize_scope(replace_scope, default="FILE"),
-        "__extras__": dict(extras),
+        "__extras__": sanitized_extras,
     }

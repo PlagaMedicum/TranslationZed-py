@@ -57,6 +57,23 @@ def test_gui_save_preserves_utf16(tmp_path, qtbot):
     assert data.decode("utf-16").replace("\r\n", "\n") == 'UI_OK = "테스트2"\n'
 
 
+def test_gui_save_preserves_cp1252(tmp_path, qtbot):
+    """Verify gui save preserves cp1252."""
+    root = _make_project(tmp_path, "PTBR", "CP1252", "Ação rápida")
+    path = root / "PTBR" / "ui.txt"
+    win = MainWindow(str(root), selected_locales=["PTBR"])
+    qtbot.addWidget(win)
+    ix = win.fs_model.index_for_path(path)
+    win._file_chosen(ix)
+    model = win.table.model()
+    model.setData(model.index(0, 2), "Salvar alterações")
+    win._save_current()
+    data = path.read_bytes()
+    assert (
+        data.decode("cp1252").replace("\r\n", "\n") == 'UI_OK = "Salvar alterações"\n'
+    )
+
+
 def test_gui_save_preserves_crlf_line_endings(tmp_path, qtbot):
     """Verify gui save preserves crlf line endings."""
     root = _make_project(tmp_path, "RU", "CP1251", "Тест")

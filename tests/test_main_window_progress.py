@@ -154,3 +154,53 @@ def test_status_bar_and_empty_state_defaults(qtbot, tmp_path: Path) -> None:
     ix_a = win.fs_model.index_for_path(root / "BE" / "a.txt")
     win._file_chosen(ix_a)
     assert win._right_stack.currentWidget() is win._table_container
+
+
+def test_shutdown_progress_workers_joins_active_pool() -> None:
+    """Verify progress-worker shutdown joins the background pool deterministically."""
+
+    class _Timer:
+        def __init__(self) -> None:
+            self.stopped = False
+
+        def isActive(self) -> bool:  # noqa: N802
+            return True
+
+        def stop(self) -> None:
+            self.stopped = True
+
+    class _Future:
+        def __init__(self) -> None:
+            self.cancelled = False
+
+        def cancel(self) -> None:
+            self.cancelled = True
+
+    class _Pool:
+        def __init__(self) -> None:
+            self.calls: list[tuple[bool, bool]] = []
+
+        def shutdown(self, *, wait: bool, cancel_futures: bool) -> None:
+            self.calls.append((wait, cancel_futures))
+
+    class _Window:
+        pass
+
+    win = _Window()
+    win._progress_locale_timer = _Timer()
+    win._progress_locale_future = _Future()
+    win._progress_locale_pending = "BE"
+    win._progress_locale_pending_current_path = Path("BE/a.txt")
+    win._progress_locale_pending_current_counts = (1, 0, 0, 0)
+    pool = _Pool()
+    win._progress_locale_pool = pool
+
+    panel_helpers._shutdown_progress_workers(win)
+
+    assert win._progress_locale_timer.stopped is True
+    assert win._progress_locale_future is None
+    assert win._progress_locale_pending is None
+    assert win._progress_locale_pending_current_path is None
+    assert win._progress_locale_pending_current_counts is None
+    assert win._progress_locale_pool is None
+    assert pool.calls == [(True, True)]

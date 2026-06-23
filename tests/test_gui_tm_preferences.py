@@ -593,6 +593,48 @@ def test_source_reference_mode_applies_globally_across_files(
     assert model.data(model.index(0, 1), Qt.DisplayRole) == "MENU EN"
 
 
+def test_source_reference_missing_counterpart_keeps_requested_locale_and_empty_source(
+    tmp_path, qtbot, monkeypatch
+):
+    """Missing requested source file should keep the selected locale and show empty source."""
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "proj"
+    for loc in ("EN", "RU", "KO"):
+        (root / loc).mkdir(parents=True, exist_ok=True)
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "ui.txt").write_text('UI_KEY = "UI EN"\n', encoding="utf-8")
+    (root / "RU" / "ui.txt").write_text('UI_KEY = "UI RU"\n', encoding="utf-8")
+    (root / "KO" / "ui.txt").write_text('UI_KEY = "UI KO"\n', encoding="utf-8")
+    (root / "EN" / "menu.txt").write_text('MENU_KEY = "MENU EN"\n', encoding="utf-8")
+    (root / "RU" / "menu.txt").write_text('MENU_KEY = "MENU RU"\n', encoding="utf-8")
+
+    win = MainWindow(str(root), selected_locales=["RU", "KO"])
+    qtbot.addWidget(win)
+    ui_idx = win.fs_model.index_for_path(root / "RU" / "ui.txt")
+    menu_idx = win.fs_model.index_for_path(root / "RU" / "menu.txt")
+
+    win._file_chosen(ui_idx)
+    model = win.table.model()
+    assert model is not None
+
+    ko_idx = win.source_ref_combo.findData("KO")
+    assert ko_idx >= 0
+    win.source_ref_combo.setCurrentIndex(ko_idx)
+    assert model.data(model.index(0, 1), Qt.DisplayRole) == "UI KO"
+
+    win._file_chosen(menu_idx)
+    model = win.table.model()
+    assert model is not None
+    assert win.source_ref_combo.currentData() == "KO"
+    assert str(model.headerData(1, Qt.Horizontal, Qt.DisplayRole)).startswith(
+        "Source [KO]"
+    )
+    assert model.data(model.index(0, 1), Qt.DisplayRole) == ""
+
+
 def test_source_reference_selector_falls_back_to_en_when_unavailable(
     tmp_path, qtbot, monkeypatch
 ):
@@ -612,35 +654,10 @@ def test_source_reference_selector_falls_back_to_en_when_unavailable(
     assert locales == ["EN", "BE"]
 
 
-def test_source_reference_selector_target_then_en_fallback_policy(
+def test_source_reference_selector_uses_visible_default_when_requested_locale_is_missing(
     tmp_path, qtbot, monkeypatch
 ):
-    """Verify source reference selector target then en fallback policy."""
-    monkeypatch.chdir(tmp_path)
-    root = tmp_path / "proj"
-    for loc, value in (("EN", "EN SRC"), ("BE", "BE SRC")):
-        (root / loc).mkdir(parents=True, exist_ok=True)
-        (root / loc / "language.txt").write_text(
-            f"text = {loc},\ncharset = UTF-8,\n",
-            encoding="utf-8",
-        )
-        (root / loc / "ui.txt").write_text(
-            f'UI_KEY = "{value}"\n',
-            encoding="utf-8",
-        )
-
-    win = MainWindow(str(root), selected_locales=["BE", "RU"])
-    qtbot.addWidget(win)
-    win._source_reference_mode = "RU"
-    win._source_reference_fallback_policy = "TARGET_THEN_EN"
-    win._sync_source_reference_mode(persist=False)
-    assert win._source_reference_mode == "BE"
-
-
-def test_source_reference_selector_prefers_locale_preset_chain(
-    tmp_path, qtbot, monkeypatch
-):
-    """Verify source reference selector follows per-locale preset fallback chain."""
+    """Missing explicit source locale should resolve to the visible default selector value."""
     monkeypatch.chdir(tmp_path)
     root = tmp_path / "proj"
     for loc, value in (("EN", "EN SRC"), ("BE", "BE SRC"), ("RU", "RU SRC")):
@@ -659,12 +676,9 @@ def test_source_reference_selector_prefers_locale_preset_chain(
     ix = win.fs_model.index_for_path(root / "BE" / "ui.txt")
     win._file_chosen(ix)
     win._source_reference_mode = "KO"
-    win._source_reference_fallback_policy = "EN_THEN_TARGET"
-    win._source_reference_fallback_chain = ("EN",)
-    win._source_reference_fallback_presets = {"BE": ("RU", "EN")}
     win._sync_source_reference_mode(persist=False)
 
-    assert win._source_reference_mode == "RU"
+    assert win._source_reference_mode == "EN"
 
 
 def test_tm_panel_includes_imported_matches(tmp_path, qtbot, monkeypatch):
@@ -964,10 +978,10 @@ def test_preferences_tm_action_buttons_set_flags(tmp_path, qtbot):
     assert values["tm_show_diagnostics"] is False
 
 
-def test_preferences_view_tab_roundtrip_source_reference_chain_and_presets(
+def test_preferences_view_tab_explains_direct_source_reference_behavior(
     tmp_path, qtbot
 ):
-    """Verify view-tab source-reference chain/presets controls roundtrip values."""
+    """View tab should explain direct source selection and empty-source behavior."""
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
         {
@@ -980,19 +994,22 @@ def test_preferences_view_tab_roundtrip_source_reference_chain_and_presets(
     )
     qtbot.addWidget(dialog)
 
-    assert dialog._source_ref_fallback_combo.currentData() == "TARGET_THEN_EN"
-    assert dialog._source_ref_chain_edit.text() == "RU,EN"
-    assert dialog._source_ref_presets_edit.toPlainText() == '{"BE":["RU","EN"]}'
-
-    dialog._source_ref_chain_edit.setText("KO,RU")
-    dialog._source_ref_presets_edit.setPlainText('{"BE":["KO","RU"]}')
+    labels = [label.text() for label in dialog.findChildren(QLabel)]
+    assert any(
+        "Source reference uses the selected locale directly." in text for text in labels
+    )
+    assert any(
+        "If the matching file is missing, the Source column stays empty." in text
+        for text in labels
+    )
     values = dialog.values()
-    assert values["source_reference_fallback_chain"] == "KO,RU"
-    assert values["source_reference_fallback_presets"] == '{"BE":["KO","RU"]}'
+    assert "source_reference_fallback_policy" not in values
+    assert "source_reference_fallback_chain" not in values
+    assert "source_reference_fallback_presets" not in values
 
 
 def test_preferences_source_reference_ui_copy_is_locale_agnostic(tmp_path, qtbot):
-    """Verify source-reference preference copy uses locale-agnostic placeholders/labels."""
+    """Source-reference help copy should stay locale-agnostic and direct."""
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
         {"tm_import_dir": str(root / ".tzp" / "tms")},
@@ -1000,19 +1017,13 @@ def test_preferences_source_reference_ui_copy_is_locale_agnostic(tmp_path, qtbot
     )
     qtbot.addWidget(dialog)
 
-    labels = [
-        dialog._source_ref_fallback_combo.itemText(idx)
-        for idx in range(dialog._source_ref_fallback_combo.count())
-    ]
-    assert labels == [
-        "Source locale, then file locale",
-        "File locale, then source locale",
-    ]
-    assert dialog._source_ref_chain_edit.placeholderText() == "<LOCALE_A>,<LOCALE_B>"
-    assert "<LOCALE_A>,<LOCALE_B>" in dialog._source_ref_chain_edit.toolTip()
-    assert (
-        dialog._source_ref_presets_edit.placeholderText()
-        == '{"<TARGET_LOCALE>":["<SOURCE_LOCALE>","<FALLBACK_LOCALE>"]}'
+    labels = [label.text() for label in dialog.findChildren(QLabel)]
+    assert any(
+        "Source reference uses the selected locale directly." in text for text in labels
+    )
+    assert any(
+        "If the matching file is missing, the Source column stays empty." in text
+        for text in labels
     )
     assert (
         dialog._lt_locale_map_edit.placeholderText()
@@ -1021,34 +1032,28 @@ def test_preferences_source_reference_ui_copy_is_locale_agnostic(tmp_path, qtbot
 
 
 def test_preferences_view_tab_roundtrip_tzp_writeback_controls(tmp_path, qtbot):
-    """Verify view-tab TZP write-back controls roundtrip and toggle prefix edit state."""
+    """Verify view-tab TZP write-back toggle roundtrips without a prefix editor."""
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
         {
             "tm_import_dir": str(root / ".tzp" / "tms"),
             "tzp_writeback_enabled": True,
-            "tzp_comment_prefix": "//",
         },
         tm_files=[],
     )
     qtbot.addWidget(dialog)
 
     assert dialog._tzp_writeback_check.isChecked() is True
-    assert dialog._tzp_comment_prefix_edit.text() == "//"
-    assert dialog._tzp_comment_prefix_edit.isEnabled() is True
 
     dialog._tzp_writeback_check.setChecked(False)
-    assert dialog._tzp_comment_prefix_edit.isEnabled() is False
-    dialog._tzp_comment_prefix_edit.setText("")
     values = dialog.values()
     assert values["tzp_writeback_enabled"] is False
-    assert values["tzp_comment_prefix"] == ""
 
 
 def test_preferences_source_reference_accept_normalizes_chain_and_presets(
     tmp_path, qtbot
 ):
-    """Verify source-reference controls normalize to canonical payload on accept."""
+    """Removed source-reference fallback controls should not block dialog accept."""
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
         {"tm_import_dir": str(root / ".tzp" / "tms")},
@@ -1056,20 +1061,18 @@ def test_preferences_source_reference_accept_normalizes_chain_and_presets(
     )
     qtbot.addWidget(dialog)
 
-    dialog._source_ref_chain_edit.setText("en -> ru | ko")
-    dialog._source_ref_presets_edit.setPlainText('{"be":["ru","en"]}')
     dialog._accept_with_validation()
 
     assert dialog.result() == dialog.DialogCode.Accepted
     values = dialog.values()
-    assert values["source_reference_fallback_chain"] == "EN,RU,KO"
-    assert values["source_reference_fallback_presets"] == '{"BE":["RU","EN"]}'
+    assert "source_reference_fallback_chain" not in values
+    assert "source_reference_fallback_presets" not in values
 
 
 def test_preferences_source_reference_accept_rejects_invalid_preset_json(
-    tmp_path, qtbot, monkeypatch
+    tmp_path, qtbot
 ):
-    """Verify invalid source-reference preset JSON blocks accept with warning."""
+    """Dialog accept should stay plain even though legacy fallback JSON is gone."""
     root = _make_project(tmp_path)
     dialog = PreferencesDialog(
         {"tm_import_dir": str(root / ".tzp" / "tms")},
@@ -1077,16 +1080,9 @@ def test_preferences_source_reference_accept_rejects_invalid_preset_json(
     )
     qtbot.addWidget(dialog)
 
-    warnings: list[str] = []
-    monkeypatch.setattr(
-        "translationzed_py.gui.preferences_dialog.QMessageBox.warning",
-        lambda *_args, **_kwargs: warnings.append("warning"),
-    )
-    dialog._source_ref_presets_edit.setPlainText("{bad-json")
     dialog._accept_with_validation()
 
-    assert dialog.result() != dialog.DialogCode.Accepted
-    assert warnings == ["warning"]
+    assert dialog.result() == dialog.DialogCode.Accepted
 
 
 def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
@@ -1111,6 +1107,7 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
             "qa_check_languagetool": True,
             "qa_languagetool_max_rows": 64,
             "qa_languagetool_automark": True,
+            "qa_panel_result_limit": 3200,
         },
         tm_files=[],
     )
@@ -1132,6 +1129,7 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert dialog._qa_lt_check.isChecked() is True
     assert dialog._qa_lt_max_rows_spin.value() == 64
     assert dialog._qa_lt_automark_check.isChecked() is True
+    assert dialog._qa_panel_result_limit_spin.value() == 3200
 
     dialog._qa_trailing_check.setChecked(True)
     dialog._qa_newlines_check.setChecked(True)
@@ -1151,6 +1149,7 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     dialog._qa_lt_check.setChecked(False)
     dialog._qa_lt_max_rows_spin.setValue(10)
     dialog._qa_lt_automark_check.setChecked(True)
+    dialog._qa_panel_result_limit_spin.setValue(2501)
 
     values = dialog.values()
     assert values["qa_check_trailing"] is True
@@ -1169,6 +1168,53 @@ def test_preferences_qa_tab_roundtrip_values(tmp_path, qtbot):
     assert values["qa_check_languagetool"] is False
     assert values["qa_languagetool_max_rows"] == 10
     assert values["qa_languagetool_automark"] is False
+    assert values["qa_panel_result_limit"] == 2501
+
+
+def test_preferences_hidden_advanced_controls_still_serialize(tmp_path, qtbot):
+    """Verify advanced controls serialize even when sections remain collapsed."""
+    root = _make_project(tmp_path)
+    dialog = PreferencesDialog(
+        {
+            "tm_import_dir": str(root / ".tzp" / "tms"),
+            "qa_auto_mark_for_review": True,
+            "qa_auto_mark_translated_for_review": True,
+            "qa_auto_mark_proofread_for_review": True,
+            "qa_check_languagetool": True,
+            "qa_languagetool_automark": True,
+            "qa_panel_result_limit": 4321,
+            "lt_editor_mode": "auto",
+            "lt_server_url": "https://lt.example.org",
+            "lt_timeout_ms": 1900,
+            "lt_picky_mode": True,
+            "lt_locale_map": '{"EN":"en-US"}',
+            "source_reference_fallback_policy": "TARGET_THEN_EN",
+            "source_reference_fallback_chain": "JA,KO",
+            "source_reference_fallback_presets": '{"JA":["KO","ZH"]}',
+            "tzp_writeback_enabled": True,
+        },
+        tm_files=[],
+    )
+    qtbot.addWidget(dialog)
+
+    assert dialog._qa_advanced_content.isHidden() is True
+    assert dialog._languagetool_advanced_content.isHidden() is True
+    assert dialog._view_advanced_content.isHidden() is True
+
+    values = dialog.values()
+    assert values["qa_auto_mark_for_review"] is True
+    assert values["qa_auto_mark_translated_for_review"] is True
+    assert values["qa_auto_mark_proofread_for_review"] is True
+    assert values["qa_languagetool_automark"] is True
+    assert values["qa_panel_result_limit"] == 4321
+    assert values["lt_server_url"] == "https://lt.example.org"
+    assert values["lt_timeout_ms"] == 1900
+    assert values["lt_picky_mode"] is True
+    assert values["lt_locale_map"] == '{"EN":"en-US"}'
+    assert "source_reference_fallback_policy" not in values
+    assert "source_reference_fallback_chain" not in values
+    assert "source_reference_fallback_presets" not in values
+    assert values["tzp_writeback_enabled"] is True
 
 
 def test_preferences_qa_touched_auto_mark_clears_when_base_toggle_off(tmp_path, qtbot):
@@ -1238,6 +1284,7 @@ def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
             "qa_auto_mark_for_review": True,
             "qa_auto_mark_translated_for_review": True,
             "qa_auto_mark_proofread_for_review": False,
+            "qa_panel_result_limit": 3200,
         }
     )
 
@@ -1249,11 +1296,12 @@ def test_apply_preferences_updates_qa_flags_and_triggers_refresh(
     assert win._qa_auto_mark_for_review is True
     assert win._qa_auto_mark_translated_for_review is True
     assert win._qa_auto_mark_proofread_for_review is False
+    assert win._qa_panel_result_limit == 3200
     assert refresh_calls == [True]
 
 
 def test_apply_preferences_updates_tzp_writeback_extras(tmp_path, qtbot, monkeypatch):
-    """Verify apply-preferences updates TZP write-back extras and fallback removal."""
+    """Verify apply-preferences updates TZP write-back extra and drops legacy prefix."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -1266,16 +1314,14 @@ def test_apply_preferences_updates_tzp_writeback_extras(tmp_path, qtbot, monkeyp
     win._apply_preferences(
         {
             "tzp_writeback_enabled": True,
-            "tzp_comment_prefix": "//",
         }
     )
     assert win._prefs_extras["TZP_STATUS_COMMENT_WRITEBACK"] == "true"
-    assert win._prefs_extras["TZP_STATUS_COMMENT_PREFIX"] == "//"
+    assert "TZP_STATUS_COMMENT_PREFIX" not in win._prefs_extras
 
     win._apply_preferences(
         {
             "tzp_writeback_enabled": False,
-            "tzp_comment_prefix": "",
         }
     )
     assert "TZP_STATUS_COMMENT_WRITEBACK" not in win._prefs_extras

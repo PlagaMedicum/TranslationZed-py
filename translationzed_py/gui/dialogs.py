@@ -344,9 +344,7 @@ class ReplaceFilesDialog(QDialog):
             main_layout.addWidget(truncation)
 
         buttons = QDialogButtonBox(self)
-        self._replace_button = buttons.addButton(
-            "Replace", QDialogButtonBox.AcceptRole
-        )
+        self._replace_button = buttons.addButton("Replace", QDialogButtonBox.AcceptRole)
         buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
         self._replace_button.setEnabled(False)
         self._replace_button.clicked.connect(self._confirm)

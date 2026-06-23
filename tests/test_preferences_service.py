@@ -10,6 +10,7 @@ from translationzed_py.core.preferences_service import (
     build_persist_payload,
     normalize_loaded_preferences,
     normalize_qa_languagetool_max_rows,
+    normalize_qa_panel_result_limit,
     normalize_scope,
     resolve_qa_preferences,
     resolve_startup_root,
@@ -70,6 +71,14 @@ def test_normalize_qa_languagetool_max_rows_clamps_range() -> None:
     assert normalize_qa_languagetool_max_rows("0") == 1
     assert normalize_qa_languagetool_max_rows("9000") == 5000
     assert normalize_qa_languagetool_max_rows("bad") == 500
+
+
+def test_normalize_qa_panel_result_limit_has_lower_bound_only() -> None:
+    """Verify QA findings-cap normalizer enforces only lower bound."""
+    assert normalize_qa_panel_result_limit("10") == 10
+    assert normalize_qa_panel_result_limit("0") == 1
+    assert normalize_qa_panel_result_limit("25000") == 25000
+    assert normalize_qa_panel_result_limit("bad") == 2000
 
 
 def test_resolve_qa_preferences_updates_flags_and_change_marker() -> None:
@@ -137,6 +146,7 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
         "qa_check_languagetool": True,
         "qa_languagetool_max_rows": 9000,
         "qa_languagetool_automark": True,
+        "qa_panel_result_limit": 3500,
         "default_root": "/tmp/default",
         "search_scope": "bad-scope",
         "replace_scope": "POOL",
@@ -153,6 +163,7 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
             "LAYOUT_RESET_REV": "1",
             "TABLE_KEY_WIDTH": "123",
             "KEEP_ME": "x",
+            "TZP_STATUS_COMMENT_WRITEBACK": "true",
         },
     }
     result = normalize_loaded_preferences(
@@ -176,6 +187,7 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
     assert result.qa_check_languagetool is True
     assert result.qa_languagetool_max_rows == 5000
     assert result.qa_languagetool_automark is True
+    assert result.qa_panel_result_limit == 3500
     assert result.default_root == "/tmp/default"
     assert result.search_scope == "FILE"
     assert result.replace_scope == "POOL"
@@ -190,6 +202,7 @@ def test_normalize_loaded_preferences_applies_layout_reset_policy() -> None:
     assert result.window_geometry == ""
     assert result.extras["LAYOUT_RESET_REV"] == "3"
     assert "TABLE_KEY_WIDTH" not in result.extras
+    assert "TZP_STATUS_COMMENT_WRITEBACK" not in result.extras
     assert result.extras["KEEP_ME"] == "x"
     assert result.patched_raw is not None
 
@@ -240,6 +253,7 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
         qa_check_languagetool=True,
         qa_languagetool_max_rows=8000,
         qa_languagetool_automark=True,
+        qa_panel_result_limit=0,
         lt_editor_mode="bad",
         lt_server_url="",
         lt_timeout_ms=80,
@@ -262,6 +276,7 @@ def test_build_persist_payload_normalizes_scope_and_copies_mutables() -> None:
     assert payload["qa_check_languagetool"] is True
     assert payload["qa_languagetool_max_rows"] == 5000
     assert payload["qa_languagetool_automark"] is True
+    assert payload["qa_panel_result_limit"] == 1
     assert payload["lt_editor_mode"] == "auto"
     assert payload["lt_server_url"] == "http://127.0.0.1:8081"
     assert payload["lt_timeout_ms"] == 100
@@ -299,6 +314,7 @@ def test_preferences_service_load_normalized_bootstraps_settings(
     assert loaded.qa_check_languagetool is False
     assert loaded.qa_languagetool_max_rows == 500
     assert loaded.qa_languagetool_automark is False
+    assert loaded.qa_panel_result_limit == 2000
     assert loaded.lt_editor_mode == "auto"
     assert loaded.lt_server_url == "http://127.0.0.1:8081"
     assert loaded.lt_timeout_ms == 1200
@@ -340,6 +356,7 @@ def test_preferences_service_persist_main_window_preferences(
         qa_check_languagetool=True,
         qa_languagetool_max_rows=64,
         qa_languagetool_automark=True,
+        qa_panel_result_limit=2600,
         lt_editor_mode="on",
         lt_server_url="https://lt.example.org",
         lt_timeout_ms=2500,
@@ -364,6 +381,7 @@ def test_preferences_service_persist_main_window_preferences(
     assert saved["qa_check_languagetool"] is True
     assert saved["qa_languagetool_max_rows"] == 64
     assert saved["qa_languagetool_automark"] is True
+    assert saved["qa_panel_result_limit"] == 2600
     assert saved["lt_editor_mode"] == "on"
     assert saved["lt_server_url"] == "https://lt.example.org"
     assert saved["lt_timeout_ms"] == 2500

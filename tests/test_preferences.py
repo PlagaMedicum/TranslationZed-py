@@ -34,6 +34,7 @@ def test_load_is_pure_read_for_missing_settings_env(
     assert prefs["qa_check_languagetool"] is False
     assert prefs["qa_languagetool_max_rows"] == 500
     assert prefs["qa_languagetool_automark"] is False
+    assert prefs["qa_panel_result_limit"] == 2000
 
     path = tmp_path / ".tzp" / "config" / "settings.env"
     assert not path.exists()
@@ -67,6 +68,7 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert prefs["qa_check_languagetool"] is False
     assert prefs["qa_languagetool_max_rows"] == 500
     assert prefs["qa_languagetool_automark"] is False
+    assert prefs["qa_panel_result_limit"] == 2000
 
     path = tmp_path / ".tzp" / "config" / "settings.env"
     assert path.exists()
@@ -93,6 +95,7 @@ def test_ensure_defaults_bootstraps_missing_settings_env(
     assert "QA_CHECK_LANGUAGETOOL=false" in raw
     assert "QA_LANGUAGETOOL_MAX_ROWS=500" in raw
     assert "QA_LANGUAGETOOL_AUTOMARK=false" in raw
+    assert "QA_PANEL_RESULT_LIMIT=2000" in raw
 
 
 def test_ensure_defaults_backfills_missing_keys_and_preserves_extras(
@@ -231,6 +234,7 @@ def test_ensure_defaults_normalizes_languagetool_settings(
         "LT_LOCALE_MAP={bad json}\n"
         "QA_CHECK_LANGUAGETOOL=true\n"
         "QA_LANGUAGETOOL_MAX_ROWS=0\n"
+        "QA_PANEL_RESULT_LIMIT=0\n"
         "QA_LANGUAGETOOL_AUTOMARK=true\n",
         encoding="utf-8",
     )
@@ -245,6 +249,7 @@ def test_ensure_defaults_normalizes_languagetool_settings(
     assert prefs["qa_check_languagetool"] is True
     assert prefs["qa_languagetool_max_rows"] == 1
     assert prefs["qa_languagetool_automark"] is True
+    assert prefs["qa_panel_result_limit"] == 1
 
 
 def test_ensure_defaults_removes_deprecated_qa_auto_mark_touched_key(

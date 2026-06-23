@@ -9,6 +9,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QSizePolicy
 
 from translationzed_py.core.model import Status
 from translationzed_py.core.qa_service import (
@@ -153,8 +154,9 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
     win._file_chosen(ix)
     win._left_qa_btn.click()
-    assert win._qa_results_list.count() == 1
-    assert "QA is manual." in win._qa_results_list.item(0).text()
+    assert win._qa_results_list.count() == 0
+    assert win._qa_results_list.isVisible() is False
+    assert "QA is manual." in win._qa_results_placeholder.text()
     win._qa_refresh_btn.click()
 
     def _labels() -> list[str]:
@@ -171,6 +173,53 @@ def test_qa_side_panel_refreshes_trailing_and_newline_findings(
     labels = _labels()
     assert any("trailing" in label for label in labels)
     assert any("newlines" in label for label in labels)
+
+
+def test_qa_placeholder_is_plain_text_not_fake_result_item(
+    qtbot, tmp_path: Path
+) -> None:
+    """QA placeholder must render as plain text while list remains empty."""
+    root, target_path = _make_basic_qa_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._left_qa_btn.click()
+    win._file_chosen(win.fs_model.index_for_path(target_path))
+
+    win._set_qa_panel_message("QA is manual. Click Run QA for this file.")
+
+    assert win._qa_results_list.count() == 0
+    assert win._qa_results_list.isVisible() is False
+    assert "QA is manual." in win._qa_results_placeholder.text()
+
+
+def test_qa_panel_labels_use_compact_top_aligned_layout(qtbot, tmp_path: Path) -> None:
+    """QA checklist/placeholder labels should stay compact and top-aligned."""
+    root, target_path = _make_basic_qa_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._left_qa_btn.click()
+    win._file_chosen(win.fs_model.index_for_path(target_path))
+    win._set_qa_panel_message("QA is manual. Click Run QA for this file.")
+
+    checklist_policy = win._qa_checklist_label.sizePolicy()
+    placeholder_policy = win._qa_results_placeholder.sizePolicy()
+    assert checklist_policy.verticalPolicy() == QSizePolicy.Policy.Minimum
+    assert placeholder_policy.verticalPolicy() == QSizePolicy.Policy.Minimum
+    assert win._qa_checklist_label.alignment() == (
+        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+    )
+    assert win._qa_results_placeholder.alignment() == (
+        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+    )
+    checklist_height = win._qa_checklist_label.height()
+    placeholder_height = win._qa_results_placeholder.height()
+    line_height = win._qa_checklist_label.fontMetrics().lineSpacing()
+    assert checklist_height <= (line_height * 2) + 4
+    assert placeholder_height <= (line_height * 2) + 4
+    gap = win._qa_results_placeholder.y() - (
+        win._qa_checklist_label.y() + win._qa_checklist_label.height()
+    )
+    assert gap <= 12
 
 
 def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
@@ -193,6 +242,7 @@ def test_qa_auto_mark_for_review_toggle_controls_status_mutation(
     win._qa_check_trailing = True
     win._qa_check_newlines = True
     win._qa_auto_refresh = False
+    win._qa_auto_mark_for_review = False
     win._qa_auto_mark_translated_for_review = False
     win._qa_auto_mark_proofread_for_review = False
     ix = win.fs_model.index_for_path(root / "BE" / "qa.txt")
@@ -399,6 +449,7 @@ def test_qa_checklist_renders_fixed_order_state_text_and_notes(
             "same_source": "Rule exception.",
         },
     )
+    win._qa_scan_busy = True
     win._set_qa_progress_snapshots((snapshot,))
 
     lines = win._qa_checklist_label.text().splitlines()
@@ -430,13 +481,16 @@ def test_qa_checklist_resets_to_queued_on_new_run_snapshot(
         state_by_rule=dict.fromkeys(QA_RULE_ORDER, QARuleState.DONE),
     )
     win._set_qa_progress_snapshots((first_snapshot,))
-    assert "Completed" in win._qa_checklist_label.text()
+    assert (
+        win._qa_checklist_label.text() == "QA completed: 1 finding(s) across 5/5 rules."
+    )
 
     second_snapshot = _build_snapshot(
         run_id="run-2",
         file_path=target_path,
         summary="Running QA checks...",
     )
+    win._qa_scan_busy = True
     win._set_qa_progress_snapshots((second_snapshot,))
 
     checklist_text = win._qa_checklist_label.text()

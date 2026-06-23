@@ -7,20 +7,12 @@ from pathlib import Path
 from translationzed_py.core.lazy_entries import EntryMeta, LazyEntries
 from translationzed_py.core.model import Entry, ParsedFile, Status
 from translationzed_py.core.source_reference_service import (
-    SOURCE_REFERENCE_FALLBACK_EN_THEN_TARGET,
-    SOURCE_REFERENCE_FALLBACK_TARGET_THEN_EN,
     build_source_lookup_materialized,
-    build_source_reference_fallback_chain,
-    dump_source_reference_fallback_presets,
     dump_source_reference_file_overrides,
     load_reference_lookup,
-    load_source_reference_fallback_presets,
     load_source_reference_file_overrides,
-    normalize_source_reference_fallback_chain,
-    normalize_source_reference_fallback_policy,
     normalize_source_reference_mode,
     reference_path_for,
-    resolve_source_reference_locale,
     resolve_source_reference_mode_for_path,
     source_reference_path_key,
 )
@@ -31,118 +23,6 @@ def test_normalize_source_reference_mode() -> None:
     assert normalize_source_reference_mode(" en ") == "EN"
     assert normalize_source_reference_mode("be") == "BE"
     assert normalize_source_reference_mode("", default="EN") == "EN"
-
-
-def test_normalize_source_reference_fallback_policy() -> None:
-    """Verify fallback policy normalization accepts only known values."""
-    assert (
-        normalize_source_reference_fallback_policy("target_then_en")
-        == SOURCE_REFERENCE_FALLBACK_TARGET_THEN_EN
-    )
-    assert (
-        normalize_source_reference_fallback_policy("bad")
-        == SOURCE_REFERENCE_FALLBACK_EN_THEN_TARGET
-    )
-
-
-def test_normalize_source_reference_fallback_chain() -> None:
-    """Verify fallback-chain normalization is ordered and unique."""
-    assert normalize_source_reference_fallback_chain("en -> ru, be | ru") == (
-        "EN",
-        "RU",
-        "BE",
-    )
-    assert normalize_source_reference_fallback_chain(["be", "EN", "be"]) == (
-        "BE",
-        "EN",
-    )
-    assert normalize_source_reference_fallback_chain(None, default=("EN", "BE")) == (
-        "EN",
-        "BE",
-    )
-
-
-def test_source_reference_fallback_presets_round_trip() -> None:
-    """Verify per-locale fallback presets parse/dump in canonical form."""
-    encoded = dump_source_reference_fallback_presets(
-        {"be": ("ru", "en"), "RU": ("EN", "BE"), "": ("EN",)}
-    )
-    loaded = load_source_reference_fallback_presets(encoded)
-    assert loaded == {"BE": ("RU", "EN"), "RU": ("EN", "BE")}
-
-
-def test_source_reference_normalization_supports_non_latin_locale_tokens() -> None:
-    """Verify normalization and preset round-trip accept non-Latin locale tokens."""
-    chain = normalize_source_reference_fallback_chain("العربية -> 한국어 | 中文, ไทย")
-    assert chain == ("العربية", "한국어", "中文", "ไทย")
-
-    encoded = dump_source_reference_fallback_presets(
-        {"العربية": ("한국어", "中文"), "ไทย": ("العربية",)}
-    )
-    loaded = load_source_reference_fallback_presets(encoded)
-    assert loaded == {"العربية": ("한국어", "中文"), "ไทย": ("العربية",)}
-
-
-def test_build_source_reference_fallback_chain_uses_policy_and_presets() -> None:
-    """Verify fallback-chain builder respects policy baseline and locale preset."""
-    default_chain = build_source_reference_fallback_chain(
-        target_locale="BE",
-        policy=SOURCE_REFERENCE_FALLBACK_EN_THEN_TARGET,
-        presets={},
-    )
-    assert default_chain == ("EN", "BE")
-
-    reversed_chain = build_source_reference_fallback_chain(
-        target_locale="BE",
-        policy=SOURCE_REFERENCE_FALLBACK_TARGET_THEN_EN,
-        presets={},
-    )
-    assert reversed_chain == ("BE", "EN")
-
-    preset_chain = build_source_reference_fallback_chain(
-        target_locale="BE",
-        policy=SOURCE_REFERENCE_FALLBACK_EN_THEN_TARGET,
-        presets={"BE": ("RU", "EN")},
-    )
-    assert preset_chain == ("RU", "EN", "BE")
-
-
-def test_resolve_source_reference_locale_prefers_requested_available() -> None:
-    """Verify resolve source reference locale prefers requested available."""
-    resolution = resolve_source_reference_locale(
-        "BE",
-        available_locales=("EN", "BE", "RU"),
-    )
-    assert resolution.requested_mode == "BE"
-    assert resolution.resolved_locale == "BE"
-    assert resolution.fallback_used is False
-
-
-def test_resolve_source_reference_locale_falls_back_to_default_then_locale() -> None:
-    """Verify expected behavior."""
-    resolution = resolve_source_reference_locale(
-        "KO",
-        available_locales=("BE", "RU"),
-        fallback_locale="RU",
-    )
-    assert resolution.requested_mode == "KO"
-    assert resolution.resolved_locale == "RU"
-    assert resolution.fallback_used is True
-
-
-def test_resolve_source_reference_locale_honors_fallback_chain_before_secondary() -> (
-    None
-):
-    """Verify ordered chain candidates are used before single fallback locale."""
-    resolution = resolve_source_reference_locale(
-        "KO",
-        available_locales=("BE", "RU"),
-        fallback_chain=("RU", "BE"),
-        fallback_locale="BE",
-        default="EN",
-    )
-    assert resolution.resolved_locale == "RU"
-    assert resolution.fallback_used is True
 
 
 def test_reference_path_for_mirror_layout(tmp_path: Path) -> None:
@@ -428,29 +308,6 @@ def test_load_reference_lookup_short_circuits_missing_context(tmp_path: Path) ->
         )
         is None
     )
-
-
-def test_resolve_source_reference_locale_falls_back_to_sorted_available_and_default() -> (
-    None
-):
-    """Verify locale resolution uses sorted available fallback and default fallback."""
-    available_fallback = resolve_source_reference_locale(
-        "JA",
-        available_locales=("RU", "BE"),
-        fallback_locale="KO",
-        default="EN",
-    )
-    assert available_fallback.resolved_locale == "BE"
-    assert available_fallback.fallback_used is True
-
-    empty_fallback = resolve_source_reference_locale(
-        "JA",
-        available_locales=(),
-        fallback_locale=None,
-        default="EN",
-    )
-    assert empty_fallback.resolved_locale == "EN"
-    assert empty_fallback.fallback_used is True
 
 
 def test_reference_path_for_handles_root_relative_and_invalid_root_entries(

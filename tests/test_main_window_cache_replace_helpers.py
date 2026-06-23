@@ -835,6 +835,7 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
     win._last_saved_text = "Saved 12:34:56"
     win._search_progress_text = "Searching..."
     win._current_model = _RowModel()  # type: ignore[assignment]
+    win._current_encoding = "cp1251"
     monkeypatch.setattr(win.table, "currentIndex", lambda: _Index(3), raising=False)
     win._current_pf = SimpleNamespace(path=root / "BE" / "ui.txt")
     win._update_status_bar()
@@ -842,6 +843,7 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
     assert "Searching..." in shown_messages[-1]
     assert "Row 4 / 11" in shown_messages[-1]
     assert "BE/ui.txt" in shown_messages[-1]
+    assert "Encoding cp1251" in shown_messages[-1]
     assert scope_updates[-1] == "u"
 
     win._current_pf = SimpleNamespace(path=Path("/tmp/external_ui.txt"))

@@ -15,6 +15,14 @@ def test_escaped_quotes(tmp_path):
     assert pf.entries[0].value == 'He said "hi"'
 
 
+def test_escaped_quotes_lazy(tmp_path):
+    """Verify escaped quotes under lazy parsing."""
+    file = tmp_path / "lazy_quotes.txt"
+    file.write_text('QUOTE = "He said \\"hi\\""\n', encoding="utf-8")
+    pf = parse_lazy(file)
+    assert pf.entries[0].value == 'He said "hi"'
+
+
 def test_concat(tmp_path):
     """Verify concat."""
     pf = _tmp('HELLO = "Hel"  ..  "lo"\n', tmp_path)
@@ -58,7 +66,15 @@ def test_parse_cp1251(prod_like_root):
     path = prod_like_root / "RU" / "IG_UI_RU.txt"
     pf = parse(path, encoding="Cp1251")
     assert pf.entries[0].key == "UI_OK"
-    assert pf.entries[0].value == "Тест"
+    assert pf.entries[0].value == "Привет"
+
+
+def test_parse_cp1252(prod_like_root):
+    """Verify parse cp1252."""
+    path = prod_like_root / "PTBR" / "IG_UI_PTBR.txt"
+    pf = parse(path, encoding="Cp1252")
+    assert pf.entries[0].key == "UI_OK"
+    assert pf.entries[0].value == "Ação rápida"
 
 
 def test_parse_utf16(prod_like_root):
@@ -66,6 +82,7 @@ def test_parse_utf16(prod_like_root):
     path = prod_like_root / "KO" / "IG_UI_KO.txt"
     pf = parse(path, encoding="UTF-16")
     assert pf.entries[0].key == "UI_OK"
+    assert pf.entries[0].value == "안녕하세요"
 
 
 def test_parse_utf16_no_bom_le(tmp_path):

@@ -7,7 +7,7 @@ import html
 import os
 import re
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
@@ -840,6 +840,7 @@ def _clear_table_model_for_empty_state(win) -> None:
 
 
 def _shutdown_progress_workers(win) -> None:
+    """Stop locale-progress timers and join the background progress worker."""
     timer = getattr(win, "_progress_locale_timer", None)
     if timer is not None and timer.isActive():
         timer.stop()
@@ -854,8 +855,10 @@ def _shutdown_progress_workers(win) -> None:
     pool = getattr(win, "_progress_locale_pool", None)
     if pool is None:
         return
+    # Join the active worker so covered/test shutdown does not leave parser work
+    # running while Qt widgets and Python GC are already tearing down.
     with contextlib.suppress(Exception):
-        pool.shutdown(wait=False, cancel_futures=True)
+        pool.shutdown(wait=True, cancel_futures=True)
     win._progress_locale_pool = None
 
 
@@ -906,6 +909,10 @@ def _refresh_qa_panel_results(win) -> None:
     if not plan.items:
         win._set_qa_list_placeholder(status_message)
         return
+    placeholder = getattr(win, "_qa_results_placeholder", None)
+    if isinstance(placeholder, QLabel):
+        placeholder.setVisible(False)
+    win._qa_results_list.setVisible(True)
     win._qa_results_list.clear()
     for row in plan.items:
         item = QListWidgetItem(row.label)
@@ -981,6 +988,12 @@ def _render_qa_checklist(win) -> None:
     snapshot = getattr(win, "_qa_progress_snapshot", None)
     if snapshot is None:
         label.setText("Run QA to see rule-by-rule progress.")
+        return
+    if not bool(getattr(win, "_qa_scan_busy", False)):
+        summary = str(snapshot.final_summary).strip()
+        note = str(getattr(win, "_qa_scan_note", "")).strip()
+        compact = " ".join(part for part in (summary, note) if part).strip()
+        label.setText(compact or "Run QA to see rule-by-rule progress.")
         return
     by_rule = {record.rule_id: record for record in snapshot.ordered_rules}
     lines: list[str] = []
@@ -1351,12 +1364,58 @@ def _prepare_manual_scenario(
     win._manual_scenario_dialog_shown = False
     win._manual_scenario_dialog = None
     if runtime.scenario.prefs_extras:
-        win._prefs_extras.update(runtime.scenario.prefs_extras)
+        win._prefs_extras.update(
+            _apply_manual_scenario_runtime_preferences(
+                win, runtime.scenario.prefs_extras
+            )
+        )
     if selected_locales is not None:
         return selected_locales
     if runtime.scenario.selected_locales:
         return list(runtime.scenario.selected_locales)
     return selected_locales
+
+
+def _parse_manual_bool(value: object) -> bool | None:
+    raw = str(value).strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+def _apply_manual_scenario_runtime_preferences(
+    win, prefs_extras: Mapping[str, str]
+) -> dict[str, str]:
+    leftovers: dict[str, str] = {}
+    bool_overrides = {
+        "QA_CHECK_TRAILING": "_qa_check_trailing",
+        "QA_CHECK_NEWLINES": "_qa_check_newlines",
+        "QA_CHECK_ESCAPES": "_qa_check_escapes",
+        "QA_CHECK_SAME_AS_SOURCE": "_qa_check_same_as_source",
+        "QA_CHECK_LANGUAGETOOL": "_qa_check_languagetool",
+        "QA_AUTO_REFRESH": "_qa_auto_refresh",
+        "QA_AUTO_MARK_FOR_REVIEW": "_qa_auto_mark_for_review",
+        "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW": "_qa_auto_mark_translated_for_review",
+        "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW": "_qa_auto_mark_proofread_for_review",
+    }
+    for key, value in prefs_extras.items():
+        normalized_key = str(key).strip().upper()
+        if normalized_key == "QA_PANEL_RESULT_LIMIT" and hasattr(
+            win, "_qa_panel_result_limit"
+        ):
+            with contextlib.suppress(TypeError, ValueError):
+                win._qa_panel_result_limit = max(1, int(str(value).strip()))
+            continue
+        attr_name = bool_overrides.get(normalized_key)
+        if attr_name and hasattr(win, attr_name):
+            parsed = _parse_manual_bool(value)
+            if parsed is not None:
+                setattr(win, attr_name, parsed)
+            continue
+        leftovers[key] = value
+    return leftovers
 
 
 def _manual_scenario_results_dir() -> Path:
@@ -1397,6 +1456,8 @@ def _show_manual_scenario_dialog(win) -> None:
                 f"Manual scenario '{runtime.scenario.id}' marked {result}.",
                 8000,
             )
+            win._manual_scenario_force_exit = True
+            QTimer.singleShot(0, win.close)
         win._manual_scenario_dialog = None
 
     dialog.finished.connect(_on_finished)
@@ -1694,12 +1755,7 @@ def _status_comment_writeback_options(
 ) -> _StatusCommentWritebackOptions:
     raw_enabled = str(win._prefs_extras.get("TZP_STATUS_COMMENT_WRITEBACK", "")).strip()
     enabled = raw_enabled.lower() in {"1", "true", "yes", "on"}
-    raw_prefix = str(win._prefs_extras.get("TZP_STATUS_COMMENT_PREFIX", "")).strip()
-    comment_prefix = (
-        raw_prefix
-        or str(win._app_config.comment_prefix).strip()
-        or _StatusCommentWritebackOptions.comment_prefix
-    )
+    comment_prefix = _StatusCommentWritebackOptions.comment_prefix
     status_by_key: dict[str, Status] | None = None
     if include_current_model_overrides and win._current_model is not None:
         status_by_key = {}
@@ -1723,28 +1779,18 @@ def _status_comment_writeback_options(
 def _tzp_writeback_preferences_payload(win) -> dict[str, object]:
     raw_enabled = str(win._prefs_extras.get("TZP_STATUS_COMMENT_WRITEBACK", "")).strip()
     enabled = raw_enabled.lower() in {"1", "true", "yes", "on"}
-    prefix = (
-        str(win._prefs_extras.get("TZP_STATUS_COMMENT_PREFIX", "")).strip()
-        or str(win._app_config.comment_prefix).strip()
-        or _StatusCommentWritebackOptions.comment_prefix
-    )
     return {
         "tzp_writeback_enabled": enabled,
-        "tzp_comment_prefix": prefix,
     }
 
 
 def _apply_tzp_writeback_preferences_for_window(win, values: dict[str, object]) -> None:
     enabled = bool(values.get("tzp_writeback_enabled", False))
-    prefix = str(values.get("tzp_comment_prefix", "")).strip()
     if enabled:
         win._prefs_extras["TZP_STATUS_COMMENT_WRITEBACK"] = "true"
     else:
         win._prefs_extras.pop("TZP_STATUS_COMMENT_WRITEBACK", None)
-    if prefix:
-        win._prefs_extras["TZP_STATUS_COMMENT_PREFIX"] = prefix
-    else:
-        win._prefs_extras.pop("TZP_STATUS_COMMENT_PREFIX", None)
+    win._prefs_extras.pop("TZP_STATUS_COMMENT_PREFIX", None)
 
 
 def _persist_preferences(win) -> None:
@@ -1765,6 +1811,7 @@ def _persist_preferences(win) -> None:
         qa_auto_mark_for_review=win._qa_auto_mark_for_review,
         qa_auto_mark_translated_for_review=(win._qa_auto_mark_translated_for_review),
         qa_auto_mark_proofread_for_review=(win._qa_auto_mark_proofread_for_review),
+        qa_panel_result_limit=win._qa_panel_result_limit,
         last_root=str(win._root),
         last_locales=list(win._selected_locales),
         window_geometry=geometry,
@@ -1799,6 +1846,8 @@ def _on_model_data_changed(win, top_left, bottom_right, roles=None) -> None:
             win._sync_detail_editors()
         if win._qa_auto_refresh:
             win._schedule_qa_refresh()
+        elif bool(getattr(win, "_qa_auto_mark_in_progress", False)):
+            return
         else:
             win._set_qa_findings(())
             if win._left_stack.currentIndex() == 3:
@@ -2069,15 +2118,16 @@ def _set_search_list_placeholder(win, text: str) -> None:
 
 
 def _set_qa_list_placeholder(win, text: str) -> None:
-    """Show a non-selectable placeholder row inside the QA results list."""
+    """Show plain-text placeholder content for QA results."""
     if not hasattr(win, "_qa_results_list") or win._qa_results_list is None:
         return
     win._qa_results_list.clear()
     message = str(text).strip() or "Select a file to run QA checks."
-    item = QListWidgetItem(message)
-    item.setFlags(Qt.ItemIsEnabled)
-    item.setData(int(Qt.UserRole) + 7, True)
-    win._qa_results_list.insertItem(0, item)
+    placeholder = getattr(win, "_qa_results_placeholder", None)
+    if isinstance(placeholder, QLabel):
+        placeholder.setText(message)
+        placeholder.setVisible(True)
+    win._qa_results_list.setVisible(False)
 
 
 def _update_tm_apply_state(win) -> None:
@@ -2506,6 +2556,9 @@ def _update_status_bar(win) -> None:
             parts.append(rel.as_posix())
         except ValueError:
             parts.append(win._current_pf.path.as_posix())
+        encoding = str(getattr(win, "_current_encoding", "")).strip()
+        if encoding:
+            parts.append(f"Encoding {encoding}")
     if not parts:
         parts.append("Ready to edit")
     win.statusBar().showMessage(" | ".join(parts))
@@ -2598,11 +2651,15 @@ def _apply_qa_auto_mark(win, findings: Sequence[_QAFinding]) -> None:
             or (allow_proofread and status == Status.PROOFREAD)
         )
     )
-    win._apply_status_to_rows(
-        rows,
-        status=Status.FOR_REVIEW,
-        label="QA auto-mark For review",
-    )
+    win._qa_auto_mark_in_progress = True
+    try:
+        win._apply_status_to_rows(
+            rows,
+            status=Status.FOR_REVIEW,
+            label="QA auto-mark For review",
+        )
+    finally:
+        win._qa_auto_mark_in_progress = False
 
 
 def _apply_status_to_selection(win, status: Status, label: str) -> None:

@@ -35,8 +35,10 @@ def test_sync_source_reference_combo_resolves_mode_from_project_locales(qtbot) -
     assert [combo.itemData(i) for i in range(combo.count())] == ["EN", "BE", "RU"]
 
 
-def test_sync_source_reference_combo_honors_fallback_order(qtbot) -> None:
-    """Verify sync source reference combo honors fallback order."""
+def test_sync_source_reference_combo_uses_en_when_requested_locale_is_missing(
+    qtbot,
+) -> None:
+    """Missing requested locale should fall back to the visible EN selector value."""
     combo = QComboBox()
     qtbot.addWidget(combo)
     resolved = sync_source_reference_combo(
@@ -44,30 +46,20 @@ def test_sync_source_reference_combo_honors_fallback_order(qtbot) -> None:
         current_mode="RU",
         selected_locales=["BE"],
         all_locales=["EN", "BE"],
-        fallback_default="BE",
-        fallback_secondary="EN",
     )
-    assert resolved == "BE"
+    assert resolved == "EN"
 
 
-def test_sync_source_reference_combo_honors_explicit_fallback_chain(qtbot) -> None:
-    """Verify explicit fallback chain drives deterministic mode resolution."""
+def test_sync_source_reference_combo_uses_first_available_when_en_is_absent(
+    qtbot,
+) -> None:
+    """Verify combo stays usable even if EN is not present in supplied project locales."""
     combo = QComboBox()
     qtbot.addWidget(combo)
     resolved = sync_source_reference_combo(
         combo,
-        current_mode="KO",
-        selected_locales=["BE"],
-        all_locales=["EN", "BE", "RU", "KO"],
-        fallback_chain=("RU", "EN"),
-    )
-    assert resolved == "KO"
-
-    resolved_missing = sync_source_reference_combo(
-        combo,
         current_mode="JA",
-        selected_locales=["BE"],
-        all_locales=["EN", "BE", "RU"],
-        fallback_chain=("RU", "EN"),
+        selected_locales=["RU"],
+        all_locales=["RU", "KO"],
     )
-    assert resolved_missing == "RU"
+    assert resolved == "EN"

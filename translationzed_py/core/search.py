@@ -109,6 +109,8 @@ def _matches_literal(
     # but only for meaningful multi-token queries.
     if not literal_plan.composed_enabled:
         return False
+    if literal_plan.parts[-1] not in text:
+        return False
     pos = 0
     for part in literal_plan.parts:
         found = text.find(part, pos)
@@ -128,6 +130,8 @@ def _match_literal_index(
     if direct >= 0:
         return (direct, len(query))
     if not plan.composed_enabled:
+        return (-1, 0)
+    if plan.parts[-1] not in text:
         return (-1, 0)
     pos = 0
     first_start = -1
@@ -245,6 +249,7 @@ def _iter_matches_with_plan(
     direct_query = literal_plan.query
     composed_enabled = literal_plan.composed_enabled
     query_parts = literal_plan.parts
+    final_part = query_parts[-1] if query_parts else ""
 
     if case_sensitive:
         if not include_preview:
@@ -258,6 +263,8 @@ def _iter_matches_with_plan(
                 text = raw_get(row) or ""
                 if direct_query in text:
                     yield Match(row.file, row.row)
+                    continue
+                if final_part not in text:
                     continue
                 pos = 0
                 for part in query_parts:
@@ -293,6 +300,8 @@ def _iter_matches_with_plan(
             target = norm_get(row)
             if direct_query in target:
                 yield Match(row.file, row.row)
+                continue
+            if final_part not in target:
                 continue
             pos = 0
             for part in query_parts:

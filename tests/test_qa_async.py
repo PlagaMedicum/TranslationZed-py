@@ -144,6 +144,8 @@ class _Win:
         self._qa_scan_pool = None
         self._qa_scan_path = None
         self._qa_scan_run_id = ""
+        self._qa_popup_pending_manual = False
+        self._qa_popup_run_id = ""
         self._qa_scan_timer = _Timer()
         self._qa_check_trailing = True
         self._qa_check_newlines = False
@@ -160,11 +162,13 @@ class _Win:
         self._qa_scan_languagetool_language = "en-US"
         self._test_mode = False
         self.messages: list[str] = []
+        self.status_messages: list[tuple[str, int]] = []
         self.notes: list[str] = []
         self.findings_history: list[tuple[object, ...]] = []
         self.progress_history: list[bool] = []
         self.auto_mark_history: list[tuple[object, ...]] = []
         self.snapshot_history: list[tuple[object, ...]] = []
+        self.popup_history: list[tuple[str, str]] = []
 
     def _set_qa_findings(self, findings) -> None:  # type: ignore[no-untyped-def]
         """Capture applied findings."""
@@ -193,6 +197,17 @@ class _Win:
     def _resolve_lt_language_for_path(self, _path: Path) -> str:
         """Resolve LanguageTool language for QA scan stubs."""
         return "en-US"
+
+    def statusBar(self):  # type: ignore[no-untyped-def]
+        return SimpleNamespace(
+            showMessage=lambda text, timeout=0: self.status_messages.append(
+                (str(text), int(timeout))
+            )
+        )
+
+    def _show_info_box(self, title: str, text: str) -> int:
+        self.popup_history.append((title, text))
+        return 0
 
 
 def _job_result_for(
@@ -240,6 +255,13 @@ def test_collect_input_rows_returns_empty_without_model() -> None:
     win = _Win()
     win._current_model = None
     assert qa_async._collect_input_rows(win) == ()
+
+
+def test_normalize_result_limit_accepts_values_above_2000() -> None:
+    """Verify QA result-limit normalizer keeps values above 2000 intact."""
+    assert qa_async._normalize_result_limit("25000") == 25000
+    assert qa_async._normalize_result_limit("0") == 1
+    assert qa_async._normalize_result_limit("bad") == 2000
 
 
 def test_run_scan_job_returns_progress_snapshots_and_rule_findings() -> None:
@@ -326,6 +348,7 @@ def test_start_scan_submits_job_and_respects_timer_activity(monkeypatch) -> None
     assert win._qa_scan_languagetool_language == "en-US"
     assert win.progress_history == [True]
     assert win.messages[-1] == "Running QA checks..."
+    assert win.status_messages[-1][0] == "QA background scan running..."
     assert win._qa_scan_timer.start_calls == 1
     assert win.snapshot_history
 
@@ -404,6 +427,61 @@ def test_poll_scan_ignores_stale_result_and_applies_current_result() -> None:
     assert win.findings_history == [(finding,)]
     assert win.auto_mark_history == [(finding,)]
     assert win.snapshot_history[-1]
+
+
+def test_poll_scan_shows_popup_only_for_manual_triggered_run() -> None:
+    """Manual-triggered run should show popup; background run should use status bar."""
+    path = Path("/tmp/project/BE/ui.txt")
+    finding = QAFinding(file=path, row=1, code=QA_CODE_TRAILING, excerpt="trim")
+
+    manual_win = _Win()
+    manual_win._qa_scan_run_id = "run-manual"
+    manual_win._qa_popup_run_id = "run-manual"
+    manual_win._qa_scan_future = _Future(
+        done=True,
+        payload=_job_result_for(
+            path,
+            run_id="run-manual",
+            findings=(finding,),
+            note="manual note",
+        ),
+    )
+    qa_async.poll_scan(manual_win)
+    assert len(manual_win.popup_history) == 1
+    title, popup_text = manual_win.popup_history[0]
+    assert title == "QA summary"
+    assert "summary manual note" in popup_text
+    assert "Rules:" in popup_text
+    assert "- Missing trailing characters: Completed (1 finding(s))" in popup_text
+    assert (
+        "- Missing/extra newlines: Skipped (0 finding(s)); Rule disabled." in popup_text
+    )
+    assert (
+        "- Protected tokens / placeholders: Skipped (0 finding(s)); Rule disabled."
+        in popup_text
+    )
+    assert (
+        "- Translation equals source: Skipped (0 finding(s)); Rule disabled."
+        in popup_text
+    )
+    assert "- LanguageTool: Skipped (0 finding(s)); Rule disabled." in popup_text
+    assert manual_win._qa_popup_run_id == ""
+
+    background_win = _Win()
+    background_win._qa_scan_run_id = "run-bg"
+    background_win._qa_popup_run_id = ""
+    background_win._qa_scan_future = _Future(
+        done=True,
+        payload=_job_result_for(
+            path,
+            run_id="run-bg",
+            findings=(finding,),
+            note="background note",
+        ),
+    )
+    qa_async.poll_scan(background_win)
+    assert background_win.popup_history == []
+    assert background_win.status_messages[-1][0] == "summary background note"
 
 
 def test_run_scan_job_skips_languagetool_when_disabled(monkeypatch) -> None:

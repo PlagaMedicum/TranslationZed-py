@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -19,20 +18,13 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QSpinBox,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
-)
-
-from translationzed_py.core.source_reference_service import (
-    dump_source_reference_fallback_presets as _dump_source_reference_fallback_presets,
-)
-from translationzed_py.core.source_reference_service import (
-    normalize_source_reference_fallback_chain as _normalize_source_reference_fallback_chain,
 )
 
 _SCOPES = [
@@ -44,10 +36,6 @@ _THEME_MODES = [
     ("System", "SYSTEM"),
     ("Light", "LIGHT"),
     ("Dark", "DARK"),
-]
-_SOURCE_REF_FALLBACKS = [
-    ("Source locale, then file locale", "EN_THEN_TARGET"),
-    ("File locale, then source locale", "TARGET_THEN_EN"),
 ]
 _LT_MODES = [
     ("Auto", "auto"),
@@ -167,16 +155,9 @@ class PreferencesDialog(QDialog):
             "qa_languagetool_automark": (
                 self._qa_lt_check.isChecked() and self._qa_lt_automark_check.isChecked()
             ),
+            "qa_panel_result_limit": int(self._qa_panel_result_limit_spin.value()),
             "theme_mode": self._theme_mode_combo.currentData(),
-            "source_reference_fallback_policy": (
-                self._source_ref_fallback_combo.currentData()
-            ),
-            "source_reference_fallback_chain": self._source_ref_chain_edit.text().strip(),
-            "source_reference_fallback_presets": (
-                self._source_ref_presets_edit.toPlainText().strip()
-            ),
             "tzp_writeback_enabled": self._tzp_writeback_check.isChecked(),
-            "tzp_comment_prefix": self._tzp_comment_prefix_edit.text().strip(),
             "tm_enabled": changed_tm_enabled,
             "tm_remove_paths": sorted(self._tm_remove_paths),
             "tm_import_paths": list(self._tm_import_paths),
@@ -185,6 +166,44 @@ class PreferencesDialog(QDialog):
             "tm_rebuild": self._tm_rebuild,
             "tm_show_diagnostics": self._tm_show_diagnostics,
         }
+
+    def _create_collapsible_section(
+        self,
+        *,
+        parent: QWidget,
+        section_key: str,
+        title: str = "Advanced settings",
+    ) -> tuple[QWidget, QToolButton, QWidget, QVBoxLayout]:
+        """Create a collapsed-by-default section with explicit expand/collapse toggle."""
+        section = QWidget(parent)
+        section_layout = QVBoxLayout(section)
+        section_layout.setContentsMargins(0, 0, 0, 0)
+        section_layout.setSpacing(4)
+
+        toggle = QToolButton(section)
+        toggle.setObjectName(f"{section_key}_advanced_toggle")
+        toggle.setCheckable(True)
+        toggle.setChecked(False)
+        toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        toggle.setArrowType(Qt.RightArrow)
+        toggle.setText(title)
+
+        content = QWidget(section)
+        content.setObjectName(f"{section_key}_advanced_content")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(16, 0, 0, 0)
+        content_layout.setSpacing(6)
+
+        def _set_expanded(expanded: bool) -> None:
+            content.setVisible(bool(expanded))
+            toggle.setArrowType(Qt.DownArrow if expanded else Qt.RightArrow)
+
+        toggle.toggled.connect(_set_expanded)
+        _set_expanded(False)
+
+        section_layout.addWidget(toggle)
+        section_layout.addWidget(content)
+        return section, toggle, content, content_layout
 
     def _build_general_tab(self) -> QWidget:
         widget = QWidget(self)
@@ -319,9 +338,6 @@ class PreferencesDialog(QDialog):
         layout.addWidget(self._qa_tokens_check)
         layout.addWidget(self._qa_same_source_check)
         layout.addWidget(self._qa_auto_refresh_check)
-        layout.addWidget(self._qa_auto_mark_check)
-        layout.addWidget(self._qa_auto_mark_translated_check)
-        layout.addWidget(self._qa_auto_mark_proofread_check)
         qa_lt_label = QLabel(
             "LanguageTool in manual QA scans",
             widget,
@@ -348,6 +364,16 @@ class PreferencesDialog(QDialog):
         self._qa_lt_automark_check.setChecked(
             bool(self._prefs.get("qa_languagetool_automark", False))
         )
+        self._qa_panel_result_limit_spin = QSpinBox(widget)
+        self._qa_panel_result_limit_spin.setRange(1, 2_147_483_647)
+        try:
+            qa_panel_result_limit = int(self._prefs.get("qa_panel_result_limit", 2000))
+        except (TypeError, ValueError):
+            qa_panel_result_limit = 2000
+        self._qa_panel_result_limit_spin.setValue(max(1, qa_panel_result_limit))
+        self._qa_panel_result_limit_spin.setToolTip(
+            "Maximum QA findings retained for one scan and shown in the QA panel list."
+        )
         self._qa_lt_check.toggled.connect(self._sync_qa_languagetool_controls)
         qa_lt_row = QWidget(widget)
         qa_lt_layout = QHBoxLayout(qa_lt_row)
@@ -359,7 +385,25 @@ class PreferencesDialog(QDialog):
         layout.addWidget(qa_lt_label)
         layout.addWidget(self._qa_lt_check)
         layout.addWidget(qa_lt_row)
-        layout.addWidget(self._qa_lt_automark_check)
+        (
+            qa_advanced_section,
+            self._qa_advanced_toggle,
+            self._qa_advanced_content,
+            qa_advanced_layout,
+        ) = self._create_collapsible_section(parent=widget, section_key="qa")
+        qa_advanced_layout.addWidget(self._qa_auto_mark_check)
+        qa_advanced_layout.addWidget(self._qa_auto_mark_translated_check)
+        qa_advanced_layout.addWidget(self._qa_auto_mark_proofread_check)
+        qa_advanced_layout.addWidget(self._qa_lt_automark_check)
+        qa_panel_limit_row = QWidget(widget)
+        qa_panel_limit_layout = QHBoxLayout(qa_panel_limit_row)
+        qa_panel_limit_layout.setContentsMargins(0, 0, 0, 0)
+        qa_panel_limit_layout.setSpacing(6)
+        qa_panel_limit_layout.addWidget(QLabel("QA findings cap", widget))
+        qa_panel_limit_layout.addWidget(self._qa_panel_result_limit_spin)
+        qa_panel_limit_layout.addStretch(1)
+        qa_advanced_layout.addWidget(qa_panel_limit_row)
+        layout.addWidget(qa_advanced_section)
         self._sync_qa_languagetool_controls(self._qa_lt_check.isChecked())
         layout.addStretch(1)
         return widget
@@ -407,9 +451,6 @@ class PreferencesDialog(QDialog):
         self._lt_picky_check.setChecked(bool(self._prefs.get("lt_picky_mode", False)))
 
         form.addRow(QLabel("Editor mode"), self._lt_editor_mode_combo)
-        form.addRow(QLabel("Server URL"), self._lt_server_url_edit)
-        form.addRow(QLabel("Timeout (ms)"), self._lt_timeout_spin)
-        form.addRow(self._lt_picky_check)
         layout.addLayout(form)
 
         locale_map_label = QLabel("Locale map JSON", widget)
@@ -423,8 +464,20 @@ class PreferencesDialog(QDialog):
         self._lt_locale_map_edit.setPlainText(
             str(self._prefs.get("lt_locale_map", "{}")).strip() or "{}"
         )
-        layout.addWidget(locale_map_label)
-        layout.addWidget(self._lt_locale_map_edit)
+        (
+            lt_advanced_section,
+            self._languagetool_advanced_toggle,
+            self._languagetool_advanced_content,
+            lt_advanced_layout,
+        ) = self._create_collapsible_section(parent=widget, section_key="languagetool")
+        lt_advanced_form = QFormLayout()
+        lt_advanced_form.addRow(QLabel("Server URL"), self._lt_server_url_edit)
+        lt_advanced_form.addRow(QLabel("Timeout (ms)"), self._lt_timeout_spin)
+        lt_advanced_form.addRow(self._lt_picky_check)
+        lt_advanced_layout.addLayout(lt_advanced_form)
+        lt_advanced_layout.addWidget(locale_map_label)
+        lt_advanced_layout.addWidget(self._lt_locale_map_edit)
+        layout.addWidget(lt_advanced_section)
 
         layout.addStretch(1)
         return widget
@@ -435,48 +488,18 @@ class PreferencesDialog(QDialog):
         if not enabled:
             self._qa_lt_automark_check.setChecked(False)
 
-    def _sync_tzp_writeback_controls(self, enabled: bool) -> None:
-        self._tzp_comment_prefix_edit.setEnabled(bool(enabled))
-
     def _build_view_tab(self) -> QWidget:
         widget = QWidget(self)
-        layout = QFormLayout(widget)
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        regular_form = QFormLayout()
 
         self._theme_mode_combo = QComboBox(self)
         for label, value in _THEME_MODES:
             self._theme_mode_combo.addItem(label, value)
         theme_mode = str(self._prefs.get("theme_mode", "SYSTEM")).upper()
         self._set_combo_value(self._theme_mode_combo, theme_mode)
-        self._source_ref_fallback_combo = QComboBox(self)
-        for label, value in _SOURCE_REF_FALLBACKS:
-            self._source_ref_fallback_combo.addItem(label, value)
-        source_ref_fallback = str(
-            self._prefs.get("source_reference_fallback_policy", "EN_THEN_TARGET")
-        ).upper()
-        self._set_combo_value(self._source_ref_fallback_combo, source_ref_fallback)
-        self._source_ref_chain_edit = QLineEdit(
-            str(self._prefs.get("source_reference_fallback_chain", "")).strip(),
-            self,
-        )
-        self._source_ref_chain_edit.setPlaceholderText("<LOCALE_A>,<LOCALE_B>")
-        self._source_ref_chain_edit.setToolTip(
-            "Ordered fallback locales after policy baseline, for example "
-            "<LOCALE_A>,<LOCALE_B>."
-        )
-        self._source_ref_presets_edit = QPlainTextEdit(self)
-        self._source_ref_presets_edit.setLineWrapMode(QPlainTextEdit.NoWrap)
-        self._source_ref_presets_edit.setTabChangesFocus(True)
-        self._source_ref_presets_edit.setMinimumHeight(96)
-        self._source_ref_presets_edit.setPlaceholderText(
-            '{"<TARGET_LOCALE>":["<SOURCE_LOCALE>","<FALLBACK_LOCALE>"]}'
-        )
-        self._source_ref_presets_edit.setToolTip(
-            "Per-locale fallback-chain JSON map, for example "
-            '{"<TARGET_LOCALE>":["<SOURCE_LOCALE>","<FALLBACK_LOCALE>"]}'
-        )
-        self._source_ref_presets_edit.setPlainText(
-            str(self._prefs.get("source_reference_fallback_presets", "")).strip()
-        )
         self._tzp_writeback_check = QCheckBox(
             "Write namespaced TZP status comments to originals on save",
             self,
@@ -484,16 +507,6 @@ class PreferencesDialog(QDialog):
         self._tzp_writeback_check.setChecked(
             bool(self._prefs.get("tzp_writeback_enabled", False))
         )
-        self._tzp_comment_prefix_edit = QLineEdit(
-            str(self._prefs.get("tzp_comment_prefix", "--")).strip() or "--",
-            self,
-        )
-        self._tzp_comment_prefix_edit.setPlaceholderText("--")
-        self._tzp_comment_prefix_edit.setToolTip(
-            "Comment prefix for generated TZP status comments (for example -- or //)."
-        )
-        self._tzp_writeback_check.toggled.connect(self._sync_tzp_writeback_controls)
-        self._sync_tzp_writeback_controls(self._tzp_writeback_check.isChecked())
         self._wrap_text_check = QCheckBox("Wrap long strings in table", self)
         self._wrap_text_check.setChecked(bool(self._prefs.get("wrap_text", False)))
         self._large_text_opt_check = QCheckBox(
@@ -514,18 +527,31 @@ class PreferencesDialog(QDialog):
         self._visual_whitespace_check.setChecked(
             bool(self._prefs.get("visual_whitespace", False))
         )
-        layout.addRow(QLabel("Theme"), self._theme_mode_combo)
-        layout.addRow(QLabel("Source fallback"), self._source_ref_fallback_combo)
-        layout.addRow(QLabel("Fallback chain"), self._source_ref_chain_edit)
-        layout.addRow(
-            QLabel("Locale fallback presets (JSON)"), self._source_ref_presets_edit
+        regular_form.addRow(QLabel("Theme"), self._theme_mode_combo)
+        regular_form.addRow(self._wrap_text_check)
+        regular_form.addRow(self._large_text_opt_check)
+        regular_form.addRow(self._visual_highlight_check)
+        regular_form.addRow(self._visual_whitespace_check)
+        layout.addLayout(regular_form)
+
+        (
+            view_advanced_section,
+            self._view_advanced_toggle,
+            self._view_advanced_content,
+            view_advanced_layout,
+        ) = self._create_collapsible_section(parent=widget, section_key="view")
+        view_advanced_form = QFormLayout()
+        source_reference_label = QLabel(
+            "Source reference uses the selected locale directly. "
+            "If the matching file is missing, the Source column stays empty.",
+            self,
         )
-        layout.addRow(self._tzp_writeback_check)
-        layout.addRow(QLabel("TZP comment prefix"), self._tzp_comment_prefix_edit)
-        layout.addRow(self._wrap_text_check)
-        layout.addRow(self._large_text_opt_check)
-        layout.addRow(self._visual_highlight_check)
-        layout.addRow(self._visual_whitespace_check)
+        source_reference_label.setWordWrap(True)
+        view_advanced_form.addRow(source_reference_label)
+        view_advanced_form.addRow(self._tzp_writeback_check)
+        view_advanced_layout.addLayout(view_advanced_form)
+        layout.addWidget(view_advanced_section)
+        layout.addStretch(1)
         return widget
 
     def _build_tm_tab(self) -> QWidget:
@@ -603,11 +629,19 @@ class PreferencesDialog(QDialog):
         ops_row.addWidget(rebuild_btn)
         ops_row.addWidget(diagnostics_btn)
         ops_row.addStretch(1)
-        layout.addLayout(ops_row)
+        (
+            tm_advanced_section,
+            self._tm_advanced_toggle,
+            self._tm_advanced_content,
+            tm_advanced_layout,
+        ) = self._create_collapsible_section(parent=widget, section_key="tm")
+        tm_advanced_layout.addLayout(ops_row)
+        layout.addWidget(tm_advanced_section)
 
         for row in self._tm_files:
             self._add_tm_file_item(row)
         self._update_tm_action_state()
+        layout.addStretch(1)
         return widget
 
     def _add_tm_file_item(self, row: dict[str, object]) -> None:
@@ -796,47 +830,5 @@ class PreferencesDialog(QDialog):
                 return
 
     def _accept_with_validation(self) -> None:
-        """Validate source-reference controls before accepting dialog values."""
-        if not self._normalize_source_reference_controls():
-            return
+        """Accept the dialog after validating advanced controls."""
         self.accept()
-
-    def _normalize_source_reference_controls(self) -> bool:
-        chain = _normalize_source_reference_fallback_chain(
-            self._source_ref_chain_edit.text(),
-            default=(),
-        )
-        self._source_ref_chain_edit.setText(",".join(chain))
-
-        raw_presets = self._source_ref_presets_edit.toPlainText().strip()
-        if not raw_presets:
-            self._source_ref_presets_edit.clear()
-            return True
-        try:
-            parsed = json.loads(raw_presets)
-        except Exception:
-            QMessageBox.warning(
-                self,
-                "Source fallback presets",
-                "Locale fallback presets must be valid JSON object text.",
-            )
-            return False
-        if not isinstance(parsed, dict):
-            QMessageBox.warning(
-                self,
-                "Source fallback presets",
-                "Locale fallback presets must be a JSON object map.",
-            )
-            return False
-        normalized_payload = _dump_source_reference_fallback_presets(parsed)
-        if normalized_payload == "{}" and parsed:
-            QMessageBox.warning(
-                self,
-                "Source fallback presets",
-                "No valid locale fallback chains were found in the JSON payload.",
-            )
-            return False
-        self._source_ref_presets_edit.setPlainText(
-            "" if normalized_payload == "{}" else normalized_payload
-        )
-        return True

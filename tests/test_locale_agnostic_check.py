@@ -98,14 +98,14 @@ def test_passes_for_locale_agnostic_copy(tmp_path: Path) -> None:
 def build(widget):
     widget.setPlaceholderText("<LOCALE_A>,<LOCALE_B>")
     widget.setToolTip(
-        "Per-locale fallback-chain JSON map, for example "
-        '{"<TARGET_LOCALE>":["<SOURCE_LOCALE>","<FALLBACK_LOCALE>"]}'
+        "Per-file source-reference override JSON map, for example "
+        '{"<RELATIVE_PATH>":"<SOURCE_LOCALE>"}'
     )
         """.strip() + "\n",
         encoding="utf-8",
     )
     doc_path.write_text(
-        'Fallback presets example: {"<TARGET_LOCALE>":["<SOURCE_LOCALE>"]}\n',
+        'Source-reference override example: {"<RELATIVE_PATH>":"<SOURCE_LOCALE>"}\n',
         encoding="utf-8",
     )
     errors = module.validate_locale_agnostic_contract(repo)

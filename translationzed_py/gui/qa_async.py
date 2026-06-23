@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -18,7 +19,9 @@ from translationzed_py.core.languagetool import (
 from translationzed_py.core.languagetool import check_text as _lt_check_text
 from translationzed_py.core.qa_service import (
     QA_CODE_LANGUAGETOOL,
+    QA_RULE_LABELS,
     QA_RULE_ORDER,
+    QA_RULE_STATE_TEXT,
     QAFinding,
     QAInputRow,
     QARuleId,
@@ -83,8 +86,8 @@ def _normalize_result_limit(value: object) -> int:
     try:
         parsed = int(value)
     except (TypeError, ValueError):
-        parsed = 500
-    return max(1, min(5000, parsed))
+        parsed = 2000
+    return max(1, parsed)
 
 
 def _now_ms() -> int:
@@ -93,6 +96,27 @@ def _now_ms() -> int:
 
 def _new_qa_run_id() -> str:
     return f"qa-{uuid.uuid4().hex}"
+
+
+def _format_popup_rule_details(snapshot: QAScanProgressSnapshot | None) -> str:
+    """Return a compact rule-by-rule summary block for QA completion popup."""
+    if snapshot is None:
+        return ""
+    records_by_rule = {record.rule_id: record for record in snapshot.ordered_rules}
+    lines: list[str] = []
+    for rule_id in QA_RULE_ORDER:
+        label = QA_RULE_LABELS.get(rule_id, str(rule_id))
+        record = records_by_rule.get(rule_id)
+        if record is None:
+            lines.append(f"- {label}: {QA_RULE_STATE_TEXT[QARuleState.QUEUED]}")
+            continue
+        state_text = QA_RULE_STATE_TEXT.get(record.state, record.state.value)
+        row = f"- {label}: {state_text} ({int(record.findings_count)} finding(s))"
+        note = str(record.note).strip()
+        if note:
+            row = f"{row}; {note}"
+        lines.append(row)
+    return "\n".join(lines)
 
 
 def _enabled_qa_rules(
@@ -329,7 +353,7 @@ def _run_scan_job(
     check_tokens: bool,
     check_same_as_source: bool,
 ) -> QAScanJobResult:
-    result_limit = _normalize_result_limit(getattr(win, "_qa_panel_result_limit", 500))
+    result_limit = _normalize_result_limit(getattr(win, "_qa_panel_result_limit", 2000))
     enabled_rules = _enabled_qa_rules(
         check_trailing=check_trailing,
         check_newlines=check_newlines,
@@ -511,22 +535,39 @@ def _set_progress_snapshots(
         setter(snapshots)
 
 
+def _show_status_message(win: Any, text: str, timeout_ms: int = 4000) -> None:
+    getter = getattr(win, "statusBar", None)
+    if not callable(getter):
+        return
+    status_bar = getter()
+    if status_bar is None or not hasattr(status_bar, "showMessage"):
+        return
+    with contextlib.suppress(Exception):
+        status_bar.showMessage(str(text), int(timeout_ms))
+
+
 def start_scan(win: Any) -> None:
     """Start a background QA scan for the currently opened file."""
+    manual_requested = bool(getattr(win, "_qa_popup_pending_manual", False))
+    win._qa_popup_pending_manual = False
     path = win._current_pf.path if win._current_pf is not None else None
     if path is None or win._current_model is None:
+        win._qa_popup_run_id = ""
         win._set_qa_scan_note("")
         win._set_qa_findings(())
         _set_progress_snapshots(win, ())
         win._set_qa_panel_message("No file selected.")
         return
     if win._qa_scan_future is not None and not win._qa_scan_future.done():
+        win._qa_popup_run_id = ""
         win._set_qa_panel_message("QA is already running...")
         return
     rows = _collect_input_rows(win)
     run_id = _new_qa_run_id()
     win._qa_scan_run_id = run_id
+    win._qa_popup_run_id = run_id if manual_requested else ""
     win._qa_scan_languagetool_language = win._resolve_lt_language_for_path(path)
+    win._set_qa_progress_visible(True)
     enabled_rules = _enabled_qa_rules(
         check_trailing=bool(win._qa_check_trailing),
         check_newlines=bool(win._qa_check_newlines),
@@ -554,8 +595,11 @@ def start_scan(win: Any) -> None:
             thread_name_prefix="tzp-qa-scan",
         )
     win._qa_scan_path = path
-    win._set_qa_progress_visible(True)
     win._set_qa_panel_message("Running QA checks...")
+    if manual_requested:
+        _show_status_message(win, "QA scan running...", 3000)
+    else:
+        _show_status_message(win, "QA background scan running...", 3000)
     win._qa_scan_future = win._qa_scan_pool.submit(
         _run_scan_job,
         win,
@@ -586,8 +630,10 @@ def poll_scan(win: Any) -> None:
     try:
         result = future.result()
     except Exception as exc:
+        win._qa_popup_run_id = ""
         win._set_qa_scan_note("")
         win._set_qa_panel_message(f"QA failed: {exc}")
+        _show_status_message(win, f"QA failed: {exc}", 6000)
         return
     if result.run_id != str(getattr(win, "_qa_scan_run_id", "")):
         return
@@ -596,6 +642,27 @@ def poll_scan(win: Any) -> None:
     _set_progress_snapshots(win, result.snapshots)
     win._set_qa_scan_note(result.note)
     win._set_qa_findings(result.findings)
+    summary = ""
+    if result.snapshots:
+        summary = str(result.snapshots[-1].final_summary).strip()
+    note = str(result.note).strip()
+    summary_text = " ".join(part for part in (summary, note) if part).strip()
+    popup_run_id = str(getattr(win, "_qa_popup_run_id", "")).strip()
+    if popup_run_id and popup_run_id == result.run_id:
+        win._qa_popup_run_id = ""
+        popup = getattr(win, "_show_info_box", None)
+        popup_text = summary_text or "QA completed."
+        rule_details = _format_popup_rule_details(
+            result.snapshots[-1] if result.snapshots else None
+        )
+        if rule_details:
+            popup_text = f"{popup_text}\n\nRules:\n{rule_details}"
+        if callable(popup):
+            popup("QA summary", popup_text)
+        else:
+            _show_status_message(win, summary_text or "QA completed.", 6000)
+    else:
+        _show_status_message(win, summary_text or "QA background scan completed.", 6000)
     if win._qa_auto_mark_for_review:
         rows_for_auto_mark = tuple(result.findings)
         if not bool(getattr(win, "_qa_languagetool_automark", False)):

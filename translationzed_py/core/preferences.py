@@ -39,6 +39,8 @@ _DEPRECATED_ENV_KEYS = {"QA_AUTO_MARK_TOUCHED_FOR_REVIEW"}
 _QA_LT_MAX_ROWS_DEFAULT = 500
 _QA_LT_MAX_ROWS_MIN = 1
 _QA_LT_MAX_ROWS_MAX = 5000
+_QA_PANEL_RESULT_LIMIT_DEFAULT = 2000
+_QA_PANEL_RESULT_LIMIT_MIN = 1
 
 
 def _normalize_qa_languagetool_max_rows(value: object) -> int:
@@ -47,6 +49,14 @@ def _normalize_qa_languagetool_max_rows(value: object) -> int:
     except (TypeError, ValueError):
         parsed = _QA_LT_MAX_ROWS_DEFAULT
     return max(_QA_LT_MAX_ROWS_MIN, min(_QA_LT_MAX_ROWS_MAX, parsed))
+
+
+def _normalize_qa_panel_result_limit(value: object) -> int:
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        parsed = _QA_PANEL_RESULT_LIMIT_DEFAULT
+    return max(_QA_PANEL_RESULT_LIMIT_MIN, parsed)
 
 
 def _normalize_lt_locale_map(value: object) -> str:
@@ -86,6 +96,7 @@ _DEFAULTS: dict[str, Any] = {
     "qa_check_languagetool": False,
     "qa_languagetool_max_rows": _QA_LT_MAX_ROWS_DEFAULT,
     "qa_languagetool_automark": False,
+    "qa_panel_result_limit": _QA_PANEL_RESULT_LIMIT_DEFAULT,
 }
 _REQUIRED_PREF_KEYS = (
     "prompt_write_on_exit",
@@ -110,6 +121,7 @@ _REQUIRED_PREF_KEYS = (
     "qa_check_languagetool",
     "qa_languagetool_max_rows",
     "qa_languagetool_automark",
+    "qa_panel_result_limit",
 )
 
 
@@ -262,6 +274,10 @@ def _set_qa_lt_max_rows_pref(out: dict[str, Any], value: str) -> None:
     out["qa_languagetool_max_rows"] = _normalize_qa_languagetool_max_rows(value)
 
 
+def _set_qa_panel_result_limit_pref(out: dict[str, Any], value: str) -> None:
+    out["qa_panel_result_limit"] = _normalize_qa_panel_result_limit(value)
+
+
 _ENV_PARSERS: dict[str, Callable[[dict[str, Any], str], None]] = {
     "PROMPT_WRITE_ON_EXIT": _set_bool_pref("prompt_write_on_exit"),
     "WRAP_TEXT": _set_bool_pref("wrap_text"),
@@ -293,6 +309,7 @@ _ENV_PARSERS: dict[str, Callable[[dict[str, Any], str], None]] = {
     "QA_CHECK_LANGUAGETOOL": _set_bool_pref("qa_check_languagetool"),
     "QA_LANGUAGETOOL_MAX_ROWS": _set_qa_lt_max_rows_pref,
     "QA_LANGUAGETOOL_AUTOMARK": _set_bool_pref("qa_languagetool_automark"),
+    "QA_PANEL_RESULT_LIMIT": _set_qa_panel_result_limit_pref,
 }
 
 
@@ -362,6 +379,9 @@ def load(root: Path | None = None) -> dict[str, Any]:
     merged["qa_languagetool_automark"] = bool(
         merged.get("qa_languagetool_automark", False)
     )
+    merged["qa_panel_result_limit"] = _normalize_qa_panel_result_limit(
+        merged.get("qa_panel_result_limit", _QA_PANEL_RESULT_LIMIT_DEFAULT)
+    )
     merged["qa_auto_mark_for_review"] = bool(
         merged.get("qa_auto_mark_for_review", False)
     )
@@ -409,6 +429,9 @@ def ensure_defaults(root: Path | None = None) -> dict[str, Any]:
     )
     prefs["qa_languagetool_automark"] = bool(
         prefs.get("qa_languagetool_automark", False)
+    )
+    prefs["qa_panel_result_limit"] = _normalize_qa_panel_result_limit(
+        prefs.get("qa_panel_result_limit", _QA_PANEL_RESULT_LIMIT_DEFAULT)
     )
     prefs["qa_auto_mark_for_review"] = bool(prefs.get("qa_auto_mark_for_review", False))
     prefs["qa_auto_mark_translated_for_review"] = bool(
@@ -474,6 +497,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
         "QA_CHECK_LANGUAGETOOL",
         "QA_LANGUAGETOOL_MAX_ROWS",
         "QA_LANGUAGETOOL_AUTOMARK",
+        "QA_PANEL_RESULT_LIMIT",
     }
     qa_lt_max_rows = _normalize_qa_languagetool_max_rows(
         prefs.get("qa_languagetool_max_rows", _QA_LT_MAX_ROWS_DEFAULT)
@@ -486,6 +510,9 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
     qa_auto_mark_proofread_for_review = bool(
         qa_auto_mark_for_review
         and prefs.get("qa_auto_mark_proofread_for_review", False)
+    )
+    qa_panel_result_limit = _normalize_qa_panel_result_limit(
+        prefs.get("qa_panel_result_limit", _QA_PANEL_RESULT_LIMIT_DEFAULT)
     )
     lines = [
         f"PROMPT_WRITE_ON_EXIT={'true' if prefs.get('prompt_write_on_exit', True) else 'false'}",
@@ -505,6 +532,7 @@ def save(prefs: dict[str, Any], root: Path | None = None) -> None:
             "QA_AUTO_REFRESH="
             f"{'true' if prefs.get('qa_auto_refresh', False) else 'false'}"
         ),
+        ("QA_PANEL_RESULT_LIMIT=" f"{qa_panel_result_limit}"),
         (
             "QA_AUTO_MARK_FOR_REVIEW="
             f"{'true' if qa_auto_mark_for_review else 'false'}"

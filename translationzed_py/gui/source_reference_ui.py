@@ -1,4 +1,4 @@
-"""UI helpers for source-reference mode selection widgets."""
+"""UI helpers for direct source-reference selection widgets."""
 
 from __future__ import annotations
 
@@ -7,9 +7,7 @@ from collections.abc import Iterable, Sequence
 from PySide6.QtWidgets import QComboBox
 
 from translationzed_py.core.source_reference_service import (
-    normalize_source_reference_fallback_chain,
     normalize_source_reference_mode,
-    resolve_source_reference_locale,
 )
 
 
@@ -54,34 +52,21 @@ def sync_source_reference_combo(
     current_mode: str,
     selected_locales: Sequence[str],
     all_locales: Iterable[str] | None = None,
-    fallback_default: str = "EN",
-    fallback_secondary: str = "EN",
-    fallback_chain: Iterable[str] | None = None,
 ) -> str:
-    """Populate the combo and resolve a valid source-reference mode."""
+    """Populate the combo and keep a direct source-reference selection valid."""
     available = available_source_reference_locales(
         selected_locales,
         all_locales=all_locales,
     )
-    chain = normalize_source_reference_fallback_chain(
-        fallback_chain,
-        default=(fallback_default, fallback_secondary),
-    )
-    default_locale = (
-        chain[0] if chain else normalize_source_reference_mode(fallback_default)
-    )
-    secondary_locale = (
-        chain[1]
-        if len(chain) > 1
-        else normalize_source_reference_mode(fallback_secondary, default="")
-    )
-    resolved = resolve_source_reference_locale(
-        current_mode,
-        available_locales=available,
-        fallback_locale=secondary_locale,
-        fallback_chain=chain[1:],
-        default=default_locale,
-    ).resolved_locale
+    requested = normalize_source_reference_mode(current_mode, default="EN")
+    if requested in available:
+        resolved = requested
+    elif "EN" in available:
+        resolved = "EN"
+    elif available:
+        resolved = available[0]
+    else:
+        resolved = "EN"
     blocker = combo.blockSignals(True)
     combo.clear()
     for locale in available:

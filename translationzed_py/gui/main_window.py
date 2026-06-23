@@ -292,9 +292,6 @@ from .source_reference_state import (
     handle_source_reference_changed as _handle_source_reference_changed,
 )
 from .source_reference_state import (
-    normalize_source_reference_fallback_policy as _normalize_source_reference_fallback_policy,
-)
-from .source_reference_state import (
     source_reference_preferences_payload_for_window as _source_ref_preferences_payload_for_window,
 )
 from .source_reference_state import (
@@ -648,7 +645,7 @@ class MainWindow(QMainWindow):
         self._tm_bootstrap_pending = False
         self._qa_findings: tuple[_QAFinding, ...] = ()
         self._qa_scan_note = ""
-        self._qa_panel_result_limit = 500
+        self._qa_panel_result_limit = 2000
         self._qa_refresh_delay_ms = 140
         self._qa_scan_pool: ThreadPoolExecutor | None = None
         self._qa_scan_future: Future[Any] | None = None
@@ -658,6 +655,9 @@ class MainWindow(QMainWindow):
         self._qa_progress_snapshots: tuple[_QAScanProgressSnapshot, ...] = ()
         self._qa_scan_languagetool_language = "en-US"
         self._qa_scan_busy = False
+        self._qa_auto_mark_in_progress = False
+        self._qa_popup_pending_manual = False
+        self._qa_popup_run_id = ""
         self._qa_scan_timer = QTimer(self)
         self._qa_scan_timer.setSingleShot(False)
         self._qa_scan_timer.setInterval(50)
@@ -716,6 +716,7 @@ class MainWindow(QMainWindow):
         self._qa_auto_mark_proofread_for_review = (
             normalized_prefs.qa_auto_mark_proofread_for_review
         )
+        self._qa_panel_result_limit = normalized_prefs.qa_panel_result_limit
         _lt_adapter.apply_loaded_preferences(self, normalized_prefs)
         self._default_root = normalized_prefs.default_root
         self._search_scope = normalized_prefs.search_scope
@@ -735,11 +736,6 @@ class MainWindow(QMainWindow):
         )
         self._source_reference_mode = _normalize_source_reference_mode(
             self._prefs_extras.get("SOURCE_REFERENCE_MODE"), default="EN"
-        )
-        self._source_reference_fallback_policy = (
-            _normalize_source_reference_fallback_policy(
-                self._prefs_extras.get("SOURCE_REFERENCE_FALLBACK_POLICY")
-            )
         )
         self._source_reference_file_overrides: dict[str, str] = {}
         self._apply_theme_mode(self._theme_mode, persist=False)
@@ -1289,11 +1285,11 @@ class MainWindow(QMainWindow):
         self._qa_refresh_btn = QToolButton(self._qa_panel)
         self._qa_refresh_btn.setAutoRaise(False)
         self._qa_refresh_btn.setIcon(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)
+            self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay)
         )
         self._qa_refresh_btn.setText("Run QA")
         self._qa_refresh_btn.setToolTip("Run QA checks for current file")
-        self._qa_refresh_btn.clicked.connect(self._start_qa_scan_for_current_file)
+        self._qa_refresh_btn.clicked.connect(self._run_qa_scan_from_user_action)
         self._qa_prefs_btn = QToolButton(self._qa_panel)
         self._qa_prefs_btn.setAutoRaise(True)
         self._qa_prefs_btn.setIcon(_preferences_icon(self.style()))
@@ -1307,19 +1303,58 @@ class MainWindow(QMainWindow):
         self._qa_progress.setTextVisible(False)
         self._qa_progress.setRange(0, 0)
         self._qa_progress.setVisible(False)
+        self._qa_summary_block = QWidget(self._qa_panel)
+        qa_summary_layout = QVBoxLayout(self._qa_summary_block)
+        qa_summary_layout.setContentsMargins(0, 0, 0, 0)
+        qa_summary_layout.setSpacing(4)
         self._qa_checklist_label = QLabel(self._qa_panel)
         self._qa_checklist_label.setWordWrap(True)
         self._qa_checklist_label.setTextFormat(Qt.TextFormat.PlainText)
+        self._qa_checklist_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
+        self._qa_checklist_label.setContentsMargins(0, 0, 0, 0)
+        self._qa_checklist_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Minimum,
+        )
         self._qa_checklist_label.setText("Run QA to see rule-by-rule progress.")
+        self._qa_results_placeholder = QLabel(self._qa_panel)
+        self._qa_results_placeholder.setWordWrap(True)
+        self._qa_results_placeholder.setTextFormat(Qt.TextFormat.PlainText)
+        self._qa_results_placeholder.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
+        self._qa_results_placeholder.setContentsMargins(0, 0, 0, 0)
+        self._qa_results_placeholder.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Minimum,
+        )
+        self._qa_results_placeholder.setText("")
+        qa_summary_layout.addWidget(
+            self._qa_checklist_label,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+        )
+        qa_summary_layout.addWidget(
+            self._qa_progress,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+        )
+        qa_summary_layout.addWidget(
+            self._qa_results_placeholder,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+        )
+        qa_summary_layout.addStretch(1)
         self._qa_results_list = QListWidget(self._qa_panel)
         self._qa_results_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self._qa_results_list.itemActivated.connect(self._open_qa_result_item)
         self._qa_results_list.itemClicked.connect(self._open_qa_result_item)
         self._set_qa_list_placeholder(_QA_DEFAULT_PLACEHOLDER)
         qa_layout.addLayout(qa_header)
-        qa_layout.addWidget(self._qa_checklist_label)
-        qa_layout.addWidget(self._qa_progress)
-        qa_layout.addWidget(self._qa_results_list)
+        qa_layout.addWidget(self._qa_summary_block)
+        qa_layout.addWidget(self._qa_results_list, 1)
         self._left_stack.addWidget(self._qa_panel)
 
         self._left_files_btn.setChecked(True)
@@ -2701,6 +2736,7 @@ class MainWindow(QMainWindow):
             "qa_auto_mark_for_review": self._qa_auto_mark_for_review,
             "qa_auto_mark_translated_for_review": self._qa_auto_mark_translated_for_review,
             "qa_auto_mark_proofread_for_review": self._qa_auto_mark_proofread_for_review,
+            "qa_panel_result_limit": self._qa_panel_result_limit,
         }
         prefs.update(
             _source_ref_preferences_payload_for_window(self)
@@ -2821,6 +2857,14 @@ class MainWindow(QMainWindow):
             self._qa_auto_mark_translated_for_review,
             self._qa_auto_mark_proofread_for_review,
         ) = updated_qa
+        previous_qa_panel_result_limit = self._qa_panel_result_limit
+        try:
+            parsed_qa_panel_result_limit = int(
+                values.get("qa_panel_result_limit", self._qa_panel_result_limit)
+            )
+        except (TypeError, ValueError):
+            parsed_qa_panel_result_limit = self._qa_panel_result_limit
+        self._qa_panel_result_limit = max(1, parsed_qa_panel_result_limit)
         qa_lt_changed = _lt_adapter.apply_runtime_preferences(self, values)
         if (qa_changed or qa_lt_changed) and self._current_model is not None:
             if self._qa_auto_refresh:
@@ -2828,6 +2872,11 @@ class MainWindow(QMainWindow):
             else:
                 self._set_qa_findings(())
                 self._set_qa_panel_message("QA settings changed. Click Run QA.")
+        if (
+            self._qa_panel_result_limit != previous_qa_panel_result_limit
+            and self._left_stack.currentIndex() == 3
+        ):
+            self._refresh_qa_panel_results()
         _apply_source_ref_preferences_for_window(self, values)
         _panel_helpers._apply_tzp_writeback_preferences_for_window(self, values)
         self._default_root = str(values.get("default_root", "")).strip()
@@ -5154,6 +5203,10 @@ class MainWindow(QMainWindow):
             return
         self._qa_refresh_timer.start(self._qa_refresh_delay_ms)
 
+    def _run_qa_scan_from_user_action(self) -> None:
+        self._qa_popup_pending_manual = True
+        self._start_qa_scan_for_current_file()
+
     _refresh_qa_for_current_file = _qa_refresh_sync_for_test
     _start_qa_scan_for_current_file = _qa_start_scan
     _poll_qa_scan = _qa_poll_scan
@@ -5267,7 +5320,9 @@ class MainWindow(QMainWindow):
         if self._merge_active:
             event.ignore()
             return
-        if not self._save_exit_flow_service.should_accept_close(
+        if not bool(
+            getattr(self, "_manual_scenario_force_exit", False)
+        ) and not self._save_exit_flow_service.should_accept_close(
             prompt_write_on_exit=self._prompt_write_on_exit,
             write_cache=self._write_cache_current,
             list_draft_files=self._draft_files,

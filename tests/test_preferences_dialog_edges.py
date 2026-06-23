@@ -6,7 +6,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QListWidgetItem, QTabWidget
+from PySide6.QtWidgets import QListWidgetItem, QTabWidget, QToolButton, QWidget
 
 from translationzed_py.gui.preferences_dialog import (
     _TM_IS_PENDING_ROLE,
@@ -181,3 +181,25 @@ def test_initial_tab_selects_requested_preferences_section(qtbot) -> None:
     tabs = dialog.findChild(QTabWidget)
     assert tabs is not None
     assert tabs.tabText(tabs.currentIndex()) == "QA"
+
+
+def test_advanced_sections_start_collapsed_and_toggle(qtbot) -> None:
+    """Verify advanced sections are collapsed by default and expandable on demand."""
+    dialog = PreferencesDialog({}, tm_files=[])
+    qtbot.addWidget(dialog)
+
+    for key in ("qa", "languagetool", "view", "tm"):
+        toggle = dialog.findChild(QToolButton, f"{key}_advanced_toggle")
+        content = dialog.findChild(QWidget, f"{key}_advanced_content")
+        assert toggle is not None
+        assert content is not None
+        assert toggle.isChecked() is False
+        assert content.isHidden() is True
+
+        toggle.click()
+        assert toggle.isChecked() is True
+        assert content.isHidden() is False
+
+        toggle.click()
+        assert toggle.isChecked() is False
+        assert content.isHidden() is True
