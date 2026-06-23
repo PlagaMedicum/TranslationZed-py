@@ -1,0 +1,97 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1782236481849,
+  "fixture_copy_root": "/tmp/tzp-manual-open-edit-save-basic-1r9l5vqn/project",
+  "manual_all_steps": [
+    "Open RU/ui.txt from the Project tree.",
+    "Edit UI_HELLO in the table or detail editor and confirm the row becomes dirty.",
+    "Use General -> Save. If a save/write prompt appears, choose Write to file for this scenario and record the prompt wording in Notes. Then open RU/menu.txt from the Project tree.",
+    "Switch back to RU/ui.txt and verify the saved value persists."
+  ],
+  "manual_checked_expected_checks": [
+    "No startup or save error dialogs appear.",
+    "Dirty and clean state changes follow edit then save.",
+    "File switching does not break the saved value or active editing context."
+  ],
+  "manual_checked_steps": [
+    "Open RU/ui.txt from the Project tree.",
+    "Edit UI_HELLO in the table or detail editor and confirm the row becomes dirty.",
+    "Use General -> Save. If a save/write prompt appears, choose Write to file for this scenario and record the prompt wording in Notes. Then open RU/menu.txt from the Project tree.",
+    "Switch back to RU/ui.txt and verify the saved value persists."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/open-edit-save-basic-open-edit-save-basic-1782236222540-1782236481665.json",
+  "manual_expected_checks": [
+    "No startup or save error dialogs appear.",
+    "Dirty and clean state changes follow edit then save.",
+    "File switching does not break the saved value or active editing context."
+  ],
+  "manual_notes": "it is not dirty, it is \"Translated\", as expected",
+  "manual_outcome": "passed",
+  "manual_return_code": 0,
+  "manual_run_token": "open-edit-save-basic-1782236222540",
+  "mode": "manual",
+  "scenario": {
+    "automation_pytest_selectors": [
+      "tests/test_gui_edit_save.py",
+      "tests/test_gui_save_prompt.py"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "No startup or save error dialogs appear.",
+      "Dirty and clean state changes follow edit then save.",
+      "File switching does not break the saved value or active editing context."
+    ],
+    "finish_condition": "Leave RU/ui.txt active after saving, switching to RU/menu.txt, and switching back, with the edited value still visible and the row clean after save.",
+    "fixture_root": "manual_workflow",
+    "focus_files": [
+      "RU/ui.txt",
+      "RU/menu.txt"
+    ],
+    "goal": "Verify the ordinary open/edit/save flow on a locale-diverse manual fixture without relying on fake file-close semantics.",
+    "id": "open-edit-save-basic",
+    "inspection_paths": [],
+    "manual_depth": "full_workflow",
+    "operator_hints": [
+      "This scenario verifies writing the copied fixture to disk, not cache-only save.",
+      "If Save prompts for a write or cache decision, choose Write to file and record the exact prompt wording in Notes. If no prompt appears, record that too."
+    ],
+    "prefs_extras": {},
+    "selected_locales": [
+      "RU"
+    ],
+    "start_context": "Launch the scenario project with RU selected. This is a file-write scenario. Use Project tree file switching because the app does not expose a close-file action.",
+    "steps": [
+      "Open RU/ui.txt from the Project tree.",
+      "Edit UI_HELLO in the table or detail editor and confirm the row becomes dirty.",
+      "Use General -> Save. If a save/write prompt appears, choose Write to file for this scenario and record the prompt wording in Notes. Then open RU/menu.txt from the Project tree.",
+      "Switch back to RU/ui.txt and verify the saved value persists."
+    ],
+    "title": "Open, edit, save, and switch files on a generic locale fixture",
+    "tracked_repo_files": [
+      "translationzed_py/gui/main_window.py",
+      "translationzed_py/core/file_workflow.py",
+      "tests/fixtures/manual_workflow/RU/ui.txt",
+      "tests/fixtures/manual_workflow/RU/menu.txt"
+    ],
+    "workflow_family": "open_save"
+  },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/manual_workflow/RU/menu.txt",
+      "sha256": "883d5c1c4e2fc5617a8f9851f1ff9adb5bd2f18a2a24fa1812eabef7d53885c6"
+    },
+    {
+      "path": "tests/fixtures/manual_workflow/RU/ui.txt",
+      "sha256": "1e96bf1a0459ccee3e1cbdad923fb0ed09545b0a16de0a197f7e5a8b6c78f2e1"
+    },
+    {
+      "path": "translationzed_py/core/file_workflow.py",
+      "sha256": "8bf0b520db03929ecc19a5d6805ea893c6e5fb4eca683db1da44b98305656f16"
+    },
+    {
+      "path": "translationzed_py/gui/main_window.py",
+      "sha256": "a6a633da5584974b08db0e58e1b9d72a13d952036051515e3227a7da827f60ba"
+    }
+  ],
+  "version": 1
+}

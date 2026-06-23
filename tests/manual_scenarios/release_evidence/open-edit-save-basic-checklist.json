@@ -1,0 +1,33 @@
+{
+  "all_steps": [
+    "Open RU/ui.txt from the Project tree.",
+    "Edit UI_HELLO in the table or detail editor and confirm the row becomes dirty.",
+    "Use General -> Save. If a save/write prompt appears, choose Write to file for this scenario and record the prompt wording in Notes. Then open RU/menu.txt from the Project tree.",
+    "Switch back to RU/ui.txt and verify the saved value persists."
+  ],
+  "checked_expected_checks": [
+    "No startup or save error dialogs appear.",
+    "Dirty and clean state changes follow edit then save.",
+    "File switching does not break the saved value or active editing context."
+  ],
+  "checked_steps": [
+    "Open RU/ui.txt from the Project tree.",
+    "Edit UI_HELLO in the table or detail editor and confirm the row becomes dirty.",
+    "Use General -> Save. If a save/write prompt appears, choose Write to file for this scenario and record the prompt wording in Notes. Then open RU/menu.txt from the Project tree.",
+    "Switch back to RU/ui.txt and verify the saved value persists."
+  ],
+  "completed_at_ms": 1782236481665,
+  "expected_checks": [
+    "No startup or save error dialogs appear.",
+    "Dirty and clean state changes follow edit then save.",
+    "File switching does not break the saved value or active editing context."
+  ],
+  "fixture_root": "manual_workflow",
+  "notes": "it is not dirty, it is \"Translated\", as expected",
+  "project_root": "/tmp/tzp-manual-open-edit-save-basic-1r9l5vqn/project",
+  "result": "passed",
+  "run_token": "open-edit-save-basic-1782236222540",
+  "scenario_id": "open-edit-save-basic",
+  "title": "Open, edit, save, and switch files on a generic locale fixture",
+  "version": 1
+}
