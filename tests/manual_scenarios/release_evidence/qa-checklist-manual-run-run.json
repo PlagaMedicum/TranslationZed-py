@@ -1,0 +1,113 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1782243361516,
+  "fixture_copy_root": "/tmp/tzp-manual-qa-checklist-manual-run-t96u_1al/project",
+  "manual_all_steps": [
+    "Open RU/ui.txt from the Project tree and confirm the QA panel shows the pre-run manual message.",
+    "Press Run QA and observe rule-state progress in fixed order until the run completes.",
+    "Activate one finding from the list and confirm the table navigates to the matching row.",
+    "Edit one translation in RU/ui.txt and confirm the stale QA message is plain text rather than a fake findings row.",
+    "Press Run QA again and confirm the findings list refreshes for the edited file."
+  ],
+  "manual_checked_expected_checks": [
+    "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
+    "Rule-state progress follows the queued, running, and completed sequence during the run.",
+    "Findings list is non-empty and supports row navigation.",
+    "Source column shows EN source text rather than empty placeholders.",
+    "After editing, stale-message text is plain panel text and the second run replaces it with refreshed findings."
+  ],
+  "manual_checked_steps": [
+    "Open RU/ui.txt from the Project tree and confirm the QA panel shows the pre-run manual message.",
+    "Press Run QA and observe rule-state progress in fixed order until the run completes.",
+    "Activate one finding from the list and confirm the table navigates to the matching row.",
+    "Edit one translation in RU/ui.txt and confirm the stale QA message is plain text rather than a fake findings row.",
+    "Press Run QA again and confirm the findings list refreshes for the edited file."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1782242581636-1782243361317.json",
+  "manual_expected_checks": [
+    "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
+    "Rule-state progress follows the queued, running, and completed sequence during the run.",
+    "Findings list is non-empty and supports row navigation.",
+    "Source column shows EN source text rather than empty placeholders.",
+    "After editing, stale-message text is plain panel text and the second run replaces it with refreshed findings."
+  ],
+  "manual_notes": "QA progress, I guess is ok, but I can't verify it completely, cuz it runs fastly, as i expect. Idk what you mean with plin panel text, but everything looks fine",
+  "manual_outcome": "passed",
+  "manual_return_code": 0,
+  "manual_run_token": "qa-checklist-manual-run-1782242581636",
+  "mode": "manual",
+  "scenario": {
+    "automation_pytest_selectors": [
+      "tests/test_qa_async.py",
+      "tests/test_gui_qa_panel.py"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
+      "Rule-state progress follows the queued, running, and completed sequence during the run.",
+      "Findings list is non-empty and supports row navigation.",
+      "Source column shows EN source text rather than empty placeholders.",
+      "After editing, stale-message text is plain panel text and the second run replaces it with refreshed findings."
+    ],
+    "finish_condition": "Leave RU/ui.txt active after the second manual QA run, with refreshed findings visible for the edited file and no fake placeholder row in the findings list.",
+    "fixture_root": "qa_manual",
+    "focus_files": [
+      "RU/ui.txt"
+    ],
+    "goal": "Verify manual QA run progression, finding navigation, stale-message rendering, and findings refresh on a deterministic QA file.",
+    "id": "qa-checklist-manual-run",
+    "inspection_paths": [],
+    "manual_depth": "same_file_diagnostic",
+    "operator_hints": [],
+    "prefs_extras": {
+      "QA_AUTO_MARK_FOR_REVIEW": "false",
+      "QA_AUTO_MARK_PROOFREAD_FOR_REVIEW": "false",
+      "QA_AUTO_MARK_TRANSLATED_FOR_REVIEW": "false",
+      "QA_AUTO_REFRESH": "false",
+      "QA_CHECK_ESCAPES": "true",
+      "QA_CHECK_LANGUAGETOOL": "false",
+      "QA_CHECK_NEWLINES": "true",
+      "QA_CHECK_SAME_AS_SOURCE": "true",
+      "QA_CHECK_TRAILING": "true",
+      "QA_PANEL_RESULT_LIMIT": "2000"
+    },
+    "selected_locales": [
+      "RU"
+    ],
+    "start_context": "Launch with RU selected and keep the QA side panel visible. Scenario preferences disable QA auto-refresh and QA auto-mark paths.",
+    "steps": [
+      "Open RU/ui.txt from the Project tree and confirm the QA panel shows the pre-run manual message.",
+      "Press Run QA and observe rule-state progress in fixed order until the run completes.",
+      "Activate one finding from the list and confirm the table navigates to the matching row.",
+      "Edit one translation in RU/ui.txt and confirm the stale QA message is plain text rather than a fake findings row.",
+      "Press Run QA again and confirm the findings list refreshes for the edited file."
+    ],
+    "title": "Manual QA run, navigation, and stale-message refresh flow",
+    "tracked_repo_files": [
+      "translationzed_py/gui/main_window_panel_helpers.py",
+      "translationzed_py/gui/qa_async.py",
+      "tests/fixtures/qa_manual/EN/ui.txt",
+      "tests/fixtures/qa_manual/RU/ui.txt"
+    ],
+    "workflow_family": "qa_checklist"
+  },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/qa_manual/EN/ui.txt",
+      "sha256": "0251aaa3d6bae768a6f7fc692885aaf9b37a5d1d98e6367389b80974621cb5f4"
+    },
+    {
+      "path": "tests/fixtures/qa_manual/RU/ui.txt",
+      "sha256": "70050cbf94cd65cb67326aca6a9384ef6f669ba16ef79f88b3a8436030a44126"
+    },
+    {
+      "path": "translationzed_py/gui/main_window_panel_helpers.py",
+      "sha256": "44022352567ef90f88ad06b32a5109d1f88268b1879526ca862578f5da722da1"
+    },
+    {
+      "path": "translationzed_py/gui/qa_async.py",
+      "sha256": "f72aca870be1bb1ba81c98077427f0c65f9e8d720070c60597bff2ce0c2d03bc"
+    }
+  ],
+  "version": 1
+}

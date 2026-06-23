@@ -23,6 +23,17 @@
       "source_run_artifact": "artifacts/manual-ui/conflict-resolution-flow-run-1782240428132.json"
     },
     {
+      "checklist_record": "tests/manual_scenarios/release_evidence/qa-checklist-manual-run-checklist.json",
+      "interactive": true,
+      "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
+      "recorded_at_ms": 1782243361516,
+      "result": "passed",
+      "run_record": "tests/manual_scenarios/release_evidence/qa-checklist-manual-run-run.json",
+      "scenario_id": "qa-checklist-manual-run",
+      "source_checklist_artifact": "artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1782242581636-1782243361317.json",
+      "source_run_artifact": "artifacts/manual-ui/qa-checklist-manual-run-run-1782243361516.json"
+    },
+    {
       "checklist_record": "tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-checklist.json",
       "interactive": true,
       "notes": "A34 interactive release-evidence closure record.",
