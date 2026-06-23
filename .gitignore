@@ -45,6 +45,7 @@ ProjectZomboidTranslations/
 .vscode/
 *.code-workspace
 .external/
+.codex
 
 # ─── OS noise ──────────────────────────────────────────────────────────────────
 .DS_Store
