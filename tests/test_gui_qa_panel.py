@@ -250,16 +250,11 @@ def test_edit_marks_only_row_qa_findings_stale(qtbot, tmp_path: Path) -> None:
     assert win._qa_results_list.isHidden() is False
     assert win._qa_scan_note == ""
     assert (
-        win._qa_checklist_label.text()
-        == "QA completed: 2 finding(s) across 5/5 rules."
+        win._qa_checklist_label.text() == "QA completed: 2 finding(s) across 5/5 rules."
     )
     assert win._qa_stale_notice_label.isHidden() is False
-    assert (
-        win._qa_stale_notice_label.text()
-        == (
-            "1 edited row needs QA again. "
-            "Old findings are hidden until you rerun QA."
-        )
+    assert win._qa_stale_notice_label.text() == (
+        "1 edited row needs QA again. " "Old findings are hidden until you rerun QA."
     )
 
     win._set_qa_findings(
