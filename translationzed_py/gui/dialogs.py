@@ -303,7 +303,9 @@ class ReplaceFilesDialog(QDialog):
                         self._scope_combo.setCurrentIndex(idx)
                         break
             else:
-                self._selected_scope = str(self._scope_combo.currentData() or "").upper()
+                self._selected_scope = str(
+                    self._scope_combo.currentData() or ""
+                ).upper()
             self._scope_combo.currentIndexChanged.connect(self._scope_selection_changed)
             scope_layout.addWidget(self._scope_combo, 1)
             main_layout.addLayout(scope_layout)
@@ -324,7 +326,9 @@ class ReplaceFilesDialog(QDialog):
             QLabel("Impact preview (file, row, before, after):", self)
         )
         self._preview_table = QTableWidget(0, 4, self)
-        self._preview_table.setHorizontalHeaderLabels(("File", "Row", "Before", "After"))
+        self._preview_table.setHorizontalHeaderLabels(
+            ("File", "Row", "Before", "After")
+        )
         self._preview_table.setSelectionMode(QAbstractItemView.NoSelection)
         self._preview_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self._preview_table.verticalHeader().setVisible(False)

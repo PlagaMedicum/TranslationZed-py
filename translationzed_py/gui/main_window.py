@@ -1308,42 +1308,20 @@ class MainWindow(QMainWindow):
         qa_summary_layout = QVBoxLayout(self._qa_summary_block)
         qa_summary_layout.setContentsMargins(0, 0, 0, 0)
         qa_summary_layout.setSpacing(4)
-        self._qa_checklist_label = QLabel(self._qa_panel)
-        self._qa_checklist_label.setWordWrap(True)
-        self._qa_checklist_label.setTextFormat(Qt.TextFormat.PlainText)
-        self._qa_checklist_label.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        self._qa_checklist_label = _panel_helpers.build_qa_panel_label(
+            self._qa_panel,
+            vertical_policy=QSizePolicy.Policy.Minimum,
+            text="Run QA to see rule-by-rule progress.",
         )
-        self._qa_checklist_label.setContentsMargins(0, 0, 0, 0)
-        self._qa_checklist_label.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Minimum,
-        )
-        self._qa_checklist_label.setText("Run QA to see rule-by-rule progress.")
-        self._qa_stale_notice_label = QLabel(self._qa_panel)
-        self._qa_stale_notice_label.setWordWrap(True)
-        self._qa_stale_notice_label.setTextFormat(Qt.TextFormat.PlainText)
-        self._qa_stale_notice_label.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
-        )
-        self._qa_stale_notice_label.setContentsMargins(0, 0, 0, 0)
-        self._qa_stale_notice_label.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Preferred,
+        self._qa_stale_notice_label = _panel_helpers.build_qa_panel_label(
+            self._qa_panel,
+            vertical_policy=QSizePolicy.Policy.Preferred,
         )
         self._qa_stale_notice_label.setVisible(False)
-        self._qa_results_placeholder = QLabel(self._qa_panel)
-        self._qa_results_placeholder.setWordWrap(True)
-        self._qa_results_placeholder.setTextFormat(Qt.TextFormat.PlainText)
-        self._qa_results_placeholder.setAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        self._qa_results_placeholder = _panel_helpers.build_qa_panel_label(
+            self._qa_panel,
+            vertical_policy=QSizePolicy.Policy.Minimum,
         )
-        self._qa_results_placeholder.setContentsMargins(0, 0, 0, 0)
-        self._qa_results_placeholder.setSizePolicy(
-            QSizePolicy.Policy.Preferred,
-            QSizePolicy.Policy.Minimum,
-        )
-        self._qa_results_placeholder.setText("")
         qa_summary_layout.addWidget(
             self._qa_checklist_label,
             0,

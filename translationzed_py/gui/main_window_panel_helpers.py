@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
+    QSizePolicy,
     QStyle,
     QToolButton,
     QVBoxLayout,
@@ -95,6 +96,23 @@ from .tm_preview import prepare_tm_preview_terms as _prepare_tm_preview_terms
 
 _PROGRESS_POLL_INTERVAL_MS = 70
 _SESSION_RESUME_WRITE_DEBOUNCE_MS = 280
+
+
+def build_qa_panel_label(
+    parent: QWidget,
+    *,
+    vertical_policy: QSizePolicy.Policy,
+    text: str = "",
+) -> QLabel:
+    """Create a plain-text, top-aligned QA summary label."""
+    label = QLabel(parent)
+    label.setWordWrap(True)
+    label.setTextFormat(Qt.TextFormat.PlainText)
+    label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+    label.setContentsMargins(0, 0, 0, 0)
+    label.setSizePolicy(QSizePolicy.Policy.Preferred, vertical_policy)
+    label.setText(text)
+    return label
 
 
 def display_path_for_root(root: Path, path: Path) -> str:
@@ -276,6 +294,7 @@ def run_replace_all(win) -> None:
     if not run_plan.run_replace:
         return
     if run_plan.show_confirmation:
+
         def dialog_payload(scope: str):
             next_state = build_scope_state(scope)
             if next_state is None:
