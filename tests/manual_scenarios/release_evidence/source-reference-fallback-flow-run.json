@@ -1,0 +1,124 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1782248806229,
+  "fixture_copy_root": "/tmp/tzp-manual-source-reference-fallback-flow-6_qrb9fm/project",
+  "manual_all_steps": [
+    "Open RU/ui.txt and use the Source column header control to select KO as the source-reference locale.",
+    "Confirm the Source column now shows KO text for RU/ui.txt.",
+    "Open RU/menu.txt and keep KO selected as the source-reference locale.",
+    "Confirm the Source column on RU/menu.txt stays empty because no KO/menu.txt exists.",
+    "Change the selected row inside RU/menu.txt and confirm the Source column stays empty there as well.",
+    "Switch back to RU/ui.txt and then return to RU/menu.txt to confirm the selected source-reference locale remains stable while the missing counterpart still produces an empty Source column."
+  ],
+  "manual_checked_expected_checks": [
+    "Source-reference control responds without errors.",
+    "KO source is shown on RU/ui.txt because a KO counterpart exists.",
+    "RU/menu.txt keeps an empty Source column rather than showing fallback text when KO/menu.txt is missing.",
+    "Switching files does not silently replace the requested KO source-reference mode with another locale."
+  ],
+  "manual_checked_steps": [
+    "Open RU/ui.txt and use the Source column header control to select KO as the source-reference locale.",
+    "Confirm the Source column now shows KO text for RU/ui.txt.",
+    "Open RU/menu.txt and keep KO selected as the source-reference locale.",
+    "Confirm the Source column on RU/menu.txt stays empty because no KO/menu.txt exists.",
+    "Change the selected row inside RU/menu.txt and confirm the Source column stays empty there as well.",
+    "Switch back to RU/ui.txt and then return to RU/menu.txt to confirm the selected source-reference locale remains stable while the missing counterpart still produces an empty Source column."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/source-reference-fallback-flow-source-reference-fallback-flow-1782248568789-1782248806052.json",
+  "manual_expected_checks": [
+    "Source-reference control responds without errors.",
+    "KO source is shown on RU/ui.txt because a KO counterpart exists.",
+    "RU/menu.txt keeps an empty Source column rather than showing fallback text when KO/menu.txt is missing.",
+    "Switching files does not silently replace the requested KO source-reference mode with another locale."
+  ],
+  "manual_notes": "",
+  "manual_outcome": "passed",
+  "manual_return_code": 0,
+  "manual_run_token": "source-reference-fallback-flow-1782248568789",
+  "mode": "manual",
+  "scenario": {
+    "automation_pytest_selectors": [
+      "tests/test_source_reference_ui.py",
+      "tests/test_source_reference_state.py"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "Source-reference control responds without errors.",
+      "KO source is shown on RU/ui.txt because a KO counterpart exists.",
+      "RU/menu.txt keeps an empty Source column rather than showing fallback text when KO/menu.txt is missing.",
+      "Switching files does not silently replace the requested KO source-reference mode with another locale."
+    ],
+    "finish_condition": "Leave RU/menu.txt active after selecting KO as the source-reference locale and confirming the Source column stays empty for the missing counterpart without changing the selected source-reference mode.",
+    "fixture_root": "manual_workflow",
+    "focus_files": [
+      "RU/ui.txt",
+      "RU/menu.txt"
+    ],
+    "goal": "Verify source-reference locale switching on files with and without KO counterparts, using empty Source cells when the requested counterpart file is missing.",
+    "id": "source-reference-fallback-flow",
+    "inspection_paths": [],
+    "manual_depth": "full_workflow",
+    "operator_hints": [
+      "Do not treat an empty Source cell on RU/menu.txt as a failure in this scenario; the empty state is the intended result when KO/menu.txt is missing.",
+      "This scenario verifies `requested source or empty`, not fallback chains. Do not open Preferences or look for automatic fallback behavior here."
+    ],
+    "prefs_extras": {
+      "SOURCE_REFERENCE_MODE": "EN"
+    },
+    "selected_locales": [
+      "RU",
+      "KO"
+    ],
+    "start_context": "Launch with RU and KO selected. Keep KO selected as the source-reference locale for the whole scenario. RU/ui.txt has a KO counterpart; RU/menu.txt does not.",
+    "steps": [
+      "Open RU/ui.txt and use the Source column header control to select KO as the source-reference locale.",
+      "Confirm the Source column now shows KO text for RU/ui.txt.",
+      "Open RU/menu.txt and keep KO selected as the source-reference locale.",
+      "Confirm the Source column on RU/menu.txt stays empty because no KO/menu.txt exists.",
+      "Change the selected row inside RU/menu.txt and confirm the Source column stays empty there as well.",
+      "Switch back to RU/ui.txt and then return to RU/menu.txt to confirm the selected source-reference locale remains stable while the missing counterpart still produces an empty Source column."
+    ],
+    "title": "Source-reference mode with empty source when counterpart is missing",
+    "tracked_repo_files": [
+      "translationzed_py/core/source_reference_service.py",
+      "translationzed_py/gui/source_reference_state.py",
+      "translationzed_py/gui/source_reference_ui.py",
+      "translationzed_py/gui/preferences_dialog.py",
+      "tests/fixtures/manual_workflow/RU/ui.txt",
+      "tests/fixtures/manual_workflow/RU/menu.txt",
+      "tests/fixtures/manual_workflow/KO/ui.txt"
+    ],
+    "workflow_family": "source_reference"
+  },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/manual_workflow/KO/ui.txt",
+      "sha256": "fd3729678ac87dec011b399b90e9b5c9edbb9622c92f2000bb081355bf9baaed"
+    },
+    {
+      "path": "tests/fixtures/manual_workflow/RU/menu.txt",
+      "sha256": "883d5c1c4e2fc5617a8f9851f1ff9adb5bd2f18a2a24fa1812eabef7d53885c6"
+    },
+    {
+      "path": "tests/fixtures/manual_workflow/RU/ui.txt",
+      "sha256": "1e96bf1a0459ccee3e1cbdad923fb0ed09545b0a16de0a197f7e5a8b6c78f2e1"
+    },
+    {
+      "path": "translationzed_py/core/source_reference_service.py",
+      "sha256": "ac974b5393a853143eefac5479743e2e5bbc3be2e67e8c3babfdfa1615314302"
+    },
+    {
+      "path": "translationzed_py/gui/preferences_dialog.py",
+      "sha256": "76d7b334e110b923279442cb561f70fc622dde73169b08903202216f3aae5a92"
+    },
+    {
+      "path": "translationzed_py/gui/source_reference_state.py",
+      "sha256": "3e4249dfa338a60f419356eb63ab65f4dc3d9dbcb8cf153f4af60e1fc0f2250e"
+    },
+    {
+      "path": "translationzed_py/gui/source_reference_ui.py",
+      "sha256": "0df17ee9196917f9006fbcde7a1daa2e55701934a9edb2150d5d1c7809c22b96"
+    }
+  ],
+  "version": 1
+}

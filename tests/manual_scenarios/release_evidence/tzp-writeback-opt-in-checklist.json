@@ -1,0 +1,37 @@
+{
+  "all_steps": [
+    "Open RU/tzp_status.txt. In row `TZP_KEEP`, change the translation to `\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u044b\u043f\u0443\u0441\u043a\u0443` and change the row status from For Review to Translated.",
+    "Use General -> Save. If Save offers both cache-only and file-write options, choose Write to file for this scenario.",
+    "Use the dialog copy buttons to copy the project root or inspection path, then open the copied inspection file RU/tzp_status.txt under the scenario project root.",
+    "Confirm `TZP_KEEP` now ends with the namespaced comment `-- TZP:TRANSLATED` on disk.",
+    "Confirm `TZP_EDIT` still keeps only the user-authored comment `-- \u0437\u0430\u043c\u0435\u0442\u043a\u0430 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u0447\u0438\u043a\u0430` and did not gain a new TZP comment.",
+    "Switch to RU/ui.txt and back to RU/tzp_status.txt to confirm normal editing flow still works."
+  ],
+  "checked_expected_checks": [
+    "Scenario-injected TZP write-back is active for this copied project without extra preference edits.",
+    "`TZP_KEEP` updates its namespaced TZP comment from FOR_REVIEW to TRANSLATED.",
+    "`TZP_EDIT` keeps the user-authored non-TZP comment unchanged."
+  ],
+  "checked_steps": [
+    "Open RU/tzp_status.txt. In row `TZP_KEEP`, change the translation to `\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u044b\u043f\u0443\u0441\u043a\u0443` and change the row status from For Review to Translated.",
+    "Use General -> Save. If Save offers both cache-only and file-write options, choose Write to file for this scenario.",
+    "Use the dialog copy buttons to copy the project root or inspection path, then open the copied inspection file RU/tzp_status.txt under the scenario project root.",
+    "Confirm `TZP_KEEP` now ends with the namespaced comment `-- TZP:TRANSLATED` on disk.",
+    "Confirm `TZP_EDIT` still keeps only the user-authored comment `-- \u0437\u0430\u043c\u0435\u0442\u043a\u0430 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u0447\u0438\u043a\u0430` and did not gain a new TZP comment.",
+    "Switch to RU/ui.txt and back to RU/tzp_status.txt to confirm normal editing flow still works."
+  ],
+  "completed_at_ms": 1782251825070,
+  "expected_checks": [
+    "Scenario-injected TZP write-back is active for this copied project without extra preference edits.",
+    "`TZP_KEEP` updates its namespaced TZP comment from FOR_REVIEW to TRANSLATED.",
+    "`TZP_EDIT` keeps the user-authored non-TZP comment unchanged."
+  ],
+  "fixture_root": "manual_workflow",
+  "notes": "",
+  "project_root": "/tmp/tzp-manual-tzp-writeback-opt-in-apjjd8_u/project",
+  "result": "passed",
+  "run_token": "tzp-writeback-opt-in-1782251695213",
+  "scenario_id": "tzp-writeback-opt-in",
+  "title": "Status-comment writeback (opt-in)",
+  "version": 1
+}

@@ -59,6 +59,9 @@ class _DialogStub:
         total_matches: int,
         affected_files: int,
         impact_preview,
+        scope_options=(),  # type: ignore[no-untyped-def]
+        selected_scope=None,
+        on_scope_changed=None,
         parent,
     ) -> None:  # type: ignore[no-untyped-def]
         self.counts = list(counts)
@@ -66,6 +69,9 @@ class _DialogStub:
         self.total_matches = int(total_matches)
         self.affected_files = int(affected_files)
         self.impact_preview = impact_preview
+        self.scope_options = tuple(scope_options)
+        self.selected_scope_value = selected_scope
+        self.on_scope_changed = on_scope_changed
         self.parent = parent
         self.exec_calls = 0
         _DialogStub._instances.append(self)
@@ -78,6 +84,10 @@ class _DialogStub:
     def confirmed(self) -> bool:
         """Return the current configured confirmation result."""
         return bool(self._confirm)
+
+    def selected_scope(self) -> str:
+        """Return the selected transient scope."""
+        return str(self.selected_scope_value or "")
 
 
 class _WarningSink:
@@ -190,7 +200,9 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
     win._replace_all()
     assert service.plan_calls == 0
 
-    win._current_model = object()  # type: ignore[assignment]
+    model = _build_table_model(win.table)
+    win.table.setModel(model)
+    win._current_model = model  # type: ignore[assignment]
     request_box["value"] = None
     win._replace_all()
     assert service.plan_calls == 0
@@ -294,6 +306,111 @@ def test_replace_all_covers_guards_confirmation_and_apply_paths(
         "file",
     ]
     assert apply_hits == ["model", "file", "model", "file"]
+    win._current_model = None
+    win._current_pf = None
+
+
+def test_replace_all_dialog_scope_is_transient_for_apply(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Dialog-selected scope should drive apply without persisting preferences."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    current_path = root / "BE" / "ui.txt"
+    extra_path = root / "BE" / "extra.txt"
+    extra_path.write_text('UI_EXTRA = "OK"\n', encoding="utf-8")
+    win._current_model = object()  # type: ignore[assignment]
+    win._current_pf = SimpleNamespace(path=current_path)
+    win._replace_scope = "FILE"
+    monkeypatch.setattr(
+        win,
+        "_prepare_replace_request",
+        lambda: SimpleNamespace(
+            pattern=re.compile("OK"),
+            replacement="GOOD",
+            use_regex=False,
+            matches_empty=False,
+            has_group_ref=False,
+        ),
+    )
+    scope_calls: list[str] = []
+
+    def _files_for_scope(scope: str) -> list[Path]:
+        scope_calls.append(scope)
+        if scope == "LOCALE":
+            return [current_path, extra_path]
+        return [current_path]
+
+    monkeypatch.setattr(win, "_files_for_scope", _files_for_scope)
+    monkeypatch.setattr(win, "_replace_all_count_in_model", lambda *_args: 1)
+    monkeypatch.setattr(win, "_replace_all_count_in_file", lambda *_args: 1)
+    monkeypatch.setattr(
+        mw._panel_helpers,
+        "build_replace_all_impact_preview",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            scope_label="scope",
+            total_matches=1,
+            affected_files=1,
+            rows=(),
+            rendered_rows=0,
+            omitted_rows=0,
+            truncated=False,
+            row_cap=1000,
+        ),
+    )
+
+    class _ChangingScopeDialog(_DialogStub):
+        def selected_scope(self) -> str:
+            return "LOCALE"
+
+    class _Service:
+        def __init__(self) -> None:
+            self.plan_scopes: list[str] = []
+            self.apply_files: list[list[Path]] = []
+
+        def build_replace_all_run_plan(self, **kwargs):  # type: ignore[no-untyped-def]
+            self.plan_scopes.append(str(kwargs["scope"]))
+            files = list(kwargs["files"])
+            return SimpleNamespace(
+                run_replace=True,
+                show_confirmation=True,
+                total_matches=len(files),
+                affected_files=len(files),
+                counts=tuple((str(path), 1) for path in files),
+                scope_label=str(kwargs["scope"]),
+            )
+
+        def apply_replace_all(self, **kwargs):  # type: ignore[no-untyped-def]
+            self.apply_files.append(list(kwargs["files"]))
+            return True
+
+    service = _Service()
+    win._search_replace_service = service  # type: ignore[assignment]
+    monkeypatch.setattr(win, "_replace_all_in_model", lambda *_args: True)
+    monkeypatch.setattr(win, "_replace_all_in_file", lambda *_args: True)
+    schedule_hits: list[str] = []
+    monkeypatch.setattr(win, "_schedule_search", lambda: schedule_hits.append("search"))
+    monkeypatch.setattr(mw._panel_helpers, "ReplaceFilesDialog", _ChangingScopeDialog)
+    _ChangingScopeDialog._confirm = True
+    _ChangingScopeDialog._instances.clear()
+
+    win._replace_all()
+
+    assert scope_calls == ["FILE", "LOCALE"]
+    assert service.plan_scopes == ["FILE", "LOCALE"]
+    assert service.apply_files == [[current_path, extra_path]]
+    assert win._replace_scope == "FILE"
+    assert schedule_hits == ["search"]
+    dialog = _ChangingScopeDialog._instances[-1]
+    assert dialog.scope_options == (
+        ("File", "FILE"),
+        ("Locale", "LOCALE"),
+        ("Locale Pool", "POOL"),
+    )
+    assert dialog.selected_scope_value == "FILE"
     win._current_model = None
     win._current_pf = None
 

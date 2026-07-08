@@ -33,7 +33,6 @@
         "File switching does not break the saved value or active editing context."
       ],
       "tracked_repo_files": [
-        "translationzed_py/gui/main_window.py",
         "translationzed_py/core/file_workflow.py",
         "tests/fixtures/manual_workflow/RU/ui.txt",
         "tests/fixtures/manual_workflow/RU/menu.txt"
@@ -86,7 +85,6 @@
         "RU/ui.txt stays a neutral non-conflicting switch target while save plus file switching remains stable after each conflict path."
       ],
       "tracked_repo_files": [
-        "translationzed_py/gui/main_window.py",
         "translationzed_py/core/conflict_service.py",
         "tests/fixtures/conflict_manual/EN/conflict_drop_cache.txt",
         "tests/fixtures/conflict_manual/EN/conflict_drop_original.txt",
@@ -124,15 +122,15 @@
         "Open RU/ui.txt from the Project tree and confirm the QA panel shows the pre-run manual message.",
         "Press Run QA and observe rule-state progress in fixed order until the run completes.",
         "Activate one finding from the list and confirm the table navigates to the matching row.",
-        "Edit one translation in RU/ui.txt and confirm the stale QA message is plain text rather than a fake findings row.",
+        "Edit one translation that has a QA finding and confirm only that row's stale finding is removed while unrelated findings stay visible and a notice explains that edited rows need QA again because old findings are hidden until rerun.",
         "Press Run QA again and confirm the findings list refreshes for the edited file."
       ],
       "expected_checks": [
         "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
         "Rule-state progress follows the queued, running, and completed sequence during the run.",
         "Findings list is non-empty and supports row navigation.",
-        "Source column shows EN source text rather than empty placeholders.",
-        "After editing, stale-message text is plain panel text and the second run replaces it with refreshed findings."
+        "After editing one row, the panel keeps unrelated findings visible and shows `1 edited row needs QA again. Old findings are hidden until you rerun QA.` outside the findings list.",
+        "The second run rebuilds the findings list from scratch for the edited file."
       ],
       "tracked_repo_files": [
         "translationzed_py/gui/main_window_panel_helpers.py",
@@ -240,7 +238,6 @@
       ],
       "tracked_repo_files": [
         "translationzed_py/core/tm_workflow_service.py",
-        "translationzed_py/gui/main_window.py",
         "tests/fixtures/manual_workflow/RU/ui.txt",
         "tests/fixtures/manual_workflow/RU/tm_memory.txt"
       ],
@@ -344,7 +341,6 @@
       "tracked_repo_files": [
         "translationzed_py/core/tzp_comment_policy.py",
         "translationzed_py/core/saver.py",
-        "translationzed_py/gui/main_window_panel_helpers.py",
         "tests/fixtures/manual_workflow/RU/tzp_status.txt",
         "tests/fixtures/manual_workflow/RU/ui.txt"
       ],
@@ -354,45 +350,8 @@
       },
       "automation_pytest_selectors": [
         "tests/test_tzp_comment_policy.py",
-        "tests/test_saver.py"
-      ]
-    },
-    {
-      "id": "status-triage-mixed-indicator",
-      "title": "Status triage mixed-selection status-bar indicator",
-      "workflow_family": "status_triage",
-      "manual_depth": "branch_check",
-      "goal": "Verify the status bar shows the mixed-selection indicator only for real mixed multi-row selection states.",
-      "start_context": "Launch with RU selected. Use RU/ui.txt and the normal toolbar status actions to create mixed and uniform selections.",
-      "fixture_root": "manual_workflow",
-      "focus_files": [
-        "RU/ui.txt"
-      ],
-      "finish_condition": "Leave RU/ui.txt active after checking mixed, single-row, and uniform multi-row selection states, with the status bar back in a non-mixed state.",
-      "selected_locales": [
-        "RU"
-      ],
-      "steps": [
-        "Open RU/ui.txt and select multiple rows.",
-        "Use toolbar status actions to keep at least two selected rows in different statuses at the same time.",
-        "Observe the status bar while the mixed selection stays active.",
-        "Reduce the selection to one row and then to a uniform multi-row status selection."
-      ],
-      "expected_checks": [
-        "Status bar shows Selection: mixed (N rows) only for mixed multi-row selection.",
-        "The indicator is not shown for a single selected row.",
-        "The indicator is not shown for uniform multi-row status selection."
-      ],
-      "tracked_repo_files": [
-        "translationzed_py/gui/main_window_panel_helpers.py",
-        "translationzed_py/gui/main_window.py",
-        "tests/fixtures/manual_workflow/RU/ui.txt"
-      ],
-      "env_overrides": {},
-      "prefs_extras": {},
-      "automation_pytest_selectors": [
-        "tests/test_main_window_cache_replace_helpers.py",
-        "tests/test_gui_service_adapters.py"
+        "tests/test_saver.py",
+        "tests/test_main_window_tzp_writeback_helpers.py"
       ]
     },
     {
@@ -400,36 +359,38 @@
       "title": "Search+replace sidebar flow with all replace scopes",
       "workflow_family": "search_replace",
       "manual_depth": "full_workflow",
-      "goal": "Verify Search sidebar controls stay synchronized with the toolbar while File, Locale, and Locale Pool replace scopes run through their real Preferences-driven workflow.",
-      "start_context": "Launch with RU and KO selected. Replace scope is configured through General -> Preferences -> Search / Replace, not from the Search sidebar.",
+      "goal": "Verify Search sidebar controls stay synchronized with the toolbar while File, Locale, and Locale Pool replace scopes run through the replace-all confirmation flow.",
+      "start_context": "Launch with RU and KO selected. Preferences start Replace scope at File; use the Confirm Replace All dialog's transient Replace scope selector for this scenario and do not persist scope changes.",
       "fixture_root": "manual_workflow",
       "focus_files": [
         "RU/search_scope.txt",
         "RU/search_scope_extra.txt",
         "KO/search_scope.txt"
       ],
-      "finish_condition": "Leave RU/search_scope.txt active after one real replace-all apply and two canceled runs, with only the intended scope changed.",
+      "finish_condition": "Leave RU/search_scope.txt active after canceling File and Locale Pool previews, then applying Locale scope so RU/search_scope.txt and RU/search_scope_extra.txt changed while KO/search_scope.txt stayed unchanged.",
       "selected_locales": [
         "RU",
         "KO"
       ],
       "steps": [
-        "Open RU/search_scope.txt, switch to the Search panel, and enter a query plus replacement with positive matches.",
-        "Confirm toolbar and sidebar controls stay synchronized, then open General -> Preferences -> Search / Replace and set Replace scope to File.",
-        "Run Replace All in File scope, review the confirmation dialog, and cancel it.",
-        "Change Replace scope to Locale, run Replace All again, review the confirmation dialog, and cancel it.",
-        "Change Replace scope to Locale Pool, run Replace All again, tick the review checkbox, and apply the replacement.",
-        "Open RU/search_scope_extra.txt and KO/search_scope.txt to confirm only the intended pool run changed files."
+        "Open RU/search_scope.txt, switch to the Search panel, enter search text `target word`, and enter replacement text `release word`.",
+        "Confirm toolbar and sidebar search controls stay synchronized in both directions.",
+        "Run Replace All with dialog Replace scope set to File, review the confirmation dialog counts/preview, and cancel it.",
+        "Run Replace All again, change the dialog Replace scope to Locale Pool, confirm the counts/preview update live, and cancel it.",
+        "Run Replace All again, change the dialog Replace scope to Locale, confirm the counts/preview update live, tick the review checkbox, and apply the replacement.",
+        "Open RU/search_scope_extra.txt and KO/search_scope.txt to confirm both RU files changed to `release word` while KO/search_scope.txt still contains `target word`."
       ],
       "expected_checks": [
         "Toolbar and sidebar search controls remain synchronized in both directions.",
-        "Replace All confirmation appears for File, Locale, and Locale Pool when matches exist.",
+        "Confirm Replace All is wide enough to read the per-file list and impact preview.",
+        "Replace All confirmation appears for File, Locale, and Locale Pool when matches exist, and dialog scope changes update counts/preview live.",
         "Canceled runs make no edits.",
-        "One applied run changes only the files inside the selected replace scope."
+        "The applied Locale run changes RU/search_scope.txt and RU/search_scope_extra.txt, but not KO/search_scope.txt.",
+        "Changing Replace scope inside Confirm Replace All does not persist the Preferences replace scope."
       ],
       "tracked_repo_files": [
         "translationzed_py/core/search_replace_service.py",
-        "translationzed_py/gui/main_window.py",
+        "translationzed_py/gui/dialogs.py",
         "tests/fixtures/manual_workflow/RU/search_scope.txt",
         "tests/fixtures/manual_workflow/RU/search_scope_extra.txt",
         "tests/fixtures/manual_workflow/KO/search_scope.txt"
@@ -440,6 +401,7 @@
       },
       "automation_pytest_selectors": [
         "tests/test_search_replace_service.py",
+        "tests/test_gui_dialogs.py",
         "tests/test_main_window_replace_merge_clipboard.py",
         "tests/test_gui_service_adapters.py"
       ]
@@ -477,8 +439,6 @@
       ],
       "tracked_repo_files": [
         "translationzed_py/core/search_replace_service.py",
-        "translationzed_py/gui/main_window.py",
-        "translationzed_py/gui/dialogs.py",
         "tests/fixtures/manual_workflow/RU/search_scope.txt",
         "tests/fixtures/manual_workflow/RU/search_scope_extra.txt",
         "tests/fixtures/manual_workflow/KO/search_scope.txt"

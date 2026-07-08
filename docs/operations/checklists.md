@@ -58,7 +58,8 @@ Packet-specific test scripts remain under `scripts/` and are intentionally outsi
 4. Run scenarios with `make ui-manual-run SCENARIO=<id>`.
 5. Sync fresh passed evidence with `make release-evidence-sync SCENARIO=<id>` or `make release-evidence-sync-all`.
 6. Validate tracked evidence with `make release-evidence-check`.
-7. Release evidence is relevance-locked by scenario `tracked_repo_files` hashes.
+7. Release evidence is relevance-locked by current manual-relevant
+   `tracked_repo_files` hashes.
 8. Manual artifacts live under `artifacts/manual-ui/*.json`.
 9. Developers own interactive pass/fail judgment; LLMs may prepare commands and run only non-interactive checks.
 

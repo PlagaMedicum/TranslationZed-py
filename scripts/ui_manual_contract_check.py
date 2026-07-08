@@ -27,7 +27,6 @@ REQUIRED_WORKFLOW_KEYS = (
     "tm_apply",
     "source_reference",
     "search_replace",
-    "status_triage",
     "tzp_writeback",
 )
 

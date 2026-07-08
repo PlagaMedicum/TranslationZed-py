@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -268,12 +269,15 @@ class ReplaceFilesDialog(QDialog):
 
     def __init__(
         self,
-        files: Iterable[str] | Iterable[tuple[str, int]],
+        files: Iterable[object],
         scope_label: str,
         *,
         total_matches: int,
         affected_files: int,
         impact_preview: ReplaceAllImpactPreview | None = None,
+        scope_options: Sequence[tuple[str, str]] = (),
+        selected_scope: str | None = None,
+        on_scope_changed: Callable[[str], object | None] | None = None,
         parent=None,
     ) -> None:
         """Initialize the instance."""
@@ -281,51 +285,57 @@ class ReplaceFilesDialog(QDialog):
         self.setWindowTitle("Confirm Replace All")
         self.setModal(True)
         self._confirmed = False
+        self._selected_scope = str(selected_scope or "").upper()
+        self._on_scope_changed = on_scope_changed
+        self._has_replacements = int(total_matches) > 0
+        self.setMinimumSize(980, 620)
 
         main_layout = QVBoxLayout(self)
-        summary = QLabel(self)
-        summary.setWordWrap(True)
-        summary.setText(
-            f"Scope: {scope_label}\n"
-            f"Total replacements: {max(0, int(total_matches))}\n"
-            f"Affected files: {max(0, int(affected_files))}"
-        )
-        main_layout.addWidget(summary)
+        if scope_options:
+            scope_layout = QHBoxLayout()
+            scope_layout.addWidget(QLabel("Replace scope", self))
+            self._scope_combo = QComboBox(self)
+            for label, value in scope_options:
+                self._scope_combo.addItem(str(label), str(value).upper())
+            if self._selected_scope:
+                for idx in range(self._scope_combo.count()):
+                    if self._scope_combo.itemData(idx) == self._selected_scope:
+                        self._scope_combo.setCurrentIndex(idx)
+                        break
+            else:
+                self._selected_scope = str(self._scope_combo.currentData() or "").upper()
+            self._scope_combo.currentIndexChanged.connect(self._scope_selection_changed)
+            scope_layout.addWidget(self._scope_combo, 1)
+            main_layout.addLayout(scope_layout)
+        else:
+            self._scope_combo = None
+
+        self._summary = QLabel(self)
+        self._summary.setWordWrap(True)
+        main_layout.addWidget(self._summary)
 
         main_layout.addWidget(QLabel("Per-file replacement counts:", self))
-        list_widget = QListWidget(self)
-        list_widget.setSelectionMode(QAbstractItemView.NoSelection)
-        for item in files:
-            if isinstance(item, tuple) and len(item) == 2:
-                path, count = item
-                list_widget.addItem(f"{path} ({count})")
-            else:
-                list_widget.addItem(str(item))
-        list_widget.setMaximumHeight(240)
-        main_layout.addWidget(list_widget)
+        self._file_counts_list = QListWidget(self)
+        self._file_counts_list.setSelectionMode(QAbstractItemView.NoSelection)
+        self._file_counts_list.setMaximumHeight(240)
+        main_layout.addWidget(self._file_counts_list)
 
         main_layout.addWidget(
             QLabel("Impact preview (file, row, before, after):", self)
         )
-        preview_rows = () if impact_preview is None else impact_preview.rows
-        preview_table = QTableWidget(len(preview_rows), 4, self)
-        preview_table.setHorizontalHeaderLabels(("File", "Row", "Before", "After"))
-        preview_table.setSelectionMode(QAbstractItemView.NoSelection)
-        preview_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        preview_table.verticalHeader().setVisible(False)
-        preview_table.horizontalHeader().setStretchLastSection(True)
-        for idx, row in enumerate(preview_rows):
-            preview_table.setItem(idx, 0, QTableWidgetItem(str(row.file)))
-            preview_table.setItem(idx, 1, QTableWidgetItem(str(max(1, int(row.row)))))
-            preview_table.setItem(
-                idx, 2, QTableWidgetItem(_clip_preview_text(str(row.before)))
-            )
-            preview_table.setItem(
-                idx, 3, QTableWidgetItem(_clip_preview_text(str(row.after)))
-            )
-        preview_table.setMinimumHeight(220)
-        preview_table.setMaximumHeight(360)
-        main_layout.addWidget(preview_table)
+        self._preview_table = QTableWidget(0, 4, self)
+        self._preview_table.setHorizontalHeaderLabels(("File", "Row", "Before", "After"))
+        self._preview_table.setSelectionMode(QAbstractItemView.NoSelection)
+        self._preview_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self._preview_table.verticalHeader().setVisible(False)
+        header = self._preview_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self._preview_table.setMinimumHeight(260)
+        self._preview_table.setMaximumHeight(420)
+        main_layout.addWidget(self._preview_table)
 
         self._confirm_checkbox = QCheckBox(
             "I reviewed the replacement list and impact preview.", self
@@ -334,14 +344,10 @@ class ReplaceFilesDialog(QDialog):
             lambda _state: self._sync_replace_enabled()
         )
         main_layout.addWidget(self._confirm_checkbox)
-        if impact_preview is not None and impact_preview.truncated:
-            truncation = QLabel(
-                "Preview truncated: "
-                f"{impact_preview.rendered_rows} shown, {impact_preview.omitted_rows} omitted.",
-                self,
-            )
-            truncation.setWordWrap(True)
-            main_layout.addWidget(truncation)
+        self._truncation_label = QLabel(self)
+        self._truncation_label.setWordWrap(True)
+        self._truncation_label.setVisible(False)
+        main_layout.addWidget(self._truncation_label)
 
         buttons = QDialogButtonBox(self)
         self._replace_button = buttons.addButton("Replace", QDialogButtonBox.AcceptRole)
@@ -350,10 +356,90 @@ class ReplaceFilesDialog(QDialog):
         self._replace_button.clicked.connect(self._confirm)
         buttons.rejected.connect(self.reject)
         main_layout.addWidget(buttons)
+        self._set_replace_payload(
+            files=tuple(files),
+            scope_label=scope_label,
+            total_matches=total_matches,
+            affected_files=affected_files,
+            impact_preview=impact_preview,
+        )
+
+    def _set_replace_payload(
+        self,
+        *,
+        files: Sequence[object],
+        scope_label: str,
+        total_matches: int,
+        affected_files: int,
+        impact_preview: ReplaceAllImpactPreview | None,
+    ) -> None:
+        self._has_replacements = int(total_matches) > 0
+        self._summary.setText(
+            f"Scope: {scope_label}\n"
+            f"Total replacements: {max(0, int(total_matches))}\n"
+            f"Affected files: {max(0, int(affected_files))}"
+        )
+        self._file_counts_list.clear()
+        for item in files:
+            if isinstance(item, tuple) and len(item) == 2:
+                path, count = item
+                self._file_counts_list.addItem(f"{path} ({count})")
+            else:
+                self._file_counts_list.addItem(str(item))
+        preview_rows = () if impact_preview is None else impact_preview.rows
+        self._preview_table.setRowCount(len(preview_rows))
+        for idx, row in enumerate(preview_rows):
+            self._preview_table.setItem(idx, 0, QTableWidgetItem(str(row.file)))
+            self._preview_table.setItem(
+                idx, 1, QTableWidgetItem(str(max(1, int(row.row))))
+            )
+            self._preview_table.setItem(
+                idx, 2, QTableWidgetItem(_clip_preview_text(str(row.before), limit=140))
+            )
+            self._preview_table.setItem(
+                idx, 3, QTableWidgetItem(_clip_preview_text(str(row.after), limit=140))
+            )
+        if impact_preview is not None and impact_preview.truncated:
+            self._truncation_label.setText(
+                "Preview truncated: "
+                f"{impact_preview.rendered_rows} shown, {impact_preview.omitted_rows} omitted."
+            )
+            self._truncation_label.setVisible(True)
+        else:
+            self._truncation_label.setText("")
+            self._truncation_label.setVisible(False)
+        self._sync_replace_enabled()
+
+    def _scope_selection_changed(self) -> None:
+        if self._scope_combo is None:
+            return
+        scope = str(self._scope_combo.currentData() or "").upper()
+        if not scope or scope == self._selected_scope:
+            return
+        self._selected_scope = scope
+        self._confirmed = False
+        self._confirm_checkbox.setChecked(False)
+        if self._on_scope_changed is None:
+            self._sync_replace_enabled()
+            return
+        payload = self._on_scope_changed(scope)
+        if not isinstance(payload, dict):
+            self._has_replacements = False
+            self._sync_replace_enabled()
+            return
+        self._set_replace_payload(
+            files=payload.get("files", ()),
+            scope_label=str(payload.get("scope_label", scope)),
+            total_matches=int(payload.get("total_matches", 0)),
+            affected_files=int(payload.get("affected_files", 0)),
+            impact_preview=payload.get("impact_preview"),
+        )
 
     def _sync_replace_enabled(self) -> None:
         """Enable Replace only after explicit checklist acknowledgement."""
-        self._replace_button.setEnabled(self._confirm_checkbox.isChecked())
+        self._replace_button.setEnabled(
+            self._confirm_checkbox.isChecked() and self._has_replacements
+        )
 
     def _confirm(self) -> None:
         """Execute confirm."""
@@ -365,6 +451,10 @@ class ReplaceFilesDialog(QDialog):
     def confirmed(self) -> bool:
         """Execute confirmed."""
         return self._confirmed
+
+    def selected_scope(self) -> str:
+        """Return the transient dialog-selected replace scope."""
+        return self._selected_scope
 
 
 def _clip_preview_text(text: str, *, limit: int = 80) -> str:

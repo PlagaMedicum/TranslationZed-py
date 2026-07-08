@@ -1,5 +1,5 @@
 # TranslationZed-Py — Test Surface
-_Last updated: 2026-03-24_
+_Last updated: 2026-06-24_
 
 ## 1) Purpose
 
@@ -19,6 +19,7 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    - `tests/test_regression_roundtrip.py`
    - `tests/test_tzp_comment_policy.py` (`TZP:` parse/format/write-plan contracts)
    - `tests/test_gui_tm_preferences.py` (`TZP:` write-back preference controls)
+   - `tests/test_main_window_tzp_writeback_helpers.py` (`TZP:` GUI adapter save-path plumbing)
 3. Encoding integrity:
    - `tests/test_encoding_diagnostics.py`
    - `tests/test_property_encoding_invariants.py`
@@ -145,8 +146,7 @@ Framework owner:
 | `tm-apply-triage-flow` | `tm_apply` | verify deterministic project TM suggestion, apply flow, and panel stability | `RU/ui.txt`, `RU/tm_memory.txt` | `full_workflow` | leave `RU/ui.txt` active on the applied row after switching away and back with TM still responsive | yes |
 | `source-reference-fallback-flow` | `source_reference` | verify KO source-reference display on matching files and empty Source cells on missing counterparts | `RU/ui.txt`, `RU/menu.txt` | `full_workflow` | leave `RU/menu.txt` active after confirming KO stays selected while the missing KO counterpart keeps the Source column empty | yes |
 | `tzp-writeback-opt-in` | `tzp_writeback` | verify opt-in `TZP:` write-back changes only namespaced status comments | `RU/tzp_status.txt`, `RU/ui.txt` | `full_workflow` | leave `RU/tzp_status.txt` active after save and switching with on-disk comments matching the opt-in policy | yes |
-| `status-triage-mixed-indicator` | `status_triage` | verify mixed multi-row selection indicator appears only for real mixed states | `RU/ui.txt` | `branch_check` | leave `RU/ui.txt` active after checking mixed, single-row, and uniform multi-row states with the indicator cleared | yes |
-| `search-replace-sidebar-all-scopes` | `search_replace` | verify toolbar/sidebar sync and FILE/LOCALE/POOL replace-all flows through Preferences-driven scope | `RU/search_scope.txt`, `RU/search_scope_extra.txt`, `KO/search_scope.txt` | `full_workflow` | leave `RU/search_scope.txt` active after one applied run and two canceled runs with only the intended scope changed | yes |
+| `search-replace-sidebar-all-scopes` | `search_replace` | verify toolbar/sidebar sync and FILE/LOCALE/POOL replace-all flows through the transient confirmation scope selector | `RU/search_scope.txt`, `RU/search_scope_extra.txt`, `KO/search_scope.txt` | `full_workflow` | leave `RU/search_scope.txt` active after canceling File/Pool previews and applying Locale so only RU files changed | yes |
 | `search-replace-impact-preview-safe-apply` | `search_replace` | verify impact preview rows, cancel path, and checkbox-gated replace safety | `RU/search_scope.txt`, `RU/search_scope_extra.txt`, `KO/search_scope.txt` | `full_workflow` | leave `RU/search_scope.txt` active after a canceled run and a confirmed pool run with persisted replacements across expected files | yes |
 
 ## 8) Quick Execution Hints

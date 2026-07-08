@@ -12,6 +12,7 @@ from translationzed_py.gui.manual_scenario_runtime import (
     SCENARIO_REGISTRY_DEFAULT,
     ManualScenario,
     ManualScenarioError,
+    compute_tracked_file_hashes,
     load_scenario_registry,
     scenario_by_id,
 )
@@ -20,6 +21,9 @@ MANIFEST_DEFAULT = "tests/manual_scenarios/release_evidence_manifest.json"
 RELEASE_DIR_DEFAULT = "tests/manual_scenarios/release_evidence"
 RESULTS_DIR_DEFAULT = "artifacts/manual-ui"
 ALLOWED_INTERACTIVE_MODES = frozenset({"manual", "manual+auto"})
+SCENARIO_METADATA_COMPAT_FIELDS = frozenset(
+    {"tracked_repo_files", "automation_pytest_selectors"}
+)
 
 
 class ReleaseEvidenceSyncError(ValueError):
@@ -88,6 +92,51 @@ def _is_valid_tracked_files(rows: Any) -> bool:
     return True
 
 
+def _manual_workflow_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in payload.items()
+        if key not in SCENARIO_METADATA_COMPAT_FIELDS
+    }
+
+
+def _scenario_payload_matches_manual_workflow(
+    payload: Any, *, scenario: ManualScenario
+) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    return _manual_workflow_payload(payload) == _manual_workflow_payload(
+        scenario.to_payload()
+    )
+
+
+def _tracked_file_sync_error(
+    *, repo_root: Path, scenario: ManualScenario, run_payload: dict[str, Any]
+) -> str:
+    tracked_rows = run_payload.get("tracked_files")
+    if not _is_valid_tracked_files(tracked_rows):
+        return "tracked file hashes missing or invalid"
+    recorded = {
+        str(row["path"]).strip(): str(row["sha256"]).strip().lower()
+        for row in tracked_rows
+    }
+    try:
+        current_rows = compute_tracked_file_hashes(
+            repo_root=repo_root,
+            tracked_repo_files=scenario.tracked_repo_files,
+        )
+    except ManualScenarioError as exc:
+        return f"unable to hash scenario tracked files: {exc}"
+    current = {str(row["path"]): str(row["sha256"]) for row in current_rows}
+    missing_paths = sorted(set(current) - set(recorded))
+    if missing_paths:
+        return f"missing tracked hash row for {missing_paths[0]}"
+    for path, current_sha in current.items():
+        if recorded.get(path) != current_sha:
+            return f"stale tracked hash for {path}"
+    return ""
+
+
 def _validate_checklist_payload(
     payload: Any, *, scenario: ManualScenario, run_token: str, source: Path
 ) -> dict[str, Any]:
@@ -153,7 +202,9 @@ def _reason_for_unsyncable_run(
         run_scenario_id = str(scenario_payload.get("id", "")).strip()
     if run_scenario_id != scenario.id:
         return f"{run_path.name}: scenario id mismatch"
-    if scenario_payload != scenario.to_payload():
+    if not _scenario_payload_matches_manual_workflow(
+        scenario_payload, scenario=scenario
+    ):
         return f"{run_path.name}: scenario payload drift"
 
     manual_outcome = str(run_payload.get("manual_outcome", "")).strip().lower()
@@ -167,8 +218,13 @@ def _reason_for_unsyncable_run(
     mode = str(run_payload.get("mode", "")).strip()
     if mode not in ALLOWED_INTERACTIVE_MODES:
         return f"{run_path.name}: interactive mode missing or invalid"
-    if not _is_valid_tracked_files(run_payload.get("tracked_files")):
-        return f"{run_path.name}: tracked file hashes missing or invalid"
+    tracked_error = _tracked_file_sync_error(
+        repo_root=repo_root,
+        scenario=scenario,
+        run_payload=run_payload,
+    )
+    if tracked_error:
+        return f"{run_path.name}: {tracked_error}"
 
     run_token, checklist_candidates = _checklist_candidates_for_run(
         repo_root=repo_root,
@@ -303,7 +359,9 @@ def _resolve_run_and_checklist(
             run_scenario_id = str(scenario_payload.get("id", "")).strip()
         if run_scenario_id != scenario.id:
             continue
-        if scenario_payload != scenario.to_payload():
+        if not _scenario_payload_matches_manual_workflow(
+            scenario_payload, scenario=scenario
+        ):
             continue
         if str(run_payload.get("manual_outcome", "")).strip().lower() != "passed":
             continue
@@ -312,7 +370,11 @@ def _resolve_run_and_checklist(
         mode = str(run_payload.get("mode", "")).strip()
         if mode not in ALLOWED_INTERACTIVE_MODES:
             continue
-        if not _is_valid_tracked_files(run_payload.get("tracked_files")):
+        if _tracked_file_sync_error(
+            repo_root=repo_root,
+            scenario=scenario,
+            run_payload=run_payload,
+        ):
             continue
 
         run_token = str(run_payload.get("manual_run_token", "")).strip()

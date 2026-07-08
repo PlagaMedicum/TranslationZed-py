@@ -1,0 +1,97 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1782248557490,
+  "fixture_copy_root": "/tmp/tzp-manual-tm-apply-triage-flow-hvzm55zv/project",
+  "manual_all_steps": [
+    "Open RU/ui.txt, switch to the TM side panel, and select the UI_CAMERA row.",
+    "Wait for TM suggestions and confirm a project-origin suggestion derived from RU/tm_memory.txt appears.",
+    "Apply the suggestion and confirm the translation cell updates under the normal edit pipeline.",
+    "Switch to RU/tm_memory.txt or a different row, then return to the applied row in RU/ui.txt.",
+    "Verify the applied value persists and the TM panel remains responsive."
+  ],
+  "manual_checked_expected_checks": [
+    "TM panel shows at least one project suggestion for the UI_CAMERA row.",
+    "Applying the suggestion updates the translation cell without freezing the UI.",
+    "The row remains editable and the TM panel still responds after the apply action."
+  ],
+  "manual_checked_steps": [
+    "Open RU/ui.txt, switch to the TM side panel, and select the UI_CAMERA row.",
+    "Wait for TM suggestions and confirm a project-origin suggestion derived from RU/tm_memory.txt appears.",
+    "Apply the suggestion and confirm the translation cell updates under the normal edit pipeline.",
+    "Switch to RU/tm_memory.txt or a different row, then return to the applied row in RU/ui.txt.",
+    "Verify the applied value persists and the TM panel remains responsive."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/tm-apply-triage-flow-tm-apply-triage-flow-1782247770898-1782248557281.json",
+  "manual_expected_checks": [
+    "TM panel shows at least one project suggestion for the UI_CAMERA row.",
+    "Applying the suggestion updates the translation cell without freezing the UI.",
+    "The row remains editable and the TM panel still responds after the apply action."
+  ],
+  "manual_notes": "",
+  "manual_outcome": "passed",
+  "manual_return_code": 0,
+  "manual_run_token": "tm-apply-triage-flow-1782247770898",
+  "mode": "manual",
+  "scenario": {
+    "automation_pytest_selectors": [
+      "tests/test_tm_workflow_service.py",
+      "tests/test_gui_tm_preferences.py"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "TM panel shows at least one project suggestion for the UI_CAMERA row.",
+      "Applying the suggestion updates the translation cell without freezing the UI.",
+      "The row remains editable and the TM panel still responds after the apply action."
+    ],
+    "finish_condition": "Leave RU/ui.txt active on the applied row after switching away and back, with the applied translation still visible and the TM panel responsive.",
+    "fixture_root": "manual_workflow",
+    "focus_files": [
+      "RU/ui.txt",
+      "RU/tm_memory.txt"
+    ],
+    "goal": "Verify deterministic project TM lookup and apply behavior on a locale-diverse generic fixture.",
+    "id": "tm-apply-triage-flow",
+    "inspection_paths": [],
+    "manual_depth": "full_workflow",
+    "operator_hints": [],
+    "prefs_extras": {},
+    "selected_locales": [
+      "RU"
+    ],
+    "start_context": "Launch with RU selected. RU/tm_memory.txt provides the project-TM match source while RU/ui.txt is the active editing file.",
+    "steps": [
+      "Open RU/ui.txt, switch to the TM side panel, and select the UI_CAMERA row.",
+      "Wait for TM suggestions and confirm a project-origin suggestion derived from RU/tm_memory.txt appears.",
+      "Apply the suggestion and confirm the translation cell updates under the normal edit pipeline.",
+      "Switch to RU/tm_memory.txt or a different row, then return to the applied row in RU/ui.txt.",
+      "Verify the applied value persists and the TM panel remains responsive."
+    ],
+    "title": "TM lookup, apply, and panel-stability flow",
+    "tracked_repo_files": [
+      "translationzed_py/core/tm_workflow_service.py",
+      "translationzed_py/gui/main_window.py",
+      "tests/fixtures/manual_workflow/RU/ui.txt",
+      "tests/fixtures/manual_workflow/RU/tm_memory.txt"
+    ],
+    "workflow_family": "tm_apply"
+  },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/manual_workflow/RU/tm_memory.txt",
+      "sha256": "38982bb81de2cf0ce40f41ff7d7d38a8ec2a212e8c79738e71ec03025c309ca7"
+    },
+    {
+      "path": "tests/fixtures/manual_workflow/RU/ui.txt",
+      "sha256": "1e96bf1a0459ccee3e1cbdad923fb0ed09545b0a16de0a197f7e5a8b6c78f2e1"
+    },
+    {
+      "path": "translationzed_py/core/tm_workflow_service.py",
+      "sha256": "25bdf828c1c3d5aae56129c1d8690de483c1c9f5b8141aec73e9ab01b10b60e4"
+    },
+    {
+      "path": "translationzed_py/gui/main_window.py",
+      "sha256": "78036aac649438270987cc1498439e98cf65a86f2db20a181dc886e42f7170a1"
+    }
+  ],
+  "version": 1
+}

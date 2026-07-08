@@ -286,6 +286,83 @@ def test_release_evidence_sync_preflight_reports_syncable_scenario(
     ]
 
 
+def test_release_evidence_sync_preflight_allows_metadata_only_drift(
+    tmp_path: Path,
+) -> None:
+    """Preflight should allow narrowed manual relevance metadata without rerun."""
+    module = _load_module()
+    repo_root = tmp_path / "repo"
+    tracked, fixture = _seed_registry(repo_root)
+    results_dir = repo_root / "artifacts" / "manual-ui"
+    _write_manual_pass_artifacts(
+        repo_root=repo_root,
+        tracked=tracked,
+        fixture=fixture,
+        results_dir=results_dir,
+    )
+    registry = repo_root / "tests" / "manual_scenarios" / "scenarios.json"
+    payload = json.loads(registry.read_text(encoding="utf-8"))
+    payload["scenarios"][0]["tracked_repo_files"] = [
+        "tests/fixtures/manual_workflow/RU/ui.txt",
+    ]
+    payload["scenarios"][0]["automation_pytest_selectors"] = [
+        "tests/test_gui_smoke.py",
+        "tests/test_gui_edit_save.py",
+    ]
+    _write_json(registry, payload)
+    tracked.write_text("MAIN = 2\n", encoding="utf-8")
+
+    rows = module.preflight_release_evidence_sync(
+        repo_root=repo_root,
+        registry_path=registry,
+        results_dir=results_dir,
+        selected_scenarios=("demo",),
+    )
+
+    assert rows == [
+        {
+            "scenario_id": "demo",
+            "status": "syncable",
+            "reason": "syncable from artifacts/manual-ui/demo-run-2000.json",
+        }
+    ]
+
+
+def test_release_evidence_sync_preflight_reports_stale_current_tracked_hash(
+    tmp_path: Path,
+) -> None:
+    """Preflight should require rerun when a current manual-tracked file drifts."""
+    module = _load_module()
+    repo_root = tmp_path / "repo"
+    tracked, fixture = _seed_registry(repo_root)
+    results_dir = repo_root / "artifacts" / "manual-ui"
+    _write_manual_pass_artifacts(
+        repo_root=repo_root,
+        tracked=tracked,
+        fixture=fixture,
+        results_dir=results_dir,
+    )
+    fixture.write_text('A = "changed"\n', encoding="utf-8")
+
+    rows = module.preflight_release_evidence_sync(
+        repo_root=repo_root,
+        registry_path=(repo_root / "tests" / "manual_scenarios" / "scenarios.json"),
+        results_dir=results_dir,
+        selected_scenarios=("demo",),
+    )
+
+    assert rows == [
+        {
+            "scenario_id": "demo",
+            "status": "rerun-needed",
+            "reason": (
+                "demo-run-2000.json: stale tracked hash for "
+                "tests/fixtures/manual_workflow/RU/ui.txt"
+            ),
+        }
+    ]
+
+
 def test_release_evidence_sync_preflight_reports_payload_drift(
     tmp_path: Path,
 ) -> None:

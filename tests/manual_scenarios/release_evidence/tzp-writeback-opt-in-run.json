@@ -1,0 +1,113 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1782251825265,
+  "fixture_copy_root": "/tmp/tzp-manual-tzp-writeback-opt-in-apjjd8_u/project",
+  "manual_all_steps": [
+    "Open RU/tzp_status.txt. In row `TZP_KEEP`, change the translation to `\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u044b\u043f\u0443\u0441\u043a\u0443` and change the row status from For Review to Translated.",
+    "Use General -> Save. If Save offers both cache-only and file-write options, choose Write to file for this scenario.",
+    "Use the dialog copy buttons to copy the project root or inspection path, then open the copied inspection file RU/tzp_status.txt under the scenario project root.",
+    "Confirm `TZP_KEEP` now ends with the namespaced comment `-- TZP:TRANSLATED` on disk.",
+    "Confirm `TZP_EDIT` still keeps only the user-authored comment `-- \u0437\u0430\u043c\u0435\u0442\u043a\u0430 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u0447\u0438\u043a\u0430` and did not gain a new TZP comment.",
+    "Switch to RU/ui.txt and back to RU/tzp_status.txt to confirm normal editing flow still works."
+  ],
+  "manual_checked_expected_checks": [
+    "Scenario-injected TZP write-back is active for this copied project without extra preference edits.",
+    "`TZP_KEEP` updates its namespaced TZP comment from FOR_REVIEW to TRANSLATED.",
+    "`TZP_EDIT` keeps the user-authored non-TZP comment unchanged."
+  ],
+  "manual_checked_steps": [
+    "Open RU/tzp_status.txt. In row `TZP_KEEP`, change the translation to `\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u044b\u043f\u0443\u0441\u043a\u0443` and change the row status from For Review to Translated.",
+    "Use General -> Save. If Save offers both cache-only and file-write options, choose Write to file for this scenario.",
+    "Use the dialog copy buttons to copy the project root or inspection path, then open the copied inspection file RU/tzp_status.txt under the scenario project root.",
+    "Confirm `TZP_KEEP` now ends with the namespaced comment `-- TZP:TRANSLATED` on disk.",
+    "Confirm `TZP_EDIT` still keeps only the user-authored comment `-- \u0437\u0430\u043c\u0435\u0442\u043a\u0430 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u0447\u0438\u043a\u0430` and did not gain a new TZP comment.",
+    "Switch to RU/ui.txt and back to RU/tzp_status.txt to confirm normal editing flow still works."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/tzp-writeback-opt-in-tzp-writeback-opt-in-1782251695213-1782251825070.json",
+  "manual_expected_checks": [
+    "Scenario-injected TZP write-back is active for this copied project without extra preference edits.",
+    "`TZP_KEEP` updates its namespaced TZP comment from FOR_REVIEW to TRANSLATED.",
+    "`TZP_EDIT` keeps the user-authored non-TZP comment unchanged."
+  ],
+  "manual_notes": "",
+  "manual_outcome": "passed",
+  "manual_return_code": 0,
+  "manual_run_token": "tzp-writeback-opt-in-1782251695213",
+  "mode": "manual",
+  "scenario": {
+    "automation_pytest_selectors": [
+      "tests/test_tzp_comment_policy.py",
+      "tests/test_saver.py"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "Scenario-injected TZP write-back is active for this copied project without extra preference edits.",
+      "`TZP_KEEP` updates its namespaced TZP comment from FOR_REVIEW to TRANSLATED.",
+      "`TZP_EDIT` keeps the user-authored non-TZP comment unchanged."
+    ],
+    "finish_condition": "Leave RU/tzp_status.txt active after saving and switching through RU/ui.txt, with on-disk comments matching the opt-in TZP policy.",
+    "fixture_root": "manual_workflow",
+    "focus_files": [
+      "RU/tzp_status.txt",
+      "RU/ui.txt"
+    ],
+    "goal": "Verify opt-in TZP status-comment write-back changes only namespaced TZP comments and keeps user comments intact.",
+    "id": "tzp-writeback-opt-in",
+    "inspection_paths": [
+      "RU/tzp_status.txt"
+    ],
+    "manual_depth": "full_workflow",
+    "operator_hints": [
+      "Use the dialog copy buttons to copy the project root or inspection paths before checking the file on disk.",
+      "This scenario verifies an on-disk file write, not cache-only save. If Save offers both, choose Write to file.",
+      "Record exactly which comment lines changed if the on-disk result differs from expectation."
+    ],
+    "prefs_extras": {
+      "TZP_STATUS_COMMENT_WRITEBACK": "true"
+    },
+    "selected_locales": [
+      "RU"
+    ],
+    "start_context": "Launch with RU selected. Scenario preferences already enable TZP write-back for this copied project. You should not need to change Preferences manually unless you are diagnosing a failure.",
+    "steps": [
+      "Open RU/tzp_status.txt. In row `TZP_KEEP`, change the translation to `\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u044b\u043f\u0443\u0441\u043a\u0443` and change the row status from For Review to Translated.",
+      "Use General -> Save. If Save offers both cache-only and file-write options, choose Write to file for this scenario.",
+      "Use the dialog copy buttons to copy the project root or inspection path, then open the copied inspection file RU/tzp_status.txt under the scenario project root.",
+      "Confirm `TZP_KEEP` now ends with the namespaced comment `-- TZP:TRANSLATED` on disk.",
+      "Confirm `TZP_EDIT` still keeps only the user-authored comment `-- \u0437\u0430\u043c\u0435\u0442\u043a\u0430 \u043f\u0435\u0440\u0435\u0432\u043e\u0434\u0447\u0438\u043a\u0430` and did not gain a new TZP comment.",
+      "Switch to RU/ui.txt and back to RU/tzp_status.txt to confirm normal editing flow still works."
+    ],
+    "title": "Status-comment writeback (opt-in)",
+    "tracked_repo_files": [
+      "translationzed_py/core/tzp_comment_policy.py",
+      "translationzed_py/core/saver.py",
+      "translationzed_py/gui/main_window_panel_helpers.py",
+      "tests/fixtures/manual_workflow/RU/tzp_status.txt",
+      "tests/fixtures/manual_workflow/RU/ui.txt"
+    ],
+    "workflow_family": "tzp_writeback"
+  },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/manual_workflow/RU/tzp_status.txt",
+      "sha256": "949e8046f671dd4fd2db7a04152724c8fbc80457f99f549c0defbd82191bfc79"
+    },
+    {
+      "path": "tests/fixtures/manual_workflow/RU/ui.txt",
+      "sha256": "1e96bf1a0459ccee3e1cbdad923fb0ed09545b0a16de0a197f7e5a8b6c78f2e1"
+    },
+    {
+      "path": "translationzed_py/core/saver.py",
+      "sha256": "ec335abca9c4ed3b7f63012b855f7df5d1cdf0f806de13d6b869c4956c4e2e53"
+    },
+    {
+      "path": "translationzed_py/core/tzp_comment_policy.py",
+      "sha256": "070560b3d9f18c55aab7e6544b1b5d2847ce5411355635a75af13032781c9b2f"
+    },
+    {
+      "path": "translationzed_py/gui/main_window_panel_helpers.py",
+      "sha256": "17944415c0f1720bd8dc202b7dde38e6944b372458dc32fa217192a4a2009f54"
+    }
+  ],
+  "version": 1
+}

@@ -18,6 +18,9 @@ from translationzed_py.gui.manual_scenario_runtime import (
 
 MANIFEST_DEFAULT = "tests/manual_scenarios/release_evidence_manifest.json"
 ALLOWED_INTERACTIVE_MODES = frozenset({"manual", "manual+auto"})
+SCENARIO_METADATA_COMPAT_FIELDS = frozenset(
+    {"tracked_repo_files", "automation_pytest_selectors"}
+)
 
 
 class ReleaseEvidenceError(ValueError):
@@ -53,6 +56,24 @@ def _load_required_scenarios(
         return load_scenario_registry(registry_path)
     except ManualScenarioError as exc:
         raise ReleaseEvidenceError(str(exc)) from exc
+
+
+def _manual_workflow_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in payload.items()
+        if key not in SCENARIO_METADATA_COMPAT_FIELDS
+    }
+
+
+def _scenario_payload_matches_manual_workflow(
+    payload: Any, *, scenario: ManualScenario
+) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    return _manual_workflow_payload(payload) == _manual_workflow_payload(
+        scenario.to_payload()
+    )
 
 
 def _validate_checklist_payload(
@@ -179,16 +200,9 @@ def _validate_tracked_files(
 
     current = {str(row["path"]): str(row["sha256"]) for row in current_rows}
     missing_paths = sorted(set(current) - set(recorded))
-    extra_paths = sorted(set(recorded) - set(current))
     for path in missing_paths:
         errors.append(
             f"{source_path}: missing tracked hash row for {path}; "
-            f"rerun `make ui-manual-run SCENARIO={scenario.id}` and "
-            f"`make release-evidence-sync SCENARIO={scenario.id}`"
-        )
-    for path in extra_paths:
-        errors.append(
-            f"{source_path}: unexpected tracked hash row {path}; "
             f"rerun `make ui-manual-run SCENARIO={scenario.id}` and "
             f"`make release-evidence-sync SCENARIO={scenario.id}`"
         )
@@ -224,7 +238,9 @@ def _validate_run_payload(
             f"{source_path}: run scenario.id mismatch "
             f"(expected {scenario.id!r}, got {run_scenario_id!r})"
         )
-    elif scenario_payload != scenario.to_payload():
+    elif not _scenario_payload_matches_manual_workflow(
+        scenario_payload, scenario=scenario
+    ):
         errors.append(
             f"{source_path}: run scenario payload no longer matches the registry; "
             f"rerun `make ui-manual-run SCENARIO={scenario.id}` and "

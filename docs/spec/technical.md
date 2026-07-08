@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.9.0 · updated 2026-06-23**\
+**Version 0.9.0 · updated 2026-06-24**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -346,6 +346,9 @@ Algorithm:
 - Search runs across selected locales; auto‑selects the **first match in the current file** only.
 - Cross‑file navigation is explicit via next/prev shortcuts; switching files does not auto‑jump.
 - Replace targets the **Translation** column and respects active replace scope.
+- Replace-all confirmation may temporarily override replace scope for that one
+  operation; dialog scope changes must refresh counts/impact preview and must not
+  persist to Preferences.
 - Regex replacement supports `$1`‑style capture references (mapped to Python `\g<1>`).
 - If a regex can match empty strings (e.g. `(.*)`), replacement is applied **once per cell**.
 - Search/replace scopes are configurable via Preferences and applied independently.
@@ -425,7 +428,9 @@ Algorithm:
   - `LOCALE`: all files in the current locale.
   - `POOL` (**Locale Pool**): all files in all selected locales (current session).
 - Scope selection lives in Preferences (not in the toolbar by default), and UI text
-  must make the scope explicit to avoid accidental mass edits.
+  must make the scope explicit to avoid accidental mass edits. Confirm Replace All
+  may offer a transient per-operation scope selector, but accepting/canceling it
+  must not write back `REPLACE_SCOPE`.
  - Defaults: `SEARCH_SCOPE=FILE`, `REPLACE_SCOPE=FILE`.
 - Status bar must echo the active scopes when search/replace are in use.
   Prefer icon‑only indicators if unambiguous (e.g., 🔍 + file/locale/pool icon),
@@ -1012,6 +1017,9 @@ historical and remain available through git history rather than this current tec
     `TZP_MANUAL_SCENARIO_FILE=<payload.json>`,
     `TZP_MANUAL_RESULTS_DIR=<output-dir>`,
     `TZP_MANUAL_RUN_TOKEN=<token>`,
+  - release evidence reruns are gated by current manual-relevant
+    `tracked_repo_files`; `automation_pytest_selectors` and narrowed tracking
+    metadata are compatibility metadata when current tracked hashes remain valid,
   - for LLM/agent shell execution, prefer `rtk <command>` when RTK is available,
   - raw commands remain the canonical human and CI workflow,
   - interactive pass/fail judgment remains human-owned.

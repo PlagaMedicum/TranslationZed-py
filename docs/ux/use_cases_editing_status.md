@@ -88,7 +88,7 @@ stateDiagram-v2
 |---|---|
 | Goal | Prioritize unfinished rows in current file. |
 | Trigger | Status header dropdown or next-priority toolbar action. |
-| Success | Sort order `Untouched -> For review -> Translated -> Proofread`; visibility filters by status; next-priority navigation wraps and shows completion dialog when exhausted; status bar shows `Selection: mixed (N rows)` only for mixed multi-row status selections. |
+| Success | Sort order `Untouched -> For review -> Translated -> Proofread`; visibility filters by status; next-priority navigation wraps and shows completion dialog when exhausted. |
 | Persistence | Runtime-only; resets on reopen/restart. |
 
 ## UC-04e Progress HUD (File and Locale)

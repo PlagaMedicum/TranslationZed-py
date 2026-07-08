@@ -1,0 +1,37 @@
+{
+  "all_steps": [
+    "Open RU/search_scope.txt, switch to the Search panel, and set query target word plus replacement target phrase.",
+    "Open General -> Preferences -> Search / Replace, set Replace scope to Locale Pool, apply the dialog, and run Replace All.",
+    "Inspect the confirmation summary and row-level impact preview, then cancel and confirm no values change.",
+    "Run Replace All again, verify the Replace button stays disabled until the review checkbox is checked, then tick it and apply the replacement.",
+    "Switch between RU/search_scope.txt, RU/search_scope_extra.txt, and KO/search_scope.txt to confirm the replacement persisted across the expected files."
+  ],
+  "checked_expected_checks": [
+    "Confirmation dialog shows scope label, total replacements, affected files, and row-level preview rows.",
+    "Replace stays disabled until the review checkbox is checked.",
+    "The cancel path leaves files unchanged.",
+    "The confirmed pool replace persists across all expected files after file switching."
+  ],
+  "checked_steps": [
+    "Open RU/search_scope.txt, switch to the Search panel, and set query target word plus replacement target phrase.",
+    "Open General -> Preferences -> Search / Replace, set Replace scope to Locale Pool, apply the dialog, and run Replace All.",
+    "Inspect the confirmation summary and row-level impact preview, then cancel and confirm no values change.",
+    "Run Replace All again, verify the Replace button stays disabled until the review checkbox is checked, then tick it and apply the replacement.",
+    "Switch between RU/search_scope.txt, RU/search_scope_extra.txt, and KO/search_scope.txt to confirm the replacement persisted across the expected files."
+  ],
+  "completed_at_ms": 1782249887368,
+  "expected_checks": [
+    "Confirmation dialog shows scope label, total replacements, affected files, and row-level preview rows.",
+    "Replace stays disabled until the review checkbox is checked.",
+    "The cancel path leaves files unchanged.",
+    "The confirmed pool replace persists across all expected files after file switching."
+  ],
+  "fixture_root": "manual_workflow",
+  "notes": "Worked as supposed, changed word \"target\" only in 1 file. Also description of this step is not clear enough. Just use quotes and say concrete words to replace. Now it is ambiguous.\n\nConfirm replace all dialog should be wider 2 times",
+  "project_root": "/tmp/tzp-manual-search-replace-impact-preview-safe-apply-z26ziw4r/project",
+  "result": "passed",
+  "run_token": "search-replace-impact-preview-safe-apply-1782249587510",
+  "scenario_id": "search-replace-impact-preview-safe-apply",
+  "title": "Search+replace impact preview with checkbox-gated replace safety",
+  "version": 1
+}

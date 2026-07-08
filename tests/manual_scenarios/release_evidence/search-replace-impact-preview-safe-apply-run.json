@@ -1,0 +1,115 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1782249887542,
+  "fixture_copy_root": "/tmp/tzp-manual-search-replace-impact-preview-safe-apply-z26ziw4r/project",
+  "manual_all_steps": [
+    "Open RU/search_scope.txt, switch to the Search panel, and set query target word plus replacement target phrase.",
+    "Open General -> Preferences -> Search / Replace, set Replace scope to Locale Pool, apply the dialog, and run Replace All.",
+    "Inspect the confirmation summary and row-level impact preview, then cancel and confirm no values change.",
+    "Run Replace All again, verify the Replace button stays disabled until the review checkbox is checked, then tick it and apply the replacement.",
+    "Switch between RU/search_scope.txt, RU/search_scope_extra.txt, and KO/search_scope.txt to confirm the replacement persisted across the expected files."
+  ],
+  "manual_checked_expected_checks": [
+    "Confirmation dialog shows scope label, total replacements, affected files, and row-level preview rows.",
+    "Replace stays disabled until the review checkbox is checked.",
+    "The cancel path leaves files unchanged.",
+    "The confirmed pool replace persists across all expected files after file switching."
+  ],
+  "manual_checked_steps": [
+    "Open RU/search_scope.txt, switch to the Search panel, and set query target word plus replacement target phrase.",
+    "Open General -> Preferences -> Search / Replace, set Replace scope to Locale Pool, apply the dialog, and run Replace All.",
+    "Inspect the confirmation summary and row-level impact preview, then cancel and confirm no values change.",
+    "Run Replace All again, verify the Replace button stays disabled until the review checkbox is checked, then tick it and apply the replacement.",
+    "Switch between RU/search_scope.txt, RU/search_scope_extra.txt, and KO/search_scope.txt to confirm the replacement persisted across the expected files."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/search-replace-impact-preview-safe-apply-search-replace-impact-preview-safe-apply-1782249587510-1782249887368.json",
+  "manual_expected_checks": [
+    "Confirmation dialog shows scope label, total replacements, affected files, and row-level preview rows.",
+    "Replace stays disabled until the review checkbox is checked.",
+    "The cancel path leaves files unchanged.",
+    "The confirmed pool replace persists across all expected files after file switching."
+  ],
+  "manual_notes": "Worked as supposed, changed word \"target\" only in 1 file. Also description of this step is not clear enough. Just use quotes and say concrete words to replace. Now it is ambiguous.\n\nConfirm replace all dialog should be wider 2 times",
+  "manual_outcome": "passed",
+  "manual_return_code": 0,
+  "manual_run_token": "search-replace-impact-preview-safe-apply-1782249587510",
+  "mode": "manual",
+  "scenario": {
+    "automation_pytest_selectors": [
+      "tests/test_search_replace_service.py",
+      "tests/test_gui_dialogs.py",
+      "tests/test_main_window_replace_merge_clipboard.py"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "Confirmation dialog shows scope label, total replacements, affected files, and row-level preview rows.",
+      "Replace stays disabled until the review checkbox is checked.",
+      "The cancel path leaves files unchanged.",
+      "The confirmed pool replace persists across all expected files after file switching."
+    ],
+    "finish_condition": "Leave RU/search_scope.txt active after a canceled run and a confirmed pool run, with the replacement persisted across the expected files.",
+    "fixture_root": "manual_workflow",
+    "focus_files": [
+      "RU/search_scope.txt",
+      "RU/search_scope_extra.txt",
+      "KO/search_scope.txt"
+    ],
+    "goal": "Verify the replace-all impact preview, row ordering, cancel path, and checkbox-gated apply flow with a real multi-file pool scope.",
+    "id": "search-replace-impact-preview-safe-apply",
+    "inspection_paths": [],
+    "manual_depth": "full_workflow",
+    "operator_hints": [],
+    "prefs_extras": {
+      "replace_scope": "POOL"
+    },
+    "selected_locales": [
+      "RU",
+      "KO"
+    ],
+    "start_context": "Launch with RU and KO selected. Set Replace scope through General -> Preferences -> Search / Replace before running Replace All.",
+    "steps": [
+      "Open RU/search_scope.txt, switch to the Search panel, and set query target word plus replacement target phrase.",
+      "Open General -> Preferences -> Search / Replace, set Replace scope to Locale Pool, apply the dialog, and run Replace All.",
+      "Inspect the confirmation summary and row-level impact preview, then cancel and confirm no values change.",
+      "Run Replace All again, verify the Replace button stays disabled until the review checkbox is checked, then tick it and apply the replacement.",
+      "Switch between RU/search_scope.txt, RU/search_scope_extra.txt, and KO/search_scope.txt to confirm the replacement persisted across the expected files."
+    ],
+    "title": "Search+replace impact preview with checkbox-gated replace safety",
+    "tracked_repo_files": [
+      "translationzed_py/core/search_replace_service.py",
+      "translationzed_py/gui/main_window.py",
+      "translationzed_py/gui/dialogs.py",
+      "tests/fixtures/manual_workflow/RU/search_scope.txt",
+      "tests/fixtures/manual_workflow/RU/search_scope_extra.txt",
+      "tests/fixtures/manual_workflow/KO/search_scope.txt"
+    ],
+    "workflow_family": "search_replace"
+  },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/manual_workflow/KO/search_scope.txt",
+      "sha256": "f6739eb5b0806cbfa84c95bb69f8bb53bbb5da1ea82981907a832d34740e34a4"
+    },
+    {
+      "path": "tests/fixtures/manual_workflow/RU/search_scope.txt",
+      "sha256": "02dee0a20125d732ce47431b088480fdaff7dc7001853d4a97dd8726bdb020df"
+    },
+    {
+      "path": "tests/fixtures/manual_workflow/RU/search_scope_extra.txt",
+      "sha256": "a0f70af868451abd5800209b86f6347146360741c0d600ce82b489c5e9fa2fb6"
+    },
+    {
+      "path": "translationzed_py/core/search_replace_service.py",
+      "sha256": "2f5694780b4cfa429b555d112b397843d3cdf13b574d81b67ee72d8a12566c47"
+    },
+    {
+      "path": "translationzed_py/gui/dialogs.py",
+      "sha256": "592ac05a718dfe137172f1ea08b582d3fe66c87407153d68d23b4870a409a8bb"
+    },
+    {
+      "path": "translationzed_py/gui/main_window.py",
+      "sha256": "78036aac649438270987cc1498439e98cf65a86f2db20a181dc886e42f7170a1"
+    }
+  ],
+  "version": 1
+}

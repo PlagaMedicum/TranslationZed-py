@@ -1,5 +1,5 @@
 # UX Use Cases — Search, Replace, QA, and Source Reference
-_Last updated: 2026-03-01_
+_Last updated: 2026-06-24_
 
 ## 1) Search and Replace Flow
 
@@ -61,6 +61,7 @@ sequenceDiagram
 | Success | Findings render as compact row labels; selection jumps to file/row; explicit empty state shown when no findings. |
 | Navigation | `F8` next and `Shift+F8` previous with wrap and `QA i/n` status hint. |
 | Checks | Active checks: trailing/newline, optional tokens and same-source, optional LT findings. |
+| Edit Staleness | Manual edits hide stale findings for edited rows, keep unrelated findings visible, and show an explanatory notice that edited rows need QA again because old findings stay hidden until rerun. |
 
 ## UC-13n Source Reference Locale Switch
 

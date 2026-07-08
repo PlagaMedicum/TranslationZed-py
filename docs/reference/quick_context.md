@@ -80,7 +80,8 @@ Use `docs/meta/docs_structure.md` when ownership is unclear.
 - canonical scenario matrix: `docs/reference/test_surface.md`
 - interactive pass/fail judgment is developer-owned
 - agents should prepare preflight, exact rerun commands, and non-interactive validation only
-- release evidence relevance is hash-locked through `tracked_repo_files`
+- release evidence relevance is hash-locked through current manual-relevant
+  `tracked_repo_files`
 
 ## 8) Release Closure Discipline
 

@@ -26,34 +26,78 @@
       "checklist_record": "tests/manual_scenarios/release_evidence/qa-checklist-manual-run-checklist.json",
       "interactive": true,
       "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
-      "recorded_at_ms": 1782243361516,
+      "recorded_at_ms": 1783468890803,
       "result": "passed",
       "run_record": "tests/manual_scenarios/release_evidence/qa-checklist-manual-run-run.json",
       "scenario_id": "qa-checklist-manual-run",
-      "source_checklist_artifact": "artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1782242581636-1782243361317.json",
-      "source_run_artifact": "artifacts/manual-ui/qa-checklist-manual-run-run-1782243361516.json"
+      "source_checklist_artifact": "artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1783468689370-1783468890602.json",
+      "source_run_artifact": "artifacts/manual-ui/qa-checklist-manual-run-run-1783468890803.json"
     },
     {
-      "checklist_record": "tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-checklist.json",
+      "checklist_record": "tests/manual_scenarios/release_evidence/encoding-charsets-manual-roundtrip-checklist.json",
       "interactive": true,
-      "notes": "A34 interactive release-evidence closure record.",
-      "recorded_at_ms": 1773058601500,
+      "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
+      "recorded_at_ms": 1782247757819,
       "result": "passed",
-      "run_record": "tests/manual_scenarios/release_evidence/status-triage-mixed-indicator-run.json",
-      "scenario_id": "status-triage-mixed-indicator",
-      "source_checklist_artifact": "artifacts/manual-ui/status-triage-mixed-indicator-1772974671458.json",
-      "source_run_artifact": "artifacts/manual-ui/status-triage-mixed-indicator-run-1773057059286.json"
+      "run_record": "tests/manual_scenarios/release_evidence/encoding-charsets-manual-roundtrip-run.json",
+      "scenario_id": "encoding-charsets-manual-roundtrip",
+      "source_checklist_artifact": "artifacts/manual-ui/encoding-charsets-manual-roundtrip-encoding-charsets-manual-roundtrip-1782246988537-1782247757644.json",
+      "source_run_artifact": "artifacts/manual-ui/encoding-charsets-manual-roundtrip-run-1782247757819.json"
+    },
+    {
+      "checklist_record": "tests/manual_scenarios/release_evidence/tm-apply-triage-flow-checklist.json",
+      "interactive": true,
+      "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
+      "recorded_at_ms": 1782248557490,
+      "result": "passed",
+      "run_record": "tests/manual_scenarios/release_evidence/tm-apply-triage-flow-run.json",
+      "scenario_id": "tm-apply-triage-flow",
+      "source_checklist_artifact": "artifacts/manual-ui/tm-apply-triage-flow-tm-apply-triage-flow-1782247770898-1782248557281.json",
+      "source_run_artifact": "artifacts/manual-ui/tm-apply-triage-flow-run-1782248557490.json"
+    },
+    {
+      "checklist_record": "tests/manual_scenarios/release_evidence/source-reference-fallback-flow-checklist.json",
+      "interactive": true,
+      "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
+      "recorded_at_ms": 1782248806229,
+      "result": "passed",
+      "run_record": "tests/manual_scenarios/release_evidence/source-reference-fallback-flow-run.json",
+      "scenario_id": "source-reference-fallback-flow",
+      "source_checklist_artifact": "artifacts/manual-ui/source-reference-fallback-flow-source-reference-fallback-flow-1782248568789-1782248806052.json",
+      "source_run_artifact": "artifacts/manual-ui/source-reference-fallback-flow-run-1782248806229.json"
+    },
+    {
+      "checklist_record": "tests/manual_scenarios/release_evidence/tzp-writeback-opt-in-checklist.json",
+      "interactive": true,
+      "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
+      "recorded_at_ms": 1782251825265,
+      "result": "passed",
+      "run_record": "tests/manual_scenarios/release_evidence/tzp-writeback-opt-in-run.json",
+      "scenario_id": "tzp-writeback-opt-in",
+      "source_checklist_artifact": "artifacts/manual-ui/tzp-writeback-opt-in-tzp-writeback-opt-in-1782251695213-1782251825070.json",
+      "source_run_artifact": "artifacts/manual-ui/tzp-writeback-opt-in-run-1782251825265.json"
     },
     {
       "checklist_record": "tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-checklist.json",
       "interactive": true,
       "notes": "A35 interactive release-evidence closure record.",
-      "recorded_at_ms": 1773058603500,
+      "recorded_at_ms": 1782258373590,
       "result": "passed",
       "run_record": "tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-run.json",
       "scenario_id": "search-replace-sidebar-all-scopes",
-      "source_checklist_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-1773049605636.json",
-      "source_run_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-run-1773049605638.json"
+      "source_checklist_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-search-replace-sidebar-all-scopes-1782256928841-1782258373288.json",
+      "source_run_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-run-1782258373590.json"
+    },
+    {
+      "checklist_record": "tests/manual_scenarios/release_evidence/search-replace-impact-preview-safe-apply-checklist.json",
+      "interactive": true,
+      "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
+      "recorded_at_ms": 1782249887542,
+      "result": "passed",
+      "run_record": "tests/manual_scenarios/release_evidence/search-replace-impact-preview-safe-apply-run.json",
+      "scenario_id": "search-replace-impact-preview-safe-apply",
+      "source_checklist_artifact": "artifacts/manual-ui/search-replace-impact-preview-safe-apply-search-replace-impact-preview-safe-apply-1782249587510-1782249887368.json",
+      "source_run_artifact": "artifacts/manual-ui/search-replace-impact-preview-safe-apply-run-1782249887542.json"
     }
   ],
   "required_scenarios": [
@@ -64,7 +108,6 @@
     "tm-apply-triage-flow",
     "source-reference-fallback-flow",
     "tzp-writeback-opt-in",
-    "status-triage-mixed-indicator",
     "search-replace-sidebar-all-scopes",
     "search-replace-impact-preview-safe-apply"
   ],

@@ -1,0 +1,115 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1782247757819,
+  "fixture_copy_root": "/tmp/tzp-manual-encoding-charsets-manual-roundtrip-jr1zgu_n/project",
+  "manual_all_steps": [
+    "Open RU/IG_UI_RU.txt and confirm the status bar shows the current file encoding before editing.",
+    "Replace one RU value with a real Cyrillic phrase such as `\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0438\u0433\u0440\u0443`, use General -> Save, and choose Write to file if prompted.",
+    "Open KO/IG_UI_KO.txt, confirm the status bar shows the current file encoding, replace one KO value with a real Korean phrase such as `\uc124\uc815\uc744 \uc800\uc7a5`, then save with Write to file if prompted.",
+    "Open PTBR/IG_UI_PTBR.txt, confirm the status bar shows the current file encoding, replace one PT-BR value with a real Cp1252-safe phrase such as `Salvar altera\u00e7\u00f5es`, then save with Write to file if prompted.",
+    "Switch back through RU/IG_UI_RU.txt, KO/IG_UI_KO.txt, and PTBR/IG_UI_PTBR.txt.",
+    "Confirm each edited value remains readable with no mojibake after the roundtrip."
+  ],
+  "manual_checked_expected_checks": [
+    "No parse or decode error dialogs appear while opening mixed encodings.",
+    "Status bar shows the current file encoding for each opened file.",
+    "Edits in Cp1251, UTF-16, and Cp1252 files persist after save.",
+    "Returning to the edited files does not show mojibake or broken open-save behavior."
+  ],
+  "manual_checked_steps": [
+    "Open RU/IG_UI_RU.txt and confirm the status bar shows the current file encoding before editing.",
+    "Replace one RU value with a real Cyrillic phrase such as `\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0438\u0433\u0440\u0443`, use General -> Save, and choose Write to file if prompted.",
+    "Open KO/IG_UI_KO.txt, confirm the status bar shows the current file encoding, replace one KO value with a real Korean phrase such as `\uc124\uc815\uc744 \uc800\uc7a5`, then save with Write to file if prompted.",
+    "Open PTBR/IG_UI_PTBR.txt, confirm the status bar shows the current file encoding, replace one PT-BR value with a real Cp1252-safe phrase such as `Salvar altera\u00e7\u00f5es`, then save with Write to file if prompted.",
+    "Switch back through RU/IG_UI_RU.txt, KO/IG_UI_KO.txt, and PTBR/IG_UI_PTBR.txt.",
+    "Confirm each edited value remains readable with no mojibake after the roundtrip."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/encoding-charsets-manual-roundtrip-encoding-charsets-manual-roundtrip-1782246988537-1782247757644.json",
+  "manual_expected_checks": [
+    "No parse or decode error dialogs appear while opening mixed encodings.",
+    "Status bar shows the current file encoding for each opened file.",
+    "Edits in Cp1251, UTF-16, and Cp1252 files persist after save.",
+    "Returning to the edited files does not show mojibake or broken open-save behavior."
+  ],
+  "manual_notes": "",
+  "manual_outcome": "passed",
+  "manual_return_code": 0,
+  "manual_run_token": "encoding-charsets-manual-roundtrip-1782246988537",
+  "mode": "manual",
+  "scenario": {
+    "automation_pytest_selectors": [
+      "tests/test_gui_save_encoding.py",
+      "tests/test_encoding_diagnostics.py"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "No parse or decode error dialogs appear while opening mixed encodings.",
+      "Status bar shows the current file encoding for each opened file.",
+      "Edits in Cp1251, UTF-16, and Cp1252 files persist after save.",
+      "Returning to the edited files does not show mojibake or broken open-save behavior."
+    ],
+    "finish_condition": "Leave PTBR/IG_UI_PTBR.txt active after switching back through all edited files, with each saved value still readable in its native script.",
+    "fixture_root": "prod_like",
+    "focus_files": [
+      "RU/IG_UI_RU.txt",
+      "KO/IG_UI_KO.txt",
+      "PTBR/IG_UI_PTBR.txt"
+    ],
+    "goal": "Verify mixed-charset roundtrip editing across Cp1251, UTF-16, and Cp1252 files without mojibake.",
+    "id": "encoding-charsets-manual-roundtrip",
+    "inspection_paths": [],
+    "manual_depth": "multi_file_roundtrip",
+    "operator_hints": [
+      "This is a file-write scenario. If Save offers cache-only versus writing the file, choose Write to file.",
+      "If the write flow explains that new lines will be inserted for missing translation rows, record the exact prompt text and continue with the normal file write for this scenario.",
+      "Use the status bar to confirm the current file encoding before each save."
+    ],
+    "prefs_extras": {},
+    "selected_locales": [
+      "RU",
+      "KO",
+      "PTBR"
+    ],
+    "start_context": "Launch with RU, KO, and PTBR selected. Use Project tree file switching between the three target files.",
+    "steps": [
+      "Open RU/IG_UI_RU.txt and confirm the status bar shows the current file encoding before editing.",
+      "Replace one RU value with a real Cyrillic phrase such as `\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0438\u0433\u0440\u0443`, use General -> Save, and choose Write to file if prompted.",
+      "Open KO/IG_UI_KO.txt, confirm the status bar shows the current file encoding, replace one KO value with a real Korean phrase such as `\uc124\uc815\uc744 \uc800\uc7a5`, then save with Write to file if prompted.",
+      "Open PTBR/IG_UI_PTBR.txt, confirm the status bar shows the current file encoding, replace one PT-BR value with a real Cp1252-safe phrase such as `Salvar altera\u00e7\u00f5es`, then save with Write to file if prompted.",
+      "Switch back through RU/IG_UI_RU.txt, KO/IG_UI_KO.txt, and PTBR/IG_UI_PTBR.txt.",
+      "Confirm each edited value remains readable with no mojibake after the roundtrip."
+    ],
+    "title": "Manual encoding and charset roundtrip verification",
+    "tracked_repo_files": [
+      "translationzed_py/core/parser.py",
+      "translationzed_py/core/saver.py",
+      "tests/fixtures/prod_like/RU/IG_UI_RU.txt",
+      "tests/fixtures/prod_like/KO/IG_UI_KO.txt",
+      "tests/fixtures/prod_like/PTBR/IG_UI_PTBR.txt"
+    ],
+    "workflow_family": "encoding_charsets"
+  },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/prod_like/KO/IG_UI_KO.txt",
+      "sha256": "dea3d970a092c4cfe5e6c413a7494c88544eb1100418908413f442f9531fb153"
+    },
+    {
+      "path": "tests/fixtures/prod_like/PTBR/IG_UI_PTBR.txt",
+      "sha256": "583111cfdba8c3928e1c3ef76ed75afbc8d062ec8dae655d48db17cb23a7c75e"
+    },
+    {
+      "path": "tests/fixtures/prod_like/RU/IG_UI_RU.txt",
+      "sha256": "302c322b362c9864a96a0bd922d9d6c150c728f43e62d027211fa649c7161413"
+    },
+    {
+      "path": "translationzed_py/core/parser.py",
+      "sha256": "43d7045e1e31747449716d4d6a5b7c8b7769c07535c6b3c99c6496b991a1b304"
+    },
+    {
+      "path": "translationzed_py/core/saver.py",
+      "sha256": "ec335abca9c4ed3b7f63012b855f7df5d1cdf0f806de13d6b869c4956c4e2e53"
+    }
+  ],
+  "version": 1
+}

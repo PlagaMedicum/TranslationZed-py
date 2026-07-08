@@ -192,6 +192,91 @@ def test_qa_placeholder_is_plain_text_not_fake_result_item(
     assert "QA is manual." in win._qa_results_placeholder.text()
 
 
+def test_edit_marks_only_row_qa_findings_stale(qtbot, tmp_path: Path) -> None:
+    """Editing one row should not clear unrelated manual QA findings."""
+    root = tmp_path / "proj"
+    root.mkdir()
+    for loc in ("EN", "BE"):
+        (root / loc).mkdir()
+        (root / loc / "language.txt").write_text(
+            f"text = {loc},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    target_path = root / "BE" / "qa.txt"
+    (root / "EN" / "qa.txt").write_text(
+        'L1 = "Hello."\nL2 = "Bye."\n',
+        encoding="utf-8",
+    )
+    target_path.write_text(
+        'L1 = "Privet"\nL2 = "Paka"\n',
+        encoding="utf-8",
+    )
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._qa_auto_refresh = False
+    win._left_qa_btn.click()
+    win._file_chosen(win.fs_model.index_for_path(target_path))
+    snapshot = _build_snapshot(
+        run_id="run-1",
+        file_path=target_path,
+        summary="QA completed: 2 finding(s) across 5/5 rules.",
+        state_by_rule=dict.fromkeys(QA_RULE_ORDER, QARuleState.DONE),
+    )
+    win._set_qa_progress_snapshots((snapshot,))
+    win._set_qa_findings(
+        [
+            QAFinding(
+                file=target_path,
+                row=0,
+                code="qa.trailing",
+                excerpt="Row one stale",
+            ),
+            QAFinding(
+                file=target_path,
+                row=1,
+                code="qa.newlines",
+                excerpt="Row two still active",
+            ),
+        ]
+    )
+    assert win._qa_results_list.count() == 2
+
+    win.table.setCurrentIndex(win._current_model.index(0, 2))
+    win._current_model.setData(win._current_model.index(0, 2), "Edited", Qt.EditRole)
+
+    assert [finding.row for finding in win._qa_findings] == [1]
+    assert win._qa_results_list.count() == 1
+    assert "Row two still active" in win._qa_results_list.item(0).text()
+    assert win._qa_results_list.isHidden() is False
+    assert win._qa_scan_note == ""
+    assert (
+        win._qa_checklist_label.text()
+        == "QA completed: 2 finding(s) across 5/5 rules."
+    )
+    assert win._qa_stale_notice_label.isHidden() is False
+    assert (
+        win._qa_stale_notice_label.text()
+        == (
+            "1 edited row needs QA again. "
+            "Old findings are hidden until you rerun QA."
+        )
+    )
+
+    win._set_qa_findings(
+        [
+            QAFinding(
+                file=target_path,
+                row=1,
+                code="qa.newlines",
+                excerpt="Fresh row two",
+            )
+        ]
+    )
+
+    assert win._qa_stale_hidden_rows == set()
+    assert win._qa_stale_notice_label.isHidden() is True
+
+
 def test_qa_panel_labels_use_compact_top_aligned_layout(qtbot, tmp_path: Path) -> None:
     """QA checklist/placeholder labels should stay compact and top-aligned."""
     root, target_path = _make_basic_qa_project(tmp_path)
@@ -202,10 +287,15 @@ def test_qa_panel_labels_use_compact_top_aligned_layout(qtbot, tmp_path: Path) -
     win._set_qa_panel_message("QA is manual. Click Run QA for this file.")
 
     checklist_policy = win._qa_checklist_label.sizePolicy()
+    stale_notice_policy = win._qa_stale_notice_label.sizePolicy()
     placeholder_policy = win._qa_results_placeholder.sizePolicy()
     assert checklist_policy.verticalPolicy() == QSizePolicy.Policy.Minimum
+    assert stale_notice_policy.verticalPolicy() == QSizePolicy.Policy.Preferred
     assert placeholder_policy.verticalPolicy() == QSizePolicy.Policy.Minimum
     assert win._qa_checklist_label.alignment() == (
+        Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+    )
+    assert win._qa_stale_notice_label.alignment() == (
         Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
     )
     assert win._qa_results_placeholder.alignment() == (

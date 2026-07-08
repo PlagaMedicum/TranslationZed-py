@@ -1,0 +1,39 @@
+{
+  "all_steps": [
+    "Open RU/ui.txt and use the Source column header control to select KO as the source-reference locale.",
+    "Confirm the Source column now shows KO text for RU/ui.txt.",
+    "Open RU/menu.txt and keep KO selected as the source-reference locale.",
+    "Confirm the Source column on RU/menu.txt stays empty because no KO/menu.txt exists.",
+    "Change the selected row inside RU/menu.txt and confirm the Source column stays empty there as well.",
+    "Switch back to RU/ui.txt and then return to RU/menu.txt to confirm the selected source-reference locale remains stable while the missing counterpart still produces an empty Source column."
+  ],
+  "checked_expected_checks": [
+    "Source-reference control responds without errors.",
+    "KO source is shown on RU/ui.txt because a KO counterpart exists.",
+    "RU/menu.txt keeps an empty Source column rather than showing fallback text when KO/menu.txt is missing.",
+    "Switching files does not silently replace the requested KO source-reference mode with another locale."
+  ],
+  "checked_steps": [
+    "Open RU/ui.txt and use the Source column header control to select KO as the source-reference locale.",
+    "Confirm the Source column now shows KO text for RU/ui.txt.",
+    "Open RU/menu.txt and keep KO selected as the source-reference locale.",
+    "Confirm the Source column on RU/menu.txt stays empty because no KO/menu.txt exists.",
+    "Change the selected row inside RU/menu.txt and confirm the Source column stays empty there as well.",
+    "Switch back to RU/ui.txt and then return to RU/menu.txt to confirm the selected source-reference locale remains stable while the missing counterpart still produces an empty Source column."
+  ],
+  "completed_at_ms": 1782248806052,
+  "expected_checks": [
+    "Source-reference control responds without errors.",
+    "KO source is shown on RU/ui.txt because a KO counterpart exists.",
+    "RU/menu.txt keeps an empty Source column rather than showing fallback text when KO/menu.txt is missing.",
+    "Switching files does not silently replace the requested KO source-reference mode with another locale."
+  ],
+  "fixture_root": "manual_workflow",
+  "notes": "",
+  "project_root": "/tmp/tzp-manual-source-reference-fallback-flow-6_qrb9fm/project",
+  "result": "passed",
+  "run_token": "source-reference-fallback-flow-1782248568789",
+  "scenario_id": "source-reference-fallback-flow",
+  "title": "Source-reference mode with empty source when counterpart is missing",
+  "version": 1
+}

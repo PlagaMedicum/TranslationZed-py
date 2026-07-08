@@ -1,24 +1,124 @@
 {
   "auto_return_code": null,
-  "completed_at_ms": 1773058603200,
-  "fixture_copy_root": "tests/fixtures/conflict_manual",
+  "completed_at_ms": 1782258373590,
+  "fixture_copy_root": "/tmp/tzp-manual-search-replace-sidebar-all-scopes-4r7q_arr/project",
+  "manual_all_steps": [
+    "Open RU/search_scope.txt, switch to the Search panel, enter search text `target word`, and enter replacement text `release word`.",
+    "Confirm toolbar and sidebar search controls stay synchronized in both directions.",
+    "Run Replace All with dialog Replace scope set to File, review the confirmation dialog counts/preview, and cancel it.",
+    "Run Replace All again, change the dialog Replace scope to Locale Pool, confirm the counts/preview update live, and cancel it.",
+    "Run Replace All again, change the dialog Replace scope to Locale, confirm the counts/preview update live, tick the review checkbox, and apply the replacement.",
+    "Open RU/search_scope_extra.txt and KO/search_scope.txt to confirm both RU files changed to `release word` while KO/search_scope.txt still contains `target word`."
+  ],
+  "manual_checked_expected_checks": [
+    "Toolbar and sidebar search controls remain synchronized in both directions.",
+    "Confirm Replace All is wide enough to read the per-file list and impact preview.",
+    "Replace All confirmation appears for File, Locale, and Locale Pool when matches exist, and dialog scope changes update counts/preview live.",
+    "Canceled runs make no edits.",
+    "The applied Locale run changes RU/search_scope.txt and RU/search_scope_extra.txt, but not KO/search_scope.txt.",
+    "Changing Replace scope inside Confirm Replace All does not persist the Preferences replace scope."
+  ],
+  "manual_checked_steps": [
+    "Open RU/search_scope.txt, switch to the Search panel, enter search text `target word`, and enter replacement text `release word`.",
+    "Confirm toolbar and sidebar search controls stay synchronized in both directions.",
+    "Run Replace All with dialog Replace scope set to File, review the confirmation dialog counts/preview, and cancel it.",
+    "Run Replace All again, change the dialog Replace scope to Locale Pool, confirm the counts/preview update live, and cancel it.",
+    "Run Replace All again, change the dialog Replace scope to Locale, confirm the counts/preview update live, tick the review checkbox, and apply the replacement.",
+    "Open RU/search_scope_extra.txt and KO/search_scope.txt to confirm both RU files changed to `release word` while KO/search_scope.txt still contains `target word`."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/search-replace-sidebar-all-scopes-search-replace-sidebar-all-scopes-1782256928841-1782258373288.json",
+  "manual_expected_checks": [
+    "Toolbar and sidebar search controls remain synchronized in both directions.",
+    "Confirm Replace All is wide enough to read the per-file list and impact preview.",
+    "Replace All confirmation appears for File, Locale, and Locale Pool when matches exist, and dialog scope changes update counts/preview live.",
+    "Canceled runs make no edits.",
+    "The applied Locale run changes RU/search_scope.txt and RU/search_scope_extra.txt, but not KO/search_scope.txt.",
+    "Changing Replace scope inside Confirm Replace All does not persist the Preferences replace scope."
+  ],
+  "manual_notes": "",
+  "manual_outcome": "passed",
   "manual_return_code": 0,
+  "manual_run_token": "search-replace-sidebar-all-scopes-1782256928841",
   "mode": "manual",
   "scenario": {
-    "id": "search-replace-sidebar-all-scopes"
+    "automation_pytest_selectors": [
+      "tests/test_search_replace_service.py",
+      "tests/test_gui_dialogs.py",
+      "tests/test_main_window_replace_merge_clipboard.py",
+      "tests/test_gui_service_adapters.py"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "Toolbar and sidebar search controls remain synchronized in both directions.",
+      "Confirm Replace All is wide enough to read the per-file list and impact preview.",
+      "Replace All confirmation appears for File, Locale, and Locale Pool when matches exist, and dialog scope changes update counts/preview live.",
+      "Canceled runs make no edits.",
+      "The applied Locale run changes RU/search_scope.txt and RU/search_scope_extra.txt, but not KO/search_scope.txt.",
+      "Changing Replace scope inside Confirm Replace All does not persist the Preferences replace scope."
+    ],
+    "finish_condition": "Leave RU/search_scope.txt active after canceling File and Locale Pool previews, then applying Locale scope so RU/search_scope.txt and RU/search_scope_extra.txt changed while KO/search_scope.txt stayed unchanged.",
+    "fixture_root": "manual_workflow",
+    "focus_files": [
+      "RU/search_scope.txt",
+      "RU/search_scope_extra.txt",
+      "KO/search_scope.txt"
+    ],
+    "goal": "Verify Search sidebar controls stay synchronized with the toolbar while File, Locale, and Locale Pool replace scopes run through the replace-all confirmation flow.",
+    "id": "search-replace-sidebar-all-scopes",
+    "inspection_paths": [],
+    "manual_depth": "full_workflow",
+    "operator_hints": [],
+    "prefs_extras": {
+      "replace_scope": "FILE"
+    },
+    "selected_locales": [
+      "RU",
+      "KO"
+    ],
+    "start_context": "Launch with RU and KO selected. Preferences start Replace scope at File; use the Confirm Replace All dialog's transient Replace scope selector for this scenario and do not persist scope changes.",
+    "steps": [
+      "Open RU/search_scope.txt, switch to the Search panel, enter search text `target word`, and enter replacement text `release word`.",
+      "Confirm toolbar and sidebar search controls stay synchronized in both directions.",
+      "Run Replace All with dialog Replace scope set to File, review the confirmation dialog counts/preview, and cancel it.",
+      "Run Replace All again, change the dialog Replace scope to Locale Pool, confirm the counts/preview update live, and cancel it.",
+      "Run Replace All again, change the dialog Replace scope to Locale, confirm the counts/preview update live, tick the review checkbox, and apply the replacement.",
+      "Open RU/search_scope_extra.txt and KO/search_scope.txt to confirm both RU files changed to `release word` while KO/search_scope.txt still contains `target word`."
+    ],
+    "title": "Search+replace sidebar flow with all replace scopes",
+    "tracked_repo_files": [
+      "translationzed_py/core/search_replace_service.py",
+      "translationzed_py/gui/main_window_panel_helpers.py",
+      "translationzed_py/gui/dialogs.py",
+      "tests/fixtures/manual_workflow/RU/search_scope.txt",
+      "tests/fixtures/manual_workflow/RU/search_scope_extra.txt",
+      "tests/fixtures/manual_workflow/KO/search_scope.txt"
+    ],
+    "workflow_family": "search_replace"
   },
   "tracked_files": [
     {
-      "path": "tests/fixtures/conflict_manual/BE/ui.txt",
-      "sha256": "e00ece2b65e0104839bb9a545b3bed7234d726ed1428d4aa86dbae6d58b2eaaa"
+      "path": "tests/fixtures/manual_workflow/KO/search_scope.txt",
+      "sha256": "f6739eb5b0806cbfa84c95bb69f8bb53bbb5da1ea82981907a832d34740e34a4"
+    },
+    {
+      "path": "tests/fixtures/manual_workflow/RU/search_scope.txt",
+      "sha256": "02dee0a20125d732ce47431b088480fdaff7dc7001853d4a97dd8726bdb020df"
+    },
+    {
+      "path": "tests/fixtures/manual_workflow/RU/search_scope_extra.txt",
+      "sha256": "a0f70af868451abd5800209b86f6347146360741c0d600ce82b489c5e9fa2fb6"
     },
     {
       "path": "translationzed_py/core/search_replace_service.py",
       "sha256": "2f5694780b4cfa429b555d112b397843d3cdf13b574d81b67ee72d8a12566c47"
     },
     {
-      "path": "translationzed_py/gui/main_window.py",
-      "sha256": "46f94bd8c064e8024e02badb007ae88689373e1452c87df9118ec86ba43f6277"
+      "path": "translationzed_py/gui/dialogs.py",
+      "sha256": "b00f63f58dccdfa6d578fc2a5490a60ef34ccf82dd113f04e783fb0ad054c3b2"
+    },
+    {
+      "path": "translationzed_py/gui/main_window_panel_helpers.py",
+      "sha256": "8a386d7526eda63f3e84ccea0e9094e13f0996122a3e8a6a6fd0b1fee1ea528e"
     }
   ],
   "version": 1

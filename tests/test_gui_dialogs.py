@@ -111,8 +111,8 @@ def test_replace_files_dialog_renders_items_and_confirms(qtbot) -> None:
             ReplaceAllImpactPreviewRow(
                 file="one.txt",
                 row=2,
-                before="A" * 95,
-                after="B" * 95,
+                before="A" * 180,
+                after="B" * 180,
             ),
             ReplaceAllImpactPreviewRow(
                 file="two.txt",
@@ -157,6 +157,89 @@ def test_replace_files_dialog_renders_items_and_confirms(qtbot) -> None:
     dialog._confirm_checkbox.setChecked(True)
     dialog._confirm()
     assert dialog.confirmed() is True
+
+
+def test_replace_files_dialog_transient_scope_rebuilds_preview(qtbot) -> None:
+    """Verify dialog-local scope changes refresh counts without auto-confirming."""
+    initial = ReplaceAllImpactPreview(
+        scope_label="File",
+        total_matches=1,
+        affected_files=1,
+        rows=(
+            ReplaceAllImpactPreviewRow(
+                file="one.txt",
+                row=1,
+                before="target",
+                after="done",
+            ),
+        ),
+        rendered_rows=1,
+        omitted_rows=0,
+        truncated=False,
+        row_cap=10,
+    )
+    locale_preview = ReplaceAllImpactPreview(
+        scope_label="Locale RU",
+        total_matches=3,
+        affected_files=2,
+        rows=(
+            ReplaceAllImpactPreviewRow(
+                file="one.txt",
+                row=1,
+                before="target",
+                after="done",
+            ),
+            ReplaceAllImpactPreviewRow(
+                file="two.txt",
+                row=2,
+                before="target",
+                after="done",
+            ),
+        ),
+        rendered_rows=2,
+        omitted_rows=0,
+        truncated=False,
+        row_cap=10,
+    )
+    scope_calls: list[str] = []
+
+    def _scope_payload(scope: str):  # type: ignore[no-untyped-def]
+        scope_calls.append(scope)
+        return {
+            "files": [("one.txt", 1), ("two.txt", 2)],
+            "scope_label": "Locale RU",
+            "total_matches": 3,
+            "affected_files": 2,
+            "impact_preview": locale_preview,
+        }
+
+    dialog = ReplaceFilesDialog(
+        [("one.txt", 1)],
+        "File",
+        total_matches=1,
+        affected_files=1,
+        impact_preview=initial,
+        scope_options=(("File", "FILE"), ("Locale", "LOCALE")),
+        selected_scope="FILE",
+        on_scope_changed=_scope_payload,
+    )
+    qtbot.addWidget(dialog)
+    from PySide6.QtWidgets import QComboBox, QLabel, QTableWidget
+
+    combo = dialog.findChild(QComboBox)
+    assert combo is not None
+    combo.setCurrentIndex(1)
+
+    assert scope_calls == ["LOCALE"]
+    assert dialog.selected_scope() == "LOCALE"
+    assert dialog.confirmed() is False
+    labels = [widget.text() for widget in dialog.findChildren(QLabel)]
+    assert any("Scope: Locale RU" in text for text in labels)
+    table = dialog.findChild(QTableWidget)
+    assert table is not None
+    assert table.rowCount() == 2
+    dialog._confirm_checkbox.setChecked(True)
+    assert dialog._replace_button.isEnabled() is True
 
 
 def test_conflict_choice_dialog_close_guard_and_choice(qtbot) -> None:

@@ -1,0 +1,35 @@
+{
+  "all_steps": [
+    "Open RU/ui.txt, switch to the TM side panel, and select the UI_CAMERA row.",
+    "Wait for TM suggestions and confirm a project-origin suggestion derived from RU/tm_memory.txt appears.",
+    "Apply the suggestion and confirm the translation cell updates under the normal edit pipeline.",
+    "Switch to RU/tm_memory.txt or a different row, then return to the applied row in RU/ui.txt.",
+    "Verify the applied value persists and the TM panel remains responsive."
+  ],
+  "checked_expected_checks": [
+    "TM panel shows at least one project suggestion for the UI_CAMERA row.",
+    "Applying the suggestion updates the translation cell without freezing the UI.",
+    "The row remains editable and the TM panel still responds after the apply action."
+  ],
+  "checked_steps": [
+    "Open RU/ui.txt, switch to the TM side panel, and select the UI_CAMERA row.",
+    "Wait for TM suggestions and confirm a project-origin suggestion derived from RU/tm_memory.txt appears.",
+    "Apply the suggestion and confirm the translation cell updates under the normal edit pipeline.",
+    "Switch to RU/tm_memory.txt or a different row, then return to the applied row in RU/ui.txt.",
+    "Verify the applied value persists and the TM panel remains responsive."
+  ],
+  "completed_at_ms": 1782248557281,
+  "expected_checks": [
+    "TM panel shows at least one project suggestion for the UI_CAMERA row.",
+    "Applying the suggestion updates the translation cell without freezing the UI.",
+    "The row remains editable and the TM panel still responds after the apply action."
+  ],
+  "fixture_root": "manual_workflow",
+  "notes": "",
+  "project_root": "/tmp/tzp-manual-tm-apply-triage-flow-hvzm55zv/project",
+  "result": "passed",
+  "run_token": "tm-apply-triage-flow-1782247770898",
+  "scenario_id": "tm-apply-triage-flow",
+  "title": "TM lookup, apply, and panel-stability flow",
+  "version": 1
+}

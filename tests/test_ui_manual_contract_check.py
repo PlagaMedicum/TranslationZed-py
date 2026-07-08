@@ -458,30 +458,6 @@ def _scenario_rows() -> list[dict[str, object]]:
             ],
         },
         {
-            "id": "status-triage-mixed-indicator",
-            "title": "Status triage",
-            "workflow_family": "status_triage",
-            "manual_depth": "branch_check",
-            "goal": "Verify RU/ui.txt shows mixed selection state only when appropriate.",
-            "start_context": "Launch with RU selected and open RU/ui.txt.",
-            "fixture_root": "manual_workflow",
-            "focus_files": ["RU/ui.txt"],
-            "finish_condition": "Leave RU/ui.txt active after returning to a non-mixed selection.",
-            "selected_locales": ["RU"],
-            "steps": ["Open RU/ui.txt from the Project tree."],
-            "expected_checks": [
-                "RU/ui.txt mixed-selection indicator toggles correctly."
-            ],
-            "tracked_repo_files": [
-                "translationzed_py/gui/main_window.py",
-            ],
-            "env_overrides": {},
-            "prefs_extras": {},
-            "automation_pytest_selectors": [
-                "tests/test_gui_service_adapters.py",
-            ],
-        },
-        {
             "id": "search-replace-sidebar-all-scopes",
             "title": "Search replace",
             "workflow_family": "search_replace",
@@ -557,9 +533,6 @@ def test_manual_contract_summary_reports_registry_shape(tmp_path: Path) -> None:
                     "search_replace": {
                         "selectors": ["tests/test_search_replace_service.py"]
                     },
-                    "status_triage": {
-                        "selectors": ["tests/test_gui_service_adapters.py"]
-                    },
                     "tzp_writeback": {
                         "selectors": ["tests/test_tzp_comment_policy.py"]
                     },
@@ -623,10 +596,6 @@ def _write_contract(path: Path, *, missing_key: str | None = None) -> None:
         "search_replace": {
             "description": "x",
             "selectors": ["tests/test_search_replace_service.py"],
-        },
-        "status_triage": {
-            "description": "x",
-            "selectors": ["tests/test_gui_service_adapters.py"],
         },
         "tzp_writeback": {
             "description": "x",
@@ -954,7 +923,7 @@ def test_contract_check_requires_workflow_family_coverage(tmp_path: Path) -> Non
     _write_registry(registry)
     payload = json.loads(registry.read_text(encoding="utf-8"))
     payload["scenarios"] = [
-        row for row in payload["scenarios"] if row["workflow_family"] != "status_triage"
+        row for row in payload["scenarios"] if row["workflow_family"] != "qa_checklist"
     ]
     registry.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     _write_contract(contract)
@@ -965,7 +934,7 @@ def test_contract_check_requires_workflow_family_coverage(tmp_path: Path) -> Non
         collect_selectors=False,
     )
     assert any(
-        "missing scenario for workflow_family: status_triage" in item for item in errors
+        "missing scenario for workflow_family: qa_checklist" in item for item in errors
     )
 
 

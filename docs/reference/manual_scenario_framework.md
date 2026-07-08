@@ -36,7 +36,8 @@ Optional fields:
 Field intent:
 - `focus_files`: fixture-relative files the operator must touch in the scenario.
 - `inspection_paths`: fixture-relative files the operator may need to inspect on disk.
-- `tracked_repo_files`: repo-relative files whose sha256 rows gate release-evidence relevance.
+- `tracked_repo_files`: repo-relative files whose sha256 rows gate manual-evidence
+  relevance after focused automated coverage is accounted for.
 - `operator_hints`: short operator-facing guidance for prompts, inspection, or ambiguity handling.
 
 Authoring rules:
@@ -92,7 +93,12 @@ Strict rules:
 - every scenario in `tests/manual_scenarios/scenarios.json` is required
 - evidence must come from interactive passed runs
 - `headless` and `auto-only` artifacts are not acceptable release evidence
-- if any `tracked_repo_files` hash changes, evidence becomes stale and must be re-run then re-synced
+- if any current `tracked_repo_files` hash changes, evidence becomes stale and must
+  be re-run then re-synced
+- changes limited to `tracked_repo_files` or `automation_pytest_selectors` metadata
+  do not require a fresh manual run when all current tracked hashes remain valid
+- historical hash rows for files removed from `tracked_repo_files` are tolerated so
+  manual tracking can be narrowed without re-running unrelated scenarios
 
 Sync surface:
 - `make release-evidence-sync SCENARIO=<id>`

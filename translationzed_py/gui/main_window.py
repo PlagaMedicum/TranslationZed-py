@@ -645,6 +645,7 @@ class MainWindow(QMainWindow):
         self._tm_bootstrap_pending = False
         self._qa_findings: tuple[_QAFinding, ...] = ()
         self._qa_scan_note = ""
+        self._qa_stale_hidden_rows: set[int] = set()
         self._qa_panel_result_limit = 2000
         self._qa_refresh_delay_ms = 140
         self._qa_scan_pool: ThreadPoolExecutor | None = None
@@ -1319,6 +1320,18 @@ class MainWindow(QMainWindow):
             QSizePolicy.Policy.Minimum,
         )
         self._qa_checklist_label.setText("Run QA to see rule-by-rule progress.")
+        self._qa_stale_notice_label = QLabel(self._qa_panel)
+        self._qa_stale_notice_label.setWordWrap(True)
+        self._qa_stale_notice_label.setTextFormat(Qt.TextFormat.PlainText)
+        self._qa_stale_notice_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+        )
+        self._qa_stale_notice_label.setContentsMargins(0, 0, 0, 0)
+        self._qa_stale_notice_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Preferred,
+        )
+        self._qa_stale_notice_label.setVisible(False)
         self._qa_results_placeholder = QLabel(self._qa_panel)
         self._qa_results_placeholder.setWordWrap(True)
         self._qa_results_placeholder.setTextFormat(Qt.TextFormat.PlainText)
@@ -1338,6 +1351,11 @@ class MainWindow(QMainWindow):
         )
         qa_summary_layout.addWidget(
             self._qa_progress,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+        )
+        qa_summary_layout.addWidget(
+            self._qa_stale_notice_label,
             0,
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
         )
@@ -5232,6 +5250,7 @@ class MainWindow(QMainWindow):
     _set_qa_findings = _panel_helpers._set_qa_findings
     _set_qa_scan_note = _panel_helpers._set_qa_scan_note
     _set_qa_panel_message = _panel_helpers._set_qa_panel_message
+    _mark_qa_findings_stale_for_rows = _panel_helpers._mark_qa_findings_stale_for_rows
     _refresh_qa_panel_results = _panel_helpers._refresh_qa_panel_results
     _open_qa_result_item = _panel_helpers._open_qa_result_item
     _focus_qa_finding_item = _panel_helpers._focus_qa_finding_item

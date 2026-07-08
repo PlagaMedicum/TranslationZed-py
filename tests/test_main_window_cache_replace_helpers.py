@@ -908,12 +908,12 @@ def test_selection_status_bar_and_scope_indicator_helpers_cover_guard_paths(
     assert indicator_widget.toolTip() == "Replace scope: Locale"
 
 
-def test_update_status_bar_appends_mixed_selection_indicator(
+def test_update_status_bar_omits_mixed_selection_indicator(
     qtbot,
     tmp_path,
     monkeypatch,
 ) -> None:
-    """Status bar should surface mixed multi-row status selection context."""
+    """Status bar should not add a special mixed-selection status indicator."""
     root = _make_project(tmp_path)
     win = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
@@ -956,7 +956,8 @@ def test_update_status_bar_appends_mixed_selection_indicator(
 
     monkeypatch.setattr(win, "_selected_rows", lambda: [1, 2], raising=False)
     win._update_status_bar()
-    assert "Selection: mixed (2 rows)" in shown_messages[-1]
+    assert "Selection: mixed" not in shown_messages[-1]
+    assert "Row 3 / 7" in shown_messages[-1]
 
     monkeypatch.setattr(win, "_selected_rows", lambda: [1, 3], raising=False)
     win._update_status_bar()

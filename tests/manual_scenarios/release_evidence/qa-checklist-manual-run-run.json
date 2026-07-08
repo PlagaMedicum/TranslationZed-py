@@ -1,40 +1,40 @@
 {
   "auto_return_code": null,
-  "completed_at_ms": 1782243361516,
-  "fixture_copy_root": "/tmp/tzp-manual-qa-checklist-manual-run-t96u_1al/project",
+  "completed_at_ms": 1783468890803,
+  "fixture_copy_root": "/tmp/tzp-manual-qa-checklist-manual-run-qq9_kfqx/project",
   "manual_all_steps": [
     "Open RU/ui.txt from the Project tree and confirm the QA panel shows the pre-run manual message.",
     "Press Run QA and observe rule-state progress in fixed order until the run completes.",
     "Activate one finding from the list and confirm the table navigates to the matching row.",
-    "Edit one translation in RU/ui.txt and confirm the stale QA message is plain text rather than a fake findings row.",
+    "Edit one translation that has a QA finding and confirm only that row's stale finding is removed while unrelated findings stay visible and a notice explains that edited rows need QA again because old findings are hidden until rerun.",
     "Press Run QA again and confirm the findings list refreshes for the edited file."
   ],
   "manual_checked_expected_checks": [
     "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
     "Rule-state progress follows the queued, running, and completed sequence during the run.",
     "Findings list is non-empty and supports row navigation.",
-    "Source column shows EN source text rather than empty placeholders.",
-    "After editing, stale-message text is plain panel text and the second run replaces it with refreshed findings."
+    "After editing one row, the panel keeps unrelated findings visible and shows `1 edited row needs QA again. Old findings are hidden until you rerun QA.` outside the findings list.",
+    "The second run rebuilds the findings list from scratch for the edited file."
   ],
   "manual_checked_steps": [
     "Open RU/ui.txt from the Project tree and confirm the QA panel shows the pre-run manual message.",
     "Press Run QA and observe rule-state progress in fixed order until the run completes.",
     "Activate one finding from the list and confirm the table navigates to the matching row.",
-    "Edit one translation in RU/ui.txt and confirm the stale QA message is plain text rather than a fake findings row.",
+    "Edit one translation that has a QA finding and confirm only that row's stale finding is removed while unrelated findings stay visible and a notice explains that edited rows need QA again because old findings are hidden until rerun.",
     "Press Run QA again and confirm the findings list refreshes for the edited file."
   ],
-  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1782242581636-1782243361317.json",
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1783468689370-1783468890602.json",
   "manual_expected_checks": [
     "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
     "Rule-state progress follows the queued, running, and completed sequence during the run.",
     "Findings list is non-empty and supports row navigation.",
-    "Source column shows EN source text rather than empty placeholders.",
-    "After editing, stale-message text is plain panel text and the second run replaces it with refreshed findings."
+    "After editing one row, the panel keeps unrelated findings visible and shows `1 edited row needs QA again. Old findings are hidden until you rerun QA.` outside the findings list.",
+    "The second run rebuilds the findings list from scratch for the edited file."
   ],
-  "manual_notes": "QA progress, I guess is ok, but I can't verify it completely, cuz it runs fastly, as i expect. Idk what you mean with plin panel text, but everything looks fine",
+  "manual_notes": "",
   "manual_outcome": "passed",
   "manual_return_code": 0,
-  "manual_run_token": "qa-checklist-manual-run-1782242581636",
+  "manual_run_token": "qa-checklist-manual-run-1783468689370",
   "mode": "manual",
   "scenario": {
     "automation_pytest_selectors": [
@@ -46,8 +46,8 @@
       "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
       "Rule-state progress follows the queued, running, and completed sequence during the run.",
       "Findings list is non-empty and supports row navigation.",
-      "Source column shows EN source text rather than empty placeholders.",
-      "After editing, stale-message text is plain panel text and the second run replaces it with refreshed findings."
+      "After editing one row, the panel keeps unrelated findings visible and shows `1 edited row needs QA again. Old findings are hidden until you rerun QA.` outside the findings list.",
+      "The second run rebuilds the findings list from scratch for the edited file."
     ],
     "finish_condition": "Leave RU/ui.txt active after the second manual QA run, with refreshed findings visible for the edited file and no fake placeholder row in the findings list.",
     "fixture_root": "qa_manual",
@@ -79,7 +79,7 @@
       "Open RU/ui.txt from the Project tree and confirm the QA panel shows the pre-run manual message.",
       "Press Run QA and observe rule-state progress in fixed order until the run completes.",
       "Activate one finding from the list and confirm the table navigates to the matching row.",
-      "Edit one translation in RU/ui.txt and confirm the stale QA message is plain text rather than a fake findings row.",
+      "Edit one translation that has a QA finding and confirm only that row's stale finding is removed while unrelated findings stay visible and a notice explains that edited rows need QA again because old findings are hidden until rerun.",
       "Press Run QA again and confirm the findings list refreshes for the edited file."
     ],
     "title": "Manual QA run, navigation, and stale-message refresh flow",
@@ -102,7 +102,7 @@
     },
     {
       "path": "translationzed_py/gui/main_window_panel_helpers.py",
-      "sha256": "44022352567ef90f88ad06b32a5109d1f88268b1879526ca862578f5da722da1"
+      "sha256": "bf02061a10d9b400e9820bb06ced5158a85666c4f3023dbc5de13dd846a9c951"
     },
     {
       "path": "translationzed_py/gui/qa_async.py",

@@ -68,6 +68,9 @@ from translationzed_py.core.tm_store import TMMatch, TMStore
 from translationzed_py.core.tm_workflow_service import (
     TMSelectionPlan as _TMSelectionPlan,
 )
+from translationzed_py.core.tzp_comment_policy import (
+    TZP_COMMENT_PREFIX_DEFAULT as _TZP_COMMENT_PREFIX_DEFAULT,
+)
 
 from . import languagetool_adapter as _lt_adapter
 from .delegates import MAX_VISUAL_CHARS
@@ -212,63 +215,104 @@ def run_replace_all(win) -> None:
     request = win._prepare_replace_request()
     if request is None:
         return
-    scope = win._replace_scope
-    files = win._files_for_scope(scope)
-    if not files:
-        return
     current_path = win._current_pf.path if win._current_pf else None
     locale = win._locale_for_path(current_path) if current_path is not None else None
 
     def display_name(path: Path) -> str:
         return display_path_for_root(win._root, path)
 
-    run_plan = win._search_replace_service.build_replace_all_run_plan(
-        scope=scope,
-        current_locale=locale,
-        selected_locale_count=len(win._selected_locales),
-        files=files,
-        current_file=current_path,
-        display_name=display_name,
-        count_in_current=lambda: win._replace_all_count_in_model(
-            request.pattern,
-            request.replacement,
-            request.use_regex,
-            request.matches_empty,
-            request.has_group_ref,
-        ),
-        count_in_file=lambda path: win._replace_all_count_in_file(
-            path,
-            request.pattern,
-            request.replacement,
-            request.use_regex,
-            request.matches_empty,
-            request.has_group_ref,
-        ),
-    )
-    if run_plan is None or not run_plan.run_replace:
+    def build_scope_state(scope: str):
+        files = win._files_for_scope(scope)
+        if not files:
+            return None
+        run_plan = win._search_replace_service.build_replace_all_run_plan(
+            scope=scope,
+            current_locale=locale,
+            selected_locale_count=len(win._selected_locales),
+            files=files,
+            current_file=current_path,
+            display_name=display_name,
+            count_in_current=lambda: win._replace_all_count_in_model(
+                request.pattern,
+                request.replacement,
+                request.use_regex,
+                request.matches_empty,
+                request.has_group_ref,
+            ),
+            count_in_file=lambda path: win._replace_all_count_in_file(
+                path,
+                request.pattern,
+                request.replacement,
+                request.use_regex,
+                request.matches_empty,
+                request.has_group_ref,
+            ),
+        )
+        if run_plan is None:
+            return None
+        impact_preview = None
+        if run_plan.run_replace and run_plan.show_confirmation:
+            impact_preview = build_replace_all_impact_preview(
+                win,
+                run_plan=run_plan,
+                files=files,
+                current_path=current_path,
+                display_name=display_name,
+                request=request,
+            )
+            if impact_preview is None:
+                return None
+        return {
+            "scope": scope,
+            "files": files,
+            "run_plan": run_plan,
+            "impact_preview": impact_preview,
+        }
+
+    state = build_scope_state(win._replace_scope)
+    if state is None:
+        return
+    run_plan = state["run_plan"]
+    if not run_plan.run_replace:
         return
     if run_plan.show_confirmation:
-        impact_preview = build_replace_all_impact_preview(
-            win,
-            run_plan=run_plan,
-            files=files,
-            current_path=current_path,
-            display_name=display_name,
-            request=request,
-        )
-        if impact_preview is None:
-            return
+        def dialog_payload(scope: str):
+            next_state = build_scope_state(scope)
+            if next_state is None:
+                return None
+            next_plan = next_state["run_plan"]
+            return {
+                "files": list(next_plan.counts),
+                "scope_label": next_plan.scope_label,
+                "total_matches": next_plan.total_matches,
+                "affected_files": next_plan.affected_files,
+                "impact_preview": next_state["impact_preview"],
+            }
+
         dialog = ReplaceFilesDialog(
             list(run_plan.counts),
             run_plan.scope_label,
             total_matches=run_plan.total_matches,
             affected_files=run_plan.affected_files,
-            impact_preview=impact_preview,
+            impact_preview=state["impact_preview"],
+            scope_options=(
+                ("File", "FILE"),
+                ("Locale", "LOCALE"),
+                ("Locale Pool", "POOL"),
+            ),
+            selected_scope=state["scope"],
+            on_scope_changed=dialog_payload,
             parent=win,
         )
         dialog.exec()
         if not dialog.confirmed():
             return
+        selected_scope = getattr(dialog, "selected_scope", lambda: state["scope"])()
+        if selected_scope != state["scope"]:
+            state = build_scope_state(selected_scope)
+            if state is None:
+                return
+    files = state["files"]
     applied = win._search_replace_service.apply_replace_all(
         files=files,
         current_file=current_path,
@@ -878,8 +922,27 @@ def _set_qa_progress_snapshots(win, snapshots: Sequence[object]) -> None:
 
 def _set_qa_findings(win, findings: Sequence[_QAFinding]) -> None:
     win._qa_findings = tuple(findings)
+    win._qa_stale_hidden_rows = set()
     if win._left_stack.currentIndex() == 3:
         win._refresh_qa_panel_results()
+
+
+def _render_qa_stale_notice(win) -> None:
+    label = getattr(win, "_qa_stale_notice_label", None)
+    if not isinstance(label, QLabel):
+        return
+    stale_rows = set(getattr(win, "_qa_stale_hidden_rows", set()))
+    if not stale_rows:
+        label.clear()
+        label.setVisible(False)
+        return
+    count = len(stale_rows)
+    noun = "row needs" if count == 1 else "rows need"
+    label.setText(
+        f"{count} edited {noun} QA again. "
+        "Old findings are hidden until you rerun QA."
+    )
+    label.setVisible(True)
 
 
 def _set_qa_scan_note(win, note: str) -> None:
@@ -890,14 +953,40 @@ def _set_qa_scan_note(win, note: str) -> None:
 
 def _set_qa_panel_message(win, text: str) -> None:
     win._qa_scan_note = ""
+    win._qa_stale_hidden_rows = set()
     win._set_qa_list_placeholder(text)
     _render_qa_checklist(win)
+    _render_qa_stale_notice(win)
+
+
+def _mark_qa_findings_stale_for_rows(win, first_row: int, last_row: int) -> None:
+    stale_rows = set(range(max(0, first_row), max(first_row, last_row) + 1))
+    current_path = None
+    if getattr(win, "_current_pf", None) is not None:
+        current_path = getattr(win._current_pf, "path", None)
+    remaining = []
+    hidden_rows: set[int] = set()
+    for finding in getattr(win, "_qa_findings", ()):
+        finding_path = getattr(finding, "file", None)
+        finding_row = int(getattr(finding, "row", -1))
+        same_file = current_path is None or finding_path == current_path
+        if same_file and finding_row in stale_rows:
+            hidden_rows.add(finding_row)
+            continue
+        remaining.append(finding)
+    win._qa_findings = tuple(remaining)
+    if hidden_rows:
+        current_hidden = set(getattr(win, "_qa_stale_hidden_rows", set()))
+        win._qa_stale_hidden_rows = current_hidden | hidden_rows
+    if win._left_stack.currentIndex() == 3:
+        win._refresh_qa_panel_results()
 
 
 def _refresh_qa_panel_results(win) -> None:
     if not hasattr(win, "_qa_results_list") or win._qa_results_list is None:
         return
     _render_qa_checklist(win)
+    _render_qa_stale_notice(win)
     plan = win._qa_service.build_panel_plan(
         findings=win._qa_findings,
         root=win._root,
@@ -992,6 +1081,8 @@ def _render_qa_checklist(win) -> None:
     if not bool(getattr(win, "_qa_scan_busy", False)):
         summary = str(snapshot.final_summary).strip()
         note = str(getattr(win, "_qa_scan_note", "")).strip()
+        if getattr(win, "_qa_stale_hidden_rows", set()):
+            note = ""
         compact = " ".join(part for part in (summary, note) if part).strip()
         label.setText(compact or "Run QA to see rule-by-rule progress.")
         return
@@ -1757,7 +1848,7 @@ def _status_comment_writeback_options(
 ) -> _StatusCommentWritebackOptions:
     raw_enabled = str(win._prefs_extras.get("TZP_STATUS_COMMENT_WRITEBACK", "")).strip()
     enabled = raw_enabled.lower() in {"1", "true", "yes", "on"}
-    comment_prefix = _StatusCommentWritebackOptions.comment_prefix
+    comment_prefix = _TZP_COMMENT_PREFIX_DEFAULT
     status_by_key: dict[str, Status] | None = None
     if include_current_model_overrides and win._current_model is not None:
         status_by_key = {}
@@ -1851,9 +1942,7 @@ def _on_model_data_changed(win, top_left, bottom_right, roles=None) -> None:
         elif bool(getattr(win, "_qa_auto_mark_in_progress", False)):
             return
         else:
-            win._set_qa_findings(())
-            if win._left_stack.currentIndex() == 3:
-                win._set_qa_panel_message("Edited. Click Run QA to refresh findings.")
+            win._mark_qa_findings_stale_for_rows(top_left.row(), bottom_right.row())
 
 
 def _on_selection_changed(win, current, previous) -> None:
@@ -2524,22 +2613,6 @@ def _selected_rows(win) -> list[int]:
     return sorted(rows)
 
 
-def _mixed_selection_status_text(win) -> str | None:
-    if not win._current_model:
-        return None
-    status_for_row = getattr(win._current_model, "status_for_row", None)
-    if not callable(status_for_row):
-        return None
-    rows = win._selected_rows()
-    if len(rows) < 2:
-        return None
-    statuses = {status_for_row(row) for row in rows}
-    statuses.discard(None)
-    if len(statuses) <= 1:
-        return None
-    return f"Selection: mixed ({len(rows)} rows)"
-
-
 def _update_status_bar(win) -> None:
     parts: list[str] = []
     if win._last_saved_text:
@@ -2550,8 +2623,6 @@ def _update_status_bar(win) -> None:
         idx = win.table.currentIndex()
         if idx.isValid():
             parts.append(f"Row {idx.row() + 1} / {win._current_model.rowCount()}")
-    if mixed_selection := _mixed_selection_status_text(win):
-        parts.append(mixed_selection)
     if win._current_pf:
         try:
             rel = win._current_pf.path.relative_to(win._root)

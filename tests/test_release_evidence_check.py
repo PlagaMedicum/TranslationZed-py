@@ -401,6 +401,53 @@ def test_release_evidence_manifest_fails_for_stale_tracked_hash(tmp_path: Path) 
     assert any("make release-evidence-sync" in item for item in errors)
 
 
+def test_release_evidence_manifest_allows_metadata_only_scenario_drift(
+    tmp_path: Path,
+) -> None:
+    """Manual evidence should not rerun for pytest-selector-only metadata changes."""
+    module = _load_module()
+    repo_root = tmp_path / "repo"
+    manifest, registry = _write_valid_manifest_set(repo_root)
+    payload = json.loads(registry.read_text(encoding="utf-8"))
+    payload["scenarios"][0]["automation_pytest_selectors"] = [
+        "tests/test_gui_smoke.py",
+        "tests/test_gui_edit_save.py",
+    ]
+    _write_json(registry, payload)
+
+    errors = module.validate_release_evidence_manifest(
+        repo_root=repo_root,
+        manifest_path=manifest,
+        registry_path=registry,
+    )
+
+    assert errors == []
+
+
+def test_release_evidence_manifest_ignores_extra_historical_hash_rows(
+    tmp_path: Path,
+) -> None:
+    """Narrowed manual tracking should ignore old extra rows in synced evidence."""
+    module = _load_module()
+    repo_root = tmp_path / "repo"
+    manifest, registry = _write_valid_manifest_set(repo_root)
+    payload = json.loads(registry.read_text(encoding="utf-8"))
+    payload["scenarios"][0]["tracked_repo_files"] = [
+        "tests/fixtures/manual_workflow/RU/ui.txt",
+    ]
+    _write_json(registry, payload)
+    removed_manual_file = repo_root / "translationzed_py" / "gui" / "main_window.py"
+    removed_manual_file.write_text("MAIN = 2\n", encoding="utf-8")
+
+    errors = module.validate_release_evidence_manifest(
+        repo_root=repo_root,
+        manifest_path=manifest,
+        registry_path=registry,
+    )
+
+    assert errors == []
+
+
 def test_release_evidence_manifest_fails_when_run_scenario_payload_drifts(
     tmp_path: Path,
 ) -> None:

@@ -55,13 +55,6 @@
         "tests/test_gui_service_adapters.py"
       ]
     },
-    "status_triage": {
-      "description": "Status-triage selection and status-bar behavior must remain covered.",
-      "selectors": [
-        "tests/test_main_window_cache_replace_helpers.py",
-        "tests/test_gui_service_adapters.py"
-      ]
-    },
     "tzp_writeback": {
       "description": "TZP opt-in comment writeback contracts must remain covered.",
       "selectors": [

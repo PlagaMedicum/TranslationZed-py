@@ -159,10 +159,7 @@ Release evidence policy references:
 - Status-bar text contract checks:
     - default fallback text is `Ready to edit`,
     - operational message text and scope indicators coexist with progress strip,
-    - current-file encoding is visible while a file is open,
-    - mixed multi-row status selection appends
-      `Selection: mixed (N rows)` only while selection contains at least two rows
-      with more than one status value.
+    - current-file encoding is visible while a file is open.
 - Empty-state coverage:
     - main content quick-start placeholder is visible before first file open and
     hidden when a file table is loaded.
@@ -215,7 +212,8 @@ Release evidence policy references:
     needs to inspect saved output on disk,
   - `focus_files` and `tracked_repo_files` are distinct:
     `focus_files` are fixture files the developer must touch,
-    `tracked_repo_files` are repo files whose hashes gate evidence relevance.
+    `tracked_repo_files` are repo files whose hashes gate manual-evidence
+    relevance after focused automated coverage is accounted for.
 - Fixture policy is normative:
   - generic fixture root is `tests/fixtures/manual_workflow/`,
   - `manual_workflow` is locale-diverse and not BE-only,
@@ -271,8 +269,13 @@ Release evidence policy references:
   - sync/update command: `make release-evidence-sync SCENARIO=<id>` or
     `make release-evidence-sync-all`,
   - required scenarios are pass-only and interactive (`headless=false`, non-`auto-only` mode).
-  - tracked-file relevance is strict: if any `tracked_repo_files` hash drifts,
-    release evidence is stale and the scenario must be re-run then re-synced.
+  - tracked-file relevance is strict for the current `tracked_repo_files`: if one
+    of those hashes drifts, release evidence is stale and the scenario must be
+    re-run then re-synced.
+  - `tracked_repo_files` and `automation_pytest_selectors` are metadata for
+    release-evidence compatibility. Narrowing tracked files or adding focused
+    pytest selectors does not by itself require a fresh manual run when the
+    current tracked hashes remain valid.
 - LLM/Developer Control Boundary (normative):
   - LLM may prepare plans, run non-interactive gates, and produce draft command sequences.
   - For LLM/agent shell execution, prefer `rtk <command>` when RTK is available.

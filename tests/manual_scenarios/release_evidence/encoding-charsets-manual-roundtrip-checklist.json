@@ -1,0 +1,39 @@
+{
+  "all_steps": [
+    "Open RU/IG_UI_RU.txt and confirm the status bar shows the current file encoding before editing.",
+    "Replace one RU value with a real Cyrillic phrase such as `\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0438\u0433\u0440\u0443`, use General -> Save, and choose Write to file if prompted.",
+    "Open KO/IG_UI_KO.txt, confirm the status bar shows the current file encoding, replace one KO value with a real Korean phrase such as `\uc124\uc815\uc744 \uc800\uc7a5`, then save with Write to file if prompted.",
+    "Open PTBR/IG_UI_PTBR.txt, confirm the status bar shows the current file encoding, replace one PT-BR value with a real Cp1252-safe phrase such as `Salvar altera\u00e7\u00f5es`, then save with Write to file if prompted.",
+    "Switch back through RU/IG_UI_RU.txt, KO/IG_UI_KO.txt, and PTBR/IG_UI_PTBR.txt.",
+    "Confirm each edited value remains readable with no mojibake after the roundtrip."
+  ],
+  "checked_expected_checks": [
+    "No parse or decode error dialogs appear while opening mixed encodings.",
+    "Status bar shows the current file encoding for each opened file.",
+    "Edits in Cp1251, UTF-16, and Cp1252 files persist after save.",
+    "Returning to the edited files does not show mojibake or broken open-save behavior."
+  ],
+  "checked_steps": [
+    "Open RU/IG_UI_RU.txt and confirm the status bar shows the current file encoding before editing.",
+    "Replace one RU value with a real Cyrillic phrase such as `\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0438\u0433\u0440\u0443`, use General -> Save, and choose Write to file if prompted.",
+    "Open KO/IG_UI_KO.txt, confirm the status bar shows the current file encoding, replace one KO value with a real Korean phrase such as `\uc124\uc815\uc744 \uc800\uc7a5`, then save with Write to file if prompted.",
+    "Open PTBR/IG_UI_PTBR.txt, confirm the status bar shows the current file encoding, replace one PT-BR value with a real Cp1252-safe phrase such as `Salvar altera\u00e7\u00f5es`, then save with Write to file if prompted.",
+    "Switch back through RU/IG_UI_RU.txt, KO/IG_UI_KO.txt, and PTBR/IG_UI_PTBR.txt.",
+    "Confirm each edited value remains readable with no mojibake after the roundtrip."
+  ],
+  "completed_at_ms": 1782247757644,
+  "expected_checks": [
+    "No parse or decode error dialogs appear while opening mixed encodings.",
+    "Status bar shows the current file encoding for each opened file.",
+    "Edits in Cp1251, UTF-16, and Cp1252 files persist after save.",
+    "Returning to the edited files does not show mojibake or broken open-save behavior."
+  ],
+  "fixture_root": "prod_like",
+  "notes": "",
+  "project_root": "/tmp/tzp-manual-encoding-charsets-manual-roundtrip-jr1zgu_n/project",
+  "result": "passed",
+  "run_token": "encoding-charsets-manual-roundtrip-1782246988537",
+  "scenario_id": "encoding-charsets-manual-roundtrip",
+  "title": "Manual encoding and charset roundtrip verification",
+  "version": 1
+}
