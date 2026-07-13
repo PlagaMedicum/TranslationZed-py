@@ -10,7 +10,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QListWidgetItem, QMessageBox, QSplitter
 
-from translationzed_py.core import preferences
+import translationzed_py.core.preferences as preferences
 from translationzed_py.core.model import Status
 from translationzed_py.core.tm_query_contracts import (
     TMExplainability,

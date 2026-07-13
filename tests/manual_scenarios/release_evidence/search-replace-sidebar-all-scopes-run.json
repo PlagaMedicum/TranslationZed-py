@@ -1,7 +1,7 @@
 {
   "auto_return_code": null,
-  "completed_at_ms": 1782258373590,
-  "fixture_copy_root": "/tmp/tzp-manual-search-replace-sidebar-all-scopes-4r7q_arr/project",
+  "completed_at_ms": 1783958763457,
+  "fixture_copy_root": "/tmp/tzp-manual-search-replace-sidebar-all-scopes-q6ctoajq/project",
   "manual_all_steps": [
     "Open RU/search_scope.txt, switch to the Search panel, enter search text `target word`, and enter replacement text `release word`.",
     "Confirm toolbar and sidebar search controls stay synchronized in both directions.",
@@ -26,7 +26,7 @@
     "Run Replace All again, change the dialog Replace scope to Locale, confirm the counts/preview update live, tick the review checkbox, and apply the replacement.",
     "Open RU/search_scope_extra.txt and KO/search_scope.txt to confirm both RU files changed to `release word` while KO/search_scope.txt still contains `target word`."
   ],
-  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/search-replace-sidebar-all-scopes-search-replace-sidebar-all-scopes-1782256928841-1782258373288.json",
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/search-replace-sidebar-all-scopes-search-replace-sidebar-all-scopes-1783958550466-1783958763278.json",
   "manual_expected_checks": [
     "Toolbar and sidebar search controls remain synchronized in both directions.",
     "Confirm Replace All is wide enough to read the per-file list and impact preview.",
@@ -38,7 +38,7 @@
   "manual_notes": "",
   "manual_outcome": "passed",
   "manual_return_code": 0,
-  "manual_run_token": "search-replace-sidebar-all-scopes-1782256928841",
+  "manual_run_token": "search-replace-sidebar-all-scopes-1783958550466",
   "mode": "manual",
   "scenario": {
     "automation_pytest_selectors": [
@@ -87,7 +87,6 @@
     "title": "Search+replace sidebar flow with all replace scopes",
     "tracked_repo_files": [
       "translationzed_py/core/search_replace_service.py",
-      "translationzed_py/gui/main_window_panel_helpers.py",
       "translationzed_py/gui/dialogs.py",
       "tests/fixtures/manual_workflow/RU/search_scope.txt",
       "tests/fixtures/manual_workflow/RU/search_scope_extra.txt",
@@ -114,11 +113,7 @@
     },
     {
       "path": "translationzed_py/gui/dialogs.py",
-      "sha256": "b00f63f58dccdfa6d578fc2a5490a60ef34ccf82dd113f04e783fb0ad054c3b2"
-    },
-    {
-      "path": "translationzed_py/gui/main_window_panel_helpers.py",
-      "sha256": "8a386d7526eda63f3e84ccea0e9094e13f0996122a3e8a6a6fd0b1fee1ea528e"
+      "sha256": "2953269070976f5491a322f70ac16c927a66e6b66167042df03c121e82d2aab2"
     }
   ],
   "version": 1

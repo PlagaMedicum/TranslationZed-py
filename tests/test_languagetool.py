@@ -7,7 +7,7 @@ import urllib.error
 
 import pytest
 
-from translationzed_py.core import languagetool as lt
+import translationzed_py.core.languagetool as lt
 
 
 def test_validate_server_url_allows_https_and_local_http() -> None:

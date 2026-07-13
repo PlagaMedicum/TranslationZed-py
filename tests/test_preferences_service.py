@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from translationzed_py.core import preferences
+import translationzed_py.core.preferences as preferences
 from translationzed_py.core.preferences_service import (
     PreferencesService,
     build_persist_payload,

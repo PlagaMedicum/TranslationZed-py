@@ -854,7 +854,7 @@ def test_tm_store_query_fails_when_explainability_order_is_corrupted(
         target_locale="BE",
         file_path=str(file_path),
     )
-    from translationzed_py.core import tm_query_engine
+    import translationzed_py.core.tm_query_engine as tm_query_engine
 
     original_sort = tm_query_engine.sort_scored_candidates
 

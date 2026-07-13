@@ -1,7 +1,7 @@
 {
   "auto_return_code": null,
-  "completed_at_ms": 1783468890803,
-  "fixture_copy_root": "/tmp/tzp-manual-qa-checklist-manual-run-qq9_kfqx/project",
+  "completed_at_ms": 1783958534327,
+  "fixture_copy_root": "/tmp/tzp-manual-qa-checklist-manual-run-uzlqpx62/project",
   "manual_all_steps": [
     "Open RU/ui.txt from the Project tree and confirm the QA panel shows the pre-run manual message.",
     "Press Run QA and observe rule-state progress in fixed order until the run completes.",
@@ -23,7 +23,7 @@
     "Edit one translation that has a QA finding and confirm only that row's stale finding is removed while unrelated findings stay visible and a notice explains that edited rows need QA again because old findings are hidden until rerun.",
     "Press Run QA again and confirm the findings list refreshes for the edited file."
   ],
-  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1783468689370-1783468890602.json",
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1783958383033-1783958534136.json",
   "manual_expected_checks": [
     "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
     "Rule-state progress follows the queued, running, and completed sequence during the run.",
@@ -34,7 +34,7 @@
   "manual_notes": "",
   "manual_outcome": "passed",
   "manual_return_code": 0,
-  "manual_run_token": "qa-checklist-manual-run-1783468689370",
+  "manual_run_token": "qa-checklist-manual-run-1783958383033",
   "mode": "manual",
   "scenario": {
     "automation_pytest_selectors": [
@@ -102,7 +102,7 @@
     },
     {
       "path": "translationzed_py/gui/main_window_panel_helpers.py",
-      "sha256": "bf02061a10d9b400e9820bb06ced5158a85666c4f3023dbc5de13dd846a9c951"
+      "sha256": "233d051e446674fe75e28b5196d33f81e821cc42dcca45e140257496efc6195f"
     },
     {
       "path": "translationzed_py/gui/qa_async.py",

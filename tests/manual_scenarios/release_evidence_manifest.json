@@ -26,12 +26,12 @@
       "checklist_record": "tests/manual_scenarios/release_evidence/qa-checklist-manual-run-checklist.json",
       "interactive": true,
       "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
-      "recorded_at_ms": 1783468890803,
+      "recorded_at_ms": 1783958534327,
       "result": "passed",
       "run_record": "tests/manual_scenarios/release_evidence/qa-checklist-manual-run-run.json",
       "scenario_id": "qa-checklist-manual-run",
-      "source_checklist_artifact": "artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1783468689370-1783468890602.json",
-      "source_run_artifact": "artifacts/manual-ui/qa-checklist-manual-run-run-1783468890803.json"
+      "source_checklist_artifact": "artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1783958383033-1783958534136.json",
+      "source_run_artifact": "artifacts/manual-ui/qa-checklist-manual-run-run-1783958534327.json"
     },
     {
       "checklist_record": "tests/manual_scenarios/release_evidence/encoding-charsets-manual-roundtrip-checklist.json",
@@ -81,12 +81,12 @@
       "checklist_record": "tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-checklist.json",
       "interactive": true,
       "notes": "A35 interactive release-evidence closure record.",
-      "recorded_at_ms": 1782258373590,
+      "recorded_at_ms": 1783958763457,
       "result": "passed",
       "run_record": "tests/manual_scenarios/release_evidence/search-replace-sidebar-all-scopes-run.json",
       "scenario_id": "search-replace-sidebar-all-scopes",
-      "source_checklist_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-search-replace-sidebar-all-scopes-1782256928841-1782258373288.json",
-      "source_run_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-run-1782258373590.json"
+      "source_checklist_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-search-replace-sidebar-all-scopes-1783958550466-1783958763278.json",
+      "source_run_artifact": "artifacts/manual-ui/search-replace-sidebar-all-scopes-run-1783958763457.json"
     },
     {
       "checklist_record": "tests/manual_scenarios/release_evidence/search-replace-impact-preview-safe-apply-checklist.json",

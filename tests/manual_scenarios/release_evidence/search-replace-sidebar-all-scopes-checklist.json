@@ -23,7 +23,7 @@
     "Run Replace All again, change the dialog Replace scope to Locale, confirm the counts/preview update live, tick the review checkbox, and apply the replacement.",
     "Open RU/search_scope_extra.txt and KO/search_scope.txt to confirm both RU files changed to `release word` while KO/search_scope.txt still contains `target word`."
   ],
-  "completed_at_ms": 1782258373288,
+  "completed_at_ms": 1783958763278,
   "expected_checks": [
     "Toolbar and sidebar search controls remain synchronized in both directions.",
     "Confirm Replace All is wide enough to read the per-file list and impact preview.",
@@ -34,9 +34,9 @@
   ],
   "fixture_root": "manual_workflow",
   "notes": "",
-  "project_root": "/tmp/tzp-manual-search-replace-sidebar-all-scopes-4r7q_arr/project",
+  "project_root": "/tmp/tzp-manual-search-replace-sidebar-all-scopes-q6ctoajq/project",
   "result": "passed",
-  "run_token": "search-replace-sidebar-all-scopes-1782256928841",
+  "run_token": "search-replace-sidebar-all-scopes-1783958550466",
   "scenario_id": "search-replace-sidebar-all-scopes",
   "title": "Search+replace sidebar flow with all replace scopes",
   "version": 1

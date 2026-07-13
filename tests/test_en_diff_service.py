@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from translationzed_py.core import en_diff_service
+import translationzed_py.core.en_diff_service as en_diff_service
 from translationzed_py.core.en_diff_snapshot import hash_key, hash_text
 
 

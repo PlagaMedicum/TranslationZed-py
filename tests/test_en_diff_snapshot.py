@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from translationzed_py.core import en_diff_snapshot
+import translationzed_py.core.en_diff_snapshot as en_diff_snapshot
 
 
 def test_snapshot_roundtrip_and_update_file(tmp_path: Path) -> None:

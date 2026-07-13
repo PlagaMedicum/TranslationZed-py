@@ -9,15 +9,20 @@ mkdir -p "$ARTIFACTS_DIR"
 MODE="${MUTATION_SCORE_MODE:-warn}"
 MIN_KILLED_PERCENT="${MUTATION_MIN_KILLED_PERCENT:-0}"
 
+# mutmut persists generated mutants and per-mutant metadata under ./mutants.
+# Start from a clean tree so interrupted or partial prior runs cannot poison
+# the next release attempt with corrupt meta files.
+rm -rf "$ROOT_DIR/mutants"
+
 if ! "$VENV_PY" -m mutmut --help >/dev/null 2>&1; then
   echo "mutmut is unavailable in this environment; skipping advisory mutation run."
   exit 0
 fi
 
 set +e
-"$VENV_PY" -m mutmut run >"$ARTIFACTS_DIR/mutmut-run.log" 2>&1
+"$VENV_PY" scripts/mutmut_wrapper.py run >"$ARTIFACTS_DIR/mutmut-run.log" 2>&1
 run_status=$?
-"$VENV_PY" -m mutmut results >"$ARTIFACTS_DIR/mutmut-results.txt" 2>&1
+"$VENV_PY" scripts/mutmut_wrapper.py results >"$ARTIFACTS_DIR/mutmut-results.txt" 2>&1
 results_status=$?
 "$VENV_PY" scripts/mutation_summary.py \
   --run-log "$ARTIFACTS_DIR/mutmut-run.log" \

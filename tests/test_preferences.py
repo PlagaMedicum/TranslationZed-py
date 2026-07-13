@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from translationzed_py.core import preferences
+import translationzed_py.core.preferences as preferences
 
 
 def test_load_is_pure_read_for_missing_settings_env(

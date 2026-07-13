@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from translationzed_py.core import app_config
+import translationzed_py.core.app_config as app_config
 
 
 def _write_config(tmp_path: Path, text: str) -> None:

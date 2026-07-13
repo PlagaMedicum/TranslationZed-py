@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from translationzed_py.core import project_session as project_session_module
-from translationzed_py.core import session_resume as session_resume_module
-from translationzed_py.core import status_cache
+import translationzed_py.core.project_session as project_session_module
+import translationzed_py.core.session_resume as session_resume_module
+import translationzed_py.core.status_cache as status_cache
 from translationzed_py.core.model import Entry, Status
 from translationzed_py.core.project_session import (
     CacheMigrationBatchCallbacks,

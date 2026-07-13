@@ -1586,6 +1586,23 @@ def test_conflict_choice_dialog_manual_scenario_path_preserves_helper_interactio
     assert _FakeLoop.instances[0].quit_called is True
 
 
+def test_exec_conflict_choice_dialog_tolerates_none_exec_result(
+    qtbot, tmp_path
+) -> None:
+    """Plain conflict dialog adapter should treat None exec results as rejected."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+
+    class _FakeDialog:
+        def exec(self):
+            return None
+
+    result = win._exec_conflict_choice_dialog(_FakeDialog())
+
+    assert result == int(QDialog.DialogCode.Rejected)
+
+
 def test_resolve_conflicts_drop_cache_delegates_persist_execution(
     qtbot, tmp_path, monkeypatch
 ):

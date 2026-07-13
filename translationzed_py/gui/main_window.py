@@ -4560,7 +4560,10 @@ class MainWindow(QMainWindow):
     def _exec_conflict_choice_dialog(self, dialog: ConflictChoiceDialog) -> int:
         """Run conflict choice UI while preserving manual checklist interaction."""
         if getattr(self, "_manual_scenario_runtime", None) is None:
-            return int(dialog.exec())
+            code = dialog.exec()
+            if code is None:
+                return int(QDialog.DialogCode.Rejected)
+            return int(code)
         dialog.setWindowModality(Qt.WindowModality.WindowModal)
         result = {"code": int(QDialog.DialogCode.Rejected)}
         loop = QEventLoop()
