@@ -29,6 +29,23 @@ def test_ci_workflow_uses_layered_gate_commands() -> None:
     assert "make verify-heavy" not in text
 
 
+def test_ci_workflow_keeps_release_tags_out_of_branch_ci() -> None:
+    """Release tags should run their L6 workflow without duplicating ordinary CI."""
+    text = _read(".github/workflows/ci.yml")
+    trigger = text.split("jobs:", 1)[0]
+    assert 'push:\n    branches:\n      - "**"' in trigger
+    assert "tags:" not in trigger
+
+
+def test_manual_contract_ci_job_has_headless_qt_prerequisites() -> None:
+    """Selector collection imports GUI modules and needs Linux Qt runtime libraries."""
+    text = _read(".github/workflows/ci.yml")
+    job = text.split("  manual-contract:", 1)[1].split("\n  ci-pr:", 1)[0]
+    assert "run: make ci-deps" in job
+    assert 'echo "QT_QPA_PLATFORM=offscreen" >> $GITHUB_ENV' in job
+    assert job.index("run: make ci-deps") < job.index("make test-ui-manual-contract")
+
+
 def test_release_workflows_use_gate_release() -> None:
     """Release and RC workflows should use strict L6 gate-release entrypoint."""
     release = _read(".github/workflows/release.yml")

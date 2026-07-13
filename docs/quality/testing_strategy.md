@@ -43,7 +43,7 @@ Policy registry (machine-checked):
 | `L1` | pre-commit hook/manual | `make gate-commit` | `L0` + manual-contract guard | blocking | hook output | no broad deterministic suite |
 | `L2` | pre-push hook/manual | `make gate-push` | `L1` + fixed core + routed packets + readonly guard | blocking | routed lane logs | fixed core once + routed dedupe |
 | `L3` | task/docs closure | `make gate-task-close` | `L2` + `test-cov` + `docs-check` + perf-contract | blocking | coverage/docs artifacts | single `test-cov`, single `docs-check` |
-| `L4` | PR/push strict CI | `make gate-ci-pr` | full static + coverage + docs + security + perf + manual contract | blocking | `artifacts/**` | no routed packet duplication in strict CI |
+| `L4` | PR/branch-push strict CI | `make gate-ci-pr` | full static + coverage + docs + security + perf + manual contract | blocking | `artifacts/**` | no routed packet duplication in strict CI; tag pushes are owned by `L6` workflows |
 | `L5` | scheduled/manual heavy | `make gate-heavy-advisory` | `test-prop-slow`, heavy perf, staged mutation | advisory | heavy artifacts | heavy extras once per run |
 | `L6` | RC/final tag | `make gate-release TAG=vX.Y.Z` | `L4` + strict bench + strict heavy + release checks | blocking | release reports + evidence manifest | single release metadata/evidence path |
 

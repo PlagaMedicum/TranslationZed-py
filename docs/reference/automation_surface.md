@@ -20,7 +20,7 @@ Machine-checked layer registry:
 | `L1` | before commit | `make gate-commit` | `L0` + manual contract guard |
 | `L2` | before push | `make gate-push` | `L1` + fixed core + routed packet scripts + readonly guard |
 | `L3` | before task/docs close | `make gate-task-close` | `L2` + coverage + docs + perf-contract |
-| `L4` | PR/push strict CI | `make gate-ci-pr` | full static + coverage + docs + security + perf-contract |
+| `L4` | PR/branch-push strict CI | `make gate-ci-pr` | full static + coverage + docs + security + perf-contract; tag pushes use `L6` release workflows |
 | `L5` | scheduled/manual heavy | `make gate-heavy-advisory` | advisory heavy randomized/perf/mutation extras |
 | `L6` | RC/final release | `make gate-release TAG=vX.Y.Z` | strict release path |
 
