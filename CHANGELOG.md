@@ -2,22 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.9.0] - 2026-03-06
+## [0.9.0] - 2026-07-13
 
 ### Added
-- QA live checklist pipeline across core, async, and UI header rendering (queued/running/terminal per-rule visibility with deterministic ordering).
-- TM explainability payloads and deterministic scoring guards for exact/fuzzy paths.
-- TM workflow UX upgrades: grouping modes, grouped-list-safe quick actions, and explanation preview panel.
-- Crash-recovery UC-12 flow with startup decision dialog (`Restore`, `Discard`, `Cancel`) and deterministic apply-plan execution contracts.
-- Packet-focused Makefile lanes for v0.9 workstreams (`test-qa-v09`, `test-tmq-v09`, `test-tmw-v09`, `test-cr-v09`).
+- QA now shows which checks are waiting, running, finished, skipped, or failed.
+- QA now shows a short result summary when a check is finished. You can also limit the number of results when working with large files.
+- Translation Memory can now explain why a suggestion matched and how it received its score.
+- TM suggestions can be grouped by source or score. You can move between them and apply them with the keyboard.
+- Crash recovery now appears after an interrupted session. You can restore your drafts, discard them, or cancel opening the project.
+- The app can restore the last open file and your previous workspace when started again.
+- Search and Replace controls are now available in the Search sidebar as well as the toolbar.
+- Replace All can work on the current file, the current locale, or the whole translation project.
+- A preview now shows which files and rows will change before Replace All is applied.
+- A new option can save `TZP:` translation status comments inside locale files. This is disabled by default.
+- The status bar now shows when selected rows have different translation statuses.
+- The status bar now shows the encoding of the current file.
 
 ### Changed
-- v0.9 canonical docs/spec/plan references synchronized to implemented packet state and release-readiness audit flow.
-- Verification evidence chain hardened for v0.9 closure (`docs-check`, `verify`, `verify-ci`).
+- QA progress takes less space and is easier to read.
+- Manual QA checks show a result popup. Automatic checks report quietly in the status bar.
+- The Source column now shows only the source locale you selected. If that locale has no matching file, the column stays empty instead of showing text from another locale.
+- Replace All now asks you to confirm where it should run and review the changes before applying them.
+- Translation Memory shows clearer messages when there are no suggestions or when something goes wrong.
+- Old or missing preferences are cleaned up automatically.
+- Opening files, parsing translations, and searching are faster and more reliable.
 
 ### Fixed
-- Restored missing packet-history coherence for executed QA checklist packet (`A19-V9-QA-3`) in implementation history.
-- Eliminated borderline core coverage drift around release gates by expanding deterministic `project_session` branch coverage.
+- Fixed old QA results appearing after switching files or starting another check.
+- Fixed translation statuses changing more than once when automatic QA marking is enabled.
+- Fixed startup problems when saved session data is broken or refers to a missing file.
+- Fixed incorrect Source column behavior when the selected source locale has no matching file.
+- Fixed several Replace All problems related to the selected area and previewed changes.
+- Fixed several editor and dialog problems that could appear while opening projects or working with unsaved changes.
 
 ## [0.8.0] - 2026-03-04
 
