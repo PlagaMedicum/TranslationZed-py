@@ -12,7 +12,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
 import xxhash
-from PySide6.QtCore import QItemSelectionModel, Qt, QTimer
+from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut, QTextOption
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -1826,6 +1826,20 @@ def _apply_session_resume_active_context(
         or win._current_model is None
     ):
         return False
+    ancestors: list[QModelIndex] = []
+    parent = index.parent()
+    while parent.isValid():
+        ancestors.append(parent)
+        parent = parent.parent()
+    for ancestor in reversed(ancestors):
+        win.tree.expand(ancestor)
+    tree_selection = win.tree.selectionModel()
+    if tree_selection is not None:
+        tree_selection.setCurrentIndex(
+            index,
+            QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+        )
+        win.tree.scrollTo(index, QAbstractItemView.PositionAtCenter)
     if active_row is None:
         return True
     row = int(active_row)

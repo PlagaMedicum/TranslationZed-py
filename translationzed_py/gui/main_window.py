@@ -2088,8 +2088,16 @@ class MainWindow(QMainWindow):
             self._selected_locales = []
             return
 
+        resume_locales: Iterable[str] = ()
+        if selected_locales is None and self._session_resume_startup_pending:
+            snapshot = self._project_session_service.read_session_resume_snapshot(
+                root=self._root
+            )
+            if snapshot is not None:
+                resume_locales = snapshot.selected_locales
         selected_locales = self._project_session_service.resolve_requested_locales(
             requested_locales=selected_locales,
+            resume_locales=resume_locales,
             last_locales=self._last_locales,
             available_locales=self._locales.keys(),
             smoke_mode=self._smoke,

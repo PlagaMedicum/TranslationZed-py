@@ -43,6 +43,7 @@ stateDiagram-v2
 | Goal | Switch left sidebar mode with minimal friction. |
 | Trigger | Click `Project`, `TM`, `Search`, or `QA`. |
 | Success | Stack switches mode, width/visibility are preserved, and panel-specific refresh behavior executes. |
+| Startup | The app always starts on `Project`; TM activation work begins only after an explicit `TM` click. |
 
 ## UC-13b TM Suggestions Query
 
@@ -101,7 +102,7 @@ stateDiagram-v2
 | Goal | Rebuild project-origin TM from EN and selected locale files. |
 | Trigger | `General -> Preferences -> TM -> Rebuild TM` or TM panel rebuild button. |
 | Success | Background rebuild with progress reporting, cache clear, and panel refresh after completion. |
-| Note | First TM panel activation in a session can auto-bootstrap stale/partial DB state. |
+| Note | The first explicit TM panel activation in a session can auto-bootstrap stale/partial DB state; startup never triggers it. |
 
 ## UC-13i TM Filters
 

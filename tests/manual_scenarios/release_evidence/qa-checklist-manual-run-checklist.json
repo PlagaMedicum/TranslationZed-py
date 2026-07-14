@@ -20,7 +20,7 @@
     "Edit one translation that has a QA finding and confirm only that row's stale finding is removed while unrelated findings stay visible and a notice explains that edited rows need QA again because old findings are hidden until rerun.",
     "Press Run QA again and confirm the findings list refreshes for the edited file."
   ],
-  "completed_at_ms": 1783958534136,
+  "completed_at_ms": 1784022525529,
   "expected_checks": [
     "Pre-run QA message indicates manual QA mode for RU/ui.txt.",
     "Rule-state progress follows the queued, running, and completed sequence during the run.",
@@ -30,9 +30,9 @@
   ],
   "fixture_root": "qa_manual",
   "notes": "",
-  "project_root": "/tmp/tzp-manual-qa-checklist-manual-run-uzlqpx62/project",
+  "project_root": "/tmp/tzp-manual-qa-checklist-manual-run-o_tc5r4k/project",
   "result": "passed",
-  "run_token": "qa-checklist-manual-run-1783958383033",
+  "run_token": "qa-checklist-manual-run-1784022481450",
   "scenario_id": "qa-checklist-manual-run",
   "title": "Manual QA run, navigation, and stale-message refresh flow",
   "version": 1

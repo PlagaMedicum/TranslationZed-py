@@ -34,9 +34,15 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
   where **Source** is the English string by default; **EN is not editable**.
 - One file open at a time in the table (no tabs in current scope).
 - On startup, apply project-scoped workspace session snapshot first (if valid),
+  automatically reuse its available target-locale pool without showing the locale chooser,
   then fallback to opening the **most recently opened file** across selected locales
   when snapshot does not restore file context.
   Last-opened timestamp is stored in each file’s cache header for deterministic fallback lookup.
+- A restored active file expands only its tree ancestors, becomes the current tree
+  selection, and is scrolled into view.
+- Startup always shows the **Project** side panel. Session resume restores file and
+  workspace context but does not reactivate TM, Search, or QA panels; TM store setup,
+  import sync, bootstrap, and queries remain deferred until an explicit TM-panel click.
 - Status per Entry: **Untouched** (initial state), **For review**, **Translated**, **Proofread**.
   Future statuses remain pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
@@ -909,8 +915,10 @@ UNTOUCHED).
      `TMWorkflowService.format_rebuild_status` (no direct
      `core.tm_rebuild.format_rebuild_status` helper import in GUI).
    - UI can rebuild project TM by scanning selected locales and pairing target entries with EN source.
-   - Auto‑bootstrap runs once per session on first TM-panel activation for selected locales
+   - Auto‑bootstrap runs once per session on the first explicit TM-panel activation for selected locales
      (even if DB already has entries), to prevent stale/partial project-index behavior.
+   - Startup/session resume never activates the TM panel or performs TM store setup,
+     import synchronization, bootstrap, rebuild, or query work.
    - Rebuild/bootstrapping runs asynchronously (background worker).
 - Related UCs: UC-13a, UC-13b, UC-13c, UC-13d, UC-13e, UC-13f, UC-13g, UC-13h, UC-13i, UC-13j, UC-13k.
 

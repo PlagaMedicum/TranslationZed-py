@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -978,8 +979,136 @@ def test_apply_session_resume_snapshot_restores_file_row_and_keeps_no_write_on_o
     assert win._current_pf.path == root / "BE" / "ui.txt"
     assert win.table.currentIndex().isValid()
     assert win.table.currentIndex().row() == 0
+    tree_index = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    assert tree_index.isValid()
+    assert win.tree.isExpanded(tree_index.parent())
+    assert win.tree.currentIndex() == tree_index
     assert win.search_edit.text() == "query"
     assert win.replace_edit.text() == "replace"
+
+
+def test_legacy_tm_session_starts_on_project_and_defers_tm_until_click(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify startup stays lightweight while an explicit TM click retains lazy activation."""
+    root = _make_project(tmp_path)
+    resume_path = root / ".tzp" / "cache" / "session.resume.json"
+    resume_path.parent.mkdir(parents=True)
+    resume_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "generated_at_ms": 1,
+                "selected_locales": ["BE"],
+                "active_file_relpath": "BE/ui.txt",
+                "active_row": 0,
+                "left_panel_index": mw._LEFT_PANEL_TM,
+                "detail_visible": False,
+                "search_text": "",
+                "replace_text": "",
+                "search_case_sensitive": False,
+                "tm_min_score": 50,
+                "tm_grouping_mode": "none",
+                "tm_origin_project": True,
+                "tm_origin_import": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(
+        mw.MainWindow,
+        "_ensure_tm_store",
+        lambda _self: (calls.append("ensure"), True)[1],
+    )
+    monkeypatch.setattr(
+        mw.MainWindow,
+        "_sync_tm_import_folder",
+        lambda _self, **_kwargs: calls.append("sync"),
+    )
+    monkeypatch.setattr(
+        mw.MainWindow,
+        "_maybe_bootstrap_tm",
+        lambda _self: calls.append("bootstrap"),
+    )
+
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    qtbot.waitUntil(lambda: not win._session_resume_startup_pending)
+
+    assert win._left_stack.currentIndex() == mw._LEFT_PANEL_FILES
+    assert win._left_files_btn.isChecked()
+    assert win._tm_bootstrap_pending is True
+    assert win._tm_store is None
+    assert win._tm_query_future is None
+    assert not win._tm_update_timer.isActive()
+    assert calls == []
+
+    win._left_tm_btn.click()
+
+    assert win._left_stack.currentIndex() == mw._LEFT_PANEL_TM
+    assert win._tm_bootstrap_pending is False
+    assert calls == ["ensure", "sync", "bootstrap"]
+
+
+def test_startup_reuses_session_locale_pool_without_showing_chooser(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify a valid saved locale pool is resolved before interactive startup."""
+    root = _make_project(tmp_path)
+    (root / "RU").mkdir()
+    (root / "RU" / "language.txt").write_text(
+        "text = Russian,\ncharset = UTF-8,\n", encoding="utf-8"
+    )
+    (root / "RU" / "ui.txt").write_text('UI_OK = "Да"\n', encoding="utf-8")
+    resume_path = root / ".tzp" / "cache" / "session.resume.json"
+    resume_path.parent.mkdir(parents=True)
+    resume_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "generated_at_ms": 1,
+                "selected_locales": ["BE", "RU"],
+                "active_file_relpath": "BE/ui.txt",
+                "active_row": 0,
+                "left_panel_index": mw._LEFT_PANEL_TM,
+                "detail_visible": False,
+                "search_text": "",
+                "replace_text": "",
+                "search_case_sensitive": False,
+                "tm_min_score": 50,
+                "tm_grouping_mode": "none",
+                "tm_origin_project": True,
+                "tm_origin_import": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class _UnexpectedLocaleChooser:
+        def __init__(self, *_args, **_kwargs) -> None:
+            raise AssertionError(
+                "locale chooser must not open for a valid session pool"
+            )
+
+    monkeypatch.setattr(mw, "LocaleChooserDialog", _UnexpectedLocaleChooser)
+
+    win = mw.MainWindow(str(root))
+    qtbot.addWidget(win)
+    qtbot.waitUntil(lambda: not win._session_resume_startup_pending)
+
+    assert win._selected_locales == ["BE", "RU"]
+    assert win._left_stack.currentIndex() == mw._LEFT_PANEL_FILES
+    assert win._current_pf is not None
+    assert win._current_pf.path == root / "BE" / "ui.txt"
+    tree_index = win.fs_model.index_for_path(root / "BE" / "ui.txt")
+    assert tree_index.isValid()
+    assert win.tree.isExpanded(tree_index.parent())
+    assert win.tree.currentIndex() == tree_index
 
 
 def test_warn_orphan_caches_purge_deletes_existing_and_ignores_unlink_errors(

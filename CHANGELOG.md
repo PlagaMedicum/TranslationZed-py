@@ -28,6 +28,9 @@ All notable changes to this project will be documented in this file.
 - Opening files, parsing translations, and searching are faster and more reliable.
 
 ### Fixed
+- Fixed the restored file remaining hidden inside a collapsed Project tree on startup.
+- Fixed startup asking for locales and then replacing the choice with the previous session pool.
+- Fixed startup reopening the TM panel and automatically running TM checks before the user requested them.
 - Fixed old QA results appearing after switching files or starting another check.
 - Fixed translation statuses changing more than once when automatic QA marking is enabled.
 - Fixed startup problems when saved session data is broken or refers to a missing file.

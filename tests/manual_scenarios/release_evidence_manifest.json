@@ -26,12 +26,12 @@
       "checklist_record": "tests/manual_scenarios/release_evidence/qa-checklist-manual-run-checklist.json",
       "interactive": true,
       "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
-      "recorded_at_ms": 1783958534327,
+      "recorded_at_ms": 1784022525730,
       "result": "passed",
       "run_record": "tests/manual_scenarios/release_evidence/qa-checklist-manual-run-run.json",
       "scenario_id": "qa-checklist-manual-run",
-      "source_checklist_artifact": "artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1783958383033-1783958534136.json",
-      "source_run_artifact": "artifacts/manual-ui/qa-checklist-manual-run-run-1783958534327.json"
+      "source_checklist_artifact": "artifacts/manual-ui/qa-checklist-manual-run-qa-checklist-manual-run-1784022481450-1784022525529.json",
+      "source_run_artifact": "artifacts/manual-ui/qa-checklist-manual-run-run-1784022525730.json"
     },
     {
       "checklist_record": "tests/manual_scenarios/release_evidence/encoding-charsets-manual-roundtrip-checklist.json",

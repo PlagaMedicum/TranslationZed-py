@@ -117,6 +117,7 @@ class ProjectSessionService:
         self,
         *,
         requested_locales: Iterable[str] | None,
+        resume_locales: Iterable[str] = (),
         last_locales: Iterable[str],
         available_locales: Iterable[str],
         smoke_mode: bool,
@@ -124,6 +125,7 @@ class ProjectSessionService:
         """Resolve requested locales."""
         return resolve_requested_locales(
             requested_locales=requested_locales,
+            resume_locales=resume_locales,
             last_locales=last_locales,
             available_locales=available_locales,
             smoke_mode=smoke_mode,
@@ -1173,6 +1175,7 @@ def use_lazy_tree(selected_locales: Iterable[str]) -> bool:
 def resolve_requested_locales(
     *,
     requested_locales: Iterable[str] | None,
+    resume_locales: Iterable[str] = (),
     last_locales: Iterable[str],
     available_locales: Iterable[str],
     smoke_mode: bool,
@@ -1181,9 +1184,16 @@ def resolve_requested_locales(
     """Resolve requested locales."""
     if requested_locales is not None:
         return list(requested_locales)
+    available = list(available_locales)
+    resumed = normalize_selected_locales(
+        requested_locales=resume_locales,
+        available_locales=available,
+        source_locale=source_locale,
+    )
+    if resumed:
+        return resumed
     if not smoke_mode:
         return None
-    available = list(available_locales)
     preferred = normalize_selected_locales(
         requested_locales=last_locales,
         available_locales=available,

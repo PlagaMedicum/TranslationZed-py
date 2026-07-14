@@ -9,6 +9,7 @@ from pathlib import Path
 
 SESSION_RESUME_FILENAME = "session.resume.json"
 SESSION_RESUME_VERSION = 1
+_STARTUP_LEFT_PANEL_INDEX = 0
 _VALID_TM_GROUPING_MODES = frozenset({"none", "origin", "score_band"})
 
 
@@ -155,7 +156,10 @@ def parse_session_resume_snapshot(payload: object) -> SessionResumeSnapshot | No
         selected_locales=tuple(selected_locales),
         active_file_relpath=active_file_relpath,
         active_row=active_row,
-        left_panel_index=left_panel_index,
+        # Startup always returns to Project.  Keep accepting the persisted field so
+        # version-1 snapshots written by older builds remain usable without letting
+        # a restored heavyweight panel run its activation work during startup.
+        left_panel_index=_STARTUP_LEFT_PANEL_INDEX,
         detail_visible=detail_visible,
         search_text=search_text,
         replace_text=replace_text,
@@ -217,7 +221,9 @@ def build_session_resume_snapshot(
         selected_locales=tuple(locales),
         active_file_relpath=relpath,
         active_row=row,
-        left_panel_index=max(0, int(left_panel_index)),
+        # Retain the public argument and serialized field for schema compatibility,
+        # but sidebar activation is intentionally not part of workspace resume.
+        left_panel_index=_STARTUP_LEFT_PANEL_INDEX,
         detail_visible=bool(detail_visible),
         search_text=str(search_text or ""),
         replace_text=str(replace_text or ""),

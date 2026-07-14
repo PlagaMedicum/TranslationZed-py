@@ -937,7 +937,7 @@ def test_project_session_service_session_resume_snapshot_roundtrip(
         selected_locales=("BE", "RU"),
         active_file_relpath="BE/a.txt",
         active_row=7,
-        left_panel_index=2,
+        left_panel_index=0,
         detail_visible=True,
         search_text="foo",
         replace_text="bar",
@@ -965,6 +965,16 @@ def test_project_session_service_session_resume_snapshot_roundtrip(
         )
         is None
     )
+
+
+def test_session_resume_parser_normalizes_legacy_sidebar_to_project() -> None:
+    """Verify legacy snapshots cannot reactivate heavyweight side panels at startup."""
+    snapshot = session_resume_module.parse_session_resume_snapshot(
+        _session_resume_payload(left_panel_index=1)
+    )
+
+    assert snapshot is not None
+    assert snapshot.left_panel_index == 0
 
 
 def test_project_session_service_session_resume_snapshot_reader_ignores_invalid_payloads(
@@ -1024,6 +1034,7 @@ def test_session_resume_persistence_helpers_support_injected_io_and_fail_closed(
         tm_origin_project=True,
         tm_origin_import=False,
     )
+    assert snapshot.left_panel_index == 0
     writes: list[tuple[Path, str]] = []
     path = session_resume_module.write_session_resume_snapshot(
         root=root,
@@ -1146,11 +1157,26 @@ def test_resolve_requested_locales_uses_explicit_request() -> None:
     """Verify resolve requested locales uses explicit request."""
     selected = resolve_requested_locales(
         requested_locales=["RU", "BE"],
+        resume_locales=["BE"],
         last_locales=["BE"],
         available_locales=["EN", "BE", "RU"],
         smoke_mode=False,
         source_locale="EN",
     )
+    assert selected == ["RU", "BE"]
+
+
+def test_resolve_requested_locales_uses_valid_session_pool_without_smoke() -> None:
+    """Verify a saved session pool bypasses interactive startup locale selection."""
+    selected = resolve_requested_locales(
+        requested_locales=None,
+        resume_locales=["EN", "RU", "RU", "missing", "BE"],
+        last_locales=[],
+        available_locales=["EN", "BE", "RU"],
+        smoke_mode=False,
+        source_locale="EN",
+    )
+
     assert selected == ["RU", "BE"]
 
 
@@ -1182,6 +1208,7 @@ def test_resolve_requested_locales_returns_none_without_smoke_mode() -> None:
     """Verify resolve requested locales returns none without smoke mode."""
     selected = resolve_requested_locales(
         requested_locales=None,
+        resume_locales=["missing"],
         last_locales=["BE"],
         available_locales=["EN", "BE", "RU"],
         smoke_mode=False,
