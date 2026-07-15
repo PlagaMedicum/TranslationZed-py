@@ -21,8 +21,67 @@ canonical documentation agree. Do not begin a later slice by weakening an earlie
   `make docs-check`, relevant performance checks, and `git diff --check`.
 - Do not promote planned text into current technical or UX contracts until the implementation and
   tests are complete.
+- Complete Slice 0 before implementing format-dependent Git synchronization, `description.txt`,
+  QA, LT, TM, or MT integration. Those slices must consume one confirmed file-format boundary
+  rather than independently assuming legacy `.txt` syntax.
 
-## 2. Slice 1 — Git-backed EN Synchronization
+## 2. Slice 0 — PZ B42.15+ Format Compatibility (Release Blocker)
+
+### Intent and evidence status
+
+Resolve the remaining compatibility part of
+[Issue #1](https://github.com/PlagaMedicum/TranslationZed-py/issues/1) before building other v1
+features on a `.txt`-only model. The issue has two parts:
+
+1. v0.9.0 already shows malformed-`language.txt` details instead of silently aborting; `dev` also
+   gives the all-invalid/no-target case its own actionable message.
+2. JSON translation files are not discovered, parsed, edited, cached, or saved. This remains open.
+
+Do not derive a production schema solely from the issue report. As of 2026-07-15, the
+[official community translation repository](https://github.com/TheIndieStone/ProjectZomboidTranslations)
+still exposes the legacy locale tree, so implementation starts with an authoritative B42.15+
+game fixture, official schema/source, or maintainer-confirmed sample and records its provenance.
+
+### Discovery gate
+
+1. Capture the smallest legally redistributable fixtures, or schema-only synthetic fixtures with
+   hashes/field notes when game files cannot be committed. Record filename rules, object/array
+   shape, key/value types, ordering significance, escaping, line endings, BOM/encoding behavior,
+   nesting, metadata, and whether comments or duplicate keys can occur.
+2. Determine whether JSON replaces every legacy file, only named families, or coexists with
+   `.txt`; define deterministic discovery and collision behavior for two files representing the
+   same logical content.
+3. Reject the slice if the evidence is insufficient. An explicit unsupported-format error is safer
+   than a permissive parser that can rewrite unknown data.
+
+### Core and workflow work
+
+1. Replace the single-extension assumption at the scanner/parser/saver boundary with a small
+   format-dispatch contract. Keep the proven legacy parser/saver unchanged behind that boundary;
+   do not force conversion between formats.
+2. Implement the confirmed JSON variant with deterministic ordering, strict shape/type validation,
+   bounded parsing, and atomic value-only writes. Preserve all structure the confirmed format
+   permits outside intentional value edits; never silently collapse duplicate or unknown data.
+3. Include format identity in cache/session/EN-diff/Git-sync identities so same-named legacy and
+   JSON files cannot share stale drafts or baselines.
+4. Route both formats through open/edit/status/undo, cache recovery, search/replace, QA, LT, TM,
+   MT, source reference, explicit Save, and conflict handling. Format-specific rules stay in core;
+   widgets consume the same row/document view.
+5. Show actionable errors for malformed or unsupported JSON and for projects with no supported
+   target files. Opening, previewing, or failing format detection never changes locale originals.
+
+### Failure and acceptance cases
+
+- Cover malformed/truncated payloads, duplicate keys, unexpected scalar/container types, unknown
+  fields, escaping and Unicode edges, BOM/EOL variants confirmed by evidence, mixed projects,
+  logical-name collisions, read-only files, interrupted atomic replacement, huge values, and
+  cancellation/reopen recovery.
+- Prove legacy `.txt` parser/saver/encoding/roundtrip equivalence remains unchanged.
+- Add representative JSON parse/save/search/cache benchmarks and one manual roundtrip scenario
+  using the confirmed format. Slice closure requires no-write-on-open and byte/structure evidence,
+  not merely successful `json.loads`/`json.dumps` roundtrips.
+
+## 3. Slice 1 — Git-backed EN Synchronization
 
 ### Intent
 
@@ -67,7 +126,7 @@ fallback. TranslationZed-Py observes local committed history; it never manages G
   translations remain unchanged, review marking is explicit, and original files remain unchanged
   until Save.
 
-## 3. Slice 2 — Add Localization
+## 4. Slice 2 — Add Localization
 
 ### Intent
 
@@ -105,7 +164,7 @@ This slice does not own or depend on `description.txt` behavior.
   binary copying, rescan, and chooser selection.
 - Add a manual scenario that inspects the new directory and proves no existing locale changed.
 
-## 4. Slice 3 — `description.txt` As A Normal Row
+## 5. Slice 3 — `description.txt` As A Normal Row
 
 ### Intent
 
@@ -132,7 +191,7 @@ separate editor and do not couple parsing or workflow policy to locale creation.
   provider paths without exposing the internal identity in the Key cell.
 - Add an independent release scenario; locale creation is neither setup nor acceptance evidence.
 
-## 5. Slice 4 — Built-in QA Safety Pack
+## 6. Slice 4 — Built-in QA Safety Pack
 
 ### Rules
 
@@ -152,7 +211,7 @@ separate editor and do not couple parsing or workflow policy to locale creation.
   files, cancellation, background refresh, and edits that invalidate only affected findings.
 - Benchmark the full local QA pack at existing representative sizes and preserve bounded results.
 
-## 6. Slice 5 — LanguageTool Diagnostics And Assistance
+## 7. Slice 5 — LanguageTool Diagnostics And Assistance
 
 ### Technical diagnostics
 
@@ -177,7 +236,7 @@ separate editor and do not couple parsing or workflow policy to locale creation.
   validation, replacement undo/redo, dictionary scope, ignore scope, corrupted config recovery,
   concurrent checks, file switches, and shutdown.
 
-## 7. Slice 6 — Machine Translation Providers
+## 8. Slice 6 — Machine Translation Providers
 
 ### Provider and data flow
 
@@ -221,7 +280,7 @@ separate editor and do not couple parsing or workflow policy to locale creation.
   cancellation, apply, undo, review marking, and bounded cache eviction. Benchmark
   request-building/cache paths, not external service or model latency.
 
-## 8. Slice 7 — Coherence And Direct Final Release
+## 9. Slice 7 — Coherence And Direct Final Release
 
 1. Audit only code touched by v1 slices. Remove proven duplication, keep GUI/core boundaries, and
    avoid line-count-driven moves or speculative abstractions.
@@ -237,7 +296,7 @@ separate editor and do not couple parsing or workflow policy to locale creation.
    commit, rerun the release gate. Tag `v1.0.0` directly and verify Linux/macOS/Windows packages,
    smoke runs, archives, and draft release.
 
-## 9. Explicitly Deferred
+## 10. Explicitly Deferred
 
 - User-defined QA rule schemas.
 - Git fetch/pull, PR creation, Git credential handling, updater integration, and remote forum

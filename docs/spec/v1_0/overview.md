@@ -7,6 +7,7 @@ status and [`delivery_plan.md`](delivery_plan.md) for the only detailed implemen
 
 | Slice | User-visible outcome |
 |---|---|
+| PZ B42.15+ format compatibility — release blocker | Resolve the remaining JSON part of [Issue #1](https://github.com/PlagaMedicum/TranslationZed-py/issues/1) from authoritative game fixtures, while keeping legacy `.txt` projects fully usable and showing actionable errors for unsupported schemas. |
 | Git-backed EN synchronization | Preview committed new strings, changed strings, removals, ordering, and comments; merge into drafts without letting the app mutate Git or originals. |
 | Add localization | From the locale chooser, acknowledge the official README/forum guidance and safely clone a source locale into a validated new locale. |
 | `description.txt` | Edit the complete file through the normal table/detail, cache, status, search, QA, LT, TM, and Save paths. This is independent of locale creation. |
