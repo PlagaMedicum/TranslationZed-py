@@ -36,6 +36,9 @@ a high-risk threshold must have an active register entry with concrete constrain
 
 ## Documentation Standard
 
+- Source docstring and comment policy is owned by
+  `docs/architecture/code_architecture.md`; documentation ownership and lifecycle are owned by
+  `docs/meta/docs_structure.md`.
 - Document public interfaces, architecture boundaries, invariants, compatibility requirements,
   failure modes, algorithms, and hard-won operational lessons.
 - Keep ordinary code self-explanatory.

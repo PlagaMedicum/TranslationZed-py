@@ -423,26 +423,6 @@ def validate_math_source(docs_root: Path) -> list[str]:
     return errors
 
 
-def validate_diagram_assets(docs_root: Path) -> list[str]:
-    """Return missing maintained diagram sources and static assets."""
-    required = (
-        "diagrams/static/system-context.svg",
-        "diagrams/static/layered-architecture.svg",
-        "diagrams/static/save-flow.svg",
-        "diagrams/static/module-dependency-map.svg",
-        "diagrams/src/layered_architecture.puml",
-        "diagrams/src/gui_controller_domain_map.puml",
-        "diagrams/src/module_dependency_dense.puml",
-        "diagrams/src/core_service_contracts_dense.puml",
-        "diagrams/src/gui_controller_adapters_dense.puml",
-    )
-    return [
-        f"missing diagram artifact/source: {docs_root / relative}"
-        for relative in required
-        if not (docs_root / relative).is_file()
-    ]
-
-
 def validate_module_map(docs_root: Path, repo_root: Path) -> list[str]:
     """Return application modules missing from the ownership map."""
     path = docs_root / "reference/module_map.md"
@@ -660,7 +640,6 @@ def validate_docs(
         *validate_stale_language(docs_root),
         *validate_semantic_contracts(docs_root),
         *validate_math_source(docs_root),
-        *validate_diagram_assets(docs_root),
         *validate_module_map(docs_root, repo_root),
         *validate_source_api_refs(docs_root, repo_root),
         *validate_command_parity(repo_root, docs_root),

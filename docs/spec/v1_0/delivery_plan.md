@@ -183,6 +183,9 @@ separate editor and do not couple parsing or workflow policy to locale creation.
 
 1. Define Qt-free request, proposal, cache-key, provider diagnostic, and bounded local-context DTOs.
    Provider adapters must be directly fakeable and must not leak transport policy into TM ranking.
+   This is a justified cohesive subpackage: keep contracts, orchestration, and cache policy under
+   `core/mt/`, concrete transports under `core/mt/providers/`, and Qt presentation/scheduling in a
+   focused `gui/mt_*` adapter rather than `main_window.py`.
 2. Implement two provider classes without sharing transport-specific policy:
    - conventional non-LLM MT through a provider-neutral adapter contract and more than one
      documented provider path; Google may be one adapter, but cannot define or be the sole path;

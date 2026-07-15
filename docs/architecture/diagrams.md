@@ -2,13 +2,10 @@
 _Last updated: 2026-03-04_
 
 This page is the high-level diagram index.
-For concrete class/interface/controller diagrams, see
-`docs/architecture/code_architecture.md`.
+For code-level dependency and extension rules, see `docs/architecture/code_architecture.md`.
 
-Notation policy:
-- Mermaid is default for browser-native rendering.
-- PlantUML source is used for dense architecture/controller-domain maps.
-- Canonical docs render one primary diagram only (no inline fallback duplication).
+Mermaid in this page is the maintained source. Canonical docs render one primary diagram only; do
+not add unreferenced alternate source or static copies.
 
 ## 1) System Context
 
@@ -29,9 +26,6 @@ flowchart TB
   APP --> CORE[Domain/Core\nparser/saver/search/qa/tm]
   CORE --> INFRA[Infrastructure IO\nfilesystem/cache/sqlite]
 ```
-
-Dense source reference:
-- `docs/diagrams/src/layered_architecture.puml`
 
 ## 3) Core Services Interaction Graph
 
@@ -56,9 +50,6 @@ graph LR
   MW --> LT[languagetool_adapter]
   MW --> PR[preferences_dialog]
 ```
-
-Dense source reference:
-- `docs/diagrams/src/gui_controller_domain_map.puml`
 
 ## 5) Save Flow Sequence
 
@@ -198,9 +189,6 @@ flowchart LR
   FW --> CACHE
   TMW --> TMDB
 ```
-
-Dense source reference:
-- `docs/diagrams/src/module_dependency_dense.puml`
 
 ## 13) QA Live Checklist Pipeline
 
