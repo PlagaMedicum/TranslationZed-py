@@ -104,4 +104,4 @@ For fast orientation, start with:
 ## License
 This project is Open-source, licensed under GPLv3. Distributions must include source code and the license text.
 
-Developed with assistance from Codex in VSCodium (GPT‑Plus). Contributors should review generated code and verify third-party license obligations before inclusion.
+Developed with assistance from Codex through an editor-independent terminal workflow. Contributors should review generated code and verify third-party license obligations before inclusion.
