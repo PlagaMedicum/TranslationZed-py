@@ -76,15 +76,14 @@ We build executables **on each target OS** (no cross‑compilation).
 
 Linux/macOS:
 ```bash
+python -m pip install -e ".[packaging]"
 make pack
 ```
 
 Windows (PowerShell):
 ```powershell
 python -m pip install -e ".[dev,packaging]"
-python -m PyInstaller --clean --noconsole --name TranslationZed-Py ^
-  --add-data "LICENSE;LICENSE" --add-data "README.md;README.md" ^
-  --collect-all PySide6 translationzed_py\\__main__.py
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/pack.ps1
 ```
 
 Artifacts are written to `dist/TranslationZed-Py/` (PyInstaller default).
@@ -105,4 +104,4 @@ For fast orientation, start with:
 ## License
 This project is Open-source, licensed under GPLv3. Distributions must include source code and the license text.
 
-Developed with assistance from Codex in VSCodium (GPT‑Plus). Contributors should ensure their usage complies with OpenAI terms/policies and review any generated code for third‑party license obligations before inclusion.
+Developed with assistance from Codex in VSCodium (GPT‑Plus). Contributors should review generated code and verify third-party license obligations before inclusion.
