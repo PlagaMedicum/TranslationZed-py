@@ -395,6 +395,8 @@ This table binds technical sections to canonical UC IDs.
   - `[cache]` → `extension`, `en_hash_filename`
   - `[formats]` → `translation_ext`, `comment_prefix`
   - `[diff]` → `insertion_enabled_globs`, `preview_context_lines`
+- Unknown sections are ignored. Invalid sections or scalar values retain typed defaults instead of
+  producing partially invalid runtime state; unreadable or malformed TOML falls back to defaults.
 
 ### 5.8  `gui.main_window`
 

@@ -6,11 +6,6 @@ config_dir = ".tzp/config"
 extension = ".bin"
 en_hash_filename = "en.hashes.bin"
 
-[adapters]
-parser = "lua_v1"
-ui = "pyside6"
-cache = "binary_v1"
-
 [formats]
 translation_ext = ".txt"
 comment_prefix = "--"

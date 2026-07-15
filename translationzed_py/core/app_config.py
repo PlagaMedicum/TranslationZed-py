@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import importlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
@@ -18,7 +18,7 @@ except ModuleNotFoundError:  # pragma: no cover
 
 @dataclass(frozen=True, slots=True)
 class AppConfig:
-    """Store effective runtime paths and adapter identifiers."""
+    """Store effective runtime file and diff settings."""
 
     cache_dir: str = ".tzp/cache"
     config_dir: str = ".tzp/config"
@@ -26,9 +26,6 @@ class AppConfig:
     translation_ext: str = ".txt"
     comment_prefix: str = "--"
     en_hash_filename: str = "en.hashes.bin"
-    parser_adapter: str = "lua_v1"
-    ui_adapter: str = "pyside6"
-    cache_adapter: str = "binary_v1"
     insertion_enabled_globs: tuple[str, ...] = ("*.txt",)
     preview_context_lines: int = 3
 
@@ -58,11 +55,17 @@ def _load_toml(path: Path) -> dict[str, Any]:
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
-    except OSError:
+    except (OSError, ValueError):
         return {}
 
 
-def _normalize_ext(value: str) -> str:
+def _nonempty_string(value: Any, *, default: str) -> str:
+    return value if isinstance(value, str) and value else default
+
+
+def _normalize_ext(value: Any, *, default: str) -> str:
+    if not isinstance(value, str) or not (value := value.strip()):
+        return default
     return value if value.startswith(".") else f".{value}"
 
 
@@ -76,7 +79,9 @@ def _normalize_globs(value: Any, *, default: tuple[str, ...]) -> tuple[str, ...]
     out: list[str] = []
     seen: set[str] = set()
     for item in candidate:
-        glob = str(item).strip()
+        if not isinstance(item, str):
+            continue
+        glob = item.strip()
         if not glob or glob in seen:
             continue
         seen.add(glob)
@@ -101,79 +106,39 @@ def load(root: Path | None = None) -> AppConfig:
         data = _load_toml(path)
         paths = data.get("paths", {})
         cache = data.get("cache", {})
-        adapters = data.get("adapters", {})
         if isinstance(paths, dict):
-            cfg = AppConfig(
-                cache_dir=paths.get("cache_dir", cfg.cache_dir),
-                config_dir=paths.get("config_dir", cfg.config_dir),
-                cache_ext=cfg.cache_ext,
-                translation_ext=cfg.translation_ext,
-                comment_prefix=cfg.comment_prefix,
-                parser_adapter=cfg.parser_adapter,
-                ui_adapter=cfg.ui_adapter,
-                cache_adapter=cfg.cache_adapter,
-                insertion_enabled_globs=cfg.insertion_enabled_globs,
-                preview_context_lines=cfg.preview_context_lines,
+            cfg = replace(
+                cfg,
+                cache_dir=_nonempty_string(
+                    paths.get("cache_dir"), default=cfg.cache_dir
+                ),
+                config_dir=_nonempty_string(
+                    paths.get("config_dir"), default=cfg.config_dir
+                ),
             )
         if isinstance(cache, dict):
-            ext = cache.get("extension", cfg.cache_ext)
-            cfg = AppConfig(
-                cache_dir=cfg.cache_dir,
-                config_dir=cfg.config_dir,
-                cache_ext=_normalize_ext(str(ext)),
-                translation_ext=cfg.translation_ext,
-                comment_prefix=cfg.comment_prefix,
-                en_hash_filename=str(
-                    cache.get("en_hash_filename", cfg.en_hash_filename)
+            cfg = replace(
+                cfg,
+                cache_ext=_normalize_ext(cache.get("extension"), default=cfg.cache_ext),
+                en_hash_filename=_nonempty_string(
+                    cache.get("en_hash_filename"), default=cfg.en_hash_filename
                 ),
-                parser_adapter=cfg.parser_adapter,
-                ui_adapter=cfg.ui_adapter,
-                cache_adapter=cfg.cache_adapter,
-                insertion_enabled_globs=cfg.insertion_enabled_globs,
-                preview_context_lines=cfg.preview_context_lines,
-            )
-        if isinstance(adapters, dict):
-            cfg = AppConfig(
-                cache_dir=cfg.cache_dir,
-                config_dir=cfg.config_dir,
-                cache_ext=cfg.cache_ext,
-                translation_ext=cfg.translation_ext,
-                comment_prefix=cfg.comment_prefix,
-                en_hash_filename=cfg.en_hash_filename,
-                parser_adapter=str(adapters.get("parser", cfg.parser_adapter)),
-                ui_adapter=str(adapters.get("ui", cfg.ui_adapter)),
-                cache_adapter=str(adapters.get("cache", cfg.cache_adapter)),
-                insertion_enabled_globs=cfg.insertion_enabled_globs,
-                preview_context_lines=cfg.preview_context_lines,
             )
         formats = data.get("formats", {})
         if isinstance(formats, dict):
-            ext = formats.get("translation_ext", cfg.translation_ext)
-            cfg = AppConfig(
-                cache_dir=cfg.cache_dir,
-                config_dir=cfg.config_dir,
-                cache_ext=cfg.cache_ext,
-                translation_ext=_normalize_ext(str(ext)),
-                comment_prefix=str(formats.get("comment_prefix", cfg.comment_prefix)),
-                en_hash_filename=cfg.en_hash_filename,
-                parser_adapter=cfg.parser_adapter,
-                ui_adapter=cfg.ui_adapter,
-                cache_adapter=cfg.cache_adapter,
-                insertion_enabled_globs=cfg.insertion_enabled_globs,
-                preview_context_lines=cfg.preview_context_lines,
+            cfg = replace(
+                cfg,
+                translation_ext=_normalize_ext(
+                    formats.get("translation_ext"), default=cfg.translation_ext
+                ),
+                comment_prefix=_nonempty_string(
+                    formats.get("comment_prefix"), default=cfg.comment_prefix
+                ),
             )
         diff = data.get("diff", {})
         if isinstance(diff, dict):
-            cfg = AppConfig(
-                cache_dir=cfg.cache_dir,
-                config_dir=cfg.config_dir,
-                cache_ext=cfg.cache_ext,
-                translation_ext=cfg.translation_ext,
-                comment_prefix=cfg.comment_prefix,
-                en_hash_filename=cfg.en_hash_filename,
-                parser_adapter=cfg.parser_adapter,
-                ui_adapter=cfg.ui_adapter,
-                cache_adapter=cfg.cache_adapter,
+            cfg = replace(
+                cfg,
                 insertion_enabled_globs=_normalize_globs(
                     diff.get("insertion_enabled_globs"),
                     default=cfg.insertion_enabled_globs,
