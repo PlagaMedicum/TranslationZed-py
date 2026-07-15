@@ -28,7 +28,7 @@ Quick lookup companion:
 | QA live checklist | rule-order invariants, state transitions, completion-ratio monotonicity, LT note semantics | `tests/test_qa_async.py`, `tests/test_gui_qa_panel.py`, new QA progress DTO tests |
 | TM explainability | payload correctness (`raw`, `ratio`, `bonus`, cap reasons), deterministic ordering unchanged | `tests/test_tm_query_scoring.py`, `tests/test_tm_store.py`, `tests/test_tm_ranking_corpus.py`, `tests/test_tm_query_perf_contract.py` |
 | TM workflow UX | grouping/sorting view invariants, quick-apply parity (keyboard/mouse), non-blocking empty/error states | `tests/test_tm_workflow_service.py`, `tests/test_gui_tm_preferences.py`, TM panel GUI tests |
-| Crash recovery (UC-12) + session resume (A32) | startup candidate detection, restore/discard/cancel semantics, snapshot-first startup ordering, discard snapshot deletion, no-write-on-open invariant | project-session/startup tests, crash-recovery/session-resume integration tests |
+| Crash recovery (UC-12) + session resume (A32) | one-writer/stale-lock detection, restore/discard/cancel semantics, atomic snapshot-first startup ordering, discard snapshot deletion, no-write-on-open invariant | project-session/startup tests, runtime-reliability/diagnostics tests, crash-recovery/session-resume integration tests |
 
 ---
 
@@ -100,6 +100,12 @@ Release evidence policy references:
 
 ### 2.2 Integration Tests
 - Open project, select locale, load table.
+- All-invalid locale metadata shows an actionable no-valid-target message instead of silently
+  aborting; partial scans retain detailed skipped-locale errors.
+- A live session lock blocks a second writer; a stale lock activates draft recovery; accepted close
+  releases the lock only after persistence and cancel guards complete.
+- Runtime file-logging failure falls back to console, uncaught Python GUI exceptions produce a
+  bounded copyable report, and report path redaction/log-tail limits are contract-tested.
 - Edit + save path writes file + cache.
 - Save preserves original file bytes outside literal spans.
 - Open/switch/close without edits keeps file bytes identical across UTF-8/CP1251/UTF-16 + EOL styles.

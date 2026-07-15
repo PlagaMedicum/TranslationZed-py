@@ -7,6 +7,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from translationzed_py.core.atomic_io import write_text_atomic
+
 SESSION_RESUME_FILENAME = "session.resume.json"
 SESSION_RESUME_VERSION = 1
 _STARTUP_LEFT_PANEL_INDEX = 0
@@ -68,8 +70,7 @@ def write_session_resume_snapshot(
     path = session_resume_snapshot_path(root=root, cache_dir=cache_dir)
     text = json.dumps(snapshot.to_payload(), ensure_ascii=False, indent=2) + "\n"
     if write_text is None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        write_text_atomic(path, text, encoding="utf-8")
     else:
         write_text(path, text)
     return path

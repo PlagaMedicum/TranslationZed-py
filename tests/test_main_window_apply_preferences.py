@@ -269,8 +269,10 @@ def test_noncritical_ui_layout_and_toggle_state_persist_across_restart(
     assert extras["TABLE_COLUMNS_USER_RESIZED"] == "1"
     assert extras["SEARCH_CASE_SENSITIVE"] == "1"
 
+    win.close()
     win_reopen = MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win_reopen)
+    assert win_reopen._startup_aborted is False
     assert win_reopen._tree_last_width == 236
     assert win_reopen._key_column_width == 164
     assert win_reopen._status_column_width == 78

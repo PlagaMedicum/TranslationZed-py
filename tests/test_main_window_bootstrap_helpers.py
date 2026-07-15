@@ -314,7 +314,7 @@ def test_init_locales_covers_malformed_warning_and_empty_selectable_branch(
             self.executed = True
 
     calls: list[str] = []
-    monkeypatch.setattr(mw, "QMessageBox", _WarningBox)
+    monkeypatch.setattr(mw._panel_helpers, "QMessageBox", _WarningBox)
     monkeypatch.setattr(
         win, "_schedule_cache_migration", lambda: calls.append("migrate")
     )
@@ -345,6 +345,20 @@ def test_init_locales_covers_malformed_warning_and_empty_selectable_branch(
     win._selected_locales = ["BE"]
     win._init_locales(selected_locales=None)
     assert win._selected_locales == []
+    no_target = _WarningBox.instances[-1]
+    assert no_target.executed is True
+    assert no_target.title == "No valid target locales"
+    assert "non-empty charset" in no_target.text
+
+    monkeypatch.setattr(
+        mw,
+        "scan_root_with_errors",
+        lambda _root: ({}, ["target/language.txt: Missing charset"]),
+    )
+    win._init_locales(selected_locales=None)
+    all_invalid = _WarningBox.instances[-1]
+    assert all_invalid.title == "No valid target locales"
+    assert all_invalid.detail == "target/language.txt: Missing charset"
 
 
 def test_init_locales_returns_empty_when_locale_dialog_is_cancelled(
@@ -448,7 +462,7 @@ def test_init_locales_malformed_scan_with_chooser_accept_schedules_followups(
             return SimpleNamespace(selected_locales=["BE"])
 
     call_log: list[str] = []
-    monkeypatch.setattr(mw, "QMessageBox", _WarningBox)
+    monkeypatch.setattr(mw._panel_helpers, "QMessageBox", _WarningBox)
     monkeypatch.setattr(mw, "_build_locale_chooser", _Dialog)
     monkeypatch.setattr(win, "_project_session_service", _Service())
     monkeypatch.setattr(
@@ -550,6 +564,7 @@ def test_main_window_startup_aborts_when_en_hash_guard_rejects(
     win = mw.MainWindow(str(root), selected_locales=["BE"])
     qtbot.addWidget(win)
     assert win._startup_aborted is True
+    assert win._project_session_lock is None
 
 
 def test_prompt_startup_crash_recovery_maps_buttons_and_renders_details(
@@ -574,6 +589,7 @@ def test_prompt_startup_crash_recovery_maps_buttons_and_renders_details(
         Warning = 1
         next_result = 0
         details = ""
+        informative = ""
 
         class StandardButton:
             Save = 10
@@ -592,8 +608,8 @@ def test_prompt_startup_crash_recovery_maps_buttons_and_renders_details(
         def setText(self, _text):
             return None
 
-        def setInformativeText(self, _text):
-            return None
+        def setInformativeText(self, text):
+            _MessageBox.informative = text
 
         def setDetailedText(self, text: str):
             _MessageBox.details = text
@@ -615,6 +631,7 @@ def test_prompt_startup_crash_recovery_maps_buttons_and_renders_details(
     assert mw._panel_helpers._prompt_startup_crash_recovery(win, report) == "restore"
     assert "Affected files:" in _MessageBox.details
     assert "BE/ui.txt [BE] drafts=2 status_only=1" in _MessageBox.details
+    assert "permanently deletes" in _MessageBox.informative
 
     _MessageBox.next_result = _MessageBox.StandardButton.Discard
     assert mw._panel_helpers._prompt_startup_crash_recovery(win, report) == "discard"
@@ -654,6 +671,32 @@ def test_run_startup_recovery_flow_clears_pending_plan_on_cancel(
     assert allowed is False
     assert win._pending_post_locale_plan is None
     assert win._post_locale_timer.isActive() is False
+
+
+def test_run_startup_recovery_forwards_unclean_session_signal(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """Verify a stale session lock reaches the core recovery detection policy."""
+    root = _make_project(tmp_path)
+    win = mw.MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._previous_session_unclean = True
+    captured: dict[str, object] = {}
+
+    def _build(_self, **kwargs):  # type: ignore[no-untyped-def]
+        captured.update(kwargs)
+        return CrashRecoveryDetectionPlan(run_recovery_flow=False, report=None)
+
+    monkeypatch.setattr(
+        mw._ProjectSessionService,
+        "build_crash_recovery_detection_plan",
+        _build,
+    )
+
+    assert mw._panel_helpers._run_startup_recovery(win) is True
+    assert captured["previous_session_unclean"] is True
 
 
 def test_run_startup_recovery_flow_executes_apply_plan_for_restore(

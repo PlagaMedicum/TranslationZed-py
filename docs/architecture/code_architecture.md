@@ -92,7 +92,8 @@ has a tested migration or an explicit reset policy.
 
 Opening a project, detecting changes, diagnostics, and synchronization previews are read-only.
 Draft cache writes and original-file writes remain distinct; only an explicit Save path changes
-locale originals.
+locale originals. A project-scoped GUI session lock is acquired before other project persistence so
+two processes cannot race on cache, snapshot, TM, or configuration state.
 
 ## 5) Resource And Performance Policy
 

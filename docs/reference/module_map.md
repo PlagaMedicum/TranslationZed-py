@@ -16,6 +16,7 @@ _Last updated: 2026-07-15_
 | `core.locale_creation` | Partial v1 foundation: validated staged locale cloning and metadata rewriting; not a completed workflow contract yet. |
 | `core.project_session` | Locale/session/tree planning and startup/switch orchestration policies. |
 | `core.session_resume` | Project-scoped workspace snapshot DTO/schema validation and cache-file read/write/delete helpers. |
+| `core.runtime_diagnostics` | Bounded rotating-log setup, private-path redaction, log-tail reads, and Qt-free GitHub issue-report formatting. |
 | `core.file_workflow` | Open/save persistence sequencing plans and callbacks. |
 | `core.save_exit_flow` | Save/exit prompt and multi-file write orchestration policies. |
 | `core.conflict_service` | Conflict detection/resolution planning and persist decisions. |
@@ -54,7 +55,8 @@ _Last updated: 2026-07-15_
 | `gui.search_scope_ui` | Search/replace scope indicator widgets. |
 | `gui.theme` | Theme detection/apply helpers. |
 | `gui.perf_trace` | GUI performance instrumentation helpers. |
-| `gui.app` | GUI app bootstrap entrypoint wrapper. |
+| `gui.runtime_reliability` | Project `QLockFile` lifecycle, uncaught-Python exception boundary, and copyable issue-report dialog. |
+| `gui.app` | Process-wide `QApplication` bootstrap. |
 
 ## 3) Ownership Boundary Rules
 
@@ -70,4 +72,5 @@ Detailed v0.9 feature contracts map to modules as follows:
 1. QA live checklist: `gui.qa_async`, `gui.main_window_panel_helpers`, `core.qa_service`.
 2. TM explainability: `core.tm_query_engine`, `core.tm_query_scoring`, `core.tm_workflow_service`, TM panel adapters.
 3. TM workflow UX: `gui.main_window_panel_helpers`, `gui.tm_preview`, `core.tm_workflow_service`.
-4. Crash recovery UC-12 + session resume: `core.project_session`, `core.session_resume`, startup/open adapters in `gui.main_window`, recovery dialog surfaces in `gui.dialogs`.
+4. Crash recovery UC-12 + session resume: `core.project_session`, `core.session_resume`,
+   `gui.runtime_reliability`, and startup/recovery adapters in `gui.main_window_panel_helpers`.

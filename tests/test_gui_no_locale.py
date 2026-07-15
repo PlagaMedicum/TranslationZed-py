@@ -19,3 +19,4 @@ def test_no_locale_selected_aborts(tmp_path):
 
     win = MainWindow(str(root), selected_locales=[])
     assert getattr(win, "_startup_aborted", False) is True
+    assert getattr(win, "_project_session_lock", None) is None

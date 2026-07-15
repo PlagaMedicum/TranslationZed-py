@@ -74,7 +74,7 @@ self-update workflow. Planned v1.0 work is indexed separately and does not redef
 | **Performance**   | Load 20k keys ≤ 2 s; memory ≤ 300 MB.                                                |
 | **Usability**     | All actions accessible via menu and shortcuts; table usable without mouse.           |
 | **Portability**   | Tested on Win 10‑11, macOS 13‑14 (ARM + x86), Ubuntu 22.04+.                         |
-| **Reliability**   | No data loss on power‑kill (`os.replace` atomic writes; cache‑only recovery model). |
+| **Reliability**   | Accepted edits use atomic draft caches; originals change only through explicit atomic Save; unclean sessions offer recovery. |
 | **Architecture**  | Workflow policy remains Qt-free and directly testable behind narrow GUI adapters.   |
 | **Security**      | Never execute user‑provided code; sanitise paths to prevent traversal.               |
 | **Productivity**  | Startup < 1s for cached project; key search/respond < 50ms typical.                  |
@@ -99,6 +99,8 @@ self-update workflow. Planned v1.0 work is indexed separately and does not redef
 - Opening, switching, and inspecting files preserve no-write-on-open behavior.
 - Reads and writes preserve locale-specific encoding fidelity.
 - Atomic multi-file save semantics apply to user-approved writes.
+- A project-scoped one-writer session lock prevents concurrent processes from racing on draft,
+  snapshot, TM, or other project-local persistence.
 
 ---
 
@@ -165,7 +167,9 @@ This table binds technical sections to canonical UC IDs.
   - `charset` (encoding for all files in that locale; **required**)
   - `text` (human‑readable language name for UI)
 - `scan_root` raises if any `language.txt` is missing or malformed.
-- GUI uses a non-raising variant to collect errors, skip invalid locales, and show a warning.
+- GUI uses a non-raising variant to collect errors and skip invalid locales. Partial results show
+  skipped-file details; an all-invalid/no-target result shows a specific actionable warning before
+  startup aborts.
 - Related UCs: UC-01, UC-02, UC-08.
 
 ### 5.2  `core.parser`
@@ -941,9 +945,21 @@ historical and remain available through git history rather than this current tec
 
 ## 8  Error Handling & Logging
 
-- Central `logger = logging.getLogger("tzpy")` configured at `INFO` (console) and `DEBUG` (rotating file `$TMPDIR/tzpy.log`).
-- GUI faults → `QMessageBox.critical`.
-- Parser errors: collect into `ParsedFile.errors` and show red exclamation in file tree.
+- Central `logging.getLogger("translationzed_py")` writes `INFO+` to stderr and `DEBUG+` to a
+  1 MB rotating file with three backups at
+  `<tempdir>/translationzed-py/translationzed-py.log`. File-handler setup failure falls back to
+  console logging and must not block startup.
+- Main-window failures routed through shared warning/error helpers remain actionable and are logged
+  through the GUI reliability adapter. Parser exceptions retain their causal traceback.
+- Uncaught Python exceptions from startup or Qt callbacks are logged and contained by the GUI
+  exception boundary. The user receives a selectable report with one-click copy, environment
+  versions, bounded traceback/log tail, recovery prompts, and the GitHub issue URL. The same report
+  is available from `Help → Copyable Issue Report…` without an exception.
+- Reports redact project-root and home paths and do not collect environment variables. Error text
+  can contain a short parser/file snippet, so the dialog tells users to review before posting.
+- Native Qt/C++ faults, interpreter aborts, out-of-memory termination, power loss, and storage
+  failure cannot be contained by a Python exception hook. Atomic persistence and next-start
+  recovery limit damage; documentation must not promise crash impossibility.
 
 ---
 
@@ -951,11 +967,21 @@ historical and remain available through git history rather than this current tec
 
 Current builds use cache-root startup recovery + session resume:
 - Drafts are persisted to `.tzp/cache` on edit.
+- Before project-cache mutation, the GUI acquires
+  `<root>/<cache_dir>/session.lock` with `QLockFile` in long-lived mode. A live owner blocks a
+  second process with an actionable message; a stale lock successfully replaced at startup marks
+  the previous session unclean and enables recovery detection.
 - Crash recovery dialog uses explicit `Restore` / `Discard` / `Cancel`.
+- `Restore` keeps listed drafts, `Discard` permanently removes the listed draft cache and session
+  snapshot, and `Cancel` aborts opening without changing them.
 - `Discard` removes recovery cache entries and the project session snapshot file
   (`session.resume.json`) from project cache root.
 - Session resume is startup-only and project-scoped; invalid or unknown-version
   snapshots are ignored safely with fallback startup behavior.
+- Session snapshots use atomic replacement. The session lock is released only after close passes
+  save/cancel guards and the shutdown persistence sequence completes; snapshot failures are logged
+  but do not put locale originals or already-written draft caches at risk. An abnormal exit leaves
+  the lock for stale-lock detection.
 
 ---
 
@@ -975,7 +1001,8 @@ Current builds use cache-root startup recovery + session resume:
 ## 11  Security Considerations
 
 - Reject paths containing `..` when scanning.
-- All writes are atomic; no elevation required.
+- Locale/cache/config file rewrites use atomic replacement where their contracts require it;
+  SQLite persistence uses transactions. No elevation is required.
 
 ---
 

@@ -8,7 +8,6 @@ import re
 import shutil
 import sys
 import time
-import traceback
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -259,6 +258,7 @@ from translationzed_py.core.tm_workflow_service import (
 from . import languagetool_adapter as _lt_adapter
 from . import main_window_en_diff_helpers as _en_diff_helpers
 from . import main_window_panel_helpers as _panel_helpers
+from . import runtime_reliability as _runtime
 from .delegates import (
     KeyDelegate,
     StatusDelegate,
@@ -457,6 +457,7 @@ def _message_box_size_limits(
 
 def _show_warning_box(parent: QWidget, title: str, text: str) -> int:
     """Show a warning message with the standard resizable dialog policy."""
+    _runtime.log_user_message(critical=False, title=title, text=text)
     if _in_test_mode():
         result = QMessageBox.warning(parent, title, text)
         return 0 if result is None else int(result)
@@ -469,6 +470,7 @@ def _show_warning_box(parent: QWidget, title: str, text: str) -> int:
 
 def _show_critical_box(parent: QWidget, title: str, text: str) -> int:
     """Show an error message with the standard resizable dialog policy."""
+    _runtime.log_user_message(critical=True, title=title, text=text)
     if _in_test_mode():
         result = QMessageBox.critical(parent, title, text)
         return 0 if result is None else int(result)
@@ -608,6 +610,9 @@ class MainWindow(QMainWindow):
             has_drafts=_read_has_drafts_from_path,
             read_last_opened=_read_last_opened_from_path,
         )
+        if not _runtime.start_project_session(self):
+            _runtime.abort_project_startup(self)
+            return
         self._render_workflow_service = _RenderWorkflowService()
         self._file_workflow_service = _FileWorkflowService()
         self._conflict_workflow_service = _ConflictWorkflowService()
@@ -693,7 +698,7 @@ class MainWindow(QMainWindow):
         self._lt_pending_hint_click: tuple[int, QPoint] | None = None
 
         if not self._smoke and not self._check_en_hash_cache():
-            self._startup_aborted = True
+            _runtime.abort_project_startup(self)
             return
         normalized_prefs = self._preferences_service.load_normalized_preferences(
             fallback_default_root=self._default_root,
@@ -1129,7 +1134,7 @@ class MainWindow(QMainWindow):
             _panel_helpers._prepare_manual_scenario(self, selected_locales)
         )
         if not self._selected_locales:
-            self._startup_aborted = True
+            _runtime.abort_project_startup(self)
             return
         self._sync_source_reference_mode(persist=False)
         tree_plan = self._project_session_service.build_tree_rebuild_plan(
@@ -1140,7 +1145,7 @@ class MainWindow(QMainWindow):
         self.tree.expanded.connect(self._on_tree_expanded)
         self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
         if not _panel_helpers._run_startup_recovery(self):
-            self._startup_aborted = True
+            _runtime.abort_project_startup(self)
             return
         _panel_helpers._schedule_post_startup_hooks(self)
         self.tree.activated.connect(self._file_chosen)
@@ -1587,6 +1592,7 @@ class MainWindow(QMainWindow):
         act_about = QAction("&About", self)
         act_about.triggered.connect(self._show_about)
         self.addAction(act_about)
+        _runtime.add_issue_report_action(self)
         self.menu_help.addAction(act_about)
 
         # ── cache ──────────────────────────────────────────────────────
@@ -2069,18 +2075,13 @@ class MainWindow(QMainWindow):
             self._locales = {}
             self._selected_locales = []
             return
-        if errors:
-            msg = QMessageBox(self)
-            msg.setIcon(QMessageBox.Warning)
-            msg.setWindowTitle("Malformed language.txt")
-            msg.setText(
-                "Some locales were skipped due to malformed language.txt. "
-                "Fix those files to enable the locales."
+        selectable = {k: v for k, v in self._locales.items() if k != "EN"}
+        if errors or not selectable:
+            msg = _panel_helpers._build_locale_scan_message(
+                self, errors, bool(selectable)
             )
-            msg.setDetailedText("\n".join(errors))
             _prepare_message_box(msg).exec()
         self._schedule_cache_migration()
-        selectable = {k: v for k, v in self._locales.items() if k != "EN"}
         _lt_adapter.seed_locale_map_defaults(self)
         self._files_by_locale.clear()
 
@@ -2456,13 +2457,14 @@ class MainWindow(QMainWindow):
     def _check_en_hash_cache(self) -> bool:
         try:
             computed = _compute_en_hashes(self._root)
-        except Exception:
+        except Exception as exc:
+            _show_warning_box(self, "English source check failed", str(exc))
             return True
         if not computed:
             return True
         cached = _read_en_hash_cache(self._root)
         if not cached:
-            _write_en_hash_cache(self._root, computed)
+            _panel_helpers._try_write_en_hashes(self, computed, _write_en_hash_cache)
             return True
         if cached == computed:
             return True
@@ -2478,7 +2480,7 @@ class MainWindow(QMainWindow):
         msg.addButton("Dismiss", QMessageBox.RejectRole)
         _prepare_message_box(msg).exec()
         if msg.clickedButton() is ack:
-            _write_en_hash_cache(self._root, computed)
+            _panel_helpers._try_write_en_hashes(self, computed, _write_en_hash_cache)
         return True
 
     def _prompt_write_original(self) -> str:
@@ -4164,7 +4166,7 @@ class MainWindow(QMainWindow):
                 original_values=original_values,
             )
         except Exception as exc:
-            _show_critical_box(self, "Cache write failed", str(exc))
+            _show_critical_box(self, "Cache write failed", _runtime.cache_error(exc))
             return False
         if self._current_model.changed_keys() or (
             self._current_model.has_pending_virtual_new_values()
@@ -4522,8 +4524,7 @@ class MainWindow(QMainWindow):
     def _report_parse_error(self, path: Path, exc: Exception) -> None:
         message = f"{path}\n\n{exc}"
         _show_warning_box(self, "Parse error", message)
-        print(f"[Parse error] {path}", file=sys.stderr)
-        traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+        _runtime.log_exception(f"Parse error: {path}", exc)
 
     # ── conflict handling -------------------------------------------------
     def _register_conflicts(
@@ -5340,6 +5341,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:  # noqa: N802
         """Guard close with save flow checks and worker shutdown."""
         if getattr(self, "_startup_aborted", False):
+            _runtime.release_project_session_lock(self)
             event.accept()
             return
         if self._merge_active:
@@ -5374,6 +5376,7 @@ class MainWindow(QMainWindow):
             self._tree_width_timer.stop()
             self._prefs_extras["TREE_PANEL_WIDTH"] = str(max(60, self._tree_last_width))
         self._persist_preferences()
+        _runtime.release_project_session_lock(self)
         event.accept()
 
     def _shutdown_tm_workers(self) -> None:

@@ -977,6 +977,37 @@ def test_session_resume_parser_normalizes_legacy_sidebar_to_project() -> None:
     assert snapshot.left_panel_index == 0
 
 
+def test_session_resume_default_writer_uses_atomic_replace(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Project session state must not expose a partial JSON file after interruption."""
+    snapshot = session_resume_module.parse_session_resume_snapshot(
+        _session_resume_payload()
+    )
+    assert snapshot is not None
+    writes: list[tuple[Path, str, str]] = []
+    monkeypatch.setattr(
+        session_resume_module,
+        "write_text_atomic",
+        lambda path, text, *, encoding: writes.append((path, text, encoding)),
+    )
+
+    path = session_resume_module.write_session_resume_snapshot(
+        root=tmp_path,
+        cache_dir=".tzp/cache",
+        snapshot=snapshot,
+    )
+
+    assert writes == [
+        (
+            path,
+            json.dumps(snapshot.to_payload(), ensure_ascii=False, indent=2) + "\n",
+            "utf-8",
+        )
+    ]
+
+
 def test_project_session_service_session_resume_snapshot_reader_ignores_invalid_payloads(
     tmp_path: Path,
 ) -> None:

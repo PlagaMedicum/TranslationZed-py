@@ -55,6 +55,7 @@ sequenceDiagram
 | Trigger | `General -> Open...` |
 | Success | Scan locale dirs, parse `language.txt`, show locale chooser, build `Project` tree, open most-recent file when available. |
 | Alternate | Unsaved drafts are auto-persisted to cache before root switch. |
+| Invalid locale metadata | Show skipped-file details, or a specific no-valid-target warning when none can be opened; do not silently close. |
 | Post-condition | Selected locales are active and window title reflects root path. |
 
 ## UC-02 Switch Locale(s)
@@ -132,5 +133,17 @@ sequenceDiagram
 | Field | Value |
 |---|---|
 | Goal | Ensure startup recovery decisions are explicit and deterministic. |
-| Current behavior | Startup dialog with `Restore`, `Discard`, `Cancel`, plaintext details, and deterministic decision application guards. |
+| Trigger | A stale project session lock proves the previous process ended uncleanly and draft-bearing cache entries exist. |
+| Concurrent process | Abort opening with the current lock-owner details; never allow two writers to share project persistence. |
+| Current behavior | Startup dialog with `Restore`, permanently deleting `Discard`, non-mutating `Cancel`, plaintext details, and deterministic decision guards. |
 | Normative spec | `docs/spec/v0_9/crash_recovery_uc12.md` |
+
+## UC-14 Error Diagnostics and Issue Report
+
+| Field | Value |
+|---|---|
+| Goal | Let a user report a failure without reconstructing runtime details manually. |
+| Trigger | `Help -> Copyable Issue Report…`, or an uncaught Python startup/Qt-callback exception. |
+| Success | Show a selectable Markdown template with one-click copy, versions, bounded traceback/log tail, recovery questions, and GitHub issue URL. |
+| Privacy | Redact project/home paths, omit environment variables, warn that an error snippet may contain file text, and require review before posting. |
+| Recovery | Leave existing draft caches untouched and advise restart when the current UI state may be unsafe. A startup failure may return without a usable window, and native-process termination remains outside this boundary. |

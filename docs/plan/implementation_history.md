@@ -53,6 +53,10 @@ Crash recovery uses explicit Restore, Discard, and Cancel decisions. Session sna
 project-scoped, versioned cache data. A valid snapshot is applied before last-opened-file fallback;
 invalid snapshots are ignored safely.
 
+Recovery policy tests are insufficient if the production adapter supplies constant lifecycle
+flags. A project-scoped one-writer lock now supplies the real unclean-session signal, prevents
+concurrent cache writers, and has a GUI-wiring regression test; session snapshots are atomic.
+
 ## Product Behavior
 
 ### Source reference semantics

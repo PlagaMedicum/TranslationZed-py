@@ -55,6 +55,9 @@ flowchart LR
 ## 4) Persistence Contracts
 
 - Draft cache: `.tzp/cache/<locale>/<relative>.bin`.
+- Workspace snapshot: `.tzp/cache/session.resume.json` (atomic replacement).
+- Live one-writer marker: `.tzp/cache/session.lock` (removed on accepted clean close; stale marker
+  activates draft-recovery detection).
 - EN hash cache: `.tzp/cache/en.hashes.bin`.
 - EN diff snapshot: `.tzp/cache/en_diff_snapshot.json`.
 - Managed TM imports: `.tzp/tms` by default.

@@ -7,7 +7,7 @@ import html
 import os
 import re
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
@@ -74,6 +74,7 @@ from translationzed_py.core.tzp_comment_policy import (
 )
 
 from . import languagetool_adapter as _lt_adapter
+from . import runtime_reliability as _runtime_reliability
 from .delegates import MAX_VISUAL_CHARS
 from .dialogs import ReplaceFilesDialog
 from .manual_scenario_dialog import ManualScenarioChecklistDialog
@@ -357,11 +358,15 @@ def run_replace_all(win) -> None:
 
 
 def _run_startup_recovery(win) -> bool:
+    lock_result = _runtime_reliability.ensure_project_session_lock(win)
+    if not lock_result.acquired:
+        _runtime_reliability.show_session_lock_error(win, lock_result)
+        return False
     plan = win._project_session_service.build_crash_recovery_detection_plan(
         root=win._root,
         selected_locales=win._selected_locales,
         startup_accepted=True,
-        previous_session_unclean=False,
+        previous_session_unclean=lock_result.previous_session_unclean,
         interrupted_draft_marker=False,
     )
     report = plan.report
@@ -377,14 +382,62 @@ def _run_startup_recovery(win) -> bool:
         plan=apply_plan
     )
     if not execution.continue_startup:
+        _runtime_reliability.release_project_session_lock(win)
         _abort_pending_post_locale_startup(win)
         return False
     if execution.failed_cache_paths and not _prompt_startup_discard_failure(
         win, execution
     ):
+        _runtime_reliability.release_project_session_lock(win)
         _abort_pending_post_locale_startup(win)
         return False
     return True
+
+
+def _try_write_en_hashes(
+    win,
+    hashes: dict[str, int],
+    writer: Callable[[Path, dict[str, int]], None],
+) -> bool:
+    """Persist the non-critical EN reminder cache without aborting project open."""
+    try:
+        writer(win._root, hashes)
+    except Exception as exc:
+        _runtime_reliability.log_exception("EN source hash cache write failed", exc)
+        QMessageBox.warning(
+            win,
+            "English source reminder unavailable",
+            "The project can remain open, but the English-change reminder could not be "
+            f"updated and may appear again. Check project-cache permissions.\n\n{exc}",
+        )
+        return False
+    return True
+
+
+def _build_locale_scan_message(
+    win,
+    errors: Sequence[str],
+    has_target_locales: bool,
+) -> QMessageBox:
+    """Build one actionable locale-scan warning for partial or empty results."""
+    msg = QMessageBox(win)
+    msg.setIcon(QMessageBox.Warning)
+    if has_target_locales:
+        msg.setWindowTitle("Malformed language.txt")
+        msg.setText(
+            "Some locales were skipped due to malformed language.txt. "
+            "Fix those files to enable the locales."
+        )
+    else:
+        msg.setWindowTitle("No valid target locales")
+        msg.setText(
+            "No valid target locale was found. Each target locale needs a readable "
+            "language.txt with a non-empty charset field. Fix or add a target locale, "
+            "then reopen the project."
+        )
+    if errors:
+        msg.setDetailedText("\n".join(errors))
+    return msg
 
 
 def _abort_pending_post_locale_startup(win) -> None:
@@ -421,7 +474,8 @@ def _prompt_startup_crash_recovery(
     msg.setWindowTitle("Recovery options")
     msg.setText(f"Found unsaved draft cache in {report.total_files} file(s).")
     msg.setInformativeText(
-        "Restore keeps draft cache, Discard skips recovery for now, Cancel aborts project open."
+        "Restore keeps the listed drafts. Discard permanently deletes them. "
+        "Cancel aborts project open without changing them."
     )
     msg.setDetailedText(_crash_recovery_details_text(report))
     msg.setStandardButtons(
@@ -1036,7 +1090,8 @@ def _open_qa_result_item(win, item: QListWidgetItem) -> None:
     raw_path, raw_row = payload
     try:
         match = _SearchMatch(Path(str(raw_path)), int(raw_row))
-    except Exception:
+    except Exception as exc:
+        _runtime_reliability.log_exception("Invalid QA result payload", exc)
         return
     win._select_match(match)
 
@@ -1637,7 +1692,8 @@ def _flush_session_resume_snapshot(win) -> None:
             root=win._root,
             snapshot=snapshot,
         )
-    except Exception:
+    except Exception as exc:
+        _runtime_reliability.log_exception("Session snapshot write failed", exc)
         return
 
 
@@ -1706,7 +1762,8 @@ def _apply_session_resume_snapshot(win) -> bool:
             active_file_relpath=snapshot.active_file_relpath,
             active_row=snapshot.active_row,
         )
-    except Exception:
+    except Exception as exc:
+        _runtime_reliability.log_exception("Session resume apply failed", exc)
         return False
     finally:
         win._session_resume_apply_in_progress = False
@@ -2503,7 +2560,8 @@ def _poll_tm_query(win) -> None:
         return
     try:
         matches = future.result()
-    except Exception:
+    except Exception as exc:
+        _runtime_reliability.log_exception("TM lookup failed", exc)
         win._set_tm_list_placeholder("TM lookup failed.")
         win._tm_apply_btn.setEnabled(False)
         return

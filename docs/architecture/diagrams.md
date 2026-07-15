@@ -216,8 +216,12 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  START[Startup open request] --> DETECT[Detect recovery candidates]
-  DETECT --> ASK{Recovery report exists}
+  START[Startup open request] --> LOCK{Acquire session.lock}
+  LOCK -- live owner --> ABORT[Explain conflict and abort open]
+  LOCK -- clean --> DETECT[Detect draft candidates]
+  LOCK -- stale replaced --> UNCLEAN[Mark previous session unclean]
+  UNCLEAN --> DETECT
+  DETECT --> ASK{Unclean signal and draft report}
   ASK -- no --> CONTINUE[Continue normal open flow]
   ASK -- yes --> DIALOG[Show Restore Discard Cancel dialog]
   DIALOG --> APPLY[Apply selected action]

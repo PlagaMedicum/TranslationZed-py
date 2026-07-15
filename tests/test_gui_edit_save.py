@@ -24,6 +24,7 @@ def test_edit_and_save(qtbot, tmp_path):
     ix = win.fs_model.index_for_path(dst / "BE" / "ui.txt")
     win._file_chosen(ix)
     assert win.table.model().rowCount() == 1
+    win.close()
     win = MainWindow(str(dst), selected_locales=["BE"])
     qtbot.addWidget(win)
     ix = win.fs_model.index_for_path(dst / "BE" / "ui.txt")

@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt
 
 from translationzed_py.core.model import Status
 from translationzed_py.gui import MainWindow
+from translationzed_py.gui import main_window as mw
 from translationzed_py.gui import main_window_panel_helpers as panel_helpers
 
 
@@ -61,6 +62,41 @@ def test_progress_strip_updates_for_file_and_locale(qtbot, tmp_path: Path) -> No
 
     assert win._progress_file_row.percent_label.text() == "T:0% P:0%"
     assert win._progress_locale_row.percent_label.text() == "T:25% P:25%"
+
+
+def test_cache_failure_keeps_edit_in_memory_and_blocks_file_switch(
+    qtbot, tmp_path: Path, monkeypatch
+) -> None:
+    """A failed draft write must not silently discard the current in-memory edit."""
+    root = tmp_path / "proj"
+    root.mkdir()
+    _make_project(root)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    win._post_locale_timer.stop()
+    first = root / "BE" / "a.txt"
+    win._file_chosen(win.fs_model.index_for_path(first))
+    model = win.table.model()
+    assert model is not None
+    errors: list[str] = []
+
+    def _fail_write(*_args, **_kwargs) -> None:  # type: ignore[no-untyped-def]
+        raise OSError("disk full")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(mw, "_write_status_cache", _fail_write)
+        patch.setattr(
+            mw,
+            "_show_critical_box",
+            lambda _parent, _title, text: errors.append(text),
+        )
+        assert model.setData(model.index(0, 2), "kept in memory", Qt.EditRole)
+        win._file_chosen(win.fs_model.index_for_path(root / "BE" / "b.txt"))
+
+    assert model.data(model.index(0, 2), Qt.EditRole) == "kept in memory"
+    assert win._current_pf is not None and win._current_pf.path == first
+    assert errors and "remains in this window" in errors[-1]
+    assert win._write_cache_current() is True
 
 
 def test_locale_progress_reuses_session_cache_and_updates_incrementally(

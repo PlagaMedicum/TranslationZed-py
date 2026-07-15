@@ -111,6 +111,7 @@ also_copy = [
     "translationzed_py/core/qa_rules.py",
     "translationzed_py/core/qa_service.py",
     "translationzed_py/core/render_workflow_service.py",
+    "translationzed_py/core/runtime_diagnostics.py",
     "translationzed_py/core/search.py",
     "translationzed_py/core/session_resume.py",
     "translationzed_py/core/source_reference_service.py",

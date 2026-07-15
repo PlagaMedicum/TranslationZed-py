@@ -51,6 +51,7 @@ flowchart TB
 | `UC-10c` | EN diff markers and NEW insertion | [`use_cases_project_lifecycle.md#uc-10c-en-diff-markers-and-new-insertion`](use_cases_project_lifecycle.md#uc-10c-en-diff-markers-and-new-insertion) |
 | `UC-11` | Exit application | [`use_cases_project_lifecycle.md#uc-11-exit-application`](use_cases_project_lifecycle.md#uc-11-exit-application) |
 | `UC-12` | Crash recovery | [`use_cases_project_lifecycle.md#uc-12-crash-recovery`](use_cases_project_lifecycle.md#uc-12-crash-recovery) |
+| `UC-14` | Error diagnostics and issue report | [`use_cases_project_lifecycle.md#uc-14-error-diagnostics-and-issue-report`](use_cases_project_lifecycle.md#uc-14-error-diagnostics-and-issue-report) |
 
 ### 4.2 Editing, statuses, and preferences
 
@@ -99,6 +100,9 @@ flowchart TB
 3. Status progression and save semantics are deterministic.
 4. LanguageTool and QA are non-blocking and explainable in UI.
 5. Source and Translation workflows preserve full-text editing behavior.
+6. Recoverable failures explain the next action; unexpected Python failures expose one copyable,
+   bounded report. Callback failures are contained when Python can safely return to the event loop;
+   startup and native-process failures must not be described as resumable.
 
 ## 6) Related Canonical Docs
 

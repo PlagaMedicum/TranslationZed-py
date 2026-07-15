@@ -60,6 +60,9 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 3. Session-resume snapshot contracts (A32):
    - `tests/test_project_session.py`
    - `tests/test_main_window_bootstrap_helpers.py`
+4. One-writer lock, exception boundary, logging, and issue reports:
+   - `tests/test_runtime_reliability.py`
+   - `tests/test_runtime_diagnostics.py`
 
 ## 4) Search / Replace / Source Reference
 

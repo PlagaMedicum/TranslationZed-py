@@ -157,8 +157,25 @@ def test_check_en_hash_cache_paths_include_exception_empty_and_mismatch_ack(
     assert win._check_en_hash_cache() is True
     assert writes[-1] == {"a": "1"}
 
+    warnings: list[tuple[str, str]] = []
+
+    def _fail_hash_write(_root, _data) -> None:  # type: ignore[no-untyped-def]
+        raise OSError("read-only cache")
+
+    monkeypatch.setattr(mw, "_write_en_hash_cache", _fail_hash_write)
+    monkeypatch.setattr(
+        mw._panel_helpers.QMessageBox,
+        "warning",
+        staticmethod(lambda _parent, title, text: warnings.append((title, text)) or 0),
+    )
+    assert win._check_en_hash_cache() is True
+    assert warnings and "may appear again" in warnings[-1][1]
+
     monkeypatch.setattr(mw, "QMessageBox", _MessageBoxStub)
     monkeypatch.setattr(mw, "_read_en_hash_cache", lambda _root: {"a": "0"})
+    monkeypatch.setattr(
+        mw, "_write_en_hash_cache", lambda _root, data: writes.append(dict(data))
+    )
     assert win._check_en_hash_cache() is True
 
 
