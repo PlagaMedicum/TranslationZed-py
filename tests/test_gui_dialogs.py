@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QCheckBox
+from PySide6.QtWidgets import QCheckBox, QPushButton
 
 from translationzed_py.core.project_scanner import LocaleMeta
 from translationzed_py.core.search_replace_service import (
@@ -52,6 +52,21 @@ def test_locale_chooser_selected_codes_and_rebuild_order(qtbot, tmp_path: Path) 
     dialog._boxes["BE"].setChecked(True)
     assert set(dialog.selected_codes()) == {"BE", "RU"}
     assert _checkbox_texts(dialog)[0].startswith("BE")
+
+
+def test_locale_chooser_add_callback_inserts_checked_locale(
+    qtbot, tmp_path: Path
+) -> None:
+    """Insert a newly created locale into the chooser as selected."""
+    initial = LocaleMeta("RU", tmp_path / "RU", "Russian", "utf-8")
+    created = LocaleMeta("UA", tmp_path / "UA", "Ukrainian", "utf-8")
+    dialog = LocaleChooserDialog([initial], on_add_locale=lambda: created)
+    qtbot.addWidget(dialog)
+
+    dialog.findChild(QPushButton, "addLocalizationButton").click()
+
+    assert dialog.selected_codes() == ["UA"]
+    assert "UA" in dialog._boxes
 
 
 def test_save_files_dialog_toggle_selection_and_choice(qtbot) -> None:

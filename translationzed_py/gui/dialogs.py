@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPlainTextEdit,
+    QPushButton,
     QScrollArea,
     QTableWidget,
     QTableWidgetItem,
@@ -40,6 +41,7 @@ class LocaleChooserDialog(QDialog):
         parent=None,
         *,
         preselected: Iterable[str] | None = None,
+        on_add_locale: Callable[[], LocaleMeta | None] | None = None,
     ) -> None:
         """Initialize the instance."""
         super().__init__(parent)
@@ -70,6 +72,25 @@ class LocaleChooserDialog(QDialog):
         scroll.setWidgetResizable(True)
         scroll.setWidget(list_widget)
         main_layout.addWidget(scroll)
+
+        if on_add_locale is not None:
+            add_locale = QPushButton("Add localization…", self)
+            add_locale.setObjectName("addLocalizationButton")
+
+            def _add() -> None:
+                meta = on_add_locale()
+                if meta is None or meta.code in self._boxes:
+                    return
+                label = f"{meta.code} — {meta.display_name}"
+                box = QCheckBox(label, self)
+                box.setChecked(True)
+                box.stateChanged.connect(self._rebuild_order)
+                self._boxes[meta.code] = box
+                self._items.append((meta.code, box))
+                self._rebuild_order()
+
+            add_locale.clicked.connect(_add)
+            main_layout.addWidget(add_locale)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,

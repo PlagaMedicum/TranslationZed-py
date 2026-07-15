@@ -268,12 +268,12 @@ from .delegates import (
 from .dialogs import (
     AboutDialog,
     ConflictChoiceDialog,
-    LocaleChooserDialog,
     SaveFilesDialog,
     TmLanguageDialog,
 )
 from .entry_model import TranslationModel
 from .fs_model import FsModel
+from .locale_creation import build_locale_chooser as _build_locale_chooser
 from .perf_trace import PERF_TRACE
 from .preferences_dialog import PreferencesDialog
 from .qa_async import poll_scan as _qa_poll_scan
@@ -2103,7 +2103,7 @@ class MainWindow(QMainWindow):
             smoke_mode=self._smoke,
         )
         if selected_locales is None:
-            dialog = LocaleChooserDialog(
+            dialog = _build_locale_chooser(
                 selectable.values(), self, preselected=self._last_locales
             )
             if dialog.exec() != dialog.DialogCode.Accepted:
@@ -2963,7 +2963,7 @@ class MainWindow(QMainWindow):
         if not self._write_cache_current():
             return
         selectable = {k: v for k, v in self._locales.items() if k != "EN"}
-        dialog = LocaleChooserDialog(
+        dialog = _build_locale_chooser(
             selectable.values(), self, preselected=self._selected_locales
         )
         if dialog.exec() != dialog.DialogCode.Accepted:

@@ -370,7 +370,7 @@ def test_init_locales_returns_empty_when_locale_dialog_is_cancelled(
         def selected_codes(self) -> list[str]:
             return ["BE"]
 
-    monkeypatch.setattr(mw, "LocaleChooserDialog", _Dialog)
+    monkeypatch.setattr(mw, "_build_locale_chooser", _Dialog)
     monkeypatch.setattr(
         mw._ProjectSessionService,
         "resolve_requested_locales",
@@ -449,7 +449,7 @@ def test_init_locales_malformed_scan_with_chooser_accept_schedules_followups(
 
     call_log: list[str] = []
     monkeypatch.setattr(mw, "QMessageBox", _WarningBox)
-    monkeypatch.setattr(mw, "LocaleChooserDialog", _Dialog)
+    monkeypatch.setattr(mw, "_build_locale_chooser", _Dialog)
     monkeypatch.setattr(win, "_project_session_service", _Service())
     monkeypatch.setattr(
         win, "_schedule_cache_migration", lambda: call_log.append("migrate")
@@ -1095,7 +1095,7 @@ def test_startup_reuses_session_locale_pool_without_showing_chooser(
                 "locale chooser must not open for a valid session pool"
             )
 
-    monkeypatch.setattr(mw, "LocaleChooserDialog", _UnexpectedLocaleChooser)
+    monkeypatch.setattr(mw, "_build_locale_chooser", _UnexpectedLocaleChooser)
 
     win = mw.MainWindow(str(root))
     qtbot.addWidget(win)

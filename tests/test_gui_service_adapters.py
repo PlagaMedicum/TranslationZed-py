@@ -174,7 +174,7 @@ def test_switch_locales_delegates_to_project_session_service(
                 current_locales=current_locales,
             )
 
-    monkeypatch.setattr(mw, "LocaleChooserDialog", _FakeDialog)
+    monkeypatch.setattr(mw, "_build_locale_chooser", _FakeDialog)
     monkeypatch.setattr(win, "_project_session_service", _SpyService())
     assert win._selected_locales == ["BE"]
     win._switch_locales()
