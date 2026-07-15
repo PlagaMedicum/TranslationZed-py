@@ -3,8 +3,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$RootDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+Set-Location $RootDir
 
-python -m pip install --upgrade pyinstaller
+python -c "import PyInstaller" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    throw 'PyInstaller is required; install the project with the "packaging" extra first.'
+}
 
 $upxArgs = @()
 $upx = Get-Command upx -ErrorAction SilentlyContinue
@@ -12,37 +17,9 @@ if ($upx) {
     $upxArgs = @("--upx-dir", $upx.Source | Split-Path)
 }
 
-# Exclude unused Qt modules to keep bundles small; PySide6 hooks pull in required parts.
-$excludes = @(
-    "PySide6.Qt3DAnimation",
-    "PySide6.Qt3DCore",
-    "PySide6.Qt3DExtras",
-    "PySide6.Qt3DInput",
-    "PySide6.Qt3DLogic",
-    "PySide6.Qt3DRender",
-    "PySide6.QtCharts",
-    "PySide6.QtDataVisualization",
-    "PySide6.QtMultimedia",
-    "PySide6.QtMultimediaWidgets",
-    "PySide6.QtNetworkAuth",
-    "PySide6.QtPdf",
-    "PySide6.QtPdfWidgets",
-    "PySide6.QtPositioning",
-    "PySide6.QtQuick",
-    "PySide6.QtQuick3D",
-    "PySide6.QtQuickControls2",
-    "PySide6.QtQuickWidgets",
-    "PySide6.QtQml",
-    "PySide6.QtSensors",
-    "PySide6.QtSerialPort",
-    "PySide6.QtSql",
-    "PySide6.QtTest",
-    "PySide6.QtWebChannel",
-    "PySide6.QtWebEngine",
-    "PySide6.QtWebEngineCore",
-    "PySide6.QtWebEngineWidgets",
-    "PySide6.QtWebSockets"
-)
+$excludes = Get-Content (Join-Path $RootDir "packaging\pyinstaller_excludes.txt") |
+    ForEach-Object { $_.Trim() } |
+    Where-Object { $_ -and -not $_.StartsWith("#") }
 
 $excludeArgs = @()
 foreach ($module in $excludes) {

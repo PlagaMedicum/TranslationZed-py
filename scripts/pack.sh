@@ -5,8 +5,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 source "$SCRIPT_DIR/_common.sh"
 ensure_venv
+cd "$ROOT_DIR"
 
-"$VENV_PY" -m pip install --upgrade pyinstaller
+if ! "$VENV_PY" -c "import PyInstaller" >/dev/null 2>&1; then
+  echo 'PyInstaller is required; install the project with the "packaging" extra first.' >&2
+  exit 2
+fi
 
 sep=":"
 case "${OSTYPE:-}" in
@@ -24,42 +28,13 @@ case "${OSTYPE:-}" in
   *) if [[ "${TZP_STRIP:-}" == "1" ]]; then STRIP_ARGS+=(--strip); fi ;;
 esac
 
-# Exclude unused Qt modules to keep bundles small; PySide6 hooks pull in required parts.
-EXCLUDES=(
-  PySide6.Qt3DAnimation
-  PySide6.Qt3DCore
-  PySide6.Qt3DExtras
-  PySide6.Qt3DInput
-  PySide6.Qt3DLogic
-  PySide6.Qt3DRender
-  PySide6.QtCharts
-  PySide6.QtDataVisualization
-  PySide6.QtMultimedia
-  PySide6.QtMultimediaWidgets
-  PySide6.QtNetworkAuth
-  PySide6.QtPdf
-  PySide6.QtPdfWidgets
-  PySide6.QtPositioning
-  PySide6.QtQuick
-  PySide6.QtQuick3D
-  PySide6.QtQuickControls2
-  PySide6.QtQuickWidgets
-  PySide6.QtQml
-  PySide6.QtSensors
-  PySide6.QtSerialPort
-  PySide6.QtSql
-  PySide6.QtTest
-  PySide6.QtWebChannel
-  PySide6.QtWebEngine
-  PySide6.QtWebEngineCore
-  PySide6.QtWebEngineWidgets
-  PySide6.QtWebSockets
-)
-
 EXCLUDE_ARGS=()
-for module in "${EXCLUDES[@]}"; do
+while IFS= read -r module || [ -n "$module" ]; do
+  case "$module" in
+    ""|\#*) continue ;;
+  esac
   EXCLUDE_ARGS+=(--exclude-module "$module")
-done
+done < "$ROOT_DIR/packaging/pyinstaller_excludes.txt"
 
 "$VENV_PY" -m PyInstaller \
   --clean \
@@ -67,8 +42,8 @@ done
   --name TranslationZed-Py \
   --add-data "LICENSE${sep}." \
   --add-data "README.md${sep}." \
-  ${STRIP_ARGS:+${STRIP_ARGS[@]}} \
-  ${UPX_ARGS:+${UPX_ARGS[@]}} \
+  "${STRIP_ARGS[@]}" \
+  "${UPX_ARGS[@]}" \
   "${EXCLUDE_ARGS[@]}" \
   translationzed_py/__main__.py
 

@@ -964,6 +964,9 @@ Current builds use cache-root startup recovery + session resume:
 - Python source distributions and wheels are built through `scripts/dist.sh`.
 - Standalone app folders are built with PyInstaller on each target operating system; release
   workflows archive the Linux, Windows, and macOS outputs separately.
+- Packaging dependencies must be installed before a build. Build scripts do not access package
+  indexes or mutate the environment, and both platforms consume
+  `packaging/pyinstaller_excludes.txt` as the single Qt-exclusion manifest.
 
 ---
 
