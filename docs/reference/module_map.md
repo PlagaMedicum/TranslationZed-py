@@ -1,5 +1,5 @@
 # TranslationZed-Py — Module Responsibility Map
-_Last updated: 2026-03-07_
+_Last updated: 2026-07-15_
 
 ## 1) Core Domain And Services
 
@@ -11,7 +11,9 @@ _Last updated: 2026-03-07_
 | `core.saver` / `core.atomic_io` | Byte-preserving save + atomic replace/write safety, with optional namespaced `TZP:` status-comment write-back. |
 | `core.status_cache` / `core.en_hash_cache` | Draft/status cache and EN baseline hash tracking. |
 | `core.en_diff_snapshot` / `core.en_diff_service` / `core.en_insert_plan` | EN diff markers (`NEW/REMOVED/MODIFIED`) and insertion planning. |
+| `core.git_sync` | Partial v1 foundation: read-only Git worktree/ref/blob inspection and synchronization-baseline persistence; no merge/UI integration yet. |
 | `core.project_scanner` | Locale/project discovery and metadata extraction. |
+| `core.locale_creation` | Partial v1 foundation: validated staged locale cloning and metadata rewriting; not a completed workflow contract yet. |
 | `core.project_session` | Locale/session/tree planning and startup/switch orchestration policies. |
 | `core.session_resume` | Project-scoped workspace snapshot DTO/schema validation and cache-file read/write/delete helpers. |
 | `core.file_workflow` | Open/save persistence sequencing plans and callbacks. |
@@ -44,6 +46,7 @@ _Last updated: 2026-03-07_
 | `gui.source_reference_header` / `gui.source_reference_ui` / `gui.source_reference_state` / `gui.source_lookup` | Source-reference UI and local runtime state. |
 | `gui.preferences_dialog` | Preferences UI for General/Search/QA/LanguageTool/TM/View with collapsed-by-default Advanced sections in crowded tabs. |
 | `gui.dialogs` | Shared dialogs (locale chooser, save selection, conflict/about, etc.). |
+| `gui.locale_creation` | Partial v1 locale-creation warning, input dialog, and chooser composition adapter. |
 | `gui.languagetool_adapter` | Editor underline spans/hints integration layer. |
 | `gui.qa_async` | Async QA run management and callback wiring. |
 | `gui.tm_preview` | TM preview helper rendering/parsing. |

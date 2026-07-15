@@ -317,7 +317,7 @@ def _tokenise(
             last_sig = kind
 
 
-# ── parse() placeholder – we’ll flesh this out next ───────────────────────────
+# ── decoded segment helpers ───────────────────────────────────────────────────
 def _segment_text(raw_text: str) -> str:
     if raw_text.startswith('"'):
         if raw_text.endswith('"'):

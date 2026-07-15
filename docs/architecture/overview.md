@@ -1,5 +1,5 @@
 # TranslationZed-Py — Architecture Overview
-_Last updated: 2026-03-24_
+_Last updated: 2026-07-15_
 
 ## 1) Goals
 
@@ -38,6 +38,10 @@ Dependency rules:
 | `tm_workflow_service` | TM query/apply/refresh orchestration and diagnostics |
 | `render_workflow_service` | render-heavy policy decisions |
 
+Partial v1 foundations are deliberately not listed as completed workflows: `git_sync` currently
+owns read-only Git inspection/state primitives, and `locale_creation` owns staged clone policy.
+Their integration status is authoritative in `docs/plan/implementation_active.md`.
+
 ```mermaid
 flowchart LR
   PS[project_session] --> FW[file_workflow]
@@ -63,11 +67,14 @@ flowchart LR
 - Main table presents one file at a time with status triage controls.
 - Detail panel supports full-text source/translation editing flow.
 
-## 6) Replaceability Points
+## 6) Change Boundaries
 
-- Parser/saver implementation can evolve behind stable contracts.
-- Cache and TM storage backends remain replaceable through service boundaries.
-- Search/TM scoring internals may be optimized without behavior drift.
+- Parser/saver changes must preserve byte and encoding contracts.
+- Cache, session, and TM schema changes require explicit compatibility and migration tests.
+- Search/TM internals may be optimized only with deterministic equivalence evidence.
+- A flat module is the default. Create a subpackage only when several cohesive modules already share
+  a stable boundary and the move removes recurring ownership ambiguity; line count alone is not a
+  reason to add nesting.
 
 ## 7) Conformance Guardrails
 

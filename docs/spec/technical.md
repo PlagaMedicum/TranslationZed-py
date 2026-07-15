@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.9.0 · updated 2026-06-24**\
+**Version 0.9.0 · updated 2026-07-15**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -19,7 +19,9 @@
 
 ## 1  Purpose
 
-Create a **clone‑and‑run** desktop CAT tool that allows translators to browse, edit and proofread Project Zomboid l10n files quickly, replacing the outdated Java TranslationZed.  The entire stack is Python + Qt (PySide6) with **zero non‑standard runtime deps** on macOS, Windows and Linux.
+Create a desktop CAT tool that allows translators to browse, edit, and proofread Project Zomboid
+l10n files quickly. The application uses Python, PySide6, and the small runtime dependency set
+declared in `pyproject.toml` on macOS, Windows, and Linux.
 
 ---
 
@@ -44,7 +46,6 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
   workspace context but does not reactivate TM, Search, or QA panels; TM store setup,
   import sync, bootstrap, and queries remain deferred until an explicit TM-panel click.
 - Status per Entry: **Untouched** (initial state), **For review**, **Translated**, **Proofread**.
-  Future statuses remain pluggable.
 - Explicit **“Status ▼”** toolbar button and `Ctrl+P` shortcut allow user‑selected status changes.
 - Live plain / regex search over Key / Source / Translation with `F3` / `Shift+F3` navigation.
 - Source column supports reference‑locale switching across **opened locales**
@@ -61,7 +62,8 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 - **Productivity bias**: prioritize low‑latency startup and interaction; avoid
   heavyweight scans on startup.
 
-*Out of scope for current scope*: item/recipe generator, VCS, self‑update.
+The current v0.9 contract has no Git synchronization, locale creation, machine translation, or
+self-update workflow. Planned v1.0 work is indexed separately and does not redefine current behavior.
 
 ---
 
@@ -73,7 +75,7 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 | **Usability**     | All actions accessible via menu and shortcuts; table usable without mouse.           |
 | **Portability**   | Tested on Win 10‑11, macOS 13‑14 (ARM + x86), Ubuntu 22.04+.                         |
 | **Reliability**   | No data loss on power‑kill (`os.replace` atomic writes; cache‑only recovery model). |
-| **Extensibility** | New statuses, parsers and generators added by registering entry‑points.              |
+| **Architecture**  | Workflow policy remains Qt-free and directly testable behind narrow GUI adapters.   |
 | **Security**      | Never execute user‑provided code; sanitise paths to prevent traversal.               |
 | **Productivity**  | Startup < 1s for cached project; key search/respond < 50ms typical.                  |
 | **UI Guidelines** | Follow GNOME HIG + KDE HIG via native Qt widgets; keep theme overrides minimal and readability-focused. |
@@ -102,82 +104,15 @@ Create a **clone‑and‑run** desktop CAT tool that allows translators to brows
 
 ## 4  Architecture Overview
 
-```
-translationzed_py/
-├── core/
-│   ├── project_scanner.py   # locate locales / files
-│   ├── parser.py            # loss‑less token parser
-│   ├── parse_utils.py       # token helpers / encoding utilities
-│   ├── lazy_entries.py      # lazy/on-demand entry access for large files
-│   ├── tzp_comment_policy.py # namespaced TZP comment parse/format/write contracts
-│   ├── model.py             # Entry, ParsedFile
-│   ├── saver.py             # multi‑file atomic writer
-│   ├── search.py            # index + query API
-│   ├── status_cache.py      # binary per-file status store
-│   ├── en_hash_cache.py     # EN hash index + migration helpers
-│   ├── en_diff_snapshot.py  # persistent EN diff baseline snapshot helpers
-│   ├── en_diff_service.py   # NEW/REMOVED/MODIFIED classification
-│   ├── en_insert_plan.py    # deterministic NEW-row insertion planning/apply
-│   ├── conflict_service.py  # conflict policy + merge planning (non-Qt)
-│   ├── file_workflow.py     # file/cache overlay + cache-save planning (non-Qt)
-│   ├── project_session.py   # session cache scan + auto-open selection (non-Qt)
-│   ├── session_resume.py    # startup workspace snapshot DTO + cache persistence (non-Qt)
-│   ├── render_workflow_service.py # large-file render/span policy (non-Qt)
-│   ├── search_replace_service.py # scope/search/replace planning (non-Qt)
-│   ├── source_reference_service.py # source-reference locale/path planning (non-Qt)
-│   ├── qa_rules.py         # pure QA primitives (trailing/newline/token checks)
-│   ├── qa_service.py       # QA list DTO/label/panel planning (non-Qt)
-│   ├── preferences_service.py # startup root + prefs normalization/persist policy (non-Qt)
-│   ├── tm_store.py          # project TM storage/query (SQLite)
-│   ├── tm_import_sync.py    # import-folder sync workflow (non-Qt)
-│   ├── tm_query.py          # TM query policy/filter helpers (non-Qt)
-│   ├── tm_workflow_service.py # TM cache/pending/query orchestration (non-Qt)
-│   ├── tm_preferences.py    # TM preference action orchestration (non-Qt)
-│   ├── tm_rebuild.py        # project-TM rebuild service (non-Qt)
-│   ├── save_exit_flow.py    # save/exit decision flow (non-Qt)
-│   ├── tmx_io.py            # TMX import/export
-│   ├── atomic_io.py         # atomic write helpers
-│   ├── app_config.py        # TOML-configurable paths/adapters/formats
-│   └── preferences.py       # user settings (settings.env)
-├── gui/
-│   ├── app.py               # QApplication bootstrap
-│   ├── commands.py          # undo/redo command objects
-│   ├── dialogs.py           # locale chooser + save dialogs
-│   ├── delegates.py         # paint/edit delegates
-│   ├── entry_model.py       # table model (Key|Source|Translation|Status)
-│   ├── fs_model.py          # file tree model
-│   ├── main_window.py       # primary GUI controller (adapter shell; line-budget guarded)
-│   ├── main_window_en_diff_helpers.py # EN-diff + insertion workflow helpers
-│   ├── main_window_panel_helpers.py   # panel/status/search/TM helper extraction
-│   ├── search_scope_ui.py   # search-scope indicator icon helpers
-│   ├── source_lookup.py     # source-column lazy/by-row lookup adapters
-│   ├── source_reference_ui.py # source-reference selector UI helpers
-│   ├── source_reference_state.py # source-reference mode/override UI state helpers
-│   ├── status_header.py     # status-column sort/filter header menu
-│   ├── table_header.py      # table-header click dispatcher
-│   ├── perf_trace.py        # opt-in perf tracing
-│   └── preferences_dialog.py# preferences UI
-└── __main__.py              # CLI + GUI entry‑point
-```
+- `translationzed_py/core/` owns Qt-free models, deterministic algorithms, workflow policy, and IO.
+- `translationzed_py/gui/` owns Qt widgets, rendering, dialogs, event wiring, and core-service
+  adaptation.
+- `translationzed_py/__main__.py` and `gui.app` own process/bootstrap concerns.
 
-Component diagram:
-
-```
-+---------+      signals/slots      +----------------+
-|  GUI    |  <------------------→  |  core.model    |
-+---------+                        +----------------+
-       ↑                                ↓
-   project_scanner       saver  ←------+
-```
-
-Layering:
-- **Core (domain)**: data model + use cases; no Qt dependencies.
-- **Infrastructure**: parser/saver/cache implementations behind interfaces.
-- **GUI adapters**: Qt widgets + models binding to core use cases.
-Interfaces should be **explicit but minimal**, justified by future replaceability
-(alternate formats, storage backends). Avoid over‑engineering. Core adapters
-and format choices are **config‑driven** (see `config/app.toml`) to allow
-library/format swaps with minimal code churn.
+Core never imports GUI or Qt. Add an interface only when it isolates a real effect or removes proven
+duplication; a possible future implementation is not sufficient justification. The current module
+inventory and responsibility boundaries are maintained in `docs/reference/module_map.md`, while
+dependency rules are owned by `docs/architecture/overview.md`.
 
 ### 4.1 Programming Paradigm and Architectural Style
 
@@ -221,16 +156,10 @@ This table binds technical sections to canonical UC IDs.
 
 ### 5.1  `core.project_scanner`
 
-```python
-def scan_root(root: Path) -> dict[str, Path]:
-    """Return mapping {locale_code: locale_path}."""
-```
-
 - Discover locale directories by listing direct children of *root* and
-  excluding `_TVRADIO_TRANSLATIONS`. Locale names are not constrained to a
-  2‑letter regex (e.g., `EN UK`, `PTBR` are valid).
+  excluding runtime and reserved directories. Existing locale directory names are read as-is.
 - Index translatable files recursively with `Path.rglob(f"*{translation_ext}")`,
-  where `translation_ext` comes from `config/app.toml` (`[formats]`).
+  where `translation_ext` comes from `config/app.toml` (`[formats]`),
   excluding `language.txt` and `credits.txt` in each locale.
 - Parse `language.txt` for:
   - `charset` (encoding for all files in that locale; **required**)
@@ -241,82 +170,34 @@ def scan_root(root: Path) -> dict[str, Path]:
 
 ### 5.2  `core.parser`
 
-Tokenizer regex patterns:
-
-- `COMMENT   = r"--.*?$"` (multiline via `re.MULTILINE`)
-- `STRING    = r'"(?:\.|[^"\])*"'`
-- `CONCAT    = r"\.\."`
-- `BRACE     = r"[{}]"`
-- `COMMA     = r","`
-- etc.
-
-`parse(path: Path, encoding: str) -> ParsedFile`
-
-Parse algorithm:
-
-1. Read raw bytes using the locale‑specific `encoding` (from `language.txt`; **mandatory**).
-   - If `encoding` is UTF‑16 and no BOM is present, **still attempt** decoding using the
-     declared charset (heuristic fallback). Fail hard only if decoding errors occur.
-2. Tokenize entire file → `list[Token]` with `(type, text, start, end)`.
-3. For each `STRING` immediately right of `IDENT "="`, create **Entry** whose
-   `span` covers *only* the string literal region (including the quotes), even
-   when the value is a concatenation chain. Braces `{}` and all whitespace /
-   commas / comments are treated as trivia and **must be preserved byte‑exactly**
-   on save.
-4. Concatenated tokens are preserved as structural metadata. The in‑memory value
-   may be flattened for editing, but **saving must preserve the original concat
-   chain and trivia** (whitespace/comments) without collapsing into a single
-   literal. All non‑literal bytes (comments, spacing, braces, line breaks) are
-   treated as immutable and must be preserved byte‑exactly.
-   - Persist per‑entry segment spans to allow re‑serialization without changing
-     token boundaries.
-5. Return `ParsedFile` containing `entries`, `raw_bytes`. `entries`, `raw_bytes`.
-6. Status comments are **not** written into localization files by default.
-   Optional write-back is gated by `TZP_STATUS_COMMENT_WRITEBACK`.
-   Program-generated status markers use explicit namespacing (`TZP:`) and
-   deterministic parse/format/write-plan contracts in `core.tzp_comment_policy`;
-   only those namespaced program comments are writable.
+- `parse` and `parse_lazy` read raw bytes once and stream tokens while retaining byte offsets.
+- The locale-declared encoding is mandatory; UTF BOMs are honored without discarding byte spans.
+- Each normal entry retains its key, decoded value, literal span, concatenated-segment lengths, and
+  exact bytes between segments. Lazy parsing defers value decoding but preserves the same contract.
+- Files without assignment entries, including `News_*.txt`, are represented as one raw-file entry.
+- Saving may change only edited literal/raw-entry bytes and explicitly enabled namespaced `TZP:`
+  status comments. Other comments, whitespace, braces, punctuation, ordering, and line endings stay
+  byte-exact.
 - Related UCs: UC-03, UC-05b, UC-10a.
 
 ### 5.3  `core.model`
 
-```python
-class Status(Enum):
-    UNTOUCHED   = auto()  # never edited in current session
-    FOR_REVIEW  = auto()
-    TRANSLATED  = auto()
-    PROOFREAD   = auto()
-
-class ParsedFile:
-    path: Path
-    entries: list[Entry]
-    dirty: bool
-```
-
-- Core model stays Qt-free; undo/redo lives in GUI adapters.
+- `Status` has exactly `UNTOUCHED`, `FOR_REVIEW`, `TRANSLATED`, and `PROOFREAD`.
+- `Entry` holds stable key/value/status/span metadata; `ParsedFile` owns eager or lazy entries plus
+  the authoritative raw bytes and dirty state.
+- Core models stay Qt-free; undo/redo lives in GUI adapters.
 - Table rendering maps row backgrounds by `Status`.
 - Related UCs: UC-03b, UC-04a, UC-04b, UC-04c.
 
 ### 5.4  `core.saver`
 
-`save(pfile: ParsedFile, new_entries: dict[str, str], encoding: str) -> None`
-
-Algorithm:
-
-1. For each `ParsedFile` where `dirty`:
-   - Read raw bytes once to preserve leading `{`, trailing `}`, comments and
-     whitespace exactly as on disk.
-   - Re‑read file using provided `encoding`.
-   - For every changed `Entry`, replace only the string‑literal `span` and apply
-     replacements in **reverse offset order** to avoid index drift.
-   - For concatenated values, preserve the original token structure and trivia;
-     do **not** collapse the chain into a single literal.
-   - All non‑literal bytes (comments, whitespace, braces, punctuation) are
-     preserved byte‑exactly; ordering is never modified.
-  - After a successful write, recompute in‑memory spans using a cumulative
-    delta to keep subsequent edits stable in the same session.
-  - Write to `path.with_suffix(".tmp")` encoded with the same charset, then `os.replace`.
-2. Emit Qt signal `saved(files=...)`. `saved(files=...)`.
+- `save` patches the in-memory raw bytes in reverse span order and writes through
+  `atomic_io.write_bytes_atomic`; it does not re-read the original or emit Qt signals.
+- Normal entries preserve concatenation gaps and segment boundaries. Raw-file entries replace their
+  one complete span.
+- Optional namespaced status-comment write-back never changes user-authored comments.
+- After success, refresh raw bytes, spans, values, and dirty state so repeated saves in one session
+  remain correct.
 - Related UCs: UC-10a, UC-11.
 
 ### 5.5  `core.search`
@@ -328,7 +209,6 @@ Algorithm:
 - Query decomposition is compiled once per search run (`prepare_search_plan`)
   and reused across row/file scans to avoid repeated split/lower/regex planning.
 - Returns `(file_path, row_index)` list for selection (multi‑file capable).
-- Future: optional `match_span`/`snippet` payload for preview; not in current scope.
 - GUI must delegate search logic to this module (no GUI-level search).
 - Related UCs: UC-05a.
 
@@ -508,22 +388,15 @@ Algorithm:
 ### 5.7  `core.app_config`
 
 - TOML file at `<project-root>/config/app.toml` (checked after cwd, optional).
-- Purpose: minimize hard‑coding and enable quick adapter/format swaps without refactors.
+- Purpose: centralize project paths, cache/translation extensions, comment syntax, and EN insertion
+  preview settings.
 - Sections:
   - `[paths]` → `cache_dir`, `config_dir`
   - `[cache]` → `extension`, `en_hash_filename`
-  - `[adapters]` → `parser`, `ui`, `cache`
   - `[formats]` → `translation_ext`, `comment_prefix`
   - `[diff]` → `insertion_enabled_globs`, `preview_context_lines`
-- Swappable adapters are selected by name; actual implementations live behind
-  interfaces in the application layer (clean architecture).
 
-### 5.8  `config/ci.yaml` (reserved)
-
-- YAML placeholder for future CI pipelines.
-- Lists scripted steps (lint/typecheck/test) to keep CI assembly lightweight.
-
-### 5.9  `gui.main_window`
+### 5.8  `gui.main_window`
 
 - Menu structure:
   - **General**: Open, Save, Switch Locale(s), Preferences, Exit
@@ -683,7 +556,7 @@ if dirty_files and not prompt_save():
   `Recorded_Media`), and QA refresh is guaranteed non-mutating until explicit save.
 - Related UCs: UC-01, UC-02, UC-04a, UC-04b, UC-04c, UC-09, UC-10b, UC-13a, UC-13b, UC-13m.
 
-### 5.9.1  UI Guidelines (GNOME + KDE)
+### 5.8.1  UI Guidelines (GNOME + KDE)
 
 - Prefer **native Qt widgets** and platform theme; avoid custom palettes/styles.
 - Use **standard dialogs** (`QFileDialog`, `QMessageBox`) to match platform HIG.
@@ -1086,9 +959,9 @@ Current builds use cache-root startup recovery + session resume:
 
 ## 10  Packaging & Distribution (details)
 
-- **Wheel** (`pipx install translationzed‑py==0.1.*`).
-- **Standalone** (`pyinstaller --windowed --onefile`).  Separate spec files per OS with icon resources.
-- **macOS .app bundle** via `py2app` (optional post‑v0.7).
+- Python source distributions and wheels are built through `scripts/dist.sh`.
+- Standalone app folders are built with PyInstaller on each target operating system; release
+  workflows archive the Linux, Windows, and macOS outputs separately.
 
 ---
 
@@ -1096,7 +969,6 @@ Current builds use cache-root startup recovery + session resume:
 
 - Reject paths containing `..` when scanning.
 - All writes are atomic; no elevation required.
-- Future idea: sandbox via `pyinstaller --enable‑lld` hardened mode.
 
 ---
 
@@ -1115,17 +987,11 @@ Current builds use cache-root startup recovery + session resume:
     verify pass; schedule-heavy additionally runs strict benchmark compare once
     (`make bench-check` fail mode) because the dedicated benchmark job is skipped on schedule.
 
-## 13  Backlog (Post‑v0.7)
+## 13  Active And Future Work
 
-1. Item/Recipe template generator.
-2. GitHub PR integration (REST v4 API).
-3. Automatic update check (GitHub Releases).
-4. Simple editor for location `description.txt` files.
-5. LanguageTool diagnostics UX extensions beyond current click-hint + quick-fix flow.
-6. Extended Translation QA rule packs (post-v0.7): domain-specific checks and
-   project-level custom rule sets beyond the shipped baseline (`qa.trailing`,
-   `qa.newlines`, `qa.tokens`, `qa.same_source`).
-7. Theme presets beyond `SYSTEM|LIGHT|DARK` (future).
+Current implementation work is owned by `docs/plan/implementation_active.md`. Planned v1.0
+behavior is specified in `docs/spec/v1_0/overview.md`; it must not be treated as current behavior
+until the corresponding slice is complete.
 
 ## 14  Undo / Redo
 

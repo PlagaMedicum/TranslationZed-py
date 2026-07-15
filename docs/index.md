@@ -18,10 +18,12 @@ browser-first reading.
 - `docs/spec/technical.md` — technical contracts and architecture constraints.
 - `docs/ux/use_cases.md` — user-facing behavior and interaction contracts.
 - `docs/spec/v0_9/overview.md` — index of detailed v0.9 feature contracts.
+- `docs/spec/v1_0/overview.md` — planned v1.0 feature contracts during active implementation.
 
 ## Delivery And Quality
 
 - `docs/plan/implementation_active.md` — active milestone scope and acceptance criteria.
+- `docs/spec/v1_0/delivery_plan.md` — detailed ordered v1.0 implementation slices and proof duties.
 - `docs/plan/implementation_history.md` — historical execution log.
 - `docs/quality/testing_strategy.md` — test policy and verification model.
 - `docs/reference/contract_index.md` — targeted on-demand source context.

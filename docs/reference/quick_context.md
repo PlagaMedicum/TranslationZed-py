@@ -1,5 +1,5 @@
 # TranslationZed-Py — Quick Context
-_Updated: 2026-06-23_
+_Updated: 2026-07-15_
 
 ## 1) What This Project Is
 
@@ -12,6 +12,8 @@ Primary constraints:
 - EN as immutable source reference.
 
 Current project version: `0.9.0`.
+
+Active development target: `v1.0.0` on `dev`; see `docs/plan/implementation_active.md`.
 
 ## 2) Fast Mental Model
 
@@ -27,7 +29,8 @@ Current project version: `0.9.0`.
   `docs/reference/module_map.md`;
 - tests or gates: `docs/reference/test_surface.md` and
   `docs/reference/automation_surface.md`;
-- active work: `docs/plan/implementation_active.md`;
+- active v1 work: read `docs/plan/implementation_active.md`, then only the relevant slice in
+  `docs/spec/v1_0/delivery_plan.md`;
 - risky modules: `docs/reference/risk_register.md`.
 
 Use `docs/meta/docs_structure.md` when ownership is unclear.

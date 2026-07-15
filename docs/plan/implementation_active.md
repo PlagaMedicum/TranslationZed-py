@@ -1,86 +1,86 @@
 # Active Implementation Plan
 
-_Updated: 2026-06-23_
+_Updated: 2026-07-15_
 
 ## Current Objective
 
-Prepare and close the unreleased v0.9.0 release without reopening product scope.
+Deliver v1.0.0 from `dev`, starting at the exact v0.9.0 release commit, without weakening
+lossless editing, cache-first safety, deterministic behavior, encoding fidelity, or bounded
+resource use.
 
-The documentation and agent-surface cleanup is complete: current contracts remain available,
-completed packet logs have moved out of normal context, active risks are explicit, and generated
-source context is now targeted and on demand.
+The scope index is `docs/spec/v1_0/overview.md`; implementation order, failure semantics, and
+per-slice proof obligations are owned by `docs/spec/v1_0/delivery_plan.md`. Current technical and
+UX contracts describe implemented behavior only.
 
-The remaining release sequence is:
+## Slice Status
 
-1. freeze a clean release-candidate commit and record its SHA;
-2. run the machine-owned preflight, including `make gate-ci-pr`, benchmark checks, and
-   `make release-check TAG=v0.9.0`;
-3. run `make release-evidence-check` and rerun every manual scenario it reports as missing,
-   stale, or structurally outdated;
-4. sync only fresh passed evidence through the supported release-evidence commands;
-5. review the tracked evidence diff, commit it without unrelated changes, and record the resulting
-   release commit SHA;
-6. from that clean commit, rerun `make release-evidence-check` and
-   `make gate-release TAG=v0.9.0`;
-7. tag that exact commit, push the tag, and verify the release workflow's Linux, macOS, and Windows
-   package builds, smoke runs, uploaded archives, and draft release.
+| Slice | State | Current boundary |
+|---|---|---|
+| Planning contract | Complete | User intent, ordering, non-goals, and acceptance are documented. |
+| 1. Git synchronization | Foundation only | Read-only Git/ref/blob inspection and baseline-state primitives exist with focused tests. Change classification, merge policy, UI, and startup/save integration do not. |
+| 2. Add localization | Foundation only | Staged clone policy and chooser/warning dialogs exist with focused tests. Treat them as retained scaffold, not a finished workflow. |
+| 3. `description.txt` | Not started | Independent first-class editing remains planned. |
+| 4. QA safety pack | Not started | Existing v0.9 QA remains current. |
+| 5. LanguageTool extension | Not started | Existing v0.9 LanguageTool behavior remains current. |
+| 6. Machine translation | Not started | v1 requires provider-neutral conventional MT plus context-aware local LLM adapters for Ollama and llama.cpp-compatible servers. |
+| 7. Release closure | Not started | Begin only after slices 1–6 meet their acceptance gates. |
 
 ## Constraints
 
-- Preserve any user work that appears during closure; do not fold unrelated changes into release
-  fixes or evidence commits.
-- Do not add features or perform broad runtime cleanup during release closure.
-- Change runtime code only for a reproduced release blocker, using the smallest behavior-preserving
-  fix and focused regression coverage.
-- Preserve deterministic behavior, byte-exact save structure, no-write-on-open safety, locale
-  encoding fidelity, security boundaries, and performance budgets.
-- Source-reference behavior is requested locale or empty Source cells when the matching file is
-  absent.
-- `TZP_STATUS_COMMENT_PREFIX` is not a user-facing preference.
-- Current-file encoding remains visible while a file is open.
-- Interactive release evidence is human-owned. Do not fabricate or hand-edit evidence that should
-  come from a passed interactive run.
-- Reproduce benchmark failures in the intended workflow before changing code or baselines.
-- Do not create or push the release tag until the exact tagged commit is clean and passes the local
-  release gate.
+- Work on `dev`; integrate the exact clean release commit into `main` only at final closure.
+- Git integration is read-only: never fetch, pull, stage, commit, or change branches.
+- Detection, synchronization, and project open never write original locale files.
+- Preserve translations when EN text changes; marking `For review` is explicit.
+- Locale creation and `description.txt` editing are separate services and workflows.
+- Machine translation is optional, never auto-applied, and marked `For review` when accepted.
+- Preserve both requested v1 provider classes: conventional non-LLM machine translation and a
+  context-aware local LLM. Conventional MT must not be designed around Google or any other single
+  vendor; Google may be one documented adapter, not the privileged or exclusive path.
+- Support both Ollama and llama.cpp-compatible HTTP servers for the local LLM path. Do not bundle,
+  start, download, or manage either runtime or its models.
+- Keep Qt in GUI adapters and workflow/provider policy in Qt-free core modules.
+- Refactor only to remove proven duplication or enforce a boundary used by the active slice.
+- Preserve v0.9 settings, caches, snapshots, TM databases, and session state.
 
 ## Verified State
 
-For the documentation and agent-surface cleanup on 2026-06-23:
-
-- `make docs-check` passes;
-- `make gate-dev` passes;
-- focused documentation, contract-context, and gate-policy tests pass;
-- `git diff --check` passes;
-- `README.md` is unchanged.
-
-This does not assert that interactive release evidence or the full release gate is current. Run the
-corresponding commands for authoritative status.
-
-Current release checks on 2026-06-23:
-
-- `make gate-ci-pr` passes after focused session-resume persistence and malformed-payload coverage
-  closed the strict coverage blocker;
-- strict coverage is 92.1% whole-package and 97.4% core;
-- `make bench-check` passes the Linux benchmark regression comparison;
-- `make release-check TAG=v0.9.0` passes version and changelog alignment;
-- no `v0.9.0` or v0.9.0 release-candidate tag exists at the current commit;
-- `make release-evidence-check` reports that all ten required manual scenarios need fresh runs:
-  seven are missing and the three existing records are stale or structurally outdated.
+- `dev` is fast-forwarded to tagged commit `v0.9.0` (`45baa879a09656338cfab029616af7b3d4d68386`).
+- The v0.9.0 worktree was clean before v1 work began.
+- v0.9.0 provides snapshot-based `NEW/MODIFIED/REMOVED` detection, comment-preserving NEW-row
+  insertion, conflict resolution, QA/LT, TM, and strict multi-platform release gates.
+- No runtime Git synchronization, locale creation, `description.txt` specialization, or MT
+  provider existed at the v1 baseline. The status table above is the authority for work added
+  since that baseline.
+- The retained foundation and planning work passes `make gate-task-close` on 2026-07-15
+  (92.3% overall coverage, 97.3% core). This is scaffold evidence, not slice completion.
 
 ## Acceptance Criteria
 
-- Machine-owned release gates pass on the intended release commit.
-- `make release-evidence-check` passes using fresh interactive evidence.
-- Required manual scenarios use real application actions and their documented finish conditions.
-- The release commit is clean, its SHA is recorded, and the release tag points to that exact commit.
-- Version, changelog, benchmark, and release metadata checks agree with `v0.9.0`.
-- Linux, macOS, and Windows release packages build, pass their workflow smoke runs, upload
-  successfully, and appear on the draft release.
-- No unrelated feature or architecture expansion is introduced during blocker closure.
+- Every slice has focused core, GUI, failure-path, and performance coverage proportional to risk.
+- Git synchronization is deterministic, previewed, cancellable, and cache-only until Save.
+- Locale creation warns about official community coordination and never overwrites a locale.
+- `description.txt` behaves as one visually keyless row across normal editing services.
+- QA/LT/MT remain asynchronous or bounded where applicable and discard stale results.
+- Conventional MT and both local-LLM protocols are fakeable in tests and remain visually separate
+  from ranked TM data.
+- `make gate-ci-pr`, strict benchmarks, fresh interactive evidence, and
+  `make gate-release TAG=v1.0.0` pass on the exact clean release commit.
+- The final tag triggers successful Linux, macOS, and Windows packages and smoke runs.
 
 ## Open Follow-ups
 
-- Runtime simplification requires a separate behavior-preserving plan after release closure.
-- Reassess Make/CI command complexity separately; the current documentation pass intentionally did
-  not remove general test, performance, security, packaging, or release machinery.
+- User-defined QA rule files, updater/PR integration, and automatic background MT generation remain
+  v1.1-or-later work.
+- Theme expansion is not planned.
+- Direct final release is intentional; no release-candidate workflow is required for v1.0.0.
+
+## Confirmed Slice 6 Provider Direction
+
+- Conventional MT uses a provider-neutral core contract and documented, licensed interfaces only.
+  No unofficial web scraping or Google-specific request model may define the shared interface.
+- Google Translate may be offered through an official adapter, alongside non-Google conventional
+  providers. The concrete adapter roster must be selected from documented interfaces before
+  implementation and recorded in the slice change; provider diversity is required for v1.
+- Context-aware local generation supports user-managed Ollama and llama.cpp-compatible HTTP
+  servers through separate adapters. Endpoints and models are explicit user configuration; the
+  application remains usable when neither runtime is installed.

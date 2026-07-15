@@ -33,8 +33,14 @@ current contracts rather than future plans.
 
 ### Active work
 
-`docs/plan/implementation_active.md` contains only the current objective, constraints, acceptance
-criteria, verified state, and open follow-ups. Completed packet narratives do not remain there.
+`docs/plan/implementation_active.md` contains only the current objective, slice status, constraints,
+acceptance criteria, verified state, unresolved decisions, and open follow-ups. Completed packet
+narratives do not remain there.
+
+While a release is under development, version-specific planned contracts may live under
+`docs/spec/<version>/` when clearly labeled as planned and linked from the active plan. They do not
+override current technical or UX contracts. Promote their implemented behavior to the canonical
+owners as each slice closes.
 
 ### Durable history
 
