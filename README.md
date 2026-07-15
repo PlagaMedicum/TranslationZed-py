@@ -76,18 +76,18 @@ We build executables **on each target OS** (no cross‑compilation).
 
 Linux/macOS:
 ```bash
-python -m pip install -e ".[packaging]"
 make pack
 ```
 
 Windows (PowerShell):
 ```powershell
-python -m pip install -e ".[packaging]"
-pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/pack.ps1
+python -m pip install -e ".[dev,packaging]"
+python -m PyInstaller --clean --noconsole --name TranslationZed-Py ^
+  --add-data "LICENSE;LICENSE" --add-data "README.md;README.md" ^
+  --collect-all PySide6 translationzed_py\\__main__.py
 ```
 
 Artifacts are written to `dist/TranslationZed-Py/` (PyInstaller default).
-Packaging scripts validate prerequisites but never install or upgrade dependencies during a build.
 
 Releases:
 - Tagged pushes (`vX.Y.Z`) trigger multi‑OS builds in GitHub Actions.
