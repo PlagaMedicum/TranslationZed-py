@@ -961,7 +961,9 @@ Current builds use cache-root startup recovery + session resume:
 
 ## 10  Packaging & Distribution (details)
 
-- Python source distributions and wheels are built through `scripts/dist.sh`.
+- Python source distributions and wheels are built through `scripts/dist.sh`. The sdist contains
+  installable project sources and metadata; repository-only tests, fixtures, docs, and automation
+  remain available from the repository rather than as a partial test payload.
 - Standalone app folders are built with PyInstaller on each target operating system; release
   workflows archive the Linux, Windows, and macOS outputs separately.
 - Packaging dependencies must be installed before a build. Build scripts do not access package
