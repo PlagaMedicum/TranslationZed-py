@@ -257,6 +257,7 @@ from translationzed_py.core.tm_workflow_service import (
     normalize_suggestion_grouping as _normalize_tm_grouping,
 )
 
+from . import git_sync_ui as _git_sync_ui
 from . import languagetool_adapter as _lt_adapter
 from . import main_window_en_diff_helpers as _en_diff_helpers
 from . import main_window_panel_helpers as _panel_helpers
@@ -1545,6 +1546,7 @@ class MainWindow(QMainWindow):
         self.menu_general.addAction(act_open)
         self.menu_general.addAction(act_save)
         self.menu_general.addAction(act_switch)
+        self._git_sync_controller = _git_sync_ui.install(self)
         self.menu_general.addSeparator()
         self.menu_general.addAction(act_prefs)
         self.menu_general.addSeparator()
@@ -5332,6 +5334,7 @@ class MainWindow(QMainWindow):
             return
         _panel_helpers._flush_session_resume_snapshot(self)
         self._stop_timers()
+        self._git_sync_controller.shutdown()
         if self._system_theme_sync_connected:
             _disconnect_system_theme_sync(self._on_system_color_scheme_changed)
             self._system_theme_sync_connected = False
