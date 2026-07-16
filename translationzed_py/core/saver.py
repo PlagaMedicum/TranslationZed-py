@@ -23,6 +23,14 @@ def save(
     status_by_key: Mapping[str, Status] | None = None,
 ) -> None:
     """Patch raw bytes and overwrite file atomically."""
+    from .translation_format import is_json_translation
+
+    if is_json_translation(pf.path):
+        from .translation_json import save as _save_json
+
+        _save_json(pf, new_entries)
+        return
+
     buf = bytearray(pf.raw_bytes())
 
     def _split_by_segments(value: str, seg_lens: tuple[int, ...]) -> list[str]:

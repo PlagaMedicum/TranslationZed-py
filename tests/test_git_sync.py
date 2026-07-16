@@ -87,6 +87,30 @@ def test_inspect_reports_dirty_en_without_including_worktree_diff(
     assert result.dirty_en is True
 
 
+def test_inspect_and_read_blob_preserve_b42_json_format_identity(
+    tmp_path: Path,
+) -> None:
+    """Committed JSON paths remain distinct and readable across the Git boundary."""
+    root = _repo(tmp_path)
+    path = root / "EN" / "UI.json"
+    path.write_text('{"A": "old"}', encoding="utf-8")
+    _git(root, "add", "EN/UI.json")
+    _git(root, "commit", "-m", "add B42 source")
+    baseline = resolve_commit(root)
+    path.write_text('{"A": "new"}', encoding="utf-8")
+    _git(root, "add", "EN/UI.json")
+    _git(root, "commit", "-m", "change B42 source")
+
+    result = inspect(root, baseline=baseline)
+
+    assert [(item.kind, item.path) for item in result.changes] == [
+        ("modified", "EN/UI.json")
+    ]
+    assert (
+        read_blob(root, commit=baseline, project_path="EN/UI.json") == b'{"A": "old"}'
+    )
+
+
 def test_inspect_reports_untracked_en_as_dirty(tmp_path: Path) -> None:
     """Warn about untracked EN files without treating them as committed changes."""
     root = _repo(tmp_path)

@@ -19,6 +19,12 @@ from translationzed_py.core.app_config import (
 from translationzed_py.core.atomic_io import write_bytes_atomic
 from translationzed_py.core.model import Entry, Status
 from translationzed_py.core.project_scanner import LocaleMeta
+from translationzed_py.core.translation_format import (
+    cache_relative_path as _translation_cache_relative_path,
+)
+from translationzed_py.core.translation_format import (
+    translation_relative_path as _translation_relative_path,
+)
 
 _MAGIC_V1 = b"TZC1"
 _MAGIC_V2 = b"TZC2"
@@ -114,7 +120,11 @@ def _cache_path(root: Path, file_path: Path) -> Path:
     """Execute cache path."""
     cfg = _load_app_config(root)
     rel = file_path.relative_to(root)
-    rel_cache = rel.parent / f"{rel.stem}{cfg.cache_ext}"
+    rel_cache = _translation_cache_relative_path(
+        rel,
+        legacy_extension=cfg.translation_ext,
+        cache_extension=cfg.cache_ext,
+    )
     return root / cfg.cache_dir / rel_cache
 
 
@@ -122,7 +132,11 @@ def _legacy_cache_path(root: Path, file_path: Path) -> Path:
     """Execute legacy cache path."""
     cfg = _load_app_config(root)
     rel = file_path.relative_to(root)
-    rel_cache = rel.parent / f"{rel.stem}{cfg.cache_ext}"
+    rel_cache = _translation_cache_relative_path(
+        rel,
+        legacy_extension=cfg.translation_ext,
+        cache_extension=cfg.cache_ext,
+    )
     legacy = root / LEGACY_CACHE_DIR / rel_cache
     current = root / cfg.cache_dir / rel_cache
     return legacy if legacy != current else current
@@ -170,7 +184,12 @@ def _original_path_from_cache(root: Path, cache_path: Path) -> Path | None:
         return None
     if rel.name == cfg.en_hash_filename:
         return None
-    return (root / rel).with_suffix(cfg.translation_ext)
+    translation_rel = _translation_relative_path(
+        rel,
+        legacy_extension=cfg.translation_ext,
+        cache_extension=cfg.cache_ext,
+    )
+    return (root / translation_rel) if translation_rel is not None else None
 
 
 def legacy_cache_paths(root: Path) -> list[Path]:

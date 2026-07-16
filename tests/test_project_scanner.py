@@ -65,6 +65,32 @@ def test_scan_root_requires_charset(tmp_path: Path) -> None:
         scan_root(root)
 
 
+def test_scan_root_defaults_b42_json_locale_to_utf8(tmp_path: Path) -> None:
+    """B42 metadata omits charset because translation JSON is always UTF-8."""
+    root = tmp_path / "project"
+    locale = root / "EN"
+    locale.mkdir(parents=True)
+    (locale / "language.txt").write_text("text = English,\n", encoding="utf-8")
+    (locale / "UI.json").write_text('{"A": "One"}', encoding="utf-8")
+
+    assert scan_root(root)["EN"].charset == "utf-8"
+
+
+def test_scan_root_requires_charset_for_mixed_json_and_legacy_locale(
+    tmp_path: Path,
+) -> None:
+    """A JSON file must not make an unknown legacy encoding look like UTF-8."""
+    root = tmp_path / "project"
+    locale = root / "BE"
+    locale.mkdir(parents=True)
+    (locale / "language.txt").write_text("text = Belarusian,\n", encoding="utf-8")
+    (locale / "UI.json").write_text('{"A": "One"}', encoding="utf-8")
+    (locale / "UI.txt").write_bytes('A = "Адзін"\n'.encode("cp1251"))
+
+    with pytest.raises(LanguageFileError, match="Missing charset"):
+        scan_root(root)
+
+
 def test_scan_root_with_errors_skips_invalid(tmp_path: Path) -> None:
     """Verify scan root with errors skips invalid."""
     root = tmp_path / "project"
@@ -90,6 +116,21 @@ def test_list_translatable_files_excludes_non_translatables(
     assert "language.txt" not in names
     assert "credits.txt" not in names
     assert "IG_UI_EN.txt" in names
+
+
+def test_list_translatable_files_keeps_json_and_legacy_collisions_distinct(
+    tmp_path: Path,
+) -> None:
+    """Mixed projects expose both formats deterministically without guessing precedence."""
+    locale = tmp_path / "BE"
+    locale.mkdir()
+    (locale / "UI.txt").write_text('A = "А"\n', encoding="utf-8")
+    (locale / "UI.json").write_text('{"A": "А"}', encoding="utf-8")
+
+    assert [path.name for path in list_translatable_files(locale)] == [
+        "UI.json",
+        "UI.txt",
+    ]
 
 
 def test_list_translatable_files_ignores_tvradio(prod_like_root: Path) -> None:

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from translationzed_py.core.model import Entry, ParsedFile, Status
+from translationzed_py.core.parser import parse
 from translationzed_py.core.search import Match, SearchField, SearchRow
 from translationzed_py.core.search_replace_service import (
     ReplaceAllFileApplyCallbacks,
@@ -61,7 +62,13 @@ from translationzed_py.core.search_replace_service import (
     search_result_label,
     search_spec_for_column,
 )
-from translationzed_py.core.status_cache import CacheEntry, CacheMap
+from translationzed_py.core.status_cache import (
+    CacheEntry,
+    CacheMap,
+    cache_path,
+    read,
+    write,
+)
 
 
 def test_scope_files_resolves_file_locale_pool() -> None:
@@ -840,6 +847,46 @@ def test_apply_replace_all_in_file_marks_translated_and_writes_cache() -> None:
     written_entry = writes[0][1][0]
     assert written_entry.value == "Use one"
     assert written_entry.status == Status.TRANSLATED
+
+
+def test_apply_replace_all_in_b42_json_writes_only_format_distinct_cache(
+    tmp_path: Path,
+) -> None:
+    """Cross-file replace must leave JSON originals untouched until explicit Save."""
+    root = tmp_path / "project"
+    path = root / "BE" / "UI.json"
+    path.parent.mkdir(parents=True)
+    path.write_text('{"A": "Drop one", "B": "Keep"}', encoding="utf-8")
+    before = path.read_bytes()
+
+    result = apply_replace_all_in_file(
+        path,
+        pattern=re.compile("Drop"),
+        replacement="Use",
+        use_regex=False,
+        matches_empty=False,
+        has_group_ref=False,
+        callbacks=ReplaceAllFileApplyCallbacks(
+            parse_file=parse,
+            read_cache=lambda file_path: read(root, file_path),
+            write_cache=lambda file_path, entries, changed_keys, original_values: write(
+                root,
+                file_path,
+                entries,
+                changed_keys=changed_keys,
+                original_values=dict(original_values),
+            ),
+        ),
+        hash_for_entry=lambda entry, _cache: int(entry.key_hash or 0),
+    )
+
+    cached = list(read(root, path).values())
+    assert result == ReplaceAllFileApplyResult(changed_keys={"A"}, changed_any=True)
+    assert path.read_bytes() == before
+    assert cache_path(root, path).name == "UI.json.bin"
+    assert [(entry.status, entry.value, entry.original) for entry in cached] == [
+        (Status.TRANSLATED, "Use one", "Drop one")
+    ]
 
 
 def test_count_replace_all_in_file_wraps_parse_error() -> None:

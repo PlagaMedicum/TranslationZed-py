@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
 from translationzed_py.core.model import Entry, Status
@@ -31,11 +31,19 @@ class EntryMeta:
 class LazyEntries:
     """Represent LazyEntries."""
 
-    def __init__(self, raw: bytes, encoding: str, metas: list[EntryMeta]) -> None:
+    def __init__(
+        self,
+        raw: bytes,
+        encoding: str,
+        metas: list[EntryMeta],
+        *,
+        literal_decoder: Callable[[str], str] | None = None,
+    ) -> None:
         """Initialize the instance."""
         self._raw = raw
         self._encoding, _bom_len = _resolve_encoding(encoding, raw)
         self._metas = metas
+        self._literal_decoder = literal_decoder
         self._value_cache: dict[int, str] = {}
         self._overrides: dict[int, Entry] = {}
         self._index_by_hash64: dict[int, list[int]] | None = None
@@ -115,6 +123,13 @@ class LazyEntries:
             if remaining <= 0:
                 break
             raw_slice = self._raw[start:end]
+            if self._literal_decoder is not None:
+                literal = raw_slice.decode(self._encoding, errors="strict")
+                segment = self._literal_decoder(literal)[:remaining]
+                if segment:
+                    parts.append(segment)
+                    remaining -= len(segment)
+                continue
             text = self._decode_prefix(raw_slice, remaining)
             if start == 0 and text.startswith("\ufeff"):
                 text = text[1:]
@@ -189,8 +204,11 @@ class LazyEntries:
             if start == 0 and text.startswith("\ufeff"):
                 text = text[1:]
             if text.startswith('"'):
-                inner = text[1:-1] if text.endswith('"') else text[1:]
-                parts.append(_unescape(inner))
+                if self._literal_decoder is not None and text.endswith('"'):
+                    parts.append(self._literal_decoder(text))
+                else:
+                    inner = text[1:-1] if text.endswith('"') else text[1:]
+                    parts.append(_unescape(inner))
             else:
                 parts.append(text.rstrip())
         return "".join(parts)

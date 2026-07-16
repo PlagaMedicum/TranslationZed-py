@@ -12,6 +12,10 @@ from translationzed_py.core.project_session import (
     collect_draft_files,
     find_last_opened_file,
 )
+from translationzed_py.core.saver import save
+from translationzed_py.core.status_cache import (
+    cache_path,
+)
 from translationzed_py.core.status_cache import (
     read as read_cache,
 )
@@ -38,6 +42,11 @@ def _write_entries(path: Path, count: int) -> None:
     lines = [f'KEY_{idx:05d} = "Value {idx}"' for idx in range(count)]
     data = "\n".join(lines) + "\n"
     path.write_text(data, encoding="utf-8")
+
+
+def _write_json_entries(path: Path, count: int) -> None:
+    rows = [f'  "KEY_{idx:05d}": "Value {idx} {"x" * 80}"' for idx in range(count)]
+    path.write_text("{\n" + ",\n".join(rows) + "\n}", encoding="utf-8")
 
 
 def _write_entries_with_long(path: Path, count: int, long_len: int) -> None:
@@ -91,6 +100,53 @@ def test_perf_large_file_open(tmp_path: Path, perf_recorder) -> None:
     assert len(pf.entries) == count
     perf_recorder("large-file open", elapsed_ms, budget_ms, f"entries={count}")
     _assert_budget("large-file open", elapsed_ms, budget_ms)
+
+
+def test_perf_b42_json_editing_workflow(tmp_path: Path, perf_recorder) -> None:
+    """Keep representative B42 parse, search, save, and cache work bounded."""
+    count = int(os.getenv("TZP_PERF_B42_JSON_ENTRIES", "13000"))
+    budget_ms = _budget_ms("TZP_PERF_B42_JSON_MS", 3000.0)
+    root = tmp_path / "root"
+    path = root / "BE" / "UI.json"
+    path.parent.mkdir(parents=True)
+    _write_json_entries(path, count)
+    changed_key = f"KEY_{count - 1:05d}"
+    original_value = f"Value {count - 1} {'x' * 80}"
+
+    gc.collect()
+    start = time.perf_counter()
+    parsed = parse_lazy(path, encoding="utf-8")
+    matches = search(
+        (
+            SearchRow(path, row, entry.key, "", entry.value)
+            for row, entry in enumerate(parsed.entries)
+        ),
+        original_value,
+        SearchField.TRANSLATION,
+        False,
+    )
+    save(parsed, {changed_key: "Changed"})
+    write_cache(
+        root,
+        path,
+        parsed.entries,
+        changed_keys={changed_key},
+        original_values={changed_key: original_value},
+    )
+    cached = read_cache(root, path)
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+
+    assert len(parsed.entries) == count
+    assert len(matches) == 1
+    assert cache_path(root, path).name == "UI.json.bin"
+    assert any(entry.value == "Changed" for entry in cached.values())
+    perf_recorder(
+        "B42 JSON parse/search/save/cache",
+        elapsed_ms,
+        budget_ms,
+        f"entries={count}",
+    )
+    _assert_budget("B42 JSON parse/search/save/cache", elapsed_ms, budget_ms)
 
 
 def test_perf_multi_file_search(tmp_path: Path, perf_recorder) -> None:

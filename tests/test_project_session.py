@@ -141,6 +141,43 @@ def test_collect_draft_files_filters_by_opened_and_locale(tmp_path: Path) -> Non
     assert files == [root / "BE" / "a.txt", root / "RU" / "c.txt"]
 
 
+def test_json_cache_identity_survives_session_recovery_mapping(tmp_path: Path) -> None:
+    """JSON draft and last-opened scans must resolve the original JSON file."""
+    root = tmp_path / "proj"
+    original = root / "BE" / "UI.json"
+    cache = root / ".tzp" / "cache" / "BE" / "UI.json.bin"
+    _touch(original, '{"A": "Адзін"}')
+    _touch(cache)
+
+    files = collect_draft_files(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        has_drafts=lambda path: path == cache,
+        locales=["BE"],
+    )
+    latest, scanned = find_last_opened_file(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        selected_locales=["BE"],
+        read_last_opened=lambda path: 42 if path == cache else 0,
+    )
+    orphans = collect_orphan_cache_paths(
+        root=root,
+        cache_dir=".tzp/cache",
+        cache_ext=".bin",
+        translation_ext=".txt",
+        selected_locales=["BE"],
+    )
+
+    assert files == [original]
+    assert (latest, scanned) == (original, 1)
+    assert orphans == {}
+
+
 def test_collect_draft_files_skips_missing_originals(tmp_path: Path) -> None:
     """Verify collect draft files skips missing originals."""
     root = tmp_path / "proj"
@@ -672,6 +709,7 @@ def test_project_session_private_path_helpers_cover_outside_and_missing_cases(
             root=root,
             cache_root=cache_root,
             cache_path=outside_cache,
+            cache_ext=".bin",
             translation_ext=".txt",
         )
         is None

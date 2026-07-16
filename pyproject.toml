@@ -128,6 +128,8 @@ also_copy = [
     "translationzed_py/core/tm_store_support.py",
     "translationzed_py/core/tm_workflow_service.py",
     "translationzed_py/core/tmx_io.py",
+    "translationzed_py/core/translation_format.py",
+    "translationzed_py/core/translation_json.py",
     "translationzed_py/core/tzp_comment_policy.py",
 ]
 paths_to_mutate = [

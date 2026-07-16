@@ -26,6 +26,12 @@ from translationzed_py.core.session_resume import (
 from translationzed_py.core.session_resume import (
     write_session_resume_snapshot as _write_session_resume_snapshot,
 )
+from translationzed_py.core.translation_format import (
+    cache_relative_path as _translation_cache_relative_path,
+)
+from translationzed_py.core.translation_format import (
+    translation_relative_path as _translation_relative_path,
+)
 
 
 def _cache_roots(root: Path, cache_dir: str) -> tuple[Path, ...]:
@@ -352,6 +358,7 @@ class ProjectSessionService:
             cache_ext=self.cache_ext,
             report=report,
             decision=decision,
+            translation_ext=self.translation_ext,
         )
 
     def execute_crash_recovery_apply_plan(
@@ -640,11 +647,15 @@ def collect_draft_files(
             if not cache_dir_path.exists():
                 continue
             for cache_path in cache_dir_path.rglob(f"*{cache_ext}"):
-                try:
-                    rel = cache_path.relative_to(cache_root)
-                except ValueError:
+                original = _original_path_from_cache(
+                    root=root,
+                    cache_root=cache_root,
+                    cache_path=cache_path,
+                    cache_ext=cache_ext,
+                    translation_ext=translation_ext,
+                )
+                if original is None:
                     continue
-                original = (root / rel).with_suffix(translation_ext)
                 if not original.exists():
                     continue
                 if opened_files is not None and original not in opened_files:
@@ -683,11 +694,15 @@ def find_last_opened_file(
                 ts = read_last_opened(cache_path)
                 if ts <= 0:
                     continue
-                try:
-                    rel = cache_path.relative_to(cache_root)
-                except ValueError:
+                original = _original_path_from_cache(
+                    root=root,
+                    cache_root=cache_root,
+                    cache_path=cache_path,
+                    cache_ext=cache_ext,
+                    translation_ext=translation_ext,
+                )
+                if original is None:
                     continue
-                original = (root / rel).with_suffix(translation_ext)
                 if not original.exists():
                     continue
                 if ts > best_ts:
@@ -720,11 +735,15 @@ def collect_orphan_cache_paths(
             if not locale_cache.exists():
                 continue
             for cache_path in locale_cache.rglob(f"*{cache_ext}"):
-                try:
-                    rel = cache_path.relative_to(cache_root)
-                except ValueError:
+                original = _original_path_from_cache(
+                    root=root,
+                    cache_root=cache_root,
+                    cache_path=cache_path,
+                    cache_ext=cache_ext,
+                    translation_ext=translation_ext,
+                )
+                if original is None:
                     continue
-                original = (root / rel).with_suffix(translation_ext)
                 if not original.exists():
                     missing_set.add(cache_path)
         if missing_set:
@@ -763,6 +782,7 @@ def build_crash_recovery_report(
                     root=root,
                     cache_root=cache_root,
                     cache_path=cache_path,
+                    cache_ext=cache_ext,
                     translation_ext=translation_ext,
                 )
                 if original is None or not original.exists():
@@ -834,6 +854,7 @@ def build_crash_recovery_apply_plan(
     cache_ext: str,
     report: CrashRecoveryReport | None,
     decision: str,
+    translation_ext: str = ".txt",
 ) -> CrashRecoveryApplyPlan:
     """Build crash recovery decision application plan."""
     normalized = str(decision or "").strip().lower()
@@ -855,6 +876,7 @@ def build_crash_recovery_apply_plan(
         root=root,
         cache_dir=cache_dir,
         cache_ext=cache_ext,
+        translation_ext=translation_ext,
         report=report,
     )
     return CrashRecoveryApplyPlan(
@@ -909,6 +931,7 @@ def _recovery_discard_cache_paths(
     root: Path,
     cache_dir: str,
     cache_ext: str,
+    translation_ext: str,
     report: CrashRecoveryReport | None,
 ) -> tuple[Path, ...]:
     out: set[Path] = {_session_resume_snapshot_path(root=root, cache_dir=cache_dir)}
@@ -921,7 +944,12 @@ def _recovery_discard_cache_paths(
             except ValueError:
                 continue
             for cache_root in _cache_roots(root, cache_dir):
-                out.add((cache_root / rel).with_suffix(cache_ext))
+                cache_rel = _translation_cache_relative_path(
+                    rel,
+                    legacy_extension=translation_ext,
+                    cache_extension=cache_ext,
+                )
+                out.add(cache_root / cache_rel)
     return tuple(sorted(out))
 
 
@@ -950,13 +978,19 @@ def _original_path_from_cache(
     root: Path,
     cache_root: Path,
     cache_path: Path,
+    cache_ext: str,
     translation_ext: str,
 ) -> Path | None:
     try:
         rel = cache_path.relative_to(cache_root)
     except ValueError:
         return None
-    return (root / rel).with_suffix(translation_ext)
+    translation_rel = _translation_relative_path(
+        rel,
+        legacy_extension=translation_ext,
+        cache_extension=cache_ext,
+    )
+    return (root / translation_rel) if translation_rel is not None else None
 
 
 def _display_file_path(*, root: Path, file_path: Path) -> str:

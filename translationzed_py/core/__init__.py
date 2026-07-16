@@ -11,6 +11,7 @@ from .project_scanner import (
     scan_root_with_errors,
 )
 from .search import Match, SearchField, SearchRow, search
+from .translation_format import is_supported_translation
 
 __all__ = [
     "scan_root",
@@ -26,4 +27,5 @@ __all__ = [
     "SearchRow",
     "Match",
     "search",
+    "is_supported_translation",
 ]

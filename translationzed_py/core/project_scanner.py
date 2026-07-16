@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from translationzed_py.core.app_config import load as _load_app_config
+from translationzed_py.core.translation_format import (
+    B42_JSON_EXTENSION,
+    supported_extensions,
+)
 
 _IGNORE_DIRS = {"_TVRADIO_TRANSLATIONS", ".git", ".vscode"}
 _IGNORE_FILES = {"language.txt", "credits.txt"}
@@ -57,6 +61,15 @@ def _parse_language_file(path: Path) -> tuple[str, str]:
         elif key == "charset" and value:
             charset = value
     if not charset:
+        cfg = _load_app_config(path.parent.parent)
+        has_json = any(path.parent.rglob(f"*{B42_JSON_EXTENSION}"))
+        has_legacy = cfg.translation_ext.lower() != B42_JSON_EXTENSION and any(
+            candidate.name not in _IGNORE_FILES
+            for candidate in path.parent.rglob(f"*{cfg.translation_ext}")
+        )
+        if has_json and not has_legacy:
+            charset = "utf-8"
+    if not charset:
         raise LanguageFileError(f"Missing charset in language.txt: {path}")
     return display_name, charset
 
@@ -64,12 +77,12 @@ def _parse_language_file(path: Path) -> tuple[str, str]:
 def list_translatable_files(locale_path: Path) -> list[Path]:
     """Return translatable files under *locale_path*, excluding non-translatables."""
     cfg = _load_app_config(locale_path.parent)
-    files = []
-    pattern = f"*{cfg.translation_ext}"
-    for path in locale_path.rglob(pattern):
-        if path.name in _IGNORE_FILES:
-            continue
-        files.append(path)
+    files: set[Path] = set()
+    for extension in supported_extensions(cfg.translation_ext):
+        for path in locale_path.rglob(f"*{extension}"):
+            if path.name in _IGNORE_FILES:
+                continue
+            files.add(path)
     return sorted(files)
 
 

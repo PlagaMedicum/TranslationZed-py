@@ -514,6 +514,13 @@ def _parse_entries_stream(
 
 def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
     """Read *path*, tokenise, and build a ParsedFile with stable spans."""
+    from .translation_format import is_json_translation
+
+    if is_json_translation(path):
+        from .translation_json import parse as _parse_json
+
+        return _parse_json(path)
+
     # local import avoids an import cycle
     from .model import Entry, ParsedFile, Status
 
@@ -581,6 +588,13 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
 
 def parse_lazy(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
     """Read *path* and build a ParsedFile with lazy entry values."""
+    from .translation_format import is_json_translation
+
+    if is_json_translation(path):
+        from .translation_json import parse as _parse_json
+
+        return _parse_json(path, lazy=True)
+
     from .model import ParsedFile, Status
 
     global _STATUS_MAP

@@ -1,0 +1,5 @@
+{
+    "UI_fixture_greeting": "Hello",
+    "UI_fixture_escaped": "Line one\n\"quoted\" and \\ path",
+    "UI_fixture_unicode": "Zażółć"
+}

@@ -10,6 +10,7 @@ from typing import Literal
 
 from .app_config import load as _load_app_config
 from .atomic_io import write_text_atomic
+from .translation_format import supported_extensions
 
 GIT_SYNC_STATE_VERSION = 1
 GitChangeKind = Literal["added", "modified", "deleted", "renamed"]
@@ -146,7 +147,10 @@ def _normalize_project_path(raw: str) -> str | None:
         return None
     if len(path.parts) < 2 or path.parts[0] != "EN":
         return None
-    if path.name in {"language.txt", "credits.txt"} or path.suffix.lower() != ".txt":
+    if path.name in {
+        "language.txt",
+        "credits.txt",
+    } or path.suffix.lower() not in supported_extensions(".txt"):
         return None
     return path.as_posix()
 

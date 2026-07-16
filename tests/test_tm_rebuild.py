@@ -73,6 +73,37 @@ def test_rebuild_project_tm_writes_entries_and_counts_skips(tmp_path: Path) -> N
     store.close()
 
 
+def test_rebuild_project_tm_indexes_b42_json(tmp_path: Path) -> None:
+    """B42 JSON files use the same locale-paired TM rebuild path."""
+    root = tmp_path / "root"
+    (root / "EN").mkdir(parents=True)
+    (root / "BE").mkdir(parents=True)
+    (root / "EN" / "UI.json").write_text(
+        '{"A": "Open", "B": "Close"}', encoding="utf-8"
+    )
+    (root / "BE" / "UI.json").write_text(
+        '{"A": "Адкрыць", "B": "Закрыць"}', encoding="utf-8"
+    )
+
+    result = rebuild_project_tm(
+        root,
+        [TMRebuildLocale("BE", root / "BE", "utf-8")],
+        source_locale="EN",
+        en_encoding="utf-8",
+    )
+
+    assert result == TMRebuildResult(files=1, entries=2)
+    store = TMStore(root)
+    matches = store.query(
+        "Open",
+        source_locale="EN",
+        target_locale="BE",
+        origins=["project"],
+    )
+    assert matches and matches[0].target_text == "Адкрыць"
+    store.close()
+
+
 def test_format_rebuild_status_includes_skip_summary() -> None:
     """Verify format rebuild status includes skip summary."""
     text = format_rebuild_status(
