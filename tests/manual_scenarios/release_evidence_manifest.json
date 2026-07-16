@@ -121,7 +121,8 @@
     "tzp-writeback-opt-in",
     "search-replace-sidebar-all-scopes",
     "search-replace-impact-preview-safe-apply",
-    "b42-json-open-edit-save"
+    "b42-json-open-edit-save",
+    "git-sync-local-head"
   ],
   "version": 1
 }

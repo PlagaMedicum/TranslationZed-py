@@ -325,6 +325,8 @@ Release evidence policy references:
     - large-file scroll/selection stability on `SurvivalGuide_BE.txt` and
     `Recorded_Media_BE.txt`,
     - source-reference locale switching latency on large fixtures.
+- `tests/test_git_sync_ui.py` enforces the 20k-item Git-preview model time/memory budget; core plan
+  construction separately stops at 100,000 items before adding another row.
 - `tests/test_render_workflow_service.py` enforces adaptive prefetch-window policy:
   render-heavy paths must cap prefetch margins to reduce lazy decode spikes.
 - Internal perf-contract scripts run dual-scale strict contracts for parser/TM/search hot paths:

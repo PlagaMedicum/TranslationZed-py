@@ -78,8 +78,8 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    `tests/test_git_sync_service.py`.
 3. Cache-only apply, staged comments, encoding fidelity, and baseline ordering:
    `tests/test_git_sync_apply.py`.
-4. Background detection, preview resolution, cancellation, open-file refresh, and no-original-write
-   GUI integration: `tests/test_git_sync_ui.py`.
+4. Background detection, preview resolution, cancellation, open-file refresh, no-original-write
+   integration, and the 20k-item GUI time/memory budget: `tests/test_git_sync_ui.py`.
 5. Explicit-Save adapter integration: `tests/test_main_window_en_diff.py`.
 
 ## 4) Search / Replace / Source Reference
@@ -170,6 +170,7 @@ Framework owner:
 | `search-replace-sidebar-all-scopes` | `search_replace` | verify toolbar/sidebar sync and FILE/LOCALE/POOL replace-all flows through the transient confirmation scope selector | `RU/search_scope.txt`, `RU/search_scope_extra.txt`, `KO/search_scope.txt` | `full_workflow` | leave `RU/search_scope.txt` active after canceling File/Pool previews and applying Locale so only RU files changed | yes |
 | `search-replace-impact-preview-safe-apply` | `search_replace` | verify impact preview rows, cancel path, and checkbox-gated replace safety | `RU/search_scope.txt`, `RU/search_scope_extra.txt`, `KO/search_scope.txt` | `full_workflow` | leave `RU/search_scope.txt` active after a canceled run and a confirmed pool run with persisted replacements across expected files | yes |
 | `b42-json-open-edit-save` | `open_save` | verify synthetic B42 JSON source reference, escaped text, value-only Save, and format-distinct cache identity | `BE/UI.json` | `full_workflow` | leave `BE/UI.json` active after saving one value and checking the copied JSON remains structurally intact | yes |
+| `git-sync-local-head` | `git_sync` | verify local committed value/comment/new-key preview, cache-only Apply, open-file refresh, and explicit Save | `EN/ui.txt`, `RU/ui.txt` | `full_workflow` | leave `RU/ui.txt` active after confirming the original stayed unchanged until Save and the committed comments/new row were then written | yes |
 
 ## 8) Quick Execution Hints
 

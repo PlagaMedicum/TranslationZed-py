@@ -23,6 +23,7 @@ VALID_WORKFLOW_FAMILIES = (
     "tzp_writeback",
     "status_triage",
     "search_replace",
+    "git_sync",
 )
 VALID_MANUAL_DEPTHS = (
     "full_workflow",

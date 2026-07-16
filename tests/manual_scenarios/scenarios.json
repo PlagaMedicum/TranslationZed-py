@@ -502,6 +502,66 @@
         "tests/test_translation_json.py",
         "tests/test_gui_edit_save.py::test_edit_and_save_b42_json"
       ]
+    },
+    {
+      "id": "git-sync-local-head",
+      "title": "Local committed EN synchronization through preview and Save",
+      "workflow_family": "git_sync",
+      "manual_depth": "full_workflow",
+      "goal": "Verify a committed EN value, comment, and new key are previewed from local HEAD, applied to cache without changing the target original, and written only by normal Save.",
+      "start_context": "Launch with RU selected. Use the copy-project-root button and a separate terminal to initialize and commit only inside this disposable scenario copy; the app itself never runs Git write commands.",
+      "fixture_root": "manual_workflow",
+      "focus_files": [
+        "EN/ui.txt",
+        "RU/ui.txt"
+      ],
+      "finish_condition": "Leave RU/ui.txt active after the synchronization preview and explicit Save, with UI_CAMERA still untranslated/For Review and the translated UI_GIT_NEW row plus both committed EN comments present on disk.",
+      "operator_hints": [
+        "Copy the disposable project root from this dialog. Never run these commands in the source fixture or installed game.",
+        "Initialize the disposable copy with: git -C <project-root> init; configure a test user; git -C <project-root> add EN RU KO; git -C <project-root> commit -m 'Manual sync baseline'. Do not add .tzp.",
+        "Use any terminal editor for EN/ui.txt, then commit only that file. Git commands are deliberately operator-owned and remain outside TranslationZed-Py."
+      ],
+      "inspection_paths": [
+        "RU/ui.txt",
+        ".tzp/cache/git_sync_state.json"
+      ],
+      "selected_locales": [
+        "RU"
+      ],
+      "steps": [
+        "Copy the disposable project root, initialize a local Git repository there, configure user.name/user.email, add only EN RU KO, and commit the unchanged fixture as `Manual sync baseline`.",
+        "Use General -> Synchronize from Git, accept setting current local HEAD as the first baseline, and confirm the app reports that synchronization is ready.",
+        "In the terminal editor, change EN/ui.txt so UI_CAMERA becomes `Camera controls`, add `-- camera guidance` directly above it, and append `-- new Git string` plus `UI_GIT_NEW = \"New committed string.\"`; commit only EN/ui.txt.",
+        "Use General -> Synchronize from Git again. Confirm the preview shows UI_CAMERA as modified/comments and UI_GIT_NEW as added; keep the proposed For Review mark and apply every resolved item.",
+        "Inspect the copied RU/ui.txt before Save. Confirm its bytes still contain the original UI_CAMERA line, no UI_GIT_NEW key, and neither new comment.",
+        "Back in the reloaded RU/ui.txt table, confirm UI_CAMERA kept its translation value and is For Review, and UI_GIT_NEW appears as a NEW row. Enter a Russian translation for UI_GIT_NEW.",
+        "Use General -> Save, choose Write to file, and apply the NEW-row insertion if prompted. Inspect RU/ui.txt and confirm the existing translation was preserved while both comments and the translated new row were written in EN order."
+      ],
+      "expected_checks": [
+        "Only the saved baseline through local committed HEAD is inspected; no remote or Git-management control appears.",
+        "The preview exposes the changed source, committed comments, new key, target value, decision, and proposed review status.",
+        "Applying the preview changes cache/baseline only and leaves RU/ui.txt unchanged until normal Save.",
+        "UI_CAMERA keeps its target value and becomes For Review; UI_GIT_NEW remains an editable NEW row after the affected file refresh.",
+        "Normal Save preserves existing target text and writes the chosen comments and translated new row without unrelated rewrites."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/core/git_sync.py",
+        "translationzed_py/core/git_sync_service.py",
+        "translationzed_py/core/git_sync_apply.py",
+        "translationzed_py/gui/git_sync_ui.py",
+        "translationzed_py/gui/main_window_en_diff_helpers.py",
+        "tests/fixtures/manual_workflow/EN/ui.txt",
+        "tests/fixtures/manual_workflow/RU/ui.txt"
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_git_sync.py",
+        "tests/test_git_sync_service.py",
+        "tests/test_git_sync_apply.py",
+        "tests/test_git_sync_ui.py",
+        "tests/test_main_window_en_diff.py"
+      ]
     }
   ]
 }

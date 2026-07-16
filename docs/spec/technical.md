@@ -693,7 +693,8 @@ UNTOUCHED).
   rename or creation is inferred.
 - Startup compares the saved baseline with local committed `HEAD` off the GUI thread. Explicit
   `General -> Synchronize from Git...` opens a bounded table preview; Apply stays disabled until
-  every conflict is resolved or ignored.
+  every conflict is resolved or ignored. Plan construction stops before exceeding 100,000 preview
+  items, and the table uses one model rather than per-row widgets.
 - Missing, corrupt, or unreachable state offers an explicit reset to current local `HEAD` or
   cancellation. No ref, branch, or remote selector is exposed. Applying runs behind a window-modal
   progress guard, then reloads an affected open file from its cache overlay.
