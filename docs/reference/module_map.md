@@ -1,5 +1,5 @@
 # TranslationZed-Py — Module Responsibility Map
-_Last updated: 2026-07-15_
+_Last updated: 2026-07-16_
 
 ## 1) Core Domain And Services
 
@@ -7,13 +7,13 @@ _Last updated: 2026-07-15_
 |---|---|
 | `core.model` | Core entry/status/value models and invariants. |
 | `core.translation_format` | Supported translation extensions and format-distinct cache-path identity. |
-| `core.translation_json` | Strict flat B42 JSON parsing and atomic value-literal-only writes. |
+| `core.translation_json` | Strict flat B42 JSON parsing plus atomic existing-value and missing-member writes. |
 | `core.parser` / `core.parse_utils` / `core.lazy_entries` | Format dispatch plus legacy locale parsing, span tracking, and shared lazy value handling. |
 | `core.tzp_comment_policy` | Namespaced `TZP:` program-comment parsing/formatting/write-plan contracts. |
 | `core.saver` / `core.atomic_io` | Byte-preserving save + atomic replace/write safety, with optional namespaced `TZP:` status-comment write-back. |
 | `core.status_cache` / `core.en_hash_cache` | Draft/status cache and EN baseline hash tracking. |
 | `core.en_diff_snapshot` / `core.en_diff_service` / `core.en_insert_plan` | EN diff markers (`NEW/REMOVED/MODIFIED`) and insertion planning. |
-| `core.git_sync` | Partial v1 foundation: read-only Git worktree/ref/blob inspection and synchronization-baseline persistence; no merge/UI integration yet. |
+| `core.git_sync` / `core.git_sync_service` | Read-only local Git/baseline/blob inspection, committed EN change classification, and immutable per-locale synchronization previews; cache application and UI integration remain. |
 | `core.project_scanner` | Locale/project discovery and metadata extraction. |
 | `core.locale_creation` | Partial v1 foundation: validated staged locale cloning and metadata rewriting; not a completed workflow contract yet. |
 | `core.project_session` | Locale/session/tree planning and startup/switch orchestration policies. |

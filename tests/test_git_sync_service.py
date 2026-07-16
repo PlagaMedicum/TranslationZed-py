@@ -44,6 +44,7 @@ def _document(path: str, text: str):
 
 
 def test_classify_documents_combines_value_comments_membership_and_order() -> None:
+    """Classify every supported key-level change without losing source order."""
     base = _document(
         "EN/UI.txt",
         '-- old A\nA = "Old"\nB = "Removed"\nC = "Stable"\n',
@@ -65,6 +66,7 @@ def test_classify_documents_combines_value_comments_membership_and_order() -> No
 
 
 def test_parse_source_document_uses_json_and_raw_file_contracts() -> None:
+    """Parse committed JSON and raw text through the production format contracts."""
     json_doc = parse_source_document(
         path="EN/UI.json",
         raw=b'{"B": "two", "A": "one"}',
@@ -89,6 +91,7 @@ def test_parse_source_document_uses_json_and_raw_file_contracts() -> None:
 def test_parse_source_document_rejects_duplicates_and_oversize(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Reject ambiguous keys and blobs beyond the synchronization limit."""
     with pytest.raises(GitSyncDocumentError, match="Duplicate"):
         _document("EN/UI.txt", 'A = "one"\nA = "two"\n')
 
@@ -102,6 +105,7 @@ def test_parse_source_document_rejects_duplicates_and_oversize(
 def test_build_change_set_reads_committed_blobs_and_preserves_file_rename(
     tmp_path: Path,
 ) -> None:
+    """Read committed blobs and retain a renamed file's old and new paths."""
     root = tmp_path / "project"
     (root / "EN").mkdir(parents=True)
     _git(root, "init")
@@ -140,6 +144,7 @@ def test_build_change_set_reads_committed_blobs_and_preserves_file_rename(
 def test_build_change_set_contains_unreadable_blob_as_file_error(
     tmp_path: Path,
 ) -> None:
+    """Contain an unreadable committed blob as a file-level preview error."""
     root = tmp_path / "project"
     (root / "EN").mkdir(parents=True)
     _git(root, "init")
@@ -181,6 +186,7 @@ def _merge_project(tmp_path: Path) -> tuple[Path, dict[str, LocaleMeta]]:
 def test_build_merge_plan_preserves_target_draft_and_exposes_comment_conflict(
     tmp_path: Path,
 ) -> None:
+    """Preserve target drafts and require an explicit divergent-comment choice."""
     root, locales = _merge_project(tmp_path)
     target = root / "BE" / "UI.txt"
     target.write_text(
@@ -274,6 +280,7 @@ def test_build_merge_plan_preserves_target_draft_and_exposes_comment_conflict(
 def test_merge_plan_requires_ignore_or_retry_for_missing_target_file(
     tmp_path: Path,
 ) -> None:
+    """Keep a missing target unresolved until the user explicitly ignores it."""
     root, locales = _merge_project(tmp_path)
     head = _document("EN/New.txt", 'A = "New"\n')
     change_set = GitSyncChangeSet(
@@ -316,6 +323,7 @@ def test_merge_plan_requires_ignore_or_retry_for_missing_target_file(
 def test_merge_plan_maps_locale_suffix_and_flags_unresolved_rename(
     tmp_path: Path,
 ) -> None:
+    """Map locale suffixes while exposing an unapplied target rename."""
     root, locales = _merge_project(tmp_path)
     old_target = root / "BE" / "IG_UI_BE.txt"
     old_target.write_text('A = "Target"\n', encoding="utf-8")
