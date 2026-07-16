@@ -1,5 +1,5 @@
 # UX Use Cases — Project Lifecycle and Save
-_Last updated: 2026-03-01_
+_Last updated: 2026-07-16_
 
 ## 1) Open and Switch Lifecycle
 
@@ -118,6 +118,16 @@ sequenceDiagram
 | Goal | Show unsaved state in project tree. |
 | Trigger | Any edit that sets file dirty. |
 | Success | File row gets leading dirty marker and clears after successful save. |
+
+## UC-10d Synchronize Committed EN Changes
+
+| Field | Value |
+|---|---|
+| Goal | Review committed EN changes from the saved baseline through local `HEAD`. |
+| Trigger | Startup availability indicator or `General -> Synchronize from Git...`. |
+| First use/recovery | Explicitly set current local `HEAD` as baseline, or cancel without mutation. |
+| Success | Preview each locale/file/key, resolve comments and conflicts, apply review/comment effects to cache, advance the baseline, and refresh an affected open file. |
+| Invariant | The app never inspects remotes or mutates Git; cancellation/unresolved plans write no synchronization effects, and only normal Save writes locale originals. |
 
 ## UC-11 Exit Application
 

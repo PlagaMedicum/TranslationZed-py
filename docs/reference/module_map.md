@@ -13,7 +13,7 @@ _Last updated: 2026-07-16_
 | `core.saver` / `core.atomic_io` | Byte-preserving save + atomic replace/write safety, with optional namespaced `TZP:` status-comment write-back. |
 | `core.status_cache` / `core.en_hash_cache` | Draft/status cache and EN baseline hash tracking. |
 | `core.en_diff_snapshot` / `core.en_diff_service` / `core.en_insert_plan` | EN diff markers (`NEW/REMOVED/MODIFIED`) and insertion planning. |
-| `core.git_sync` / `core.git_sync_service` / `core.git_sync_apply` | Read-only local Git/baseline/blob inspection, committed EN classification, immutable per-locale previews, cache-only resolved-plan effects, and staged comment Save; preview UI integration remains. |
+| `core.git_sync` / `core.git_sync_service` / `core.git_sync_apply` | Read-only local Git/baseline/blob inspection, committed EN classification, immutable per-locale previews, cache-only resolved-plan effects, and staged comment Save. |
 | `core.project_scanner` | Locale/project discovery and metadata extraction. |
 | `core.locale_creation` | Partial v1 foundation: validated staged locale cloning and metadata rewriting; not a completed workflow contract yet. |
 | `core.project_session` | Locale/session/tree planning and startup/switch orchestration policies. |
@@ -58,6 +58,7 @@ _Last updated: 2026-07-16_
 | `gui.theme` | Theme detection/apply helpers. |
 | `gui.perf_trace` | GUI performance instrumentation helpers. |
 | `gui.runtime_reliability` | Project `QLockFile` lifecycle, uncaught-Python exception boundary, and copyable issue-report dialog. |
+| `gui.git_sync_ui` | Background local-HEAD detection, explicit synchronization preview choices, and cache-only apply lifecycle. |
 | `gui.app` | Process-wide `QApplication` bootstrap. |
 
 ## 3) Ownership Boundary Rules

@@ -101,11 +101,11 @@ or combines remotes and never manages Git for the user.
 
 ### Core work
 
-1. Resolve the project worktree, user-selected baseline, and local `HEAD` through argument-list Git
+1. Resolve the project worktree, saved baseline, and local `HEAD` through argument-list Git
    subprocesses with timeouts. Accept only commits and project-relative paths under `EN/`.
-2. Persist a versioned project baseline under `.tzp/cache`. On first use, default to `HEAD` but
-   permit an advanced ref/commit. Invalid or unreachable state produces a recovery choice, not
-   mutation.
+2. Persist a versioned project baseline under `.tzp/cache`. On first explicit use, offer current
+   local `HEAD` as the starting point. Invalid or unreachable state offers reset to current `HEAD`
+   or cancellation; the UI does not expose branches, remotes, or arbitrary refs.
 3. Read base/head blobs and classify per-file additions, deletions, renames, key order, source-value
    changes, and adjacent EN comment blocks.
 4. Build an immutable merge plan per target locale/file. Decisions are `apply`, `ignore`, or

@@ -1,5 +1,5 @@
 # TranslationZed-Py — Architecture Diagrams
-_Last updated: 2026-03-04_
+_Last updated: 2026-07-16_
 
 This page is the high-level diagram index.
 For code-level dependency and extension rules, see `docs/architecture/code_architecture.md`.
@@ -48,6 +48,7 @@ graph LR
   MW --> ED[entry_model]
   MW --> SH[status_header]
   MW --> LT[languagetool_adapter]
+  MW --> GS[git_sync_ui]
   MW --> PR[preferences_dialog]
 ```
 
@@ -94,6 +95,25 @@ sequenceDiagram
   D-->>GUI: row marker payload
   GUI->>I: build insertion preview for edited NEW rows
   I-->>GUI: Apply/Skip/Edit/Cancel preview
+```
+
+### 7.1 Local Git Synchronization Sequence
+
+```mermaid
+sequenceDiagram
+  actor U as User
+  participant GUI as git_sync_ui
+  participant GI as git_sync
+  participant GP as git_sync_service
+  participant GA as git_sync_apply
+  U->>GUI: General / Synchronize from Git
+  GUI->>GI: inspect saved baseline to local HEAD (worker)
+  GI->>GP: classify and build immutable locale plan
+  GP-->>GUI: preview items and warnings
+  U->>GUI: resolve every item, then Apply
+  GUI->>GA: apply resolved choices (worker)
+  GA-->>GUI: cache effects complete; baseline advanced
+  Note over GUI,GA: Git and locale originals remain unchanged
 ```
 
 ## 8) Status Triage State Machine

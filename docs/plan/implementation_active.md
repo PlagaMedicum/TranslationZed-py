@@ -19,7 +19,7 @@ UX contracts describe implemented behavior only.
 | Planning contract | Complete | User intent, ordering, non-goals, and acceptance are documented. |
 | Reliability prerequisite | Complete | Project sessions are one-writer, stale locks activate real draft recovery, session snapshots are atomic, rotating logs and copyable issue reports exist, and unexpected Python GUI exceptions are contained and reported. |
 | 0. PZ B42.15+ format compatibility ([Issue #1](https://github.com/PlagaMedicum/TranslationZed-py/issues/1)) | Complete | The B42.19 flat JSON contract is implemented for discovery, existing-key editing, cache/session identity, recovery, search, QA, TM, Git path inspection, source reference, and atomic Save. Automated gates, the 13k-row budget, and the interactive roundtrip pass. Keep the issue open until the v1.0.0 release by user decision. |
-| 1. Git synchronization | Core workflow in progress | Local committed inspection, deterministic file/key/comment classification, immutable per-locale decisions, cache-only review marking, staged comment Save, and format-aware JSON `NEW` insertion exist with focused tests. Startup detection and the synchronization preview UI remain. |
+| 1. Git synchronization | Workflow implemented; closure evidence pending | Local committed-`HEAD` detection, explicit preview/resolution, cache-only review marking, staged comment Save, affected-file refresh, and format-aware JSON `NEW` insertion exist with focused tests. Large-change evidence and the interactive release scenario remain. |
 | 2. Add localization | Foundation only | Staged clone policy and chooser/warning dialogs exist with focused tests. Treat them as retained scaffold, not a finished workflow. |
 | 3. `description.txt` | Complete — existing behavior accepted | The generic raw-file path already presents keyless content as one normal table/detail row. Do not add a separate editor, parser, model, or workflow; only presentation-only file-tree polish may be considered during release coherence. |
 | 4. QA safety pack | Not started | Existing v0.9 QA remains current. |
@@ -72,6 +72,9 @@ UX contracts describe implemented behavior only.
   baseline, changed-file routed suites, read-only diagnostics, docs, scale performance, and full
   branch coverage (92.26% overall, 97.02% core). Interactive scenario
   `b42-json-open-edit-save` passed and its release evidence was synced on 2026-07-16.
+- Slice 1 now has the explicit `General -> Synchronize from Git...` workflow. Git inspection and
+  application run off the GUI thread; the preview must resolve or ignore every item, and normal
+  Save remains the only path to locale originals.
 
 ## Acceptance Criteria
 

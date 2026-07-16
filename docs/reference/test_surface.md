@@ -78,7 +78,9 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    `tests/test_git_sync_service.py`.
 3. Cache-only apply, staged comments, encoding fidelity, and baseline ordering:
    `tests/test_git_sync_apply.py`.
-4. Explicit-Save adapter integration: `tests/test_main_window_en_diff.py`.
+4. Background detection, preview resolution, cancellation, open-file refresh, and no-original-write
+   GUI integration: `tests/test_git_sync_ui.py`.
+5. Explicit-Save adapter integration: `tests/test_main_window_en_diff.py`.
 
 ## 4) Search / Replace / Source Reference
 

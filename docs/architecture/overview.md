@@ -1,5 +1,5 @@
 # TranslationZed-Py — Architecture Overview
-_Last updated: 2026-07-15_
+_Last updated: 2026-07-16_
 
 ## 1) Goals
 
@@ -39,9 +39,9 @@ Dependency rules:
 | `render_workflow_service` | render-heavy policy decisions |
 | `git_sync` / `git_sync_service` / `git_sync_apply` | local committed EN inspection, immutable preview policy, and cache-only resolved effects |
 
-`locale_creation` remains a partial v1 foundation with staged clone policy. Git synchronization's
-preview UI is still in progress; integration status is authoritative in
-`docs/plan/implementation_active.md`.
+`locale_creation` remains a partial v1 foundation with staged clone policy. `gui.git_sync_ui` owns
+the background local-HEAD check and renders core synchronization plans; integration status is
+authoritative in `docs/plan/implementation_active.md`.
 
 ```mermaid
 flowchart LR

@@ -1,6 +1,6 @@
 # TranslationZed‑Py — **Technical Specification**
 
-**Version 0.9.0 · updated 2026-07-15**\
+**Version 0.9.0 · updated 2026-07-16**\
 *author: TranslationZed‑Py team*
 
 ---
@@ -691,6 +691,12 @@ UNTOUCHED).
   retained during comment replacement. Locale originals are never written by synchronization.
 - Missing/unreadable/renamed targets remain explicit conflict-or-ignore items; no target filesystem
   rename or creation is inferred.
+- Startup compares the saved baseline with local committed `HEAD` off the GUI thread. Explicit
+  `General -> Synchronize from Git...` opens a bounded table preview; Apply stays disabled until
+  every conflict is resolved or ignored.
+- Missing, corrupt, or unreachable state offers an explicit reset to current local `HEAD` or
+  cancellation. No ref, branch, or remote selector is exposed. Applying runs behind a window-modal
+  progress guard, then reloads an affected open file from its cache overlay.
 
 ---
 
