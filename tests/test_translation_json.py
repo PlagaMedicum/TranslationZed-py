@@ -14,7 +14,11 @@ from translationzed_py.core.translation_format import (
     supported_extensions,
     translation_relative_path,
 )
-from translationzed_py.core.translation_json import TranslationJSONError
+from translationzed_py.core.translation_json import (
+    TranslationJSONError,
+    build_insert_plan,
+    insert_missing,
+)
 
 
 def _fixture_root() -> Path:
@@ -185,6 +189,117 @@ def test_b42_json_save_rejects_invalid_values_and_skips_noop_write(
         save(parsed, {"A": 1})  # type: ignore[dict-item]
     with pytest.raises(TranslationJSONError, match="invalid Unicode"):
         save(parsed, {"A": "\ud800"})
+
+
+def test_b42_json_insert_plan_uses_source_order_and_existing_anchors() -> None:
+    """Missing members should keep source order without reordering target members."""
+    plan = build_insert_plan(
+        source_order=("A", "B", "C", "D"),
+        target_order=("A", "D"),
+        edited_new_values={"C": "three", "B": "two", "ignored": "value"},
+    )
+
+    assert [(item.key, item.anchor_key) for item in plan.items] == [
+        ("B", "A"),
+        ("C", "A"),
+    ]
+
+
+def test_b42_json_insert_missing_preserves_existing_bytes(
+    tmp_path: Path,
+) -> None:
+    """JSON insertion should add only planned member bytes around an existing anchor."""
+    path = tmp_path / "UI.json"
+    path.write_bytes(b'{\n  "A" : "\\u0410",\n  "D":"last"\n}\n')
+
+    inserted = insert_missing(
+        path,
+        source_order=("A", "B", "C", "D"),
+        edited_new_values={"B": "Б", "C": "three"},
+    )
+
+    assert inserted == ("B", "C")
+    assert (
+        path.read_bytes()
+        == (
+            '{\n  "A" : "\\u0410",\n  "B": "Б",\n  "C": "three",\n  "D":"last"\n}\n'
+        ).encode()
+    )
+
+
+@pytest.mark.parametrize(
+    ("payload", "source_order", "values", "expected"),
+    [
+        (
+            b'{"B":"bee"}',
+            ("A", "B", "C"),
+            {"A": "aye", "C": "see"},
+            b'{"A": "aye", "B":"bee", "C": "see"}',
+        ),
+        (
+            b"{\n}\n",
+            ("A",),
+            {"A": "one"},
+            b'{\n    "A": "one"\n}\n',
+        ),
+    ],
+)
+def test_b42_json_insert_missing_handles_edge_positions(
+    tmp_path: Path,
+    payload: bytes,
+    source_order: tuple[str, ...],
+    values: dict[str, str],
+    expected: bytes,
+) -> None:
+    """Insertion should handle members before, after, and without existing keys."""
+    path = tmp_path / "UI.json"
+    path.write_bytes(payload)
+
+    insert_missing(path, source_order=source_order, edited_new_values=values)
+
+    assert path.read_bytes() == expected
+
+
+def test_b42_json_insert_missing_is_idempotent_and_atomic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Retries should not duplicate keys and failed replacement should preserve the file."""
+    path = tmp_path / "UI.json"
+    path.write_bytes(b'{"A":"one"}')
+    insert_missing(path, source_order=("A", "B"), edited_new_values={"B": "two"})
+    after_insert = path.read_bytes()
+    writes: list[bytes] = []
+    monkeypatch.setattr(
+        "translationzed_py.core.translation_json.write_bytes_atomic",
+        lambda _path, data: writes.append(data),
+    )
+
+    assert (
+        insert_missing(
+            path,
+            source_order=("A", "B"),
+            edited_new_values={"B": "two"},
+        )
+        == ()
+    )
+    assert writes == []
+
+    path.write_bytes(b'{"A":"one"}')
+
+    def _fail_write(_path: Path, _data: bytes) -> None:
+        raise OSError("simulated insertion failure")
+
+    monkeypatch.setattr(
+        "translationzed_py.core.translation_json.write_bytes_atomic", _fail_write
+    )
+    with pytest.raises(OSError, match="insertion failure"):
+        insert_missing(
+            path,
+            source_order=("A", "B"),
+            edited_new_values={"B": "two"},
+        )
+    assert path.read_bytes() == b'{"A":"one"}'
+    assert after_insert == b'{"A":"one", "B": "two"}'
 
 
 def test_translation_format_handles_json_only_config_and_unrelated_cache() -> None:

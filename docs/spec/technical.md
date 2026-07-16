@@ -203,8 +203,9 @@ This table binds technical sections to canonical UC IDs.
   `atomic_io.write_bytes_atomic`; it does not re-read the original or emit Qt signals.
 - Normal entries preserve concatenation gaps and segment boundaries. Raw-file entries replace their
   one complete span.
-- B42 JSON Save replaces existing value-literal spans only. It never serializes the whole object or
-  applies legacy line/comment insertion rules.
+- B42 JSON Save replaces existing value-literal spans without serializing the whole object. Edited
+  virtual `NEW` rows use a separate explicit-Save insertion path that adds only missing members in
+  EN order; it never applies legacy line/comment insertion rules.
 - Optional namespaced status-comment write-back never changes user-authored comments.
 - After success, refresh raw bytes, spans, values, and dirty state so repeated saves in one session
   remain correct.

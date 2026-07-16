@@ -5,6 +5,7 @@ from __future__ import annotations
 import codecs
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from .atomic_io import write_bytes_atomic
@@ -18,6 +19,22 @@ _JSON_WHITESPACE = frozenset(b" \t\r\n")
 
 class TranslationJSONError(ValueError):
     """Report malformed or unsupported B42 translation JSON safely."""
+
+
+@dataclass(frozen=True, slots=True)
+class JSONInsertItem:
+    """Describe one missing JSON member and its existing-key anchor."""
+
+    key: str
+    value: str
+    anchor_key: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class JSONInsertPlan:
+    """Describe missing JSON members in source order."""
+
+    items: tuple[JSONInsertItem, ...]
 
 
 def _at(message: str, offset: int) -> TranslationJSONError:
@@ -189,6 +206,118 @@ def _encode_literal(key: str, value: str) -> bytes:
         raise TranslationJSONError(
             f"Translation value for {key!r} contains invalid Unicode."
         ) from exc
+
+
+def build_insert_plan(
+    *,
+    source_order: tuple[str, ...],
+    target_order: tuple[str, ...],
+    edited_new_values: Mapping[str, str],
+) -> JSONInsertPlan:
+    """Plan edited missing members without changing either JSON document."""
+    target_keys = set(target_order)
+    anchor_key: str | None = None
+    items: list[JSONInsertItem] = []
+    for key in source_order:
+        if key in target_keys:
+            anchor_key = key
+            continue
+        if key not in edited_new_values:
+            continue
+        value = edited_new_values[key]
+        _encode_literal(key, value)
+        items.append(JSONInsertItem(key, value, anchor_key))
+    return JSONInsertPlan(tuple(items))
+
+
+def _member_bytes(item: JSONInsertItem) -> bytes:
+    key_literal = _encode_literal(item.key, item.key)
+    value_literal = _encode_literal(item.key, item.value)
+    return key_literal + b": " + value_literal
+
+
+def _json_layout(
+    raw: bytes, object_start: int, first_member: int
+) -> tuple[bytes, bytes]:
+    prefix = raw[object_start + 1 : first_member]
+    if b"\r\n" in prefix:
+        newline = b"\r\n"
+    elif b"\n" in prefix:
+        newline = b"\n"
+    elif b"\r" in prefix:
+        newline = b"\r"
+    else:
+        return b" ", b""
+    line_start = raw.rfind(newline, object_start + 1, first_member)
+    indent = raw[line_start + len(newline) : first_member] if line_start >= 0 else b""
+    if not indent or any(byte not in b" \t" for byte in indent):
+        indent = b"    "
+    return newline + indent, indent
+
+
+def _apply_insert_plan(raw: bytes, parsed: ParsedFile, plan: JSONInsertPlan) -> bytes:
+    entries = tuple(parsed.entries)
+    entry_by_key = {entry.key: entry for entry in entries}
+    object_start = _skip_whitespace(raw, 0)
+    first_member = _skip_whitespace(raw, object_start + 1)
+    separator, indent = _json_layout(raw, object_start, first_member)
+    grouped: dict[str | None, list[JSONInsertItem]] = {}
+    for item in plan.items:
+        grouped.setdefault(item.anchor_key, []).append(item)
+
+    insertions: list[tuple[int, bytes]] = []
+    for anchor_key, items in grouped.items():
+        members = (b"," + separator).join(_member_bytes(item) for item in items)
+        if anchor_key is not None:
+            anchor = entry_by_key.get(anchor_key)
+            if anchor is None:
+                raise TranslationJSONError(
+                    f"JSON insertion anchor {anchor_key!r} is no longer present."
+                )
+            insertions.append((anchor.span[1], b"," + separator + members))
+            continue
+        if entries:
+            insertions.append((first_member, members + b"," + separator))
+            continue
+        close_brace = first_member
+        if separator == b" ":
+            insertions.append((close_brace, members))
+            continue
+        line_start = raw.rfind(separator[: -len(indent)], object_start + 1, close_brace)
+        offset = (
+            line_start + len(separator) - len(indent)
+            if line_start >= 0
+            else close_brace
+        )
+        insertions.append((offset, indent + members + separator[: -len(indent)]))
+
+    merged = bytearray(raw)
+    for offset, insertion in sorted(insertions, reverse=True):
+        merged[offset:offset] = insertion
+    return bytes(merged)
+
+
+def insert_missing(
+    path: Path,
+    *,
+    source_order: tuple[str, ...],
+    edited_new_values: Mapping[str, str],
+) -> tuple[str, ...]:
+    """Atomically insert edited missing members and return inserted keys."""
+    raw = path.read_bytes()
+    parsed = parse_bytes(path, raw)
+    target_order = tuple(entry.key for entry in parsed.entries)
+    plan = build_insert_plan(
+        source_order=source_order,
+        target_order=target_order,
+        edited_new_values=edited_new_values,
+    )
+    if not plan.items:
+        return ()
+    merged = _apply_insert_plan(raw, parsed, plan)
+    parse_bytes(path, merged)
+    write_bytes_atomic(path, merged)
+    return tuple(item.key for item in plan.items)
 
 
 def save(pf: ParsedFile, new_entries: Mapping[str, str]) -> None:

@@ -38,6 +38,20 @@ def _make_project(tmp_path: Path) -> Path:
     return root
 
 
+def _make_json_project(tmp_path: Path) -> Path:
+    root = tmp_path / "json-proj"
+    root.mkdir()
+    for locale in ("EN", "BE"):
+        (root / locale).mkdir()
+        (root / locale / "language.txt").write_text(
+            f"text = {locale},\ncharset = UTF-8,\n",
+            encoding="utf-8",
+        )
+    (root / "EN" / "UI.json").write_bytes(b'{"A":"Source A","B":"Source B"}')
+    (root / "BE" / "UI.json").write_bytes(b'{"A":"Target A"}')
+    return root
+
+
 def _find_row_by_key(win: MainWindow, key: str) -> int:
     model = win.table.model()
     assert model is not None
@@ -122,6 +136,36 @@ def test_save_current_apply_inserts_edited_new_rows(
     assert 'A = "Target A"' in text
     assert 'B = "Draft B"' in text
     assert win._en_new_drafts_by_file.get(root / "BE" / "ui.txt") is None
+
+
+def test_save_current_apply_inserts_edited_json_new_rows(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """Explicit Save should insert edited JSON NEW rows without a legacy snippet path."""
+    root = _make_json_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    win._prompt_write_on_exit = False
+    qtbot.addWidget(win)
+    path = root / "BE" / "UI.json"
+    win._file_chosen(win.fs_model.index_for_path(path))
+
+    model = win.table.model()
+    assert model is not None
+    row_b = _find_row_by_key(win, "B")
+    assert row_b >= 0
+    assert model.setData(model.index(row_b, 2), "Draft B", Qt.EditRole) is True
+    prompt_calls: list[dict[str, object]] = []
+
+    def _apply(**kwargs):
+        prompt_calls.append(kwargs)
+        return "apply", None
+
+    monkeypatch.setattr(win, "_prompt_new_row_insertion_action", _apply)
+
+    assert win._save_current() is True
+    assert path.read_bytes() == b'{"A":"Target A", "B": "Draft B"}'
+    assert prompt_calls[0]["plan"] is None
+    assert win._en_new_drafts_by_file.get(path) is None
 
 
 def test_en_diff_resolves_locale_suffix_reference_paths(qtbot, tmp_path) -> None:

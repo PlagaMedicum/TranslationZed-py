@@ -36,6 +36,16 @@ from translationzed_py.core.en_insert_plan import (
 from translationzed_py.core.source_reference_service import (
     reference_path_for as _reference_path_for,
 )
+from translationzed_py.core.translation_format import (
+    is_json_translation as _is_json_translation,
+)
+from translationzed_py.core.translation_json import JSONInsertPlan as _JSONInsertPlan
+from translationzed_py.core.translation_json import (
+    build_insert_plan as _build_json_insert_plan,
+)
+from translationzed_py.core.translation_json import (
+    insert_missing as _insert_missing_json,
+)
 
 from .entry_model import VirtualNewRow
 
@@ -216,6 +226,80 @@ def _build_en_insert_preview_text(
     return "\n\n".join(blocks)
 
 
+def _build_json_insert_preview_text(plan: _JSONInsertPlan) -> str:
+    if not plan.items:
+        return "No NEW rows to insert."
+    return "\n\n".join(
+        (
+            f"Key: {item.key}\nAnchor: {item.anchor_key or '<file-start>'}\nValue: {item.value}"
+        )
+        for item in plan.items
+    )
+
+
+def _relative_display_path(win, path: Path) -> str:
+    try:
+        return path.relative_to(win._root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _prepare_new_row_insertion(
+    win,
+    *,
+    path: Path,
+    edited_new_values: Mapping[str, str],
+    en_path: Path | None,
+    locale_encoding: str,
+) -> tuple[str, dict[str, str] | None]:
+    """Build and show the format-specific explicit-Save insertion preview."""
+    if not edited_new_values or en_path is None:
+        return "skip", None
+    en_encoding = (
+        win._locales.get("EN", LocaleMeta("", Path(), "", "utf-8")).charset or "utf-8"
+    )
+    try:
+        if _is_json_translation(path):
+            source = parse(en_path, encoding=en_encoding)
+            target = parse(path, encoding=locale_encoding)
+            plan = _build_json_insert_plan(
+                source_order=tuple(entry.key for entry in source.entries),
+                target_order=tuple(entry.key for entry in target.entries),
+                edited_new_values=edited_new_values,
+            )
+            if not plan.items:
+                return "skip", None
+            return win._prompt_new_row_insertion_action(
+                rel_path=_relative_display_path(win, path),
+                preview_text=_build_json_insert_preview_text(plan),
+                plan=None,
+            )
+
+        en_text = win._read_file_text(en_path, encoding=en_encoding)
+        locale_text = win._read_file_text(path, encoding=locale_encoding)
+        plan = _build_en_insert_plan(
+            en_text=en_text,
+            locale_text=locale_text,
+            edited_new_values=edited_new_values,
+            comment_prefixes=(win._app_config.comment_prefix, "#", "--"),
+        )
+        if not plan.items:
+            return "skip", None
+        preview_text = win._build_en_insert_preview_text(
+            locale_text=locale_text,
+            plan=plan,
+            context_lines=win._app_config.preview_context_lines,
+        )
+        return win._prompt_new_row_insertion_action(
+            rel_path=_relative_display_path(win, path),
+            preview_text=preview_text,
+            plan=plan,
+        )
+    except Exception as exc:
+        QMessageBox.warning(win, "Save preview unavailable", str(exc))
+        return "cancel", None
+
+
 def _parse_insert_edit_payload(
     win,
     text: str,
@@ -301,7 +385,7 @@ def _prompt_new_row_insertion_action(
     *,
     rel_path: str,
     preview_text: str,
-    plan: _ENInsertPlan,
+    plan: _ENInsertPlan | None,
 ) -> tuple[str, dict[str, str] | None]:
     if win._test_mode:
         return "skip", None
@@ -310,13 +394,11 @@ def _prompt_new_row_insertion_action(
         msg.setIcon(QMessageBox.Question)
         msg.setWindowTitle("Apply NEW rows")
         msg.setText(f"Edited NEW rows were found for {rel_path}.")
-        msg.setInformativeText(
-            "Apply inserts snippets preserving EN order and comments."
-        )
+        msg.setInformativeText("Apply inserts the rows in source order.")
         msg.setDetailedText(preview_text)
         apply_btn = msg.addButton("Apply", QMessageBox.AcceptRole)
         skip_btn = msg.addButton("Skip", QMessageBox.ActionRole)
-        edit_btn = msg.addButton("Edit", QMessageBox.ActionRole)
+        edit_btn = msg.addButton("Edit", QMessageBox.ActionRole) if plan else None
         cancel_btn = msg.addButton("Cancel", QMessageBox.RejectRole)
         msg.exec()
         clicked = msg.clickedButton()
@@ -326,7 +408,7 @@ def _prompt_new_row_insertion_action(
             return "skip", None
         if clicked is cancel_btn or clicked is None:
             return "cancel", None
-        if clicked is edit_btn:
+        if edit_btn is not None and clicked is edit_btn and plan is not None:
             edited = win._prompt_insert_snippet_edits(
                 plan=plan,
                 preview_text=preview_text,
@@ -355,9 +437,17 @@ def _apply_new_row_insertions(
     )
     target_encoding = locale_encoding or win._current_encoding
     try:
+        if _is_json_translation(path):
+            source = parse(en_path, encoding=en_encoding)
+            _insert_missing_json(
+                path,
+                source_order=tuple(entry.key for entry in source.entries),
+                edited_new_values=edited_new_values,
+            )
+            return True
         en_text = win._read_file_text(en_path, encoding=en_encoding)
         locale_text = win._read_file_text(path, encoding=target_encoding)
-    except OSError as exc:
+    except Exception as exc:
         QMessageBox.warning(win, "Insertion failed", str(exc))
         return False
     plan = _build_en_insert_plan(

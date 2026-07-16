@@ -11,5 +11,5 @@ translation_ext = ".txt"
 comment_prefix = "--"
 
 [diff]
-insertion_enabled_globs = ["*.txt"]
+insertion_enabled_globs = ["*.txt", "*.json"]
 preview_context_lines = 3

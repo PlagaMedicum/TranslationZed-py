@@ -28,6 +28,7 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    performance:
    - `tests/test_translation_json.py`
    - `tests/test_project_scanner.py`
+   - `tests/test_main_window_en_diff.py`
    - `tests/test_perf_budgets.py::test_perf_b42_json_editing_workflow`
    - `scripts/test_b42_json.sh`
 

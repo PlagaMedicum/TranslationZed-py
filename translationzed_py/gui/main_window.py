@@ -2411,6 +2411,7 @@ class MainWindow(QMainWindow):
     _parse_insert_edit_payload = _en_diff_helpers._parse_insert_edit_payload
     _prompt_insert_snippet_edits = _en_diff_helpers._prompt_insert_snippet_edits
     _prompt_new_row_insertion_action = _en_diff_helpers._prompt_new_row_insertion_action
+    _prepare_new_row_insertion = _en_diff_helpers._prepare_new_row_insertion
     _apply_new_row_insertions = _en_diff_helpers._apply_new_row_insertions
 
     def _load_reference_source(
@@ -3669,51 +3670,14 @@ class MainWindow(QMainWindow):
             if callable(edited_virtual_reader):
                 edited_new_values = edited_virtual_reader()
             if edited_new_values:
-                en_path = self._current_en_reference_path
-                if en_path is not None:
-                    en_meta = self._locales.get(
-                        "EN", LocaleMeta("", Path(), "", "utf-8")
-                    )
-                    en_encoding = en_meta.charset or "utf-8"
-                    try:
-                        en_text = self._read_file_text(en_path, encoding=en_encoding)
-                        locale_text = self._read_file_text(
-                            self._current_pf.path,
-                            encoding=self._current_encoding,
-                        )
-                    except OSError as exc:
-                        _show_warning_box(
-                            self,
-                            "Save preview unavailable",
-                            str(exc),
-                        )
-                        return False
-                    insert_plan = _en_diff_helpers._build_en_insert_plan(
-                        en_text=en_text,
-                        locale_text=locale_text,
-                        edited_new_values=edited_new_values,
-                        comment_prefixes=(self._app_config.comment_prefix, "#", "--"),
-                    )
-                    if insert_plan.items:
-                        preview_text = self._build_en_insert_preview_text(
-                            locale_text=locale_text,
-                            plan=insert_plan,
-                            context_lines=self._app_config.preview_context_lines,
-                        )
-                        rel_path = str(self._current_pf.path)
-                        with contextlib.suppress(ValueError):
-                            rel_path = str(
-                                self._current_pf.path.relative_to(self._root)
-                            )
-                        insertion_action, insertion_edits = (
-                            self._prompt_new_row_insertion_action(
-                                rel_path=rel_path,
-                                preview_text=preview_text,
-                                plan=insert_plan,
-                            )
-                        )
-                        if insertion_action == "cancel":
-                            return False
+                insertion_action, insertion_edits = self._prepare_new_row_insertion(
+                    path=self._current_pf.path,
+                    edited_new_values=edited_new_values,
+                    en_path=self._current_en_reference_path,
+                    locale_encoding=self._current_encoding,
+                )
+                if insertion_action == "cancel":
+                    return False
         callbacks = _SaveCurrentCallbacks(
             save_file=self._save_parsed_file_with_writeback,
             write_cache=lambda path, entries, last_opened: _write_status_cache(
@@ -4101,46 +4065,24 @@ class MainWindow(QMainWindow):
         if pending_new_drafts and self._insertion_enabled_for_path(path):
             en_path, _en_rel, _en_values, _en_order = self._load_en_reference_data(path)
             if en_path is not None:
-                en_meta = self._locales.get("EN", LocaleMeta("", Path(), "", "utf-8"))
-                en_encoding = en_meta.charset or "utf-8"
-                try:
-                    en_text = self._read_file_text(en_path, encoding=en_encoding)
-                    locale_text = self._read_file_text(path, encoding=encoding)
-                except OSError as exc:
-                    _show_warning_box(self, "Save preview unavailable", str(exc))
-                    return False
-                insert_plan = _en_diff_helpers._build_en_insert_plan(
-                    en_text=en_text,
-                    locale_text=locale_text,
+                action, edited_snippets = self._prepare_new_row_insertion(
+                    path=path,
                     edited_new_values=pending_new_drafts,
-                    comment_prefixes=(self._app_config.comment_prefix, "#", "--"),
+                    en_path=en_path,
+                    locale_encoding=encoding,
                 )
-                if insert_plan.items:
-                    preview_text = self._build_en_insert_preview_text(
-                        locale_text=locale_text,
-                        plan=insert_plan,
-                        context_lines=self._app_config.preview_context_lines,
+                if action == "cancel":
+                    return False
+                if action == "apply":
+                    insertion_applied = self._apply_new_row_insertions(
+                        path=path,
+                        edited_new_values=pending_new_drafts,
+                        edited_snippets=edited_snippets,
+                        en_path=en_path,
+                        locale_encoding=encoding,
                     )
-                    rel_path = str(path)
-                    with contextlib.suppress(ValueError):
-                        rel_path = str(path.relative_to(self._root))
-                    action, edited_snippets = self._prompt_new_row_insertion_action(
-                        rel_path=rel_path,
-                        preview_text=preview_text,
-                        plan=insert_plan,
-                    )
-                    if action == "cancel":
+                    if not insertion_applied:
                         return False
-                    if action == "apply":
-                        insertion_applied = self._apply_new_row_insertions(
-                            path=path,
-                            edited_new_values=pending_new_drafts,
-                            edited_snippets=edited_snippets,
-                            en_path=en_path,
-                            locale_encoding=encoding,
-                        )
-                        if not insertion_applied:
-                            return False
         if result.had_drafts or insertion_applied:
             with contextlib.suppress(Exception):
                 self._update_en_snapshot_for_locale_file(path)

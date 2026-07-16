@@ -66,6 +66,9 @@ This local validation is provenance, not a redistributable test fixture.
 
 - Open, preview, detection failure, search, QA, and TM indexing do not write locale originals.
 - Save replaces only value-literal spans for existing keys and uses atomic replacement.
+- Edited virtual `NEW` rows may be inserted only after the user chooses Apply during explicit Save.
+  Insertion adds missing members in EN order, uses atomic replacement, and leaves all pre-existing
+  bytes unchanged.
 - An unchanged decoded value keeps its original literal spelling, including Unicode escape style.
 - Untouched keys, whitespace, punctuation, ordering, and final-newline state remain byte-exact.
 - JSON has no comment write-back surface. Optional `TZP:` status-comment write-back is ignored for
@@ -75,9 +78,9 @@ This local validation is provenance, not a redistributable test fixture.
 
 ## Deliberate Boundary
 
-This slice edits existing JSON keys. It does not convert legacy `.txt` files into JSON or insert a
-missing JSON key. Format-aware new-key insertion belongs to the Git synchronization slice and must
-not reuse the legacy line-insertion algorithm.
+The application does not convert legacy `.txt` files into JSON, create missing target JSON files,
+or manufacture translations implicitly. JSON new-key insertion is a format-specific part of the
+Git synchronization/EN-diff Save workflow; it does not reuse legacy line or comment insertion.
 
 The observed Belarusian game symptom follows this boundary: B42.19.0 can list and select BE from
 `language.txt`, while a BE directory containing only legacy translation `.txt` payloads provides no

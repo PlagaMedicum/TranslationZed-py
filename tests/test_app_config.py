@@ -17,7 +17,7 @@ def test_load_defaults_include_diff_contract(tmp_path: Path) -> None:
     """Verify app config defaults include diff insertion settings."""
     app_config.load.cache_clear()
     cfg = app_config.load(tmp_path)
-    assert cfg.insertion_enabled_globs == ("*.txt",)
+    assert cfg.insertion_enabled_globs == ("*.txt", "*.json")
     assert cfg.preview_context_lines == 3
 
 
@@ -95,7 +95,7 @@ preview_context_lines = "bad"
 """.strip() + "\n",
     )
     cfg = app_config.load(tmp_path)
-    assert cfg.insertion_enabled_globs == ("*.txt",)
+    assert cfg.insertion_enabled_globs == ("*.txt", "*.json")
     assert cfg.preview_context_lines == 3
 
 

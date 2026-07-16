@@ -108,7 +108,7 @@ sequenceDiagram
 |---|---|
 | Goal | Surface EN deltas and insert edited virtual `NEW` rows deterministically. |
 | Trigger | File open/refresh and save with edited virtual `NEW` rows. |
-| Success | Mark `NEW/REMOVED/MODIFIED`, prompt `Apply / Skip / Edit / Cancel`, preserve EN order and comment dedup rules. |
+| Success | Mark `NEW/REMOVED/MODIFIED`, prompt before insertion, preserve EN order, retain legacy comment dedup rules, and use member-only insertion for JSON. `Edit` applies only to legacy snippets. |
 | Invariant | `REMOVED` remains marker-only; no auto-delete. |
 
 ## UC-10b Dirty Indicator in File Tree

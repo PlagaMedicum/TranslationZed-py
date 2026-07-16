@@ -26,7 +26,7 @@ class AppConfig:
     translation_ext: str = ".txt"
     comment_prefix: str = "--"
     en_hash_filename: str = "en.hashes.bin"
-    insertion_enabled_globs: tuple[str, ...] = ("*.txt",)
+    insertion_enabled_globs: tuple[str, ...] = ("*.txt", "*.json")
     preview_context_lines: int = 3
 
 
