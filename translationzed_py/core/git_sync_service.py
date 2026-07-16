@@ -25,6 +25,7 @@ from translationzed_py.core.translation_format import is_json_translation
 from translationzed_py.core.tzp_comment_policy import parse_tzp_status_comment
 
 MAX_SYNC_BLOB_BYTES = 64 * 1024 * 1024
+MAX_SYNC_PLAN_ITEMS = 100_000
 GitKeyChangeKind = Literal["added", "removed", "modified", "comments", "reordered"]
 GitSyncDecision = Literal["apply", "ignore", "conflict"]
 GitSyncCommentDecision = Literal["none", "use_en", "keep_locale", "choose"]
@@ -553,6 +554,14 @@ def _file_conflict_item(
     )
 
 
+def _add_plan_item(items: list[GitSyncPlanItem], item: GitSyncPlanItem) -> None:
+    if len(items) >= MAX_SYNC_PLAN_ITEMS:
+        raise GitSyncDocumentError(
+            f"Synchronization preview exceeds {MAX_SYNC_PLAN_ITEMS:,} items."
+        )
+    items.append(item)
+
+
 def _comment_policy(
     delta: GitKeyDelta,
     target_comments: tuple[str, ...],
@@ -672,7 +681,8 @@ def build_merge_plan(
             target = _target_path_for_source(root, meta, source_for_target)
             target_rel = _relative_path(root, target)
             if file_delta.error:
-                items.append(
+                _add_plan_item(
+                    items,
                     _file_conflict_item(
                         change_set=change_set,
                         locale=locale,
@@ -680,7 +690,7 @@ def build_merge_plan(
                         target_path=target_rel,
                         kind="file_unreadable",
                         reason=file_delta.error,
-                    )
+                    ),
                 )
                 continue
             if file_delta.kind == "renamed" and file_delta.previous_path:
@@ -690,7 +700,8 @@ def build_merge_plan(
                     file_delta.previous_path,
                 )
                 if not target.exists() and previous_target.exists():
-                    items.append(
+                    _add_plan_item(
+                        items,
                         _file_conflict_item(
                             change_set=change_set,
                             locale=locale,
@@ -701,13 +712,14 @@ def build_merge_plan(
                                 "The English file was renamed; rename or create the target "
                                 "file explicitly before applying key changes."
                             ),
-                        )
+                        ),
                     )
                     continue
             if not target.exists():
                 if file_delta.kind == "deleted":
                     continue
-                items.append(
+                _add_plan_item(
+                    items,
                     _file_conflict_item(
                         change_set=change_set,
                         locale=locale,
@@ -715,7 +727,7 @@ def build_merge_plan(
                         target_path=target_rel,
                         kind="file_missing",
                         reason="No corresponding target locale file exists.",
-                    )
+                    ),
                 )
                 continue
             try:
@@ -726,7 +738,8 @@ def build_merge_plan(
                     comment_prefixes=comment_prefixes,
                 )
             except Exception as exc:
-                items.append(
+                _add_plan_item(
+                    items,
                     _file_conflict_item(
                         change_set=change_set,
                         locale=locale,
@@ -734,21 +747,22 @@ def build_merge_plan(
                         target_path=target_rel,
                         kind="target_unreadable",
                         reason=str(exc) or type(exc).__name__,
-                    )
+                    ),
                 )
                 continue
             target_by_key = {row.key: row for row in target_document.rows}
-            items.extend(
-                _plan_key_item(
-                    change_set=change_set,
-                    file_delta=file_delta,
-                    locale=locale,
-                    target_path=target_rel,
-                    delta=delta,
-                    target_row=target_by_key.get(delta.key),
+            for delta in file_delta.keys:
+                _add_plan_item(
+                    items,
+                    _plan_key_item(
+                        change_set=change_set,
+                        file_delta=file_delta,
+                        locale=locale,
+                        target_path=target_rel,
+                        delta=delta,
+                        target_row=target_by_key.get(delta.key),
+                    ),
                 )
-                for delta in file_delta.keys
-            )
     return GitSyncMergePlan(
         baseline=change_set.baseline,
         head=change_set.head,
@@ -809,6 +823,7 @@ def resolve_merge_plan(
 
 
 __all__ = [
+    "MAX_SYNC_PLAN_ITEMS",
     "GitFileDelta",
     "GitKeyDelta",
     "GitSourceDocument",

@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import gc
 import json
+import os
 import subprocess
 import threading
+import time
+import tracemalloc
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -287,3 +291,46 @@ def test_async_apply_refreshes_open_file_without_writing_original(
     assert state.baseline == resolve_commit(root)
     assert window._current_model.status_for_row(0) is Status.FOR_REVIEW
     assert (root / "BE" / "UI.txt").read_bytes() == original
+
+
+def test_large_preview_model_has_time_and_memory_budgets(qtbot, perf_recorder) -> None:
+    """Keep a large preview's transient GUI model bounded and widget-free."""
+    count = int(os.getenv("TZP_PERF_GIT_SYNC_ITEMS", "20000"))
+    budget_ms = float(os.getenv("TZP_PERF_GIT_SYNC_MODEL_MS", "1200"))
+    memory_budget = int(os.getenv("TZP_PERF_GIT_SYNC_MODEL_MIB", "16")) * 1024**2
+    items = tuple(
+        GitSyncPlanItem(
+            item_id=f"BE:{index}",
+            locale="BE",
+            source_path="EN/UI.txt",
+            target_path="BE/UI.txt",
+            key=f"KEY_{index:05d}",
+            kinds=("modified",),
+            base_source="Old",
+            head_source="New",
+            target_value="Target",
+            target_file_value="Target",
+            target_status=Status.TRANSLATED,
+            propose_for_review=True,
+        )
+        for index in range(count)
+    )
+    plan = GitSyncMergePlan(baseline="a" * 40, head="b" * 40, items=items)
+
+    gc.collect()
+    tracemalloc.start()
+    started = time.perf_counter()
+    model = git_sync_ui.GitSyncPreviewModel(plan)
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    _current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert model.rowCount() == count
+    perf_recorder(
+        "Git synchronization preview model",
+        elapsed_ms,
+        budget_ms,
+        f"items={count} peak_mib={peak / 1024**2:.1f}",
+    )
+    assert elapsed_ms <= budget_ms
+    assert peak <= memory_budget

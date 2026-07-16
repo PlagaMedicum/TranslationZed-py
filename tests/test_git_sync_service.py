@@ -322,6 +322,38 @@ def test_merge_plan_requires_ignore_or_retry_for_missing_target_file(
     assert ignored.advance_baseline is True
 
 
+def test_merge_plan_rejects_excessive_preview_items(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Stop plan construction at the fixed item-count resource boundary."""
+    root, locales = _merge_project(tmp_path)
+    (root / "BE" / "UI.txt").write_text('C = "Target"\n', encoding="utf-8")
+    head = _document("EN/UI.txt", 'A = "New A"\nB = "New B"\n')
+    change_set = GitSyncChangeSet(
+        baseline="a" * 40,
+        head="b" * 40,
+        files=(
+            GitFileDelta(
+                kind="added",
+                path="EN/UI.txt",
+                previous_path=None,
+                keys=classify_documents(None, head),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        "translationzed_py.core.git_sync_service.MAX_SYNC_PLAN_ITEMS", 1
+    )
+
+    with pytest.raises(GitSyncDocumentError, match="exceeds 1 items"):
+        build_merge_plan(
+            root,
+            change_set,
+            locales=locales,
+            selected_locales=["BE"],
+        )
+
+
 def test_merge_plan_maps_locale_suffix_and_flags_unresolved_rename(
     tmp_path: Path,
 ) -> None:
