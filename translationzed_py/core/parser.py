@@ -512,14 +512,18 @@ def _parse_entries_stream(
     return (entries_eager or []), saw_equal
 
 
-def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
-    """Read *path*, tokenise, and build a ParsedFile with stable spans."""
+def parse_bytes(  # noqa: F821
+    path: Path,
+    raw: bytes,
+    encoding: str = "utf-8",
+) -> ParsedFile:
+    """Parse supplied translation bytes under *path* identity without writing."""
     from .translation_format import is_json_translation
 
     if is_json_translation(path):
-        from .translation_json import parse as _parse_json
+        from .translation_json import parse_bytes as _parse_json_bytes
 
-        return _parse_json(path)
+        return _parse_json_bytes(path, raw)
 
     # local import avoids an import cycle
     from .model import Entry, ParsedFile, Status
@@ -533,7 +537,6 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
             "FOR_REVIEW": Status.FOR_REVIEW,
         }
 
-    raw = path.read_bytes()
     resolved_encoding, _ = _resolve_encoding(encoding, raw)
     if b"=" not in raw or path.name.startswith("News_"):
         text = _decode_text(raw, resolved_encoding)
@@ -584,6 +587,11 @@ def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
         raise ValueError("Unsupported file format (no translatable entries found).")
 
     return ParsedFile(path, entries, raw)
+
+
+def parse(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821
+    """Read *path*, tokenise, and build a ParsedFile with stable spans."""
+    return parse_bytes(path, path.read_bytes(), encoding)
 
 
 def parse_lazy(path: Path, encoding: str = "utf-8") -> ParsedFile:  # noqa: F821

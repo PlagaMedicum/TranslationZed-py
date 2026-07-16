@@ -11,6 +11,7 @@ from translationzed_py.core import git_sync
 from translationzed_py.core.git_sync import (
     GitSyncError,
     inspect,
+    inspect_state,
     read_blob,
     read_state,
     resolve_commit,
@@ -85,6 +86,7 @@ def test_inspect_reports_dirty_en_without_including_worktree_diff(
 
     assert result.changes == ()
     assert result.dirty_en is True
+    assert result.dirty_paths == ("EN/ui.txt",)
 
 
 def test_inspect_and_read_blob_preserve_b42_json_format_identity(
@@ -121,6 +123,7 @@ def test_inspect_reports_untracked_en_as_dirty(tmp_path: Path) -> None:
 
     assert result.changes == ()
     assert result.dirty_en is True
+    assert result.dirty_paths == ("EN/untracked.txt",)
 
 
 def test_state_roundtrip_is_versioned_and_resolved(tmp_path: Path) -> None:
@@ -147,6 +150,31 @@ def test_read_state_ignores_invalid_payloads(tmp_path: Path, payload: str) -> No
 
 
 @pytest.mark.parametrize(
+    ("payload", "problem"),
+    [
+        (None, "missing"),
+        ("{", "malformed"),
+        ("[]", "malformed"),
+        ('{"version": 2, "baseline": "0"}', "unsupported_version"),
+        ('{"version": 1, "baseline": "bad"}', "invalid_baseline"),
+    ],
+)
+def test_inspect_state_preserves_recovery_reason(
+    tmp_path: Path, payload: str | None, problem: str
+) -> None:
+    """Missing and invalid state must lead to different recovery choices."""
+    state_path = tmp_path / ".tzp" / "cache" / "git_sync_state.json"
+    if payload is not None:
+        state_path.parent.mkdir(parents=True)
+        state_path.write_text(payload, encoding="utf-8")
+
+    result = inspect_state(tmp_path)
+
+    assert result.state is None
+    assert result.problem == problem
+
+
+@pytest.mark.parametrize(
     ("failure", "message"),
     [
         (FileNotFoundError(), "not found"),
@@ -164,6 +192,24 @@ def test_git_process_failures_are_actionable(
     monkeypatch.setattr(git_sync.subprocess, "run", fail)
 
     with pytest.raises(GitSyncError, match=message):
+        resolve_commit(tmp_path)
+
+
+def test_git_output_and_object_id_validation_are_bounded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Accept modern object IDs while rejecting unexpectedly large Git output."""
+
+    class Result:
+        returncode = 0
+        stderr = b""
+        stdout = (b"a" * 64) + b"\n"
+
+    monkeypatch.setattr(git_sync.subprocess, "run", lambda *_args, **_kwargs: Result())
+    assert resolve_commit(tmp_path) == "a" * 64
+
+    Result.stdout = b"a" * (git_sync.GIT_OUTPUT_LIMIT_BYTES + 1)
+    with pytest.raises(GitSyncError, match="64 MiB"):
         resolve_commit(tmp_path)
 
 
@@ -204,3 +250,28 @@ def test_inspect_supports_project_nested_inside_repository(tmp_path: Path) -> No
 
     assert result.repository_root == repo.resolve()
     assert result.changes[0].path == "EN/ui.txt"
+
+
+def test_inspect_reports_dirty_metadata_and_unsupported_committed_paths(
+    tmp_path: Path,
+) -> None:
+    """Show EN worktree metadata while excluding unsupported committed payloads."""
+    root = _repo(tmp_path)
+    baseline = resolve_commit(root)
+    (root / "EN" / "notes.md").write_text("not a translation", encoding="utf-8")
+    _git(root, "add", "EN/notes.md")
+    _git(root, "commit", "-m", "add unsupported EN file")
+    (root / "EN" / "language.txt").write_text("text = Changed\n", encoding="utf-8")
+
+    result = inspect(root, baseline=baseline)
+
+    assert result.changes == ()
+    assert result.unsupported_paths == ("EN/notes.md",)
+    assert result.dirty_paths == ("EN/language.txt",)
+    assert result.dirty_en is True
+
+
+def test_name_status_parser_rejects_truncated_records() -> None:
+    """Malformed Git protocol output must not be silently accepted."""
+    with pytest.raises(GitSyncError, match="truncated"):
+        git_sync._parse_name_status(b"R100\0EN/old.txt\0")

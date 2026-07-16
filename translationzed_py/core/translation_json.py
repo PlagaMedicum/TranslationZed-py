@@ -157,9 +157,8 @@ def _parse_entries(raw: bytes, *, lazy: bool) -> list[Entry] | LazyEntries:
     return entries
 
 
-def parse(path: Path, *, lazy: bool = False) -> ParsedFile:
-    """Parse one confirmed B42 flat string-map JSON file without writing it."""
-    raw = path.read_bytes()
+def parse_bytes(path: Path, raw: bytes, *, lazy: bool = False) -> ParsedFile:
+    """Parse supplied B42 bytes under *path* identity without filesystem writes."""
     if len(raw) > MAX_JSON_FILE_BYTES:
         limit_mib = MAX_JSON_FILE_BYTES // (1024 * 1024)
         raise TranslationJSONError(
@@ -174,6 +173,11 @@ def parse(path: Path, *, lazy: bool = False) -> ParsedFile:
     except UnicodeDecodeError as exc:
         raise _at("Translation JSON must be valid UTF-8", exc.start) from exc
     return ParsedFile(path, _parse_entries(raw, lazy=lazy), raw)
+
+
+def parse(path: Path, *, lazy: bool = False) -> ParsedFile:
+    """Parse one confirmed B42 flat string-map JSON file without writing it."""
+    return parse_bytes(path, path.read_bytes(), lazy=lazy)
 
 
 def _encode_literal(key: str, value: str) -> bytes:
