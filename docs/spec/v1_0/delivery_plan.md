@@ -96,7 +96,8 @@ Slice 1 requirement and must not reuse the legacy line-insertion algorithm.
 ### Intent
 
 Replace snapshot-only awareness with a repository-aware change range while retaining snapshot
-fallback. TranslationZed-Py observes local committed history; it never manages Git for the user.
+fallback. TranslationZed-Py observes the user's local fork and committed history; it never inspects
+or combines remotes and never manages Git for the user.
 
 ### Core work
 
@@ -113,8 +114,9 @@ fallback. TranslationZed-Py observes local committed history; it never manages G
    translation and offer `For review`. For removals, keep the existing marker-only behavior.
 6. Treat comments as three-way data: replace EN-derived locale comments only when they equal the
    base EN block; otherwise require `keep locale` or `use EN`.
-7. Advance the baseline only when every item is applied or explicitly ignored. Store unresolved
-   work without falsely accepting `HEAD`.
+7. Advance the baseline only when every item is applied or explicitly ignored. If anything remains
+   unresolved, write nothing; the unchanged baseline reproduces the same range on retry, so no
+   partial-progress ledger is needed.
 
 ### GUI and workflow
 

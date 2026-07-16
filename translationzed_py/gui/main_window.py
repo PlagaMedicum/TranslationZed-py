@@ -2413,6 +2413,9 @@ class MainWindow(QMainWindow):
     _prompt_new_row_insertion_action = _en_diff_helpers._prompt_new_row_insertion_action
     _prepare_new_row_insertion = _en_diff_helpers._prepare_new_row_insertion
     _apply_new_row_insertions = _en_diff_helpers._apply_new_row_insertions
+    _pending_git_comment_files = _en_diff_helpers._pending_git_comment_files
+    _preflight_pending_git_comments = _en_diff_helpers._preflight_pending_git_comments
+    _apply_pending_git_comments = _en_diff_helpers._apply_pending_git_comments
 
     def _load_reference_source(
         self,
@@ -3644,11 +3647,19 @@ class MainWindow(QMainWindow):
         changed_keys_reader = getattr(self._current_model, "changed_keys", None)
         if self._current_model is not None and callable(changed_keys_reader):
             changed_keys = set(changed_keys_reader())
+        pending_git_comments = 0
+        if self._current_pf is not None:
+            pending_count = self._preflight_pending_git_comments(self._current_pf.path)
+            if pending_count is None:
+                return False
+            pending_git_comments = pending_count
         plan = self._file_workflow_service.build_save_current_run_plan(
             has_current_file=self._current_pf is not None,
             has_current_model=self._current_model is not None,
             conflicts_resolved=conflicts_resolved,
-            has_changed_keys=bool(changed_keys) or has_virtual_new,
+            has_changed_keys=(
+                bool(changed_keys) or has_virtual_new or bool(pending_git_comments)
+            ),
         )
         if plan.immediate_result is not None:
             return plan.immediate_result
@@ -3716,6 +3727,11 @@ class MainWindow(QMainWindow):
             )
             if not insertion_applied:
                 return False
+        comments_applied = False
+        if pending_git_comments:
+            comments_applied = self._apply_pending_git_comments(self._current_pf.path)
+            if not comments_applied:
+                return False
         if (
             save_succeeded
             and self._current_en_reference_rel
@@ -3731,7 +3747,7 @@ class MainWindow(QMainWindow):
         has_pending_new = self._current_model.has_pending_virtual_new_values()
         self.fs_model.set_dirty(self._current_pf.path, has_pending_new)
         self._set_saved_status()
-        if insertion_applied:
+        if insertion_applied or comments_applied:
             self._reload_file(self._current_pf.path)
         else:
             self._refresh_current_en_diff_state()
@@ -3802,6 +3818,7 @@ class MainWindow(QMainWindow):
             )
         )
         files.update(self._pending_virtual_new_files(locales=self._selected_locales))
+        files.update(self._pending_git_comment_files())
         return sorted(files)
 
     def _all_draft_files(self, locales: Iterable[str] | None = None) -> list[Path]:
@@ -3812,6 +3829,7 @@ class MainWindow(QMainWindow):
             )
         )
         files.update(self._pending_virtual_new_files(locales=locales))
+        files.update(self._pending_git_comment_files())
         return sorted(files)
 
     def _pending_virtual_new_files(self, *, locales: Iterable[str] | None) -> set[Path]:
@@ -4033,6 +4051,9 @@ class MainWindow(QMainWindow):
             self._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset
             or "utf-8"
         )
+        pending_git_comments = self._preflight_pending_git_comments(path)
+        if pending_git_comments is None:
+            return False
         callbacks = _SaveFromCacheCallbacks(
             parse_file=lambda file_path, enc: parse(file_path, encoding=enc),
             save_file=self._save_parsed_file_with_writeback,
@@ -4083,13 +4104,23 @@ class MainWindow(QMainWindow):
                     )
                     if not insertion_applied:
                         return False
-        if result.had_drafts or insertion_applied:
+        comments_applied = False
+        if pending_git_comments:
+            comments_applied = self._apply_pending_git_comments(path)
+            if not comments_applied:
+                return False
+        if result.had_drafts or insertion_applied or comments_applied:
             with contextlib.suppress(Exception):
                 self._update_en_snapshot_for_locale_file(path)
         if insertion_applied:
             self._en_new_drafts_by_file.pop(path, None)
         dirty = bool(self._en_new_drafts_by_file.get(path))
-        if not result.had_drafts and not insertion_applied and not dirty:
+        if (
+            not result.had_drafts
+            and not insertion_applied
+            and not comments_applied
+            and not dirty
+        ):
             return True
         self.fs_model.set_dirty(path, dirty)
         return True

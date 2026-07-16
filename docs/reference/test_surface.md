@@ -1,5 +1,5 @@
 # TranslationZed-Py — Test Surface
-_Last updated: 2026-07-15_
+_Last updated: 2026-07-16_
 
 ## 1) Purpose
 
@@ -70,6 +70,15 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
 4. One-writer lock, exception boundary, logging, and issue reports:
    - `tests/test_runtime_reliability.py`
    - `tests/test_runtime_diagnostics.py`
+
+## 3.2) Git Synchronization
+
+1. Local Git/state/blob protocol and failure bounds: `tests/test_git_sync.py`.
+2. Committed document classification and immutable per-locale previews:
+   `tests/test_git_sync_service.py`.
+3. Cache-only apply, staged comments, encoding fidelity, and baseline ordering:
+   `tests/test_git_sync_apply.py`.
+4. Explicit-Save adapter integration: `tests/test_main_window_en_diff.py`.
 
 ## 4) Search / Replace / Source Reference
 

@@ -37,10 +37,11 @@ Dependency rules:
 | `qa_service` | QA finding generation and panel/navigation planning |
 | `tm_workflow_service` | TM query/apply/refresh orchestration and diagnostics |
 | `render_workflow_service` | render-heavy policy decisions |
+| `git_sync` / `git_sync_service` / `git_sync_apply` | local committed EN inspection, immutable preview policy, and cache-only resolved effects |
 
-Partial v1 foundations are deliberately not listed as completed workflows: `git_sync` currently
-owns read-only Git inspection/state primitives, and `locale_creation` owns staged clone policy.
-Their integration status is authoritative in `docs/plan/implementation_active.md`.
+`locale_creation` remains a partial v1 foundation with staged clone policy. Git synchronization's
+preview UI is still in progress; integration status is authoritative in
+`docs/plan/implementation_active.md`.
 
 ```mermaid
 flowchart LR
@@ -50,6 +51,8 @@ flowchart LR
   SR[search_replace_service] --> SEARCH[core.search]
   QA[qa_service] --> RULES[qa_rules]
   TMW[tm_workflow_service] --> TMS[tm_store]
+  GI[git_sync] --> GP[git_sync_service] --> GA[git_sync_apply]
+  GA --> SC
 ```
 
 ## 4) Persistence Contracts
@@ -57,6 +60,8 @@ flowchart LR
 - Draft cache: legacy `file.txt` maps to `.tzp/cache/<locale>/file.bin`; B42 `file.json` maps to
   `.tzp/cache/<locale>/file.json.bin`.
 - Workspace snapshot: `.tzp/cache/session.resume.json` (atomic replacement).
+- Git synchronization baseline: `.tzp/cache/git_sync_state.json`; staged legacy comment changes
+  remain in `.tzp/cache/git_sync_comments.json` until normal explicit Save.
 - Live one-writer marker: `.tzp/cache/session.lock` (removed on accepted clean close; stale marker
   activates draft-recovery detection).
 - EN hash cache: `.tzp/cache/en.hashes.bin`.

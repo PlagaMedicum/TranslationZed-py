@@ -62,8 +62,9 @@ declared in `pyproject.toml` on macOS, Windows, and Linux.
 - **Productivity bias**: prioritize low‑latency startup and interaction; avoid
   heavyweight scans on startup.
 
-The current v0.9 contract has no Git synchronization, locale creation, machine translation, or
-self-update workflow. Planned v1.0 work is indexed separately and does not redefine current behavior.
+The published v0.9 contract has no Git synchronization, locale creation, machine translation, or
+self-update workflow. In-progress v1.0 core contracts are described here when implemented; their
+user-facing availability remains explicit in `docs/plan/implementation_active.md`.
 
 ---
 
@@ -468,10 +469,9 @@ if dirty_files and not prompt_save():
   - `REMOVED`: key exists in locale and not in EN (marker only, no auto-delete),
   - `MODIFIED`: EN source hash differs from snapshot baseline.
 - `NEW` keys are exposed as editable virtual rows.
-  On save with edited `NEW` rows, GUI shows mandatory insertion prompt:
-  `Apply` / `Skip` / `Edit` / `Cancel`.
-  `Apply` inserts generated snippets in EN order (comment copy/dedup preserved),
-  `Skip` keeps drafts pending, `Edit` edits insertion snippets only with bounded context.
+  On save with edited `NEW` rows, GUI requires `Apply` / `Skip` / `Cancel`; legacy text also offers
+  `Edit` for bounded insertion snippets. `Apply` uses format-specific EN-order insertion, including
+  legacy comment copy/dedup; `Skip` keeps drafts pending.
 - Architecture watchdog enforces `translationzed_py/gui/main_window.py <= 5450`
   (`make arch-check` + `tests/test_architecture_guard.py`).
 - Locale selection uses checkboxes for multi-select; EN is excluded from the
@@ -677,7 +677,24 @@ UNTOUCHED).
 
 ---
 
-### 5.11.2  `core.tm_store` + TMX I/O
+### 5.11.2  Git synchronization core
+
+- Inspect only the saved local commit baseline through local committed `HEAD`; never fetch, pull,
+  merge, rebase, stage, commit, push, or select branches/remotes.
+- Parse base/head blobs through production format readers, classify file/key/value/order/comment
+  changes, and build immutable per-locale `apply` / `ignore` / `conflict` preview items.
+- Applying requires every item resolved. It preserves target values and drafts, writes optional
+  `For review` status to cache, stages chosen legacy comment replacements, and advances the baseline
+  only after those cache effects succeed. Cancellation and unresolved plans write nothing.
+- Normal explicit Save applies staged user-comment changes atomically with locale encoding and line
+  endings preserved. Namespaced `TZP:` status comments are excluded from merge comparison and
+  retained during comment replacement. Locale originals are never written by synchronization.
+- Missing/unreadable/renamed targets remain explicit conflict-or-ignore items; no target filesystem
+  rename or creation is inferred.
+
+---
+
+### 5.11.3  `core.tm_store` + TMX I/O
 
 - Project‑scoped SQLite DB at `<root>/.tzp/config/tm.sqlite`.
 - If `<root>/.tzp/config/tm.sqlite` is absent but legacy `<root>/.tzp-config/tm.sqlite`

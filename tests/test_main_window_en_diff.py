@@ -200,3 +200,29 @@ def test_en_diff_resolves_locale_suffix_reference_paths(qtbot, tmp_path) -> None
     assert model.data(model.index(row_a, 0), DIFF_MARKER_ROLE) is None
     assert model.data(model.index(row_b, 0), Qt.DisplayRole) == "B"
     assert model.data(model.index(row_b, 0), DIFF_MARKER_ROLE) == "NEW"
+
+
+def test_save_current_processes_staged_git_comments_without_value_edits(
+    qtbot, tmp_path, monkeypatch
+) -> None:
+    """A staged comment alone should run through the explicit Save boundary."""
+    root = _make_project(tmp_path)
+    win = MainWindow(str(root), selected_locales=["BE"])
+    win._prompt_write_on_exit = False
+    qtbot.addWidget(win)
+    path = root / "BE" / "ui.txt"
+    win._file_chosen(win.fs_model.index_for_path(path))
+    applied: list[Path] = []
+    monkeypatch.setattr(
+        win,
+        "_preflight_pending_git_comments",
+        lambda *_args, **_kwargs: 1,
+    )
+    monkeypatch.setattr(
+        win,
+        "_apply_pending_git_comments",
+        lambda target, **_kwargs: applied.append(target) or True,
+    )
+
+    assert win._save_current() is True
+    assert applied == [path]

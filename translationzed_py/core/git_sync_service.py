@@ -22,6 +22,7 @@ from translationzed_py.core.parser import parse_bytes
 from translationzed_py.core.project_scanner import LocaleMeta
 from translationzed_py.core.status_cache import read as read_status_cache
 from translationzed_py.core.translation_format import is_json_translation
+from translationzed_py.core.tzp_comment_policy import parse_tzp_status_comment
 
 MAX_SYNC_BLOB_BYTES = 64 * 1024 * 1024
 GitKeyChangeKind = Literal["added", "removed", "modified", "comments", "reordered"]
@@ -198,7 +199,8 @@ def leading_comments_by_key(
                 stripped.startswith(prefix) for prefix in prefixes
             ):
                 break
-            comments.append(candidate)
+            if parse_tzp_status_comment(candidate) is None:
+                comments.append(candidate)
             cursor -= 1
         comments.reverse()
         out[key] = tuple(comments)

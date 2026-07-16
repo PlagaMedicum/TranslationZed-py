@@ -190,7 +190,8 @@ def test_build_merge_plan_preserves_target_draft_and_exposes_comment_conflict(
     root, locales = _merge_project(tmp_path)
     target = root / "BE" / "UI.txt"
     target.write_text(
-        '-- лакальны A\nA = "Target A"\nB = "Target B"\nC = "Target C"\n',
+        '-- лакальны A\n-- TZP:PROOFREAD\nA = "Target A"\n'
+        'B = "Target B"\nC = "Target C"\n',
         encoding="utf-8",
     )
     parsed = parse(target)
@@ -247,6 +248,7 @@ def test_build_merge_plan_preserves_target_draft_and_exposes_comment_conflict(
     assert by_key["A"].target_value == "Draft A"
     assert by_key["A"].target_file_value == "Target A"
     assert by_key["A"].target_status is Status.PROOFREAD
+    assert by_key["A"].target_comments == ("-- лакальны A",)
     assert by_key["A"].default_decision == "conflict"
     assert by_key["A"].comment_decision == "choose"
     assert by_key["A"].propose_for_review is True

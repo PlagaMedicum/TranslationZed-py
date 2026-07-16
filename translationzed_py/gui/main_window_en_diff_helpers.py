@@ -33,6 +33,15 @@ from translationzed_py.core.en_insert_plan import (
 from translationzed_py.core.en_insert_plan import (
     build_insert_plan as _build_en_insert_plan,
 )
+from translationzed_py.core.git_sync_apply import (
+    apply_pending_comments as _apply_pending_comments,
+)
+from translationzed_py.core.git_sync_apply import (
+    pending_comment_paths as _pending_comment_paths,
+)
+from translationzed_py.core.git_sync_apply import (
+    preflight_pending_comments as _preflight_pending_comments,
+)
 from translationzed_py.core.source_reference_service import (
     reference_path_for as _reference_path_for,
 )
@@ -467,5 +476,47 @@ def _apply_new_row_insertions(
         _write_text_atomic(path, merged, encoding=target_encoding)
     except OSError as exc:
         QMessageBox.warning(win, "Insertion failed", str(exc))
+        return False
+    return True
+
+
+def _pending_git_comment_files(win) -> set[Path]:
+    try:
+        return set(_pending_comment_paths(win._root))
+    except Exception as exc:
+        win.statusBar().showMessage(f"Staged Git comments unavailable: {exc}", 8000)
+        return set()
+
+
+def _target_encoding(win, path: Path) -> str:
+    locale = win._locale_for_path(path)
+    return (
+        win._locales.get(locale, LocaleMeta("", Path(), "", "utf-8")).charset or "utf-8"
+    )
+
+
+def _preflight_pending_git_comments(win, path: Path) -> int | None:
+    try:
+        return _preflight_pending_comments(
+            win._root,
+            path,
+            encoding=_target_encoding(win, path),
+            comment_prefixes=(win._app_config.comment_prefix, "#", "--"),
+        )
+    except Exception as exc:
+        QMessageBox.warning(win, "Save blocked by staged comments", str(exc))
+        return None
+
+
+def _apply_pending_git_comments(win, path: Path) -> bool:
+    try:
+        _apply_pending_comments(
+            win._root,
+            path,
+            encoding=_target_encoding(win, path),
+            comment_prefixes=(win._app_config.comment_prefix, "#", "--"),
+        )
+    except Exception as exc:
+        QMessageBox.warning(win, "Comment synchronization failed", str(exc))
         return False
     return True
