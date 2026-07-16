@@ -18,7 +18,7 @@ UX contracts describe implemented behavior only.
 |---|---|---|
 | Planning contract | Complete | User intent, ordering, non-goals, and acceptance are documented. |
 | Reliability prerequisite | Complete | Project sessions are one-writer, stale locks activate real draft recovery, session snapshots are atomic, rotating logs and copyable issue reports exist, and unexpected Python GUI exceptions are contained and reported. |
-| 0. PZ B42.15+ format compatibility ([Issue #1](https://github.com/PlagaMedicum/TranslationZed-py/issues/1)) | Not started — release blocker | v0.9 already warns about malformed locale metadata and `dev` now makes the all-invalid state explicit. JSON translation files remain unsupported; confirm the actual game schema from authoritative fixtures before implementing dual-format support. |
+| 0. PZ B42.15+ format compatibility ([Issue #1](https://github.com/PlagaMedicum/TranslationZed-py/issues/1)) | Automated implementation complete — manual evidence pending | The B42.19 flat JSON contract is implemented for discovery, existing-key editing, cache/session identity, recovery, search, QA, TM, Git path inspection, source reference, and atomic Save. Task-close component gates and the 13k-row budget pass; the new interactive roundtrip remains human-owned. Legacy-to-JSON conversion and missing-key insertion are intentionally not implicit. |
 | 1. Git synchronization | Foundation only | Read-only Git/ref/blob inspection and baseline-state primitives exist with focused tests. Change classification, merge policy, UI, and startup/save integration do not. |
 | 2. Add localization | Foundation only | Staged clone policy and chooser/warning dialogs exist with focused tests. Treat them as retained scaffold, not a finished workflow. |
 | 3. `description.txt` | Not started | Independent first-class editing remains planned. |
@@ -53,14 +53,25 @@ UX contracts describe implemented behavior only.
 - v0.9.0 provides snapshot-based `NEW/MODIFIED/REMOVED` detection, comment-preserving NEW-row
   insertion, conflict resolution, QA/LT, TM, and strict multi-platform release gates.
 - Issue #1 contains two independent reports. v0.9.0 includes the malformed-`language.txt` warning
-  that fixes the silent-abort symptom; `dev` adds a specific no-valid-target message. The JSON
-  compatibility request is not implemented, so the issue is not fully resolved.
+  that fixes the silent-abort symptom; `dev` adds a specific no-valid-target message and implements
+  the confirmed B42.19 JSON editing boundary. Keep the issue open until Slice 0 verification and
+  interactive evidence close.
+- Read-only inspection of the local B42.19 installation confirmed 610 flat UTF-8 string-map JSON
+  files and all 1,192,196 entries parsed successfully. Exact provenance and hashes are recorded in
+  `docs/domain/b42_json_format.md`; only synthetic fixtures are committed.
+- The observed BE game directory still contains legacy translation payloads rather than BE JSON.
+  B42 can therefore list/select the locale from `language.txt` without having JSON translations to
+  display. Application support does not implicitly convert those files.
 - No runtime Git synchronization, locale creation, `description.txt` specialization, or MT
   provider existed at the v1 baseline. The status table above is the authority for work added
   since that baseline.
 - The retained foundation, reliability prerequisite, and planning work pass
   `make gate-task-close` on 2026-07-15 (92.2% overall coverage, 97.2% core). This is verified
   infrastructure/scaffold evidence, not completion of Slice 0 or later feature slices.
+- Slice 0 task-close component lanes pass on 2026-07-16: commit/push checks, 210-test core
+  baseline, changed-file routed suites, read-only diagnostics, docs, scale performance, and full
+  branch coverage (92.26% overall, 97.02% core). Manual scenario `b42-json-open-edit-save` is
+  registered but has no interactive release evidence yet.
 
 ## Acceptance Criteria
 

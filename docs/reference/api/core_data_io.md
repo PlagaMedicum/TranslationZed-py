@@ -1,5 +1,5 @@
 # Core Data/IO API
-_Last updated: 2026-03-07_
+_Last updated: 2026-07-15_
 
 ## 1) Why This Layer Exists
 
@@ -20,7 +20,7 @@ It exists to:
 
 ```mermaid
 flowchart LR
-  RAW[(locale text files)] --> PARSER[core.parser]
+  RAW[(locale translation files)] --> PARSER[core.parser + format dispatch]
   PARSER --> MODEL[Parsed entries]
   MODEL --> SAVER[core.saver]
   SAVER --> RAW
@@ -33,6 +33,8 @@ flowchart LR
 
 | Module | Responsibility | Hard Invariant |
 |---|---|---|
+| `translation_format` | supported-extension and cache-identity mapping | formats never share cache identity |
+| `translation_json` | strict flat B42 JSON parsing and value-only saving | reject unknown shape; preserve all unedited bytes |
 | `parser` | tolerant decode + tokenization + span extraction | preserve source offsets for saver |
 | `saver` | span-based patch writer | do not mutate non-literal bytes |
 | `status_cache` | per-file draft/status cache | deterministic read/write; no hidden writes |
@@ -100,18 +102,21 @@ sequenceDiagram
 
 ## 7) Failure Modes
 
-1. Decode failure (`parser`): file is rejected for write path; UI surfaces diagnostics.
+1. Decode or unsupported-shape failure (`parser` / `translation_json`): file is rejected for the
+   write path and the UI surfaces diagnostics.
 2. Span mismatch or write failure (`saver`): save aborts; no partial mutation.
 3. Cache read/write corruption (`status_cache`): treated as recoverable warning path; core keeps no-write-on-open guarantees.
 4. Snapshot or insertion planning conflict: save-time insertion prompt must fail safe (`Skip`/`Cancel` paths).
 5. SQLite TM store errors: query/import paths degrade with explicit warning; editing workflow remains functional.
 
-## 8) Current v0.9 Contracts
+## 8) Current Compatibility Contracts
 
 1. TM explainability payload emission must not change scores or ordering.
 2. Crash-recovery/session-resume startup data surfaces must preserve no-write-on-open behavior.
 3. Session-resume snapshot payload (`session.resume.json`) is project cache scoped and versioned.
 4. Any new data payload must remain deterministic and explicitly schema-documented in canonical specs.
+5. Legacy text and B42 JSON share the `ParsedFile`/`Entry` model but retain separate parser, saver,
+   encoding, and cache identities. See `docs/domain/b42_json_format.md`.
 
 ## 9) Change-Safety Focus
 
@@ -129,6 +134,18 @@ Current status:
    spans, and benchmark contracts when changing this module.
 
 ::: translationzed_py.core.parser
+    options:
+      show_root_heading: true
+      show_root_toc_entry: true
+      members: true
+      filters:
+        - "!^__"
+      show_source: false
+      members_order: source
+
+### 10.1 B42 JSON API
+
+::: translationzed_py.core.translation_json
     options:
       show_root_heading: true
       show_root_toc_entry: true

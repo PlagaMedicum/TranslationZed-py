@@ -6,7 +6,9 @@ _Last updated: 2026-07-15_
 | Module | Responsibility |
 |---|---|
 | `core.model` | Core entry/status/value models and invariants. |
-| `core.parser` / `core.parse_utils` / `core.lazy_entries` | Locale file parsing, span tracking, lazy text handling. |
+| `core.translation_format` | Supported translation extensions and format-distinct cache-path identity. |
+| `core.translation_json` | Strict flat B42 JSON parsing and atomic value-literal-only writes. |
+| `core.parser` / `core.parse_utils` / `core.lazy_entries` | Format dispatch plus legacy locale parsing, span tracking, and shared lazy value handling. |
 | `core.tzp_comment_policy` | Namespaced `TZP:` program-comment parsing/formatting/write-plan contracts. |
 | `core.saver` / `core.atomic_io` | Byte-preserving save + atomic replace/write safety, with optional namespaced `TZP:` status-comment write-back. |
 | `core.status_cache` / `core.en_hash_cache` | Draft/status cache and EN baseline hash tracking. |

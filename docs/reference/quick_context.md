@@ -20,6 +20,8 @@ Active development target: `v1.0.0` on `dev`; see `docs/plan/implementation_acti
 - GUI adapters own widgets, dialogs, and event wiring.
 - Core services own workflow decisions and remain Qt-free.
 - Parser/saver/cache/TM/search behavior is deterministic and contract-tested.
+- Legacy locale text and flat UTF-8 B42 JSON are separate supported formats; never infer or
+  auto-convert between them.
 - Terminal/Make workflow is canonical; the repo is fully usable without any external tool.
 
 ## 3) Read By Task

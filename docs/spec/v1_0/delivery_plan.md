@@ -1,6 +1,6 @@
 # v1.0 Detailed Delivery Plan
 
-_Status: planned · updated 2026-07-15_
+_Status: active · updated 2026-07-15_
 
 This document is the implementation handoff for v1.0. It orders work into independently reviewable
 slices. A slice is complete only when its behavior, focused tests, performance evidence, and
@@ -35,12 +35,20 @@ features on a `.txt`-only model. The issue has two parts:
 
 1. v0.9.0 already shows malformed-`language.txt` details instead of silently aborting; `dev` also
    gives the all-invalid/no-target case its own actionable message.
-2. JSON translation files are not discovered, parsed, edited, cached, or saved. This remains open.
+2. JSON compatibility was open at the v1 baseline. `dev` now has the dual-format implementation;
+   task-close component lanes are green and the interactive roundtrip remains to be recorded.
 
 Do not derive a production schema solely from the issue report. As of 2026-07-15, the
 [official community translation repository](https://github.com/TheIndieStone/ProjectZomboidTranslations)
 still exposes the legacy locale tree, so implementation starts with an authoritative B42.15+
 game fixture, official schema/source, or maintainer-confirmed sample and records its provenance.
+The discovery gate is now satisfied by a read-only B42.19.0 installed corpus. The detailed evidence,
+accepted schema, preservation rules, and unsupported boundary are canonical in
+`docs/domain/b42_json_format.md`; committed fixtures contain synthetic strings only.
+
+The implemented boundary edits existing flat JSON string-map keys. It deliberately does not
+convert legacy translation files or insert missing JSON keys. Format-aware new-key insertion is a
+Slice 1 requirement and must not reuse the legacy line-insertion algorithm.
 
 ### Discovery gate
 
@@ -64,9 +72,10 @@ game fixture, official schema/source, or maintainer-confirmed sample and records
    permits outside intentional value edits; never silently collapse duplicate or unknown data.
 3. Include format identity in cache/session/EN-diff/Git-sync identities so same-named legacy and
    JSON files cannot share stale drafts or baselines.
-4. Route both formats through open/edit/status/undo, cache recovery, search/replace, QA, LT, TM,
-   MT, source reference, explicit Save, and conflict handling. Format-specific rules stay in core;
-   widgets consume the same row/document view.
+4. Route both formats through the implemented open/edit/status/undo, cache recovery,
+   search/replace, QA, LT, TM, source-reference, explicit Save, and conflict paths. Planned MT must
+   consume the same row/document view when Slice 6 implements it; Slice 0 does not invent an MT
+   adapter. Format-specific rules stay in core.
 5. Show actionable errors for malformed or unsupported JSON and for projects with no supported
    target files. Opening, previewing, or failing format detection never changes locale originals.
 

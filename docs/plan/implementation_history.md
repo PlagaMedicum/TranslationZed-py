@@ -1,6 +1,6 @@
 # Decision And Lessons Ledger
 
-_Updated: 2026-06-23_
+_Updated: 2026-07-15_
 
 This is durable, non-normative history. Current behavior belongs in the technical, UX, domain, and
 architecture documents. Current work belongs in `implementation_active.md`. Detailed milestone and
@@ -41,6 +41,16 @@ and saved structure remain equivalent.
 Locale `language.txt` metadata is authoritative for translation-file encoding. UTF-8, single-byte
 encodings, and UTF-16—including supported no-BOM inputs—must round-trip without implicit
 transcoding.
+
+### B42 JSON is a separate lossless format
+
+The installed B42 corpus established a flat UTF-8 JSON string-map contract. JSON uses its own
+strict parser/value-only saver behind the shared `ParsedFile` model; the proven legacy parser and
+saver remain intact. Format identity is retained in source-reference and cache paths.
+
+Legacy-to-JSON conversion and missing-key insertion are explicit workflows, not side effects of
+opening or saving a file. This prevents a same-named legacy/JSON pair from sharing drafts and keeps
+future Git synchronization from reusing the legacy line-insertion algorithm on JSON.
 
 ### Cache-first draft safety
 

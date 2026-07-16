@@ -1,5 +1,5 @@
 # TranslationZed-Py — Test Surface
-_Last updated: 2026-06-24_
+_Last updated: 2026-07-15_
 
 ## 1) Purpose
 
@@ -24,6 +24,12 @@ Use it for fast orientation. Full policy remains in `docs/quality/testing_strate
    - `tests/test_encoding_diagnostics.py`
    - `tests/test_property_encoding_invariants.py`
    - `tests/test_gui_save_encoding.py`
+4. B42 JSON discovery, strict/lossless IO, cache/session identity, workflow routing, and bounded
+   performance:
+   - `tests/test_translation_json.py`
+   - `tests/test_project_scanner.py`
+   - `tests/test_perf_budgets.py::test_perf_b42_json_editing_workflow`
+   - `scripts/test_b42_json.sh`
 
 ## 2.1) Randomized / Stateful Invariants
 
@@ -151,6 +157,7 @@ Framework owner:
 | `tzp-writeback-opt-in` | `tzp_writeback` | verify opt-in `TZP:` write-back changes only namespaced status comments | `RU/tzp_status.txt`, `RU/ui.txt` | `full_workflow` | leave `RU/tzp_status.txt` active after save and switching with on-disk comments matching the opt-in policy | yes |
 | `search-replace-sidebar-all-scopes` | `search_replace` | verify toolbar/sidebar sync and FILE/LOCALE/POOL replace-all flows through the transient confirmation scope selector | `RU/search_scope.txt`, `RU/search_scope_extra.txt`, `KO/search_scope.txt` | `full_workflow` | leave `RU/search_scope.txt` active after canceling File/Pool previews and applying Locale so only RU files changed | yes |
 | `search-replace-impact-preview-safe-apply` | `search_replace` | verify impact preview rows, cancel path, and checkbox-gated replace safety | `RU/search_scope.txt`, `RU/search_scope_extra.txt`, `KO/search_scope.txt` | `full_workflow` | leave `RU/search_scope.txt` active after a canceled run and a confirmed pool run with persisted replacements across expected files | yes |
+| `b42-json-open-edit-save` | `open_save` | verify synthetic B42 JSON source reference, escaped text, value-only Save, and format-distinct cache identity | `BE/UI.json` | `full_workflow` | leave `BE/UI.json` active after saving one value and checking the copied JSON remains structurally intact | yes |
 
 ## 8) Quick Execution Hints
 

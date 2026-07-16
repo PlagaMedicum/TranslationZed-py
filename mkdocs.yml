@@ -76,6 +76,7 @@ nav:
       - Flows: architecture/flows.md
       - Diagrams: architecture/diagrams.md
   - Domain:
+      - B42 Translation JSON: domain/b42_json_format.md
       - TM Ranking: domain/tm_ranking.md
   - Quality:
       - Testing Strategy: quality/testing_strategy.md

@@ -9,8 +9,8 @@
 
 | Term                 | Meaning                                                            |
 | -------------------- | ------------------------------------------------------------------ |
-| **l10n**             | Localisation; language‑specific text files used by Project Zomboid |
-| **Entry**            | A single `key = "value"` line inside a locale file                 |
+| **l10n**             | Localisation; language-specific translation files used by Project Zomboid |
+| **Entry**            | One ordered key/value translation record inside a locale file      |
 | **Target locale**    | Locale currently edited by the translator                          |
 | **Reference locale** | A second locale shown in the **Source** column for comparison      |
 | **Baseline scope**   | Historical minimal feature set shipped in early releases            |
@@ -160,12 +160,13 @@ This table binds technical sections to canonical UC IDs.
 
 - Discover locale directories by listing direct children of *root* and
   excluding runtime and reserved directories. Existing locale directory names are read as-is.
-- Index translatable files recursively with `Path.rglob(f"*{translation_ext}")`,
-  where `translation_ext` comes from `config/app.toml` (`[formats]`),
-  excluding `language.txt` and `credits.txt` in each locale.
+- Index the configured legacy `translation_ext` and built-in B42 `.json` recursively, excluding
+  `language.txt` and `credits.txt` in each locale.
 - Parse `language.txt` for:
-  - `charset` (encoding for all files in that locale; **required**)
+  - `charset` (required for legacy and mixed-format locales)
   - `text` (human‑readable language name for UI)
+- A JSON-only locale may omit `charset`; its translation files are UTF-8. A JSON file never
+  supplies an encoding default to legacy files in the same locale.
 - `scan_root` raises if any `language.txt` is missing or malformed.
 - GUI uses a non-raising variant to collect errors and skip invalid locales. Partial results show
   skipped-file details; an all-invalid/no-target result shows a specific actionable warning before
@@ -174,8 +175,11 @@ This table binds technical sections to canonical UC IDs.
 
 ### 5.2  `core.parser`
 
-- `parse` and `parse_lazy` read raw bytes once and stream tokens while retaining byte offsets.
-- The locale-declared encoding is mandatory; UTF BOMs are honored without discarding byte spans.
+- `parse` and `parse_lazy` dispatch by confirmed format, read raw bytes once, and retain value
+  byte offsets. Legacy tokenization remains unchanged; B42 JSON uses the strict contract in
+  `docs/domain/b42_json_format.md`.
+- Legacy input uses the locale-declared encoding and honors UTF BOMs without discarding byte spans.
+  B42 JSON is UTF-8 and rejects BOM input because none exists in the confirmed corpus.
 - Each normal entry retains its key, decoded value, literal span, concatenated-segment lengths, and
   exact bytes between segments. Lazy parsing defers value decoding but preserves the same contract.
 - Files without assignment entries, including `News_*.txt`, are represented as one raw-file entry.
@@ -199,6 +203,8 @@ This table binds technical sections to canonical UC IDs.
   `atomic_io.write_bytes_atomic`; it does not re-read the original or emit Qt signals.
 - Normal entries preserve concatenation gaps and segment boundaries. Raw-file entries replace their
   one complete span.
+- B42 JSON Save replaces existing value-literal spans only. It never serializes the whole object or
+  applies legacy line/comment insertion rules.
 - Optional namespaced status-comment write-back never changes user-authored comments.
 - After success, refresh raw bytes, spans, values, and dirty state so repeated saves in one session
   remain correct.
@@ -596,7 +602,7 @@ if dirty_files and not prompt_save():
 
 ### 5.11  `core.status_cache`
 
-Binary cache stored **per translation file** (1:1 with each `.txt`), inside a
+Binary cache stored **per supported translation file**, inside a
 hidden `.tzp/cache/` subfolder under the repo root, preserving relative paths.
 
 * **Layout**
@@ -651,6 +657,9 @@ Cache path convention:
 - For a translation file `<root>/<locale>/path/file.txt`, the cache lives at
   `<root>/<cache_dir>/<locale>/path/file.bin` where `cache_dir` is configured in
   `config/app.toml` (default `.tzp/cache`).
+- For `<root>/<locale>/path/file.json`, the cache is
+  `<root>/<cache_dir>/<locale>/path/file.json.bin`. Keeping `.json` in the cache basename prevents
+  collision with a same-named legacy file.
 - Related UCs: UC-06, UC-06b, UC-10a, UC-10b, UC-11, UC-12.
 
 ### 5.11.1  `core.en_hash_cache`

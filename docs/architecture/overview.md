@@ -54,7 +54,8 @@ flowchart LR
 
 ## 4) Persistence Contracts
 
-- Draft cache: `.tzp/cache/<locale>/<relative>.bin`.
+- Draft cache: legacy `file.txt` maps to `.tzp/cache/<locale>/file.bin`; B42 `file.json` maps to
+  `.tzp/cache/<locale>/file.json.bin`.
 - Workspace snapshot: `.tzp/cache/session.resume.json` (atomic replacement).
 - Live one-writer marker: `.tzp/cache/session.lock` (removed on accepted clean close; stale marker
   activates draft-recovery detection).
@@ -72,7 +73,8 @@ flowchart LR
 
 ## 6) Change Boundaries
 
-- Parser/saver changes must preserve byte and encoding contracts.
+- Parser/saver/format-dispatch changes must preserve byte, encoding, and format-identity contracts;
+  the confirmed B42 boundary is documented in `docs/domain/b42_json_format.md`.
 - Cache, session, and TM schema changes require explicit compatibility and migration tests.
 - Search/TM internals may be optimized only with deterministic equivalence evidence.
 - A flat module is the default. Create a subpackage only when several cohesive modules already share
