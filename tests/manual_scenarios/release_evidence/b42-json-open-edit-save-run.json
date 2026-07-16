@@ -1,0 +1,114 @@
+{
+  "auto_return_code": null,
+  "completed_at_ms": 1784219880009,
+  "fixture_copy_root": "/tmp/tzp-manual-b42-json-open-edit-save-rpar7lk9/project",
+  "manual_all_steps": [
+    "Open BE/UI.json and confirm the Source column contains the matching EN values.",
+    "Inspect the escaped multiline/quote row in the detail panel and confirm it renders as text rather than raw JSON escapes.",
+    "Edit only UI_fixture_greeting, then use General -> Save and choose Write to file if prompted.",
+    "Inspect the copied BE/UI.json and confirm the edited greeting is present while UI_fixture_escaped and UI_fixture_unicode remain unchanged.",
+    "Return to BE/UI.json in the app and confirm all three rows remain readable."
+  ],
+  "manual_checked_expected_checks": [
+    "The locale opens without a charset or parse warning even though B42 language.txt omits charset.",
+    "Source reference, escaped text, Unicode text, and row order are correct.",
+    "Save changes only the selected JSON value and does not rewrite unrelated formatting or values.",
+    "A format-distinct BE/UI.json.bin draft cache is used and no legacy UI.bin collision occurs."
+  ],
+  "manual_checked_steps": [
+    "Open BE/UI.json and confirm the Source column contains the matching EN values.",
+    "Inspect the escaped multiline/quote row in the detail panel and confirm it renders as text rather than raw JSON escapes.",
+    "Edit only UI_fixture_greeting, then use General -> Save and choose Write to file if prompted.",
+    "Inspect the copied BE/UI.json and confirm the edited greeting is present while UI_fixture_escaped and UI_fixture_unicode remain unchanged.",
+    "Return to BE/UI.json in the app and confirm all three rows remain readable."
+  ],
+  "manual_checklist_artifact": "/home/plagamed/Documents/translations/PZ/TranslationZed-Py/artifacts/manual-ui/b42-json-open-edit-save-b42-json-open-edit-save-1784219679778-1784219879795.json",
+  "manual_expected_checks": [
+    "The locale opens without a charset or parse warning even though B42 language.txt omits charset.",
+    "Source reference, escaped text, Unicode text, and row order are correct.",
+    "Save changes only the selected JSON value and does not rewrite unrelated formatting or values.",
+    "A format-distinct BE/UI.json.bin draft cache is used and no legacy UI.bin collision occurs."
+  ],
+  "manual_notes": "",
+  "manual_outcome": "passed",
+  "manual_return_code": 0,
+  "manual_run_token": "b42-json-open-edit-save-1784219679778",
+  "mode": "manual",
+  "scenario": {
+    "automation_pytest_selectors": [
+      "tests/test_translation_json.py",
+      "tests/test_gui_edit_save.py::test_edit_and_save_b42_json"
+    ],
+    "env_overrides": {},
+    "expected_checks": [
+      "The locale opens without a charset or parse warning even though B42 language.txt omits charset.",
+      "Source reference, escaped text, Unicode text, and row order are correct.",
+      "Save changes only the selected JSON value and does not rewrite unrelated formatting or values.",
+      "A format-distinct BE/UI.json.bin draft cache is used and no legacy UI.bin collision occurs."
+    ],
+    "finish_condition": "Leave BE/UI.json active after saving one edited value and confirming the copied BE/UI.json remains valid JSON with the other values unchanged.",
+    "fixture_root": "b42_json",
+    "focus_files": [
+      "BE/UI.json"
+    ],
+    "goal": "Verify a synthetic B42 JSON locale opens with its matching EN source, preserves escaped values, and writes only the edited translation value on explicit Save.",
+    "id": "b42-json-open-edit-save",
+    "inspection_paths": [
+      "BE/UI.json"
+    ],
+    "manual_depth": "full_workflow",
+    "operator_hints": [
+      "This is a file-write scenario. If Save offers cache-only versus writing the file, choose Write to file.",
+      "Use the dialog copy action for the project root before inspecting BE/UI.json; never inspect or edit the installed game's files for this scenario."
+    ],
+    "prefs_extras": {},
+    "selected_locales": [
+      "BE"
+    ],
+    "start_context": "Launch with BE selected. This scenario uses only synthetic strings and writes only the copied scenario project.",
+    "steps": [
+      "Open BE/UI.json and confirm the Source column contains the matching EN values.",
+      "Inspect the escaped multiline/quote row in the detail panel and confirm it renders as text rather than raw JSON escapes.",
+      "Edit only UI_fixture_greeting, then use General -> Save and choose Write to file if prompted.",
+      "Inspect the copied BE/UI.json and confirm the edited greeting is present while UI_fixture_escaped and UI_fixture_unicode remain unchanged.",
+      "Return to BE/UI.json in the app and confirm all three rows remain readable."
+    ],
+    "title": "B42 JSON open, edit, source-reference, and save roundtrip",
+    "tracked_repo_files": [
+      "translationzed_py/core/translation_format.py",
+      "translationzed_py/core/translation_json.py",
+      "translationzed_py/core/project_scanner.py",
+      "translationzed_py/core/status_cache.py",
+      "tests/fixtures/b42_json/EN/UI.json",
+      "tests/fixtures/b42_json/BE/UI.json"
+    ],
+    "workflow_family": "open_save"
+  },
+  "tracked_files": [
+    {
+      "path": "tests/fixtures/b42_json/BE/UI.json",
+      "sha256": "f35ce601c849b06f1e1210f775821c2a4b235b2c5d5fe7cf8530102e19d4d900"
+    },
+    {
+      "path": "tests/fixtures/b42_json/EN/UI.json",
+      "sha256": "b6baaf4a234262756f8af1913c0ab1687ba5be6dab4a9f58f7e92e9e9f99fcd9"
+    },
+    {
+      "path": "translationzed_py/core/project_scanner.py",
+      "sha256": "882574ca689bbce2db9fba493ae08d8cdbc786613b5b1895673dd46e6578bfa4"
+    },
+    {
+      "path": "translationzed_py/core/status_cache.py",
+      "sha256": "6c8acadf4f8b7fcb3713160ec862ebe6161eb5530cdaf9a43b366b5605e96813"
+    },
+    {
+      "path": "translationzed_py/core/translation_format.py",
+      "sha256": "a2ec6153b958b86711a2de836a571f9b5c496564851d5c1366b120db5a7764eb"
+    },
+    {
+      "path": "translationzed_py/core/translation_json.py",
+      "sha256": "66471e267694e5ff6f88ddeb2fe55abf69790c8737ebacffcbedb2c8a9e52078"
+    }
+  ],
+  "version": 1
+}

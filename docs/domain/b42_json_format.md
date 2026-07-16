@@ -92,4 +92,5 @@ BE JSON files, but it does not manufacture them implicitly.
 - Search/cache, TM, Git path, recovery, and GUI integration: their owner tests plus
   `scripts/test_b42_json.sh`
 - Bounded 13k-entry parse/search/save/cache workflow: `tests/test_perf_budgets.py`
-- Human roundtrip: manual scenario `b42-json-open-edit-save`
+- Human roundtrip: manual scenario `b42-json-open-edit-save` passed and was synced as release
+  evidence on 2026-07-16

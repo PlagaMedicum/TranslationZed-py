@@ -1,0 +1,37 @@
+{
+  "all_steps": [
+    "Open BE/UI.json and confirm the Source column contains the matching EN values.",
+    "Inspect the escaped multiline/quote row in the detail panel and confirm it renders as text rather than raw JSON escapes.",
+    "Edit only UI_fixture_greeting, then use General -> Save and choose Write to file if prompted.",
+    "Inspect the copied BE/UI.json and confirm the edited greeting is present while UI_fixture_escaped and UI_fixture_unicode remain unchanged.",
+    "Return to BE/UI.json in the app and confirm all three rows remain readable."
+  ],
+  "checked_expected_checks": [
+    "The locale opens without a charset or parse warning even though B42 language.txt omits charset.",
+    "Source reference, escaped text, Unicode text, and row order are correct.",
+    "Save changes only the selected JSON value and does not rewrite unrelated formatting or values.",
+    "A format-distinct BE/UI.json.bin draft cache is used and no legacy UI.bin collision occurs."
+  ],
+  "checked_steps": [
+    "Open BE/UI.json and confirm the Source column contains the matching EN values.",
+    "Inspect the escaped multiline/quote row in the detail panel and confirm it renders as text rather than raw JSON escapes.",
+    "Edit only UI_fixture_greeting, then use General -> Save and choose Write to file if prompted.",
+    "Inspect the copied BE/UI.json and confirm the edited greeting is present while UI_fixture_escaped and UI_fixture_unicode remain unchanged.",
+    "Return to BE/UI.json in the app and confirm all three rows remain readable."
+  ],
+  "completed_at_ms": 1784219879795,
+  "expected_checks": [
+    "The locale opens without a charset or parse warning even though B42 language.txt omits charset.",
+    "Source reference, escaped text, Unicode text, and row order are correct.",
+    "Save changes only the selected JSON value and does not rewrite unrelated formatting or values.",
+    "A format-distinct BE/UI.json.bin draft cache is used and no legacy UI.bin collision occurs."
+  ],
+  "fixture_root": "b42_json",
+  "notes": "",
+  "project_root": "/tmp/tzp-manual-b42-json-open-edit-save-rpar7lk9/project",
+  "result": "passed",
+  "run_token": "b42-json-open-edit-save-1784219679778",
+  "scenario_id": "b42-json-open-edit-save",
+  "title": "B42 JSON open, edit, source-reference, and save roundtrip",
+  "version": 1
+}

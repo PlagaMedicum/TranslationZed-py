@@ -98,6 +98,17 @@
       "scenario_id": "search-replace-impact-preview-safe-apply",
       "source_checklist_artifact": "artifacts/manual-ui/search-replace-impact-preview-safe-apply-search-replace-impact-preview-safe-apply-1782249587510-1782249887368.json",
       "source_run_artifact": "artifacts/manual-ui/search-replace-impact-preview-safe-apply-run-1782249887542.json"
+    },
+    {
+      "checklist_record": "tests/manual_scenarios/release_evidence/b42-json-open-edit-save-checklist.json",
+      "interactive": true,
+      "notes": "Synced from artifacts/manual-ui via release-evidence-sync.",
+      "recorded_at_ms": 1784219880009,
+      "result": "passed",
+      "run_record": "tests/manual_scenarios/release_evidence/b42-json-open-edit-save-run.json",
+      "scenario_id": "b42-json-open-edit-save",
+      "source_checklist_artifact": "artifacts/manual-ui/b42-json-open-edit-save-b42-json-open-edit-save-1784219679778-1784219879795.json",
+      "source_run_artifact": "artifacts/manual-ui/b42-json-open-edit-save-run-1784219880009.json"
     }
   ],
   "required_scenarios": [
@@ -109,7 +120,8 @@
     "source-reference-fallback-flow",
     "tzp-writeback-opt-in",
     "search-replace-sidebar-all-scopes",
-    "search-replace-impact-preview-safe-apply"
+    "search-replace-impact-preview-safe-apply",
+    "b42-json-open-edit-save"
   ],
   "version": 1
 }

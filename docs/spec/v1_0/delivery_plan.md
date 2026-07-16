@@ -1,6 +1,6 @@
 # v1.0 Detailed Delivery Plan
 
-_Status: active · updated 2026-07-15_
+_Status: active · updated 2026-07-16_
 
 This document is the implementation handoff for v1.0. It orders work into independently reviewable
 slices. A slice is complete only when its behavior, focused tests, performance evidence, and
@@ -21,8 +21,8 @@ canonical documentation agree. Do not begin a later slice by weakening an earlie
   `make docs-check`, relevant performance checks, and `git diff --check`.
 - Do not promote planned text into current technical or UX contracts until the implementation and
   tests are complete.
-- Complete Slice 0 before implementing format-dependent Git synchronization, `description.txt`,
-  QA, LT, TM, or MT integration. Those slices must consume one confirmed file-format boundary
+- Complete Slice 0 before implementing format-dependent Git synchronization, QA, LT, TM, or MT
+  integration. Those slices must consume one confirmed file-format boundary
   rather than independently assuming legacy `.txt` syntax.
 
 ## 2. Slice 0 — PZ B42.15+ Format Compatibility (Release Blocker)
@@ -36,7 +36,8 @@ features on a `.txt`-only model. The issue has two parts:
 1. v0.9.0 already shows malformed-`language.txt` details instead of silently aborting; `dev` also
    gives the all-invalid/no-target case its own actionable message.
 2. JSON compatibility was open at the v1 baseline. `dev` now has the dual-format implementation;
-   task-close component lanes are green and the interactive roundtrip remains to be recorded.
+   task-close component lanes and the synced interactive roundtrip are green. Issue #1 remains open
+   until the v1.0.0 release by user decision.
 
 Do not derive a production schema solely from the issue report. As of 2026-07-15, the
 [official community translation repository](https://github.com/TheIndieStone/ProjectZomboidTranslations)
@@ -175,30 +176,16 @@ This slice does not own or depend on `description.txt` behavior.
 
 ## 5. Slice 3 — `description.txt` As A Normal Row
 
-### Intent
+### Accepted existing behavior
 
-Support existing or future `description.txt` files as regular translation content. Do not create a
-separate editor and do not couple parsing or workflow policy to locale creation.
+Closed by user decision on 2026-07-16. The generic raw-file path already opens a keyless file as one
+normal table/detail entry and routes edits through the existing cache and explicit-Save behavior.
+That is the intended KISS implementation.
 
-### Behavior
-
-1. Recognize the complete file as one raw-text entry with a stable internal file identity.
-2. Render one row with an empty Key cell. Internal cache, TM, search, status, and undo identity must
-   never depend on an empty string.
-3. Load the selected source locale's matching `description.txt` into Source; show empty Source when
-   absent, matching normal source-reference policy.
-4. Route Translation editing, statuses, undo/redo, cache, explicit Save, search/replace, QA,
-   LanguageTool, TM, and MT through their normal services.
-5. Preserve the declared locale encoding, BOM behavior, complete line endings, and raw-file save
-   semantics. Opening and switching remain read-only.
-
-### Verification
-
-- Cover files with one line, empty content, embedded `=`, quotes, Unicode, missing source reference,
-  CP1251, UTF-8, UTF-16, BOM/no-BOM, CRLF/LF, cache recovery, conflict resolution, and atomic Save.
-- Exercise FILE/LOCALE/POOL search and replace, TM indexing/apply, every QA/LT route, and both MT
-  provider paths without exposing the internal identity in the Key cell.
-- Add an independent release scenario; locale creation is neither setup nor acceptance evidence.
+Do not add a dedicated editor, parser, model, service, or locale-creation dependency for
+`description.txt`. A presentation-only file-tree label or icon improvement may be considered in
+Slice 7; it must not alter discovery, identity, parsing, caching, or saving. Add focused coverage
+only if that presentation changes.
 
 ## 6. Slice 4 — Built-in QA Safety Pack
 
