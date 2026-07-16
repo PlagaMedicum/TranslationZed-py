@@ -432,8 +432,8 @@ def _build_locale_scan_message(
         msg.setWindowTitle("No valid target locales")
         msg.setText(
             "No valid target locale was found. Each target locale needs a readable "
-            "language.txt with a non-empty charset field. Fix or add a target locale, "
-            "then reopen the project."
+            "language.txt. Legacy locales must declare a charset; B42 JSON locales "
+            "use UTF-8. Fix or add a target locale, then reopen the project."
         )
     if errors:
         msg.setDetailedText("\n".join(errors))

@@ -348,7 +348,8 @@ def test_init_locales_covers_malformed_warning_and_empty_selectable_branch(
     no_target = _WarningBox.instances[-1]
     assert no_target.executed is True
     assert no_target.title == "No valid target locales"
-    assert "non-empty charset" in no_target.text
+    assert "Legacy locales must declare a charset" in no_target.text
+    assert "B42 JSON locales use UTF-8" in no_target.text
 
     monkeypatch.setattr(
         mw,

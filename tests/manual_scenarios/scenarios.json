@@ -452,6 +452,56 @@
         "tests/test_gui_dialogs.py",
         "tests/test_main_window_replace_merge_clipboard.py"
       ]
+    },
+    {
+      "id": "b42-json-open-edit-save",
+      "title": "B42 JSON open, edit, source-reference, and save roundtrip",
+      "workflow_family": "open_save",
+      "manual_depth": "full_workflow",
+      "goal": "Verify a synthetic B42 JSON locale opens with its matching EN source, preserves escaped values, and writes only the edited translation value on explicit Save.",
+      "start_context": "Launch with BE selected. This scenario uses only synthetic strings and writes only the copied scenario project.",
+      "fixture_root": "b42_json",
+      "focus_files": [
+        "BE/UI.json"
+      ],
+      "finish_condition": "Leave BE/UI.json active after saving one edited value and confirming the copied BE/UI.json remains valid JSON with the other values unchanged.",
+      "operator_hints": [
+        "This is a file-write scenario. If Save offers cache-only versus writing the file, choose Write to file.",
+        "Use the dialog copy action for the project root before inspecting BE/UI.json; never inspect or edit the installed game's files for this scenario."
+      ],
+      "inspection_paths": [
+        "BE/UI.json"
+      ],
+      "selected_locales": [
+        "BE"
+      ],
+      "steps": [
+        "Open BE/UI.json and confirm the Source column contains the matching EN values.",
+        "Inspect the escaped multiline/quote row in the detail panel and confirm it renders as text rather than raw JSON escapes.",
+        "Edit only UI_fixture_greeting, then use General -> Save and choose Write to file if prompted.",
+        "Inspect the copied BE/UI.json and confirm the edited greeting is present while UI_fixture_escaped and UI_fixture_unicode remain unchanged.",
+        "Return to BE/UI.json in the app and confirm all three rows remain readable."
+      ],
+      "expected_checks": [
+        "The locale opens without a charset or parse warning even though B42 language.txt omits charset.",
+        "Source reference, escaped text, Unicode text, and row order are correct.",
+        "Save changes only the selected JSON value and does not rewrite unrelated formatting or values.",
+        "A format-distinct BE/UI.json.bin draft cache is used and no legacy UI.bin collision occurs."
+      ],
+      "tracked_repo_files": [
+        "translationzed_py/core/translation_format.py",
+        "translationzed_py/core/translation_json.py",
+        "translationzed_py/core/project_scanner.py",
+        "translationzed_py/core/status_cache.py",
+        "tests/fixtures/b42_json/EN/UI.json",
+        "tests/fixtures/b42_json/BE/UI.json"
+      ],
+      "env_overrides": {},
+      "prefs_extras": {},
+      "automation_pytest_selectors": [
+        "tests/test_translation_json.py",
+        "tests/test_gui_edit_save.py::test_edit_and_save_b42_json"
+      ]
     }
   ]
 }

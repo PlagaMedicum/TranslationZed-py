@@ -35,3 +35,45 @@ def test_edit_and_save(qtbot, tmp_path):
 
     win._save_current()
     assert (dst / "BE" / "ui.txt").read_text() == 'UI_YES = "Yes-edited"\n'
+
+
+def test_edit_and_save_b42_json(qtbot, tmp_path):
+    """B42 JSON uses the normal source, edit, cache, and explicit-save workflow."""
+    root = tmp_path / "proj"
+    for locale, display, value in (
+        ("EN", "English", "Yes."),
+        ("BE", "Belarusian", "Так"),
+    ):
+        locale_path = root / locale
+        locale_path.mkdir(parents=True)
+        (locale_path / "language.txt").write_text(
+            f"VERSION = 1,\ntext = {display},\n",
+            encoding="utf-8",
+        )
+        (locale_path / "UI.json").write_text(
+            f'{{\n    "UI_YES": "{value}"\n}}',
+            encoding="utf-8",
+        )
+
+    win = MainWindow(str(root), selected_locales=["BE"])
+    qtbot.addWidget(win)
+    path = root / "BE" / "UI.json"
+    win._file_chosen(win.fs_model.index_for_path(path))
+
+    model = win.table.model()
+    assert model.rowCount() == 1
+    assert model.index(0, 1).data() == "Yes."
+    win._qa_check_trailing = True
+    win._qa_check_newlines = False
+    win._qa_check_escapes = False
+    win._qa_check_same_as_source = False
+    win._qa_check_languagetool = False
+    win._refresh_qa_for_current_file()
+    assert [(finding.row, finding.code) for finding in win._qa_findings] == [
+        (0, "qa.trailing")
+    ]
+    assert model.setData(model.index(0, 2), "Так — праверана") is True
+    assert win._save_current() is True
+
+    assert path.read_text(encoding="utf-8") == ('{\n    "UI_YES": "Так — праверана"\n}')
+    assert (root / ".tzp" / "cache" / "BE" / "UI.json.bin").exists()

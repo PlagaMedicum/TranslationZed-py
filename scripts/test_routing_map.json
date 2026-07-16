@@ -3,6 +3,7 @@
   "default_fast_targets": [],
   "full_targets": [
     "scripts/test_a31_manual.sh",
+    "scripts/test_b42_json.sh",
     "scripts/test_cr_v09.sh",
     "scripts/test_qa_v09.sh",
     "scripts/test_search_a37.sh",
@@ -13,6 +14,28 @@
     "scripts/test_tzp_a30.sh"
   ],
   "rules": [
+    {
+      "id": "b42-json",
+      "description": "B42 JSON discovery, lossless IO, cache identity, and workflow routing",
+      "match_globs": [
+        "translationzed_py/core/translation_format.py",
+        "translationzed_py/core/translation_json.py",
+        "translationzed_py/core/lazy_entries.py",
+        "translationzed_py/core/parser.py",
+        "translationzed_py/core/saver.py",
+        "translationzed_py/core/project_scanner.py",
+        "translationzed_py/core/status_cache.py",
+        "translationzed_py/core/project_session.py",
+        "tests/fixtures/b42_json/**",
+        "tests/test_translation_json.py"
+      ],
+      "targets_fast": [
+        "scripts/test_b42_json.sh"
+      ],
+      "targets_full": [
+        "scripts/test_b42_json.sh"
+      ]
+    },
     {
       "id": "manual-framework",
       "description": "Manual scenario framework/runtime and contract files",

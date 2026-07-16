@@ -78,6 +78,7 @@ from translationzed_py.core import (
     Entry,
     LocaleMeta,
     ParsedFile,
+    is_supported_translation,
     list_translatable_files,
     parse,
     parse_lazy,
@@ -216,6 +217,7 @@ from translationzed_py.core.source_reference_service import (
 from translationzed_py.core.status_cache import (
     CacheEntry,
 )
+from translationzed_py.core.status_cache import cache_path as _status_cache_path
 from translationzed_py.core.status_cache import (
     legacy_cache_paths as _legacy_cache_paths,
 )
@@ -3036,7 +3038,9 @@ class MainWindow(QMainWindow):
         self._stash_current_new_row_drafts()
         raw_path = index.data(Qt.UserRole)  # FsModel stores absolute path string
         path = Path(raw_path) if raw_path else None
-        if not (path and path.suffix == self._app_config.translation_ext):
+        if path is None or not is_supported_translation(
+            path, legacy_extension=self._app_config.translation_ext
+        ):
             return
         if (
             self._current_pf
@@ -4967,15 +4971,10 @@ class MainWindow(QMainWindow):
             return None
 
     def _cache_mtime_for_rows(self, path: Path) -> int:
-        try:
-            rel = path.relative_to(self._root)
-        except ValueError:
-            return 0
-        cache_path = (self._root / self._app_config.cache_dir / rel).with_suffix(
-            self._app_config.cache_ext
-        )
-        with contextlib.suppress(OSError):
-            return cache_path.stat().st_mtime_ns
+        with contextlib.suppress(ValueError):
+            cache_path = _status_cache_path(self._root, path)
+            with contextlib.suppress(OSError):
+                return cache_path.stat().st_mtime_ns
         return 0
 
     def _source_mtime_for_rows(self, path: Path, locale: str) -> int:
