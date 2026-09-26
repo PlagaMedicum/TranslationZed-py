@@ -24,7 +24,7 @@ jobs:
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
       - name: L0 static gate
-        run: make gate-dev
+        run: FMT_SCOPE=all make gate-dev
 
   tests-coverage:
     runs-on: ubuntu-latest
